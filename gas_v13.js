@@ -6676,6 +6676,59 @@ function _bcRequireKw_(p){
   if (/tourmaline cao cấp/i.test(nm)) return 'nhẫn tour';
   return /vòng/i.test(nm) ? 'vòng' : '';
 }
+// GỘP ĐƠN GHÉP KHI XÉT THƯỞNG "THEO ĐƠN" (Duyên 2026-11-04): 2 đơn gốc CÙNG KHÁCH (cùng SĐT) + CÙNG BỘ SALE mà ghi chú Pos của 1 đơn trỏ tới mã đơn kia
+// ("GHÉP CÙNG ĐƠN 663T10" / "GHÉP ĐƠN CÙNG 663T10" / "SHIP CÙNG ĐƠN ...") = MỘT bill: cộng giá trị + sản phẩm rồi mới xét mốc 10/15/20tr, thưởng 1 lần (chia đều sale chung).
+// CHỈ dùng cho vòng thưởng "Theo đơn" — số đơn, doanh thu, hoa hồng, thưởng theo NGÀY vẫn tính từng đơn như cũ. Khác SĐT / khác bộ sale → vẫn 2 bill.
+// okFn(o) (tuỳ chọn): đơn nào được phép tham gia gộp (vd chỉ đơn gốc). Trả mảng mới: đơn gộp = bản sao đơn đầu + giaTriDon/giaTri cộng dồn, sanPham/maSanPham/soLuong nối, ghepSoDon, ghepMaDon.
+function _bcGhepCodes_(note){
+  var out = {};
+  String(note == null ? '' : note).normalize('NFC').toUpperCase().replace(/(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, function(m, p, c){ out[c] = 1; return m; });
+  return out;
+}
+function _bcMergeGhepBills_(list, okFn){
+  list = list || [];
+  var GR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+  var n = list.length, par = [], i, j;
+  for (i = 0; i < n; i++) par.push(i);
+  function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
+  function skey(o){ return String(o.saleBan == null ? '' : o.saleBan).toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(','); }
+  function phone(o){ return String(o.soDienThoai || o.sdt || '').replace(/\D/g, '').replace(/^84/, '0'); }
+  function excl(o){ return /^(huy|hoan|da huy|da hoan|dang hoan|chuyen hoan)/.test(_bcFold_(o.trangThai)); }
+  var ok = [], sk = [], ph = [], codes = [];
+  for (i = 0; i < n; i++){
+    var o = list[i];
+    ok.push(!!o && !excl(o) && (!okFn || !!okFn(o)));
+    sk.push(o ? skey(o) : ''); ph.push(o ? phone(o) : ''); codes.push(o ? _bcGhepCodes_(o.ghiChu) : {});
+  }
+  var any = false;
+  for (i = 0; i < n; i++){
+    if (!ok[i]) continue;
+    var m = GR.exec(String(list[i].ghiChu == null ? '' : list[i].ghiChu).normalize('NFC').toUpperCase());
+    if (!m) continue;
+    for (j = 0; j < n; j++){
+      if (j === i || !ok[j] || sk[j] !== sk[i] || !sk[i] || !ph[i] || ph[i] !== ph[j] || !codes[j][m[1]]) continue;
+      if (find(i) !== find(j)){ par[find(i)] = find(j); any = true; }
+    }
+  }
+  if (!any) return list.slice();
+  var grp = {}, out = [];
+  for (i = 0; i < n; i++){ var r = find(i); (grp[r] = grp[r] || []).push(i); }
+  for (i = 0; i < n; i++){
+    var g = grp[find(i)];
+    if (g.length < 2){ out.push(list[i]); continue; }
+    if (g[0] !== i) continue;
+    var ps = g.map(function(k){ return list[k]; }), mg = Object.assign({}, ps[0]);
+    mg.giaTriDon = ps.reduce(function(a, p){ return a + (Number(p.giaTriDon != null ? p.giaTriDon : p.giaTri) || 0); }, 0);
+    if (ps[0].giaTri != null) mg.giaTri = mg.giaTriDon;
+    mg.sanPham = ps.map(function(p){ return p.sanPham; }).filter(Boolean).join(', ');
+    mg.maSanPham = ps.map(function(p){ return p.maSanPham; }).filter(Boolean).join(';');
+    mg.soLuong = ps.map(function(p){ return p.soLuong; }).filter(Boolean).join(', ');
+    mg.ghepSoDon = ps.length;
+    mg.ghepMaDon = ps.map(function(p){ return String(p.ghiChu == null ? '' : p.ghiChu).split(/[\r\n]/)[0].trim(); });
+    out.push(mg);
+  }
+  return out;
+}
 // ═══════════ HẾT BONUS CORE ═══════════
 
 function buildCsStats_(cs, dateFrom, dateTo) {
@@ -6763,7 +6816,9 @@ function buildCsStats_(cs, dateFrom, dateTo) {
       : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
     mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
-      goc: !hasGocField || !!o.donGoc, info: bInfo });
+      goc: !hasGocField || !!o.donGoc, info: bInfo,
+      // truong phuc vu gop don GHEP khi xet thuong theo don (_bcMergeGhepBills_): ghi chu, SDT, bo sale, trang thai, ma SP/SL
+      ghiChu: o.ghiChu, soDienThoai: o.soDienThoai, saleBan: o.saleBanValid, trangThai: o.trangThai, maSanPham: o.maSanPham, soLuong: o.soLuong });
     var chC = _csChannelCommissionOf_(o, channelRate);   // luat vang kenh Nguon (10k 1,5% / 14k 1%) hoac % kenh admin cai; null = theo moc 15tr
     if (chC !== null) {
       ordCh++; revCh += share; commCh += share * chC.rate / 100;
@@ -6820,7 +6875,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
       bonusItems.push({ date: g.date, scope: pr[1], program: pr[0].program.name, amount: pr[0].amount, detail: pr[0].detail });
     });
   });
-  mine.forEach(function(o) {
+  // GOP DON GHEP (Duyen 2026-11-04, port js/12): 2 don goc cung khach + cung sale, ghi chu tro nhau ("GHEP DON CUNG 663T10") = 1 bill khi xet moc. CHI vong thuong theo don nay;
+  // so don/doanh thu/hoa hong/thuong theo ngay o tren giu tung don. Don gop dem lai san pham (info) tu tong SP cua ca 2 don.
+  _bcMergeGhepBills_(mine, function(o) { return !!o.goc; }).map(function(o) {
+    return o.ghepSoDon > 1 ? Object.assign({}, o, { info: _bcOrderInfo_(Object.assign({}, o, { giaTriDon: o.giaTri }), prodMap, orderOvr) }) : o;
+  }).forEach(function(o) {
     if (!o.goc) return;   // thuong theo don cung chi tinh don goc
     var best = null;
     programs.forEach(function(p) {
@@ -6854,7 +6913,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     if (best) {
       var n = o.nSales > 1 ? o.nSales : 1, part = Math.round(best.amount / n); // chia deu cho sale tham gia
       bonusTotal += part;
-      bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: part, detail: best.detail + (n > 1 ? ' — thưởng ' + _csMoney_(best.amount) + ' chia đều ' + n + ' sale' : '') });
+      bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: part, detail: best.detail + (o.ghepSoDon > 1 ? ' — GỘP ' + o.ghepSoDon + ' đơn ghép (' + o.ghepMaDon.join(' + ') + ')' : '') + (n > 1 ? ' — thưởng ' + _csMoney_(best.amount) + ' chia đều ' + n + ' sale' : '') });
     }
   });
   bonusItems.sort(function(a, b) { return String(a.date).localeCompare(String(b.date)); });

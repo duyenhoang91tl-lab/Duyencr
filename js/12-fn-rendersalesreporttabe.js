@@ -265,7 +265,9 @@ function _computeBonusData_(orders){
 
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
   var review = [];   // đơn cần kiểm tra tay (mã SP chưa xác nhận, đơn vòng thiếu doanh thu dòng...) — hiện ở tab "Chi tiết thưởng"
-  orders.forEach(function(o){
+  // GỘP ĐƠN GHÉP (Duyên 2026-11-04): 704T10 "GHÉP ĐƠN CÙNG 663T10" = 2 đơn gốc cùng khách + cùng sale → 1 bill khi xét mốc (giá trị + sản phẩm cộng lại). CHỈ vòng "Theo đơn" này; vòng "theo ngày" ở trên giữ từng đơn.
+  var _ghepBills = (typeof _bcMergeGhepBills_ === 'function') ? _bcMergeGhepBills_(orders, function(o){ return !_hasGocField || !!o.donGoc; }) : orders;
+  _ghepBills.forEach(function(o){
     if (_hasGocField && !o.donGoc) return;   // thưởng theo đơn cũng chỉ tính đơn gốc
     var dateStr = _bonusYmd_(o);
     var giaTri = Number(o.giaTriDon)||0;
@@ -324,7 +326,7 @@ function _computeBonusData_(orders){
         var rec = ensure(name);
         var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
         rec.total += part;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepSoDon>1 ? ' — GỘP '+o.ghepSoDon+' đơn ghép ('+o.ghepMaDon.join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
       }
     });
   });

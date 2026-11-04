@@ -111,3 +111,56 @@ function _bcRequireKw_(p){
   if (/tourmaline cao cấp/i.test(nm)) return 'nhẫn tour';
   return /vòng/i.test(nm) ? 'vòng' : '';
 }
+// GỘP ĐƠN GHÉP KHI XÉT THƯỞNG "THEO ĐƠN" (Duyên 2026-11-04): 2 đơn gốc CÙNG KHÁCH (cùng SĐT) + CÙNG BỘ SALE mà ghi chú Pos của 1 đơn trỏ tới mã đơn kia
+// ("GHÉP CÙNG ĐƠN 663T10" / "GHÉP ĐƠN CÙNG 663T10" / "SHIP CÙNG ĐƠN ...") = MỘT bill: cộng giá trị + sản phẩm rồi mới xét mốc 10/15/20tr, thưởng 1 lần (chia đều sale chung).
+// CHỈ dùng cho vòng thưởng "Theo đơn" — số đơn, doanh thu, hoa hồng, thưởng theo NGÀY vẫn tính từng đơn như cũ. Khác SĐT / khác bộ sale → vẫn 2 bill.
+// okFn(o) (tuỳ chọn): đơn nào được phép tham gia gộp (vd chỉ đơn gốc). Trả mảng mới: đơn gộp = bản sao đơn đầu + giaTriDon/giaTri cộng dồn, sanPham/maSanPham/soLuong nối, ghepSoDon, ghepMaDon.
+function _bcGhepCodes_(note){
+  var out = {};
+  String(note == null ? '' : note).normalize('NFC').toUpperCase().replace(/(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, function(m, p, c){ out[c] = 1; return m; });
+  return out;
+}
+function _bcMergeGhepBills_(list, okFn){
+  list = list || [];
+  var GR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+  var n = list.length, par = [], i, j;
+  for (i = 0; i < n; i++) par.push(i);
+  function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
+  function skey(o){ return String(o.saleBan == null ? '' : o.saleBan).toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(','); }
+  function phone(o){ return String(o.soDienThoai || o.sdt || '').replace(/\D/g, '').replace(/^84/, '0'); }
+  function excl(o){ return /^(huy|hoan|da huy|da hoan|dang hoan|chuyen hoan)/.test(_bcFold_(o.trangThai)); }
+  var ok = [], sk = [], ph = [], codes = [];
+  for (i = 0; i < n; i++){
+    var o = list[i];
+    ok.push(!!o && !excl(o) && (!okFn || !!okFn(o)));
+    sk.push(o ? skey(o) : ''); ph.push(o ? phone(o) : ''); codes.push(o ? _bcGhepCodes_(o.ghiChu) : {});
+  }
+  var any = false;
+  for (i = 0; i < n; i++){
+    if (!ok[i]) continue;
+    var m = GR.exec(String(list[i].ghiChu == null ? '' : list[i].ghiChu).normalize('NFC').toUpperCase());
+    if (!m) continue;
+    for (j = 0; j < n; j++){
+      if (j === i || !ok[j] || sk[j] !== sk[i] || !sk[i] || !ph[i] || ph[i] !== ph[j] || !codes[j][m[1]]) continue;
+      if (find(i) !== find(j)){ par[find(i)] = find(j); any = true; }
+    }
+  }
+  if (!any) return list.slice();
+  var grp = {}, out = [];
+  for (i = 0; i < n; i++){ var r = find(i); (grp[r] = grp[r] || []).push(i); }
+  for (i = 0; i < n; i++){
+    var g = grp[find(i)];
+    if (g.length < 2){ out.push(list[i]); continue; }
+    if (g[0] !== i) continue;
+    var ps = g.map(function(k){ return list[k]; }), mg = Object.assign({}, ps[0]);
+    mg.giaTriDon = ps.reduce(function(a, p){ return a + (Number(p.giaTriDon != null ? p.giaTriDon : p.giaTri) || 0); }, 0);
+    if (ps[0].giaTri != null) mg.giaTri = mg.giaTriDon;
+    mg.sanPham = ps.map(function(p){ return p.sanPham; }).filter(Boolean).join(', ');
+    mg.maSanPham = ps.map(function(p){ return p.maSanPham; }).filter(Boolean).join(';');
+    mg.soLuong = ps.map(function(p){ return p.soLuong; }).filter(Boolean).join(', ');
+    mg.ghepSoDon = ps.length;
+    mg.ghepMaDon = ps.map(function(p){ return String(p.ghiChu == null ? '' : p.ghiChu).split(/[\r\n]/)[0].trim(); });
+    out.push(mg);
+  }
+  return out;
+}
