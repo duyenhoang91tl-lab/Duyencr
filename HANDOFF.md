@@ -11,6 +11,16 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 28) — THƯỞNG T10: chạy lại TOÀN pipeline trên Check_DT_t10_1.xlsx + đối chiếu bảng SALE TỰ NHẬP (PDF online/offline) — XONG, đã push
+- **Duyên yêu cầu:** check lại doanh thu T10 + kiểm các đơn sale tự nhập: chuẩn ngày lên Base, có đơn Pos, Base không Hủy/Thất bại thì tính.
+- [x] Chạy lại `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js` → `build_delivery_xlsx.py` trên file mới: tổng **3.986.673** (KHỚP v6, chi tiết từng dòng trùng v6). Dòng "giá niêm yết tour khôi phục" ra đúng 1301T10 (31.500.000).
+- [x] MỚI `tools/bonus-t10/check_sale_entries.py <Check_DT> <work> <entries.csv> <ra.json>` (entries.csv = mã đơn, mức, ngày, tên sale; KHÔNG commit vì có thưởng từng người). Sheet `Đối chiếu sale tự nhập` trong file giao.
+- **Kết quả 97 đơn T10 sale nhập:** 62 KHỚP; 27 LỆCH MỨC; 7 ENGINE=0; 1 LOẠI (338T10 Ngà 24,89tr: Base Thất bại → không tính); 0 đơn thiếu trên Pos; 11 đơn lệch ngày (sale ghi ≠ ngày Base, không đổi tiền theo đơn).
+- **NGUYÊN NHÂN lệch (không phải do Pos/Base):** (1) engine đếm SP theo Pos, không tính quà hộp/lá bồ đề/phí kiểm định → 265T10, 745T10, 1057T10 chỉ 1 SP chính nên không đạt combo; (2) bill vòng/chuỗi mix charm <15tr không đạt V15 → 333T10, 368T10, 143T10, 76T10; (3) đơn nhiều sale: engine chia đều mức thưởng (sale nhập cả mức) → 17T10, 268T10, 442T10, 1225T10...; (4) sale nhập mức cao hơn số SP/giá trị trên Pos (509T10, 569T10, 120T10, 394T10...). Tổng chênh nếu duyệt hết phần sale nhập CAO hơn: +406.665 (ròng +376.663).
+- ⚠ **CHƯA đổi tiền theo mức sale nhập** vì mâu thuẫn quy tắc đếm SP/V15 đã chốt; Duyên chốt từng nhóm (1)-(4) nếu muốn đổi.
+- [ ] **VIỆC KẾ TIẾP:** Duyên duyệt sheet `Đối chiếu sale tự nhập` (đơn ENGINE=0 và LỆCH MỨC); `CHECK TAY Pos-Base` như cũ. Không sửa gas_v13.js/extension → không cần deploy/reload.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 27) — THƯỞNG T10: đơn tour 1301T10 của thuydinh95 phải xét theo GIÁ NIÊM YẾT (T31 200k) — XONG, đã push
 - **Duyên báo:** 1301T10 tour niêm yết 31.500k; 1326T10+NG139T10 và 254T10 "thiếu"; "quy tắc tính tour theo giá niêm yết mà giờ lại bỏ".
 - **NGUYÊN NHÂN GỐC:** từ khi chuyển sang đọc file Pos (`extract_orders_pos.py`) `giaTriTruocGiam` luôn = 0 → pass "Tourmaline cao cấp" của `calc_bonus.js` (chỉ chạy khi giaTriTruocGiam > giaTriDon) bị bỏ qua → 1301T10 (niêm yết 31.500.000, giảm 5% còn 29.925.000) chỉ được T21 100k thay vì T31 200k. Quy tắc giá niêm yết KHÔNG mất trong calc_bonus.js, mất ở khâu nạp dữ liệu.
