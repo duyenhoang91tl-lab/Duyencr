@@ -46,9 +46,11 @@ ok(B.totalGiaTri === 1000000 && B.bhPrepaid.count === 0, 'BH khong gan the sale:
 // 4) nguon khac (Facebook) co tien tra truoc -> khong tru
 B = run([don('2T10/2026', 'minhanh99', 5000000, 'Fb Phạm Thu Hiền', 1000000)]);
 ok(g(B, 'minhanh99') === 5000000 && B.bhPrepaid.count === 0, 'nguon KHAC Bao hanh co tien tra truoc: khong tru');
-// 5) BH tra truoc > gia tri don -> am (khong chan duoi 0)
+// 5) BH tra truoc > gia tri don: phan du la tien ship -> khong tinh, doanh thu = 0 (khong am)
 B = run([don('BH3T10/2026', 'minhanh99', 95000, 'Bảo hành', 135000)]);
-ok(g(B, 'minhanh99') === -40000, 'BH 95.000 − 135.000 = −40.000 (doanh thu am dung ban chat hoan tien)');
+ok(g(B, 'minhanh99') === 0 && B.bhPrepaid.count === 1 && B.bhPrepaid.total === 95000, 'BH 95.000, tra truoc 135.000: chi tru toi da 95.000 (40.000 du la tien ship) -> doanh thu 0, khong am');
+B = run([don('BH7T10/2026', 'minhanh99, lanVH1995', 100000, 'Bảo hành', 300000)]);
+ok(g(B, 'minhanh99') === 0 && g(B, 'lanVH1995') === 0 && B.totalGiaTri === 0, 'BH 2 sale tra truoc vuot gia tri: ca hai ve 0, khong am');
 // 6) BH tien tra truoc = 0 / thieu cot S -> nhu cu
 B = run([don('BH4T10/2026', 'minhanh99', 500000, 'Bảo hành', 0), Object.assign(don('BH5T10/2026', 'minhanh99', 300000, 'Bảo hành', 0), { tienTraTruoc: undefined })]);
 ok(g(B, 'minhanh99') === 800000 && B.bhPrepaid.count === 0, 'tien tra truoc 0 / khong co cot S: giu nguyen 800.000');

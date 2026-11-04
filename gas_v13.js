@@ -5825,7 +5825,9 @@ function _tachDonKey_(ghiChu) { var t = _tachDonParse_(ghiChu); return t ? t.key
 function _bhPrepaidDeduct_(row, hasSaleRow) {
   var t = Number(row && row.tienTraTruoc) || 0;
   if (t <= 0 || !hasSaleRow) return 0;
-  return _stripVN_(String(row.nguonDon || '')).trim() === 'bao hanh' ? t : 0;
+  if (_stripVN_(String(row.nguonDon || '')).trim() !== 'bao hanh') return 0;
+  // Duyen 2026-11-04: CHAN KHONG AM — tien tra truoc vuot gia tri don thi phan du la TIEN SHIP (khach ck ca ship) nen KHONG tinh; chi tru toi da bang gia tri don.
+  return Math.min(t, Math.max(0, Number(row.giaTriSauGiam) || 0));
 }
 function _mergeTachDon_(rows) {
   var out = [], groups = {};
@@ -6200,7 +6202,7 @@ function buildSalesReportB_(filters) {
     var qRatio = _quaySaleRatio_(effRow.nguonDon, effRow.ghiChu, hasSaleRow);
     if (qRatio !== 1) effRow = Object.assign({}, effRow, { saleRatio: qRatio });
     // DON BAO HANH CO GAN THE SALE (KT yeu cau 2026-11-03): cot S "Tien tra truoc" = khach da chuyen khoan truoc, ban chat la hoan lai tien cho khach
-    // -> TRU khoi doanh thu cua sale (chia theo cung ty le sale cua don). Khong chan duoi 0: don BH nho hon tien tra truoc ra doanh thu am (dung ban chat hoan tien).
+    // -> TRU khoi doanh thu cua sale (chia theo cung ty le sale cua don), toi da bang gia tri don (phan tra truoc vuot gia tri don la tien ship, khong tinh -> doanh thu khong am).
     var bhDed = _bhPrepaidDeduct_(effRow, hasSaleRow);
     if (bhDed) { effRow = Object.assign({}, effRow, { giaTriTruTraTruoc: effRow.giaTriSauGiam, truTraTruoc: bhDed, giaTriSauGiam: (Number(effRow.giaTriSauGiam) || 0) - bhDed }); bhPrepaid.count++; bhPrepaid.total += bhDed; }
     // Gan co don can doi chieu ghep (KHONG doi tien): chua duoc ke toan xu ly + (ghi chu co chu "ghep" HOAC >=2 ma bo dem khong phai
@@ -6730,7 +6732,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     totalOrders++; revenue += share;
     // THUONG THEO DON: don dat quy tac thi TIEN THUONG CHIA DEU cho cac sale tham gia (yeu cau Duyen 2026-10-08; thay cho
     // quy tac "chi nguoi tao" 2026-10-07). nSales = so sale tren don; moi nguoi nhan best.amount / nSales.
-    var nSales = (o.saleShares && o.saleShares.length) ? o.saleShares.length
+    var nSales = (o.saleShares && o.saleShares.length) ? (o.saleShares.filter(function(x) { return Number(x.frac) > 0; }).length || o.saleShares.length)
       : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
     mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
@@ -6751,9 +6753,12 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   var bonusItems = [], bonusTotal = 0;
   var byDay = {};
   mine.forEach(function(o) {
+    // THUONG THEO DON GOC (Duyen 2026-11-04): so don/ngay, don dau tien va doanh so ngay CHI tinh don goc (ma bo dem sach, co tren Base+Pos), theo ngay tao Base.
+    // Don chia A+B: moi nguoi +1 don, doanh so = phan duoc chia. Truoc day don khong phai don goc van bi dem so don (chi doanh thu moi bo loc goc).
+    if (!o.goc) return;
     if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
     var g = byDay[o.date];
-    if (o.goc) g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale, CHI don goc (ma bo dem sach, co tren Base+Pos), theo ngay tao Base
+    g.revenue += o.share;
     g.count++;
     if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
   });
@@ -6789,6 +6794,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     });
   });
   mine.forEach(function(o) {
+    if (!o.goc) return;   // thuong theo don cung chi tinh don goc
     var best = null;
     programs.forEach(function(p) {
       if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;
