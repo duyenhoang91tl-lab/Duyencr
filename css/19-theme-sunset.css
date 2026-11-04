@@ -98,3 +98,20 @@ html.ui-pro:not([data-theme="dark"]) #boot-splash > div:first-child{border-top-c
 /* vòng xoay "Đang tải dữ liệu" (index.html <style> dòng 22-23 đặt tím #4a2c8f cứng) */
 html.ui-pro:not([data-theme="dark"]) .ev-spin{color:#a8326c;}
 html.ui-pro:not([data-theme="dark"]) .ev-spin i{border-color:rgba(214,71,122,.18);border-top-color:#d6477a;}
+
+/* ── 7. ĐỘ TƯƠNG PHẢN CAO (Duyên báo 2026-11-04: "chữ nhòe mờ khó nhìn") ──
+   NGUYÊN NHÂN GỐC: chữ phụ dùng --muted/--hint (tông hồng xám nhạt #7a5f6b/#ad97a1) cỡ 10-11px, trên nền hồng pastel
+   → tương phản chỉ ~2.3-4:1 (chuẩn đọc tốt là >= 4.5:1, chữ nhỏ nên >= 7:1); thêm body đặt -webkit-font-smoothing:antialiased
+   làm nét chữ mảnh/nhạt trên Mac. Chữ trong bảng KH để weight 400 nên càng mảnh.
+   Cách sửa: đậm hoá 3 biến chữ (mọi chỗ dùng var(--text/--muted/--hint) tự đậm theo), bỏ antialiased, tiêu đề cột + ô bảng đậm hơn. */
+html.ui-pro:not([data-theme="dark"]){
+  --text:#1a0f15; --muted:#4f3443; --hint:#6b4f5e;
+}
+html.ui-pro:not([data-theme="dark"]) body{-webkit-font-smoothing:auto;text-rendering:auto;}
+html.ui-pro:not([data-theme="dark"]) #main-table thead th{color:var(--text);font-size:11.5px;}
+html.ui-pro:not([data-theme="dark"]) #main-table thead th .th-filter-icon{color:var(--muted);}
+html.ui-pro:not([data-theme="dark"]) #main-table tbody td{color:var(--text);font-weight:500;}
+html.ui-pro:not([data-theme="dark"]) .sidebar .cs-filter-label,
+html.ui-pro:not([data-theme="dark"]) .sidebar .sb-label,
+html.ui-pro:not([data-theme="dark"]) #ymf-bar .ymf-label,
+html.ui-pro:not([data-theme="dark"]) #col-toggle-bar .ymf-label{color:var(--text);}
