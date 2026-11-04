@@ -55,15 +55,15 @@ for s in ('Phat_theo_kenh', 'Phat_tung_nguoi'):
             if isinstance(c.value, str) and '1454' in c.value: c.value = c.value.replace('1454', str(last))
 wb['Cau_hinh']['A18'] = ('Dữ liệu T10 theo file FINAL "LƯƠNG SALE" (Duyên chốt 04/11): DT từng sale = cột TỔNG; Du_lieu = từng dòng thẻ chia đều theo số sale. '
                          'Nếu có dòng vàng "Điều chỉnh theo KT Huyền" = phần số chốt lệch cộng dòng (không rõ kênh → tính NGOÀI kênh FB chính).')
-# ── Duyên 04/11 (18:06): phần 8 tỷ phải TRỪ doanh thu nguồn mỹ phẩm/Dược; MKT (Huy, Hưng) tính theo kênh nguồn riêng ──
-ws['K1'] = 'Loại khỏi phần 8 tỷ (nguồn NGUỒN / Facebook=mỹ phẩm / Kênh Dược) (1/0)'; ws['K1']._style = copy.copy(ws['J1']._style)
+# ── Duyên 04/11 (18:06): phần 8 tỷ chỉ TRỪ nguồn mỹ phẩm/Dược (nguồn NGUỒN vẫn tính); MKT (Huy, Hưng) tính theo kênh nguồn riêng ──
+ws['K1'] = 'Loại khỏi phần 8 tỷ (nguồn Facebook=mỹ phẩm / Kênh Dược) (1/0)'; ws['K1']._style = copy.copy(ws['J1']._style)
 for r in range(r0, last + 1):
-    ws.cell(r, 11, f'=IF(OR(ISNUMBER(SEARCH("715661768577683",E{r})),LOWER(TRIM(E{r}))="facebook",LOWER(TRIM(E{r}))="kênh dược"),1,0)')
+    ws.cell(r, 11, f'=IF(OR(LOWER(TRIM(E{r}))="facebook",LOWER(TRIM(E{r}))="kênh dược"),1,0)')
 ws.column_dimensions['K'].width = 24
 pk = wb['Phat_theo_kenh']
 pk['B17'] = f'=SUMIFS(Du_lieu!H2:H{last},Du_lieu!I2:I{last},0,Du_lieu!J2:J{last},0,Du_lieu!K2:K{last},0)'
-pk['A17'] = 'Doanh thu còn lại (đ) — đã trừ kênh FB chính, đơn ngoài FB của Mến, nguồn NGUỒN / Facebook (mỹ phẩm) / Kênh Dược'
-pk['A23'] = 'DT nguồn bị loại khỏi phần 8 tỷ (NGUỒN + Facebook mỹ phẩm + Kênh Dược) (đ)'
+pk['A17'] = 'Doanh thu còn lại (đ) — đã trừ kênh FB chính, đơn ngoài FB của Mến, nguồn Facebook (mỹ phẩm) / Kênh Dược'
+pk['A23'] = 'DT nguồn bị loại khỏi phần 8 tỷ (Facebook mỹ phẩm + Kênh Dược; vẫn TÍNH nguồn NGUỒN) (đ)'
 pk['B23'] = f'=SUMIFS(Du_lieu!H2:H{last},Du_lieu!I2:I{last},0,Du_lieu!J2:J{last},0,Du_lieu!K2:K{last},1)'
 pk['B23'].number_format = '#,##0'
 pk['A30'] = 'Kiểm tra: DT kênh FB chính + DT còn lại + DT nguồn loại = tổng DT sau khi chia sale (đ)'

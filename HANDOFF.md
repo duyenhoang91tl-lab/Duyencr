@@ -52,6 +52,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [x] **BƯỚC 2/2 XONG:** chạy `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js`; file `Thuong_T10_chuan_v2.xlsx` giao qua chat (KHÔNG commit, có tiền từng người). Tổng thưởng T10 engine = **4.073.340** (phiên 19: 4.483.340; giảm 410.000 chủ yếu vì thưởng NGÀY chuyển sang tính theo ngày Base: trangNH2005 mất 50k ngày 23/10; huyenmaii/minhquach/ninhnga99/thuydinh95... đổi ngày). Thưởng theo đơn đổi ngày theo Base (tổng gần như giữ).
 - [ ] **VIỆC KẾ TIẾP:** Duyên xác nhận diễn giải "cùng ngày = lệch ≤1 ngày Base" (hằng `dayGapOk`); web CRM thật dùng baseNgayTao sẵn nên số web nên khớp file này — Duyên đối chiếu Báo cáo G/E T10 sau khi workflow deploy GAS xanh + Ctrl+F5.
 
+## 2026-11-04 (phiên 20) — PHẠT THI ĐUA T10 v8: đội Sale CHỈ bỏ nguồn Dược + mỹ phẩm, nguồn NGUỒN vẫn tính — XONG, đã push
+- **Duyên chốt (đính chính phiên 19):** phần 8 tỷ chỉ trừ `Kênh Dược` và `Facebook` (mỹ phẩm); `Facebook / NGUỒN (715661768577683)` VẪN TÍNH. **v8 thay v7.**
+- [x] **ĐÃ PUSH:** `tools/thidua-t10/build_phat_t10.py` — công thức Du_lieu cột K bỏ điều kiện nguồn NGUỒN. File `Phat_thi_dua_T10_2026_v8.xlsx` giao qua chat, KHÔNG commit. Sheet `Phat_MKT` giữ nguyên.
+- **Kết quả:** DT bị loại 117.008.500; phần còn lại 6.515.121.800 = 81,44% → mức 0,015% → phạt 1.200.000 (16 sale không đạt + Duyên = 17 đầu → 70.588đ). FB chính 280.000 (46.667đ). Tổng 1.480.000đ. Ninh Ngà không đạt (998.338.750 < 1 tỷ).
+- **NGUYÊN NHÂN GỐC v7 sai:** loại thêm nguồn NGUỒN (236.918.000) làm % tụt 78,48% → sai mức 0,02%.
+- [ ] **VIỆC KẾ TIẾP:** Duyên cho KPI T10 của Huy/Hưng để tính phạt Marketing (ô vàng sheet Phat_MKT); `js/64-thidua.js` (web) chưa trừ Dược/mỹ phẩm. Không sửa gas_v13.js/extension.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 19) — THƯỞNG T10: gộp đơn GHÉP lên WEB + GAS — BƯỚC 2/3 xong, đã push (Duyên gửi lại cùng yêu cầu + file Check_DT_t10.xlsx)
 - [x] **BƯỚC 2/3 ĐÃ PUSH:** `_bcMergeGhepBills_(list, okFn)` + `_bcGhepCodes_` thêm cuối `js/27-fn-bonuscore.js` và BẢN SAO NGUYÊN VĂN trong khối BONUS CORE của `gas_v13.js` (+ `gas/*.gs` qua `split-gas.js`, `--check` OK). Luật: 2 đơn gốc CÙNG SĐT + CÙNG bộ sale, ghi chú đơn này trỏ mã đơn kia ("GHÉP ĐƠN CÙNG 663T10" / "GHÉP CÙNG ĐƠN" / "SHIP CÙNG ĐƠN"), không Huỷ/Hoàn → 1 bill (giá trị + SP cộng lại, đếm lại số sản phẩm).
 - **Chỗ gọi:** `js/12 _computeBonusData_` vòng "Theo đơn" (CHỈ vòng này; số đơn/doanh thu/thưởng THEO NGÀY giữ từng đơn) và `gas_v13.js buildCsStats_` (mảng `mine` → Pancake AI csStats). Dòng thưởng ghi "GỘP N đơn ghép (mã + mã)". Test mới `tools/test-bonus-ghep-bill.js` (12 ca) + các test thưởng cũ đều PASS.
