@@ -56,4 +56,25 @@ ws = wb.create_sheet('Doanh thu ngày ' + WATCH); hdr(ws, ['Ngày tạo đơn Ba
 for i, d in enumerate(sorted(day), 2):
     for j, v in enumerate([d, round(day[d]), 'ĐẠT' if day[d] >= 60e6 else 'không', ', '.join(cnt[d])], 1): ws.cell(row=i, column=j, value=v)
     ws.cell(row=i, column=2).number_format = '#,##0'
+# Sheet CT ap dung: 2 bang chuong trinh Duyen gui 2026-11-04 (anh "Ap dung cho Sale thu viec" + "Sale online/chinh thuc") + sale nao theo bang nao
+ws = wb.create_sheet('CT áp dụng'); hdr(ws, ['Bảng', 'STT', 'Viết tắt', 'Nội dung thưởng', 'Điều kiện áp dụng', 'Thời gian', 'Mức thưởng (đ)'], [22, 6, 10, 38, 44, 34, 16])
+TV = [('Đơn đầu', 'Thưởng đơn đầu tiên trong ngày', 'Mỗi đơn đầu tiên chốt thành công trong ngày', '3 ngày đầu kể từ ngày bắt đầu chat khách', 50000), ('2 đơn', 'Thưởng số đơn/ngày', 'Chốt từ 02 đơn/ngày', 'Từ ngày thứ 4 đến hết thử việc', 30000),
+      ('3 đơn', 'Thưởng số đơn/ngày', 'Chốt từ 03 đơn/ngày', 'Từ ngày thứ 4 đến hết thử việc', 50000), ('5 đơn', 'Thưởng số đơn/ngày', 'Chốt từ 05 đơn/ngày', 'Từ ngày thứ 4 đến hết thử việc', 100000),
+      ('25tr', 'Thưởng doanh số ngày', 'Doanh thu từ 25tr', 'Từ ngày thứ 4 đến hết thử việc', 30000), ('50tr', 'Thưởng doanh số ngày', 'Doanh thu từ 50tr', 'Từ ngày thứ 4 đến hết thử việc', 50000),
+      ('80tr', 'Thưởng doanh số ngày', 'Doanh thu từ 80tr', 'Từ ngày thứ 4 đến hết thử việc', 100000), ('THM', 'Tỳ hưu thiên lộc Moon', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Từ 20/8', 10000),
+      ('THT', 'Tỳ hưu thiên lộc Tourmaline Hồng', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Từ 20/8', 8000), ('THT', 'Tỳ hưu thiên lộc Tourmaline Xanh', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Từ 20/8', 8000),
+      ('THA', 'Tỳ hưu thiên lộc Aquamarine', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Từ 20/8', 8000), ('T21', 'Tourmaline cao cấp', 'Đơn từ 21tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 100000), ('T31', 'Tourmaline cao cấp', 'Đơn từ 31tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 200000)]
+CT = [('10tr', 'Bill combo 2 sản phẩm', 'Đơn trên 10tr', 'Nguồn All', 20000), ('15tr', 'Bill combo 3 sản phẩm', 'Đơn trên 15tr', 'Nguồn All', 30000), ('20tr', 'Bill combo 4 sản phẩm', 'Đơn trên 20tr', 'Nguồn All', 40000),
+      ('V15tr', 'Bill vòng mix charm', 'Đơn từ 15tr', 'Nguồn All', 20000), ('V20tr', 'Bill vòng mix charm', 'Doanh thu từ 20tr', 'Nguồn All', 30000), ('60tr', 'Thưởng doanh số ngày', 'Đạt từ 60tr/1 ngày', 'Nguồn All', 50000),
+      ('100tr', 'Thưởng doanh số ngày', 'Đạt từ 100tr/1 ngày', 'Nguồn All', 100000), ('THMoon', 'Tỳ hưu thiên lộc Moon', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 10000),
+      ('THT', 'Tỳ hưu thiên lộc Tourmaline Hồng', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000), ('THT', 'Tỳ hưu thiên lộc Tourmaline Xanh', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000),
+      ('THA', 'Tỳ hưu thiên lộc Aquamarine', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000), ('T21', 'Tourmaline cao cấp', 'Đơn từ 21tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 100000), ('T31', 'Tourmaline cao cấp', 'Đơn từ 31tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 200000)]
+tv_sales = ', '.join(k for k, v in ch.items() if v == 'probation'); cc_sales = ', '.join(x['name'] for x in r['bySale'] if ch.get(x['name']) != 'probation')
+k = 2
+for title, tbl, who in (('Sale thử việc', TV, tv_sales), ('Sale online / chính thức (gồm cả sale offline đã chính thức)', CT, cc_sales)):
+    for n, x in enumerate(tbl, 1):
+        for j, v in enumerate([title, n, x[0], x[1], x[2], x[3], x[4]], 1): ws.cell(row=k, column=j, value=v)
+        ws.cell(row=k, column=7).number_format = '#,##0'; k += 1
+    ws.cell(row=k, column=1, value='Áp dụng cho: ' + who).font = Font(bold=True); k += 2
+ws.cell(row=k, column=1, value='Loại trừ Tỳ hưu: không áp dụng mẫu chế tác từ chất liệu Ngọc (Ngọc Lam, Ngọc Bích, Ngọc Cẩm Thạch B, Ruby, Saphire) — engine KHÔNG tự chấm, đã soát tay các dòng Tỳ hưu trong bảng.')
 wb.save(OUT); print('tong thuong', sum(x[5] for x in rows), '-> ', OUT)

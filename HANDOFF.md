@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 25) — THƯỞNG T10: Duyên gửi 2 bảng CT (Sale thử việc / Sale online-chính thức) — soát lại engine, xuất v4 — XONG, đã push
+- **Duyên chỉ ra:** Ngọc (thử việc) theo bảng "Áp dụng cho Sale thử việc" (13 dòng); sale chính thức (kể cả offline đã chính thức) theo bảng online/chính thức (13 dòng). Mình trước đó ghi "Ngọc không nhận thưởng theo đơn" — chưa đúng hết: bảng thử việc CÒN dòng 8-13 (Tỳ hưu Moon/Tourmaline Hồng+Xanh/Aquamarine từ 20/8, Tourmaline cao cấp T21/T31 từ 21/9).
+- **NGUYÊN NHÂN GỐC:** `_bonusProgramApplies_` (js/12) cố ý loại sale `probation` khỏi mọi CT có audience online/offline; mẫu thử việc `_bpSeedProbationTemplate_` chỉ có 5 CT (GĐ1 + GĐ2) → thiếu 6 CT sản phẩm/cao cấp cho sale thử việc. Bảng chính thức: engine khớp 13/13 dòng.
+- [x] `calc_bonus.js` thêm 6 CT "TV — ..." (probationDay từ ngày 1, dateFrom 20/8 hoặc 21/9) cho sale thử việc. `build_delivery_xlsx.py` thêm sheet `CT áp dụng` (2 bảng + sale nào theo bảng nào).
+- **Kết quả T10:** KHÔNG đổi tiền — tổng vẫn 3.823.340. Ngọc 190.000 (1 đơn Tỳ hưu LAM THỦY 26/10 không thuộc CT Moon/Tourmaline/Aquamarine; không đơn nào ≥21,5tr; ngày cao nhất 14,05tr < 25tr). Đã soát 8 dòng Tỳ hưu toàn team: không dính chất liệu loại trừ (engine KHÔNG tự chấm loại trừ — js/12 ghi "chỉ hiển thị").
+- ⚠ **Web CRM CHƯA đổi** (không sửa js/12/gas_v13.js): để Ngọc nhận thưởng sản phẩm/cao cấp trên web thì phải thêm 6 CT thử việc tương ứng trong Cấu hình thưởng (hoặc nhờ mình thêm vào `_bpSeedProbationTemplate_`; khi đó sửa gas_v13.js → phải deploy lại GAS).
+- [ ] **VIỆC KẾ TIẾP:** Duyên duyệt CHECK TAY; nếu cần web khớp bảng thử việc đầy đủ → thêm 6 CT trong Cấu hình.
+- **ĐANG LÀM:** không có việc dở. Không sửa gas_v13.js/extension → không cần deploy/reload.
+
 ## 2026-11-04 (phiên 24) — THƯỞNG T10: Duyên chốt đơn M45869 (681T10+937T10) — BƯỚC 1/2 (code) xong, đã push
 - **Duyên chốt:** 937T10 là của Mai Huyền 3.550.000; 681T10 là của Ngọc (ngocNB2003saleoff). Tính thưởng theo đó.
 - **NGUYÊN NHÂN GỐC:** Pos M45869 (14.523.000) gắn 2 thẻ nên engine CHIA ĐỀU 2 sale → Mai Huyền nhận nhầm 10.000 (đơn "combo 2 SP" chia 2) dù phần của Mai chỉ 3,55tr (<10tr, không đạt mốc).

@@ -97,7 +97,14 @@ PROGRAMS.push(
   PM({ name: 'GĐ2 — Bậc số đơn/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, tier: { enabled: true, rows: [{ count: 2, bonus: 30000 }, { count: 3, bonus: 50000 }, { count: 5, bonus: 100000 }] } }),
   PM({ name: 'GĐ2 — Doanh số ≥25 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 25e6, max: '' }, bonusAmount: 30000 }),
   PM({ name: 'GĐ2 — Doanh số ≥50 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 50e6, max: '' }, bonusAmount: 50000 }),
-  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }));
+  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }),
+  // Bang "Ap dung cho Sale thu viec" (Duyen gui 2026-11-04) co them dong 8-13: Ty huu Moon/Tourmaline Hong+Xanh/Aquamarine (tu 20/8) + Tourmaline cao cap T21/T31 (tu 21/9), ap dung tu ngay 1 thu viec.
+  // CT chinh thuc online/offline KHONG ap cho sale thu viec (js/12 _bonusProgramApplies_) nen phai co ban rieng cho thu viec.
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Aquamarine', bonusAmount: 8000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
 const PROBATION = { 'ngocNB2003saleoff': '2026-10-14' };
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
