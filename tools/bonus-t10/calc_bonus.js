@@ -106,7 +106,8 @@ PROGRAMS.push(
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
-const PROBATION = { 'ngocNB2003saleoff': '2026-10-14' };
+// Duyen chot 2026-11-04: 3 sale thu viec = ngocNB2003saleoff (bat dau 14/10), haPTN + thanhNP (bat dau 10/10 - theo Duyen bao o phien truoc). Con lai (19 tai khoan doi Sale) la chinh thuc.
+const PROBATION = { 'ngocNB2003saleoff': '2026-10-14', 'haPTN': '2026-10-10', 'thanhNP': '2026-10-10' };
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
 const SC = {}; Object.keys(chRaw).forEach(k => { SC[k] = chRaw[k]; });
 const SCP = {}; Object.keys(PROBATION).forEach(k => { SC[k] = 'probation'; chRaw[k] = 'probation'; SCP[k] = [{ from: PROBATION[k], channel: 'probation', bonusFrom: PROBATION[k] }]; });

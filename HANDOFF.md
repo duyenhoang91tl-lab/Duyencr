@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 26) — THƯỞNG T10: Duyên chốt 22 tài khoản đội Sale, 3 bạn THỬ VIỆC = ngocNB2003saleoff, haPTN, thanhNP — XONG, đã push
+- **Duyên chốt (18:21):** đội Sale gồm 19 chính thức (huyenmaii1990, minhquach1995, dungnguyen1995, thuyha88, biichnguyen1993, nonghong88, giangnguyen1990, mainguyen97, tuoipham1993, thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995, thuNH1986, dungNTK1987, anhNP1999, trangNH2005, yenNTH2004, ninhLTK1984) + 3 thử việc (ngocNB2003saleoff, haPTN, thanhNP).
+- **NGUYÊN NHÂN GỐC lệch:** `calc_bonus.js` chỉ khai Ngọc là thử việc → haPTN/thanhNP bị tính theo bảng chính thức (combo đơn 10tr/15tr…) trong khi họ thuộc bảng thử việc.
+- [x] `PROBATION` trong `calc_bonus.js`: Ngọc 14/10; **haPTN + thanhNP 10/10** (⚠ lấy từ lời Duyên ở phiên trước "haPTN/thanhNP bắt đầu 10/10" — Duyên xác nhận lại ngày bắt đầu TÍNH THƯỞNG của 2 bạn này).
+- **Kết quả T10:** haPTN 16.667 → **86.667** (đơn đầu 10/10 = 50k, 2 đơn/ngày 14/10 = 30k, Tỳ hưu Moon 6.667; đơn 8/10 trước ngày bắt đầu không tính); thanhNP 6.667 → **0** (3 đơn từ 19/10, mỗi ngày 1 đơn, chưa đạt 2 đơn/ngày; không còn thưởng combo vì thử việc không có). Tổng 3.823.340 → **3.886.673** (+63.333). File `Thuong_T10_chuan_v5.xlsx` (giao qua chat, KHÔNG commit).
+- ⚠ menbui2002 (CSKH, không thuộc 22 tài khoản đội Sale) vẫn giữ 41.667 theo quy tắc cũ của Duyên (CT Online cho đơn nguồn FB Phạm Thu Hiền) — Duyên xác nhận còn giữ không.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xác nhận ngày bắt đầu haPTN/thanhNP + menbui2002; web CRM: đặt kênh "Thử việc" + Ngày bắt đầu cho haPTN, thanhNP trong Quản lý Sale (không sửa code) để web khớp file; nếu muốn web có 6 CT TV sản phẩm/cao cấp (phiên 25) thì thêm trong Cấu hình.
+- **ĐANG LÀM:** không có việc dở. Không sửa gas_v13.js/extension → không cần deploy/reload.
+
 ## 2026-11-04 (phiên 25) — THƯỞNG T10: Duyên gửi 2 bảng CT (Sale thử việc / Sale online-chính thức) — soát lại engine, xuất v4 — XONG, đã push
 - **Duyên chỉ ra:** Ngọc (thử việc) theo bảng "Áp dụng cho Sale thử việc" (13 dòng); sale chính thức (kể cả offline đã chính thức) theo bảng online/chính thức (13 dòng). Mình trước đó ghi "Ngọc không nhận thưởng theo đơn" — chưa đúng hết: bảng thử việc CÒN dòng 8-13 (Tỳ hưu Moon/Tourmaline Hồng+Xanh/Aquamarine từ 20/8, Tourmaline cao cấp T21/T31 từ 21/9).
 - **NGUYÊN NHÂN GỐC:** `_bonusProgramApplies_` (js/12) cố ý loại sale `probation` khỏi mọi CT có audience online/offline; mẫu thử việc `_bpSeedProbationTemplate_` chỉ có 5 CT (GĐ1 + GĐ2) → thiếu 6 CT sản phẩm/cao cấp cho sale thử việc. Bảng chính thức: engine khớp 13/13 dòng.
