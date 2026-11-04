@@ -26,13 +26,29 @@ for j in range(3, 7):
     L = ws.cell(row=1, column=j).column_letter; ws.cell(row=n, column=j, value='=SUM(%s2:%s%d)' % (L, L, n - 1)).font = Font(bold=True)
 for row in ws.iter_rows(min_row=2, min_col=3, max_col=6):
     for c in row: c.number_format = '#,##0'
-ws = wb.create_sheet('4_Chi tiết thưởng'); hdr(ws, ['Ngày (Base)', 'Sale', 'Kênh', 'Loại thưởng', 'Chương trình', 'Tiền thưởng (đ)', 'Căn cứ', 'Mã đơn (ghi chú Pos)'], [12, 22, 14, 22, 42, 14, 70, 30])
+# Cot "San pham" (Duyen yeu cau 2026-11-04): de doi chieu thuong tinh chuan hay khong. Lay tu orders.json (cung work dir) theo orderId cua dong thuong.
+# Don GOP (ghep/tach): lay san pham cua moi don cung SDT co ma don nam trong ghi chu Pos cua dong thuong. Thuong THEO NGAY khong gan 1 don -> de trong.
+import re
+_ords = json.load(open(W + '/orders.json')); _idx = {str(o.get('id')): o for o in _ords}
+def _codes(t): return set(re.findall(r'[A-Za-z]*\d+T\d+/\d{4}', str(t or '')))
+def _fmt_sp(o):
+    sp = [x.strip() for x in str(o.get('sanPham') or '').split(',') if x.strip()]; sl = [x.strip() for x in str(o.get('soLuong') or '').split(',') if x.strip()]
+    if sp and len(sp) == len(sl): return '; '.join('%s x%s' % (a, b) for a, b in zip(sp, sl))
+    return '; '.join(sp)
+def prod_text(it):
+    o = _idx.get(str(it.get('orderId') or ''))
+    if not o: return ''
+    if 'GỘP' in str(it.get('detail') or ''):
+        cs = _codes(it.get('maDonPos')); grp = [x for x in _ords if x.get('sdt') == o.get('sdt') and _codes(x.get('ghiChu')) & cs] or [o]
+        return ' || '.join(_fmt_sp(x) for x in grp)
+    return _fmt_sp(o)
+ws = wb.create_sheet('4_Chi tiết thưởng'); hdr(ws, ['Ngày (Base)', 'Sale', 'Kênh', 'Loại thưởng', 'Chương trình', 'Tiền thưởng (đ)', 'Căn cứ', 'Mã đơn (ghi chú Pos)', 'Sản phẩm trên đơn (Pos) x SL'], [12, 22, 14, 22, 42, 14, 70, 30, 80])
 k = 2
 for s in r['bySale']:
     for it in sorted(s['items'], key=lambda x: x['date']):
-        for j, v in enumerate([it['date'], s['name'], ch.get(s['name'], ''), it['scope'], it['program'], it['amount'], it['detail'], (it.get('maDonPos') or '').replace('\n', ' ')], 1): ws.cell(row=k, column=j, value=v)
+        for j, v in enumerate([it['date'], s['name'], ch.get(s['name'], ''), it['scope'], it['program'], it['amount'], it['detail'], (it.get('maDonPos') or '').replace('\n', ' '), prod_text(it)], 1): ws.cell(row=k, column=j, value=v)
         ws.cell(row=k, column=6).number_format = '#,##0'; k += 1
-ws.auto_filter.ref = 'A1:H%d' % (k - 1)
+ws.auto_filter.ref = 'A1:I%d' % (k - 1)
 ws = wb.create_sheet('CHECK TAY Pos-Base'); hdr(ws, ['Mã đơn (ghi chú Pos)', 'Sale', 'SĐT', 'Giá trị Pos', 'Ngày Pos', 'Trạng thái Pos', 'Lý do', 'Xử lý thưởng'], [38, 30, 14, 14, 12, 14, 52, 34])
 order = {'base-that-bai': 0, 'khong-co-base': 1, '': 2}
 for i, x in enumerate(sorted(chk, key=lambda x: (order.get(x['loaiThuong'], 3), str(x['ma']))), 2):
