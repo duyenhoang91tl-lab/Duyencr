@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 23) — BẢNG THƯỞNG T10 "chuẩn theo file KT C DUYÊN-lương sale" — BƯỚC 1/2 xong (đã push script), CHỜ file nguồn để chốt số cuối
+- **Yêu cầu Duyên:** gửi lại bảng thưởng T10 sale theo file KT `C DUYÊN-lương sale.xlsx`. File KT chỉ có HOA HỒNG (AO), không có thưởng, không có cột ngày/sản phẩm → KHÔNG tính lại thưởng trực tiếp từ KT được.
+- [x] **ĐÃ PUSH:** `tools/bonus-t10/build_thuong_chuan_kt.py <Thuong_T10_chuan_v2.xlsx> <C_DUYEN_luong_sale.xlsx> <ra.xlsx>` — lấy bảng thưởng engine, gán NHÓM KT (SALE ONL/SALE OFF/CSKH, cột Q) cho từng sale, đối chiếu từng dòng thưởng "Theo đơn" với đơn trên KT (mã đơn + thẻ sale). File ra giao qua chat, KHÔNG commit (có tiền từng người).
+- **Kết quả đối chiếu:** 182/183 dòng thưởng theo đơn KHỚP KT (mã đơn + sale; đơn gộp 839T10+1031T10 khớp). **1 dòng CHECK TAY:** huyenmaii1990 681T10+937T10 (10.000đ) — KT không có mã 681T10/937T10 trong ghi chú, chỉ có dòng `M45869` (Mai Huyền 3.550.000) và 1 dòng 14.523.000 của ngocNB2003saleoff không ghi chú. Chưa tự sửa — Duyên chốt đơn này của ai.
+- **Nhóm KT đổi gì:** 4 sale (thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995) KT = SALE OFF, CRM = online. Thưởng KHÔNG đổi (CT thưởng audience online+offline như nhau), chỉ % hoa hồng đổi.
+- ⚠ **Tổng trong file giao = 4.073.340 (bản phiên 20, file `Thuong_T10_chuan_v2.xlsx` Duyên gửi lên), CHƯA trừ phần phiên 21** (loại đơn Base Thất bại / không có Base → 3.833.340, −240.000). Không dựng lại được số 3.833.340 vì thiếu `Check_DT_t10.xlsx` + export Base trong phiên này.
+- [ ] **VIỆC KẾ TIẾP (bước 2/2):** Duyên gửi lại `Check_DT_t10.xlsx` (+ export Base) → chạy `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js` → `build_delivery_xlsx.py` ra bản 3.833.340, rồi `build_thuong_chuan_kt.py` để gắn nhóm KT; chốt 681T10/937T10.
+- **ĐANG LÀM:** không có việc dở. Không sửa gas_v13.js/extension → không cần deploy GAS hay reload extension.
+
 ## 2026-11-04 (phiên 22) — ĐỐI CHIẾU file KT "C DUYÊN-lương sale.xlsx" với CRM — XONG, đã push (kết luận: CHƯA khớp, nguyên nhân rõ)
 - **File KT là gì:** Sheet1 = sổ HUYỀN + cột AO "LƯƠNG SALE" (= HOA HỒNG, KHÔNG gồm thưởng) và AP "LƯƠNG HỦY". Nên thưởng T10 (3.833.340) KHÔNG đối chiếu được với file này.
 - **Công thức KT = công thức CRM:** nhóm Q "SALE ONL" 1,5% (≥15tr)/1% (<15tr); "SALE OFF" 1%/0,8%; ngoại lệ KT: menbui2002 (CSKH) +432.345 (khoản CSKH FB Phạm Thu Hiền), linhNM1995 0,8% phẳng. Tự kiểm: KT đúng 0đ trên doanh thu của chính KT cho mọi sale còn lại.
