@@ -22,7 +22,7 @@ var THIDUA_CONFIGS = {
     { name: 'Phạm Thị Hoàng Tươi', user: 'tuoipham1993', team: 'Online', commit: 500e6 },
     { name: 'Bùi Mến', user: 'menbui2002', team: 'Online', fbMain: true, fbOnly: true }] },
   '2026-11': { label: 'Tháng 11/2026', kpiTotal: 8500000000, kpiFb: 1500000000, duyenHeads: 1,
-    cskh: { label: 'Kênh CSKH - Duyên', kpi: 100000000, sources: [], users: [] },   // CHƯA cấu hình cách xác định doanh thu kênh CSKH-Duyên (điền sources/users khi Duyên chốt) → báo "chưa xác định", chưa phạt
+    cskh: { label: 'Kênh CSKH - Duyên', kpi: 100000000, sources: [], users: ['menbui2002'] },   // doanh thu kênh CSKH-Duyên = phần ĐƠN NGOÀI FB của menbui2002 (CSKH); phạt chia Duyên + sale chưa đạt (không gồm Mến) — giả định, Duyên chưa nói rõ cách xác định doanh thu
     marketing: [{ name: 'Ngô Việt Huy', kpi: 6000000000, match: ['ngô việt huy'] }, { name: 'Nguyễn Văn Hưng', kpi: 900000000, match: ['nguyễn văn hưng'] }],
     commitments: [
     { name: 'Trịnh Phương Anh', user: 'anhtrinh1995', team: 'Văn phòng', commit: 650e6 }, { name: 'Đinh Thị Thu Thủy', user: 'thuydinh95', team: 'Văn phòng', commit: 900e6 },
@@ -53,12 +53,12 @@ function _computeThiDua_(orders, ym) {
     if (o.baoHanh) return;
     var ymd = o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao); if (String(ymd || '').slice(0, 7) !== ym) return;
     if (hasGoc && !o.donGoc) return;   // đơn không phải đơn gốc: không cộng doanh thu (cùng quy ước thưởng ngày)
-    var shares = _orderRevenueShares_(o), isFb = THIDUA_FB_SRC_.indexOf(_tdFold_(o.nguonDon)) >= 0, isCs = false;
-    if (!isFb && csOk) isCs = _tdHasAny_(o.nguonDon, cs.sources) || (!!(cs.users || []).length && shares.length > 0 && shares.every(function (x) { return (cs.users || []).some(function (u) { return _tdFold_(u) === _tdFold_(x.name); }); }));
+    var shares = _orderRevenueShares_(o), isFb = THIDUA_FB_SRC_.indexOf(_tdFold_(o.nguonDon)) >= 0, srcCs = !isFb && csOk && _tdHasAny_(o.nguonDon, cs.sources);
     shares.forEach(function (x) {
       var k = _tdFold_(x.name); if (!k) return;
       var skipUser = fbOnlySet[k] && !isFb;   // fbOnly (Mến): đơn ngoài FB không tính vào doanh thu cá nhân / phần Duyên+MKT; riêng đơn nguồn CSKH vẫn thuộc kênh CSKH-Duyên
       if (!skipUser) { var u = byUser[k] || (byUser[k] = { total: 0, fb: 0 }); u.total += x.share; if (isFb) u.fb += x.share; }
+      var isCs = !isFb && csOk && (srcCs || (cs.users || []).some(function (uu) { return _tdFold_(uu) === k; }));   // đơn nguồn CSKH, hoặc PHẦN CỦA người thuộc kênh CSKH (Mến) trên đơn ngoài FB
       if (isFb) revFb += x.share; else if (isCs) revCs += x.share; else if (!skipUser) revRest += x.share;
     });
     mk.forEach(function (m) { if ((m.cfg.match || []).some(function (n) { return _tdFold_(o.marketer) === _tdFold_(n); })) { m.rev += Number(o.giaTriDon) || 0; m.n++; } });
@@ -70,12 +70,12 @@ function _computeThiDua_(orders, ym) {
     return { name: c.name, user: c.user, team: c.team, fbMain: !!c.fbMain, fbOnly: !!c.fbOnly, commit: c.commit || 0, rev: Math.round(u.total), revFb: Math.round(u.fb), pct: pct, ok: ok, gap: c.fbOnly ? 0 : Math.max(0, Math.round(c.commit - u.total)), penFb: 0, penRest: 0, total: 0 };
   });
   var nFb = rows.filter(function (r) { return r.fbMain; }).length + heads, nRest = rows.filter(function (r) { return !r.ok; }).length + heads;
-  var perFb = nFb ? fb.penalty / nFb : 0, perRest = nRest ? rest.penalty / nRest : 0;
-  rows.forEach(function (r) { r.penFb = r.fbMain ? Math.round(perFb) : 0; r.penRest = r.ok ? 0 : Math.round(perRest); r.total = r.penFb + r.penRest; });
-  var duyen = { penFb: Math.round(perFb * heads), penRest: Math.round(perRest * heads), penCskh: csPart ? csPart.penalty : 0 }; duyen.total = duyen.penFb + duyen.penRest + duyen.penCskh;
-  var tot = { penFb: duyen.penFb, penRest: duyen.penRest, penCskh: duyen.penCskh, total: duyen.total }; rows.forEach(function (r) { tot.penFb += r.penFb; tot.penRest += r.penRest; tot.total += r.total; });
+  var perFb = nFb ? fb.penalty / nFb : 0, perRest = nRest ? rest.penalty / nRest : 0, perCs = csPart && nRest ? csPart.penalty / nRest : 0;   // phạt CSKH chia như phần Duyên+MKT: sale chưa đạt + Duyên (Mến đã ok → không chịu)
+  rows.forEach(function (r) { r.penFb = r.fbMain ? Math.round(perFb) : 0; r.penRest = r.ok ? 0 : Math.round(perRest); r.penCskh = r.ok ? 0 : Math.round(perCs); r.total = r.penFb + r.penRest + r.penCskh; });
+  var duyen = { penFb: Math.round(perFb * heads), penRest: Math.round(perRest * heads), penCskh: Math.round(perCs * heads) }; duyen.total = duyen.penFb + duyen.penRest + duyen.penCskh;
+  var tot = { penFb: duyen.penFb, penRest: duyen.penRest, penCskh: duyen.penCskh, total: duyen.total }; rows.forEach(function (r) { tot.penFb += r.penFb; tot.penRest += r.penRest; tot.penCskh += r.penCskh; tot.total += r.total; });
   var marketing = mk.map(function (m) { var p = _tdPart_(m.cfg.kpi, m.rev); p.name = m.cfg.name; p.orders = m.n; return p; });
-  return { month: ym, label: cfg.label, cfg: cfg, fb: fb, cskh: csPart, rest: rest, marketing: marketing, nFb: nFb, nRest: nRest, perFb: Math.round(perFb), perRest: Math.round(perRest), rows: rows, duyen: duyen, totals: tot };
+  return { month: ym, label: cfg.label, cfg: cfg, fb: fb, cskh: csPart, rest: rest, marketing: marketing, nFb: nFb, nRest: nRest, perCs: Math.round(perCs), perFb: Math.round(perFb), perRest: Math.round(perRest), rows: rows, duyen: duyen, totals: tot };
 }
 function _tdPartHtml_(title, p, n, per, note) {
   var col = p.pct >= 1 ? 'var(--green)' : 'var(--red)';
@@ -92,11 +92,11 @@ function _srThiDuaSectionHtml_(d) {
   h += '<div style="margin-bottom:6px"><button class="btn sm" onclick="_srThiDuaExportXlsx()">⬇ Xuất Excel thi đua</button></div>';
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + _tdPartHtml_('Kênh Facebook chính (Fb Phạm Thu Hiền)', td.fb, td.nFb, td.perFb, 'Chia đều: ' + td.rows.filter(function (r) { return r.fbMain; }).length + ' người FB chính (gồm CSKH nếu có) + Duyên') +
     _tdPartHtml_('Duyên + MKT (bỏ kênh FB chính' + (td.cskh ? ' và CSKH-Duyên' : '') + ')', td.rest, td.nRest, td.perRest, 'Chia đều: sale chưa đạt cam kết + Duyên (Duyên không có doanh thu, chỉ chia phạt)') +
-    (td.cskh ? _tdPartHtml_(td.cskh.label || 'Kênh CSKH - Duyên', td.cskh, 1, td.cskh.penalty, 'Duyên chịu') : '') + '</div>';
+    (td.cskh ? _tdPartHtml_(td.cskh.label || 'Kênh CSKH - Duyên', td.cskh, td.nRest, td.perCs, 'Doanh thu = đơn ngoài FB của Mến. Chia đều: sale chưa đạt cam kết + Duyên (không gồm Mến)') : '') + '</div>';
   if (td.marketing.length) h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + td.marketing.map(function (m) { return _tdPartHtml_('Marketing — ' + m.name + ' (kênh riêng)', m, 1, m.penalty, m.orders ? m.orders + ' đơn có Marketer khớp tên; phạt/thưởng của chính người này' : '⚠ Chưa có đơn nào có Marketer khớp tên "' + esc(m.name) + '" — kiểm tra cột Marketer'); }).join('') + '</div>';
   h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Cam kết</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">% đạt</th><th style="text-align:right">Còn thiếu</th><th>Kết quả</th><th style="text-align:right">Phạt kênh FB</th><th style="text-align:right">Phạt Duyên + MKT</th><th style="text-align:right">Phạt CSKH</th><th style="text-align:right">Tổng phạt</th></tr></thead><tbody>';
   td.rows.forEach(function (r) {
-    h += '<tr><td>' + esc(r.name) + (r.fbMain ? ' <span style="font-size:10px;color:var(--muted)">(FB chính)</span>' : '') + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : _srMoney(r.commit)) + '</td><td style="text-align:right">' + _srMoney(r.rev) + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : (Math.round(r.pct * 1000) / 10) + '%') + '</td><td style="text-align:right">' + (r.gap ? _srMoney(r.gap) : '—') + '</td><td style="color:' + (r.ok ? 'var(--green)' : 'var(--red)') + '">' + (r.fbOnly ? 'Chỉ chia phạt kênh FB' : (r.ok ? 'Đạt — không phạt' : 'Chưa đạt')) + '</td><td style="text-align:right">' + (r.penFb ? _srMoney(r.penFb) : '—') + '</td><td style="text-align:right">' + (r.penRest ? _srMoney(r.penRest) : '—') + '</td><td style="text-align:right">—</td><td style="text-align:right"><b>' + (r.total ? _srMoney(r.total) : '—') + '</b></td></tr>';
+    h += '<tr><td>' + esc(r.name) + (r.fbMain ? ' <span style="font-size:10px;color:var(--muted)">(FB chính)</span>' : '') + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : _srMoney(r.commit)) + '</td><td style="text-align:right">' + _srMoney(r.rev) + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : (Math.round(r.pct * 1000) / 10) + '%') + '</td><td style="text-align:right">' + (r.gap ? _srMoney(r.gap) : '—') + '</td><td style="color:' + (r.ok ? 'var(--green)' : 'var(--red)') + '">' + (r.fbOnly ? 'Chỉ chia phạt kênh FB' : (r.ok ? 'Đạt — không phạt' : 'Chưa đạt')) + '</td><td style="text-align:right">' + (r.penFb ? _srMoney(r.penFb) : '—') + '</td><td style="text-align:right">' + (r.penRest ? _srMoney(r.penRest) : '—') + '</td><td style="text-align:right">' + (r.penCskh ? _srMoney(r.penCskh) : '—') + '</td><td style="text-align:right"><b>' + (r.total ? _srMoney(r.total) : '—') + '</b></td></tr>';
   });
   h += '<tr><td>Duyên</td><td colspan="5" style="color:var(--muted)">Không có doanh thu — chỉ chia phạt</td><td style="text-align:right">' + _srMoney(td.duyen.penFb) + '</td><td style="text-align:right">' + _srMoney(td.duyen.penRest) + '</td><td style="text-align:right">' + (td.duyen.penCskh ? _srMoney(td.duyen.penCskh) : '—') + '</td><td style="text-align:right"><b>' + _srMoney(td.duyen.total) + '</b></td></tr>';
   h += '<tr style="font-weight:700"><td>Tổng (Sale + Duyên)</td><td colspan="5"></td><td style="text-align:right">' + _srMoney(td.totals.penFb) + '</td><td style="text-align:right">' + _srMoney(td.totals.penRest) + '</td><td style="text-align:right">' + _srMoney(td.totals.penCskh) + '</td><td style="text-align:right">' + _srMoney(td.totals.total) + '</td></tr></tbody></table>';
@@ -108,10 +108,10 @@ function _tdExportRows_(td) {
   var kenh = [['Kênh', 'KPI (đ)', 'Doanh thu (đ)', '% hoàn thành', 'Tỷ lệ phạt', 'Tiền phạt (đ)', 'Thưởng nếu đạt (đ)', 'Số người chia phạt', 'Mỗi người (đ)', 'Ghi chú']];
   kenh.push(['FB chính (Fb Phạm Thu Hiền)', td.fb.kpi, td.fb.rev, pct(td.fb), rate(td.fb), td.fb.penalty, td.fb.bonus, td.nFb, td.perFb, 'Sale FB chính + Mến + Duyên']);
   kenh.push(['Duyên + MKT (phần còn lại)', td.rest.kpi, td.rest.rev, pct(td.rest), rate(td.rest), td.rest.penalty, td.rest.bonus, td.nRest, td.perRest, 'Sale chưa đạt cam kết + Duyên']);
-  if (td.cskh) kenh.push([td.cskh.label || 'CSKH - Duyên', td.cskh.kpi, td.cskh.rev, td.cskh.pending ? 'chưa xác định' : pct(td.cskh), td.cskh.pending ? '' : rate(td.cskh), td.cskh.penalty, td.cskh.bonus, 1, td.cskh.penalty, td.cskh.pending ? 'Chưa cấu hình cách tính doanh thu kênh' : 'Duyên chịu']);
+  if (td.cskh) kenh.push([td.cskh.label || 'CSKH - Duyên', td.cskh.kpi, td.cskh.rev, td.cskh.pending ? 'chưa xác định' : pct(td.cskh), td.cskh.pending ? '' : rate(td.cskh), td.cskh.penalty, td.cskh.bonus, td.nRest, td.perCs, td.cskh.pending ? 'Chưa cấu hình cách tính doanh thu kênh' : 'Sale chưa đạt cam kết + Duyên (không gồm Mến)']);
   td.marketing.forEach(function (m) { kenh.push(['Marketing — ' + m.name, m.kpi, m.rev, pct(m), rate(m), m.penalty, m.bonus, 1, m.penalty, m.orders + ' đơn khớp Marketer']); });
   var sale = [['Sale', 'Tài khoản', 'Đội', 'Cam kết (đ)', 'Doanh thu (đ)', '% đạt', 'Còn thiếu (đ)', 'Kết quả', 'Phạt kênh FB (đ)', 'Phạt Duyên + MKT (đ)', 'Phạt CSKH (đ)', 'Tổng phạt (đ)']];
-  td.rows.forEach(function (r) { sale.push([r.name, r.user, r.team, r.fbOnly ? '' : r.commit, r.rev, r.fbOnly ? '' : Math.round(r.pct * 1000) / 10 + '%', r.gap, r.fbOnly ? 'Chỉ chia phạt FB' : (r.ok ? 'Đạt' : 'Chưa đạt'), r.penFb, r.penRest, 0, r.total]); });
+  td.rows.forEach(function (r) { sale.push([r.name, r.user, r.team, r.fbOnly ? '' : r.commit, r.rev, r.fbOnly ? '' : Math.round(r.pct * 1000) / 10 + '%', r.gap, r.fbOnly ? 'Chỉ chia phạt FB' : (r.ok ? 'Đạt' : 'Chưa đạt'), r.penFb, r.penRest, r.penCskh, r.total]); });
   sale.push(['Duyên', '', 'Quản lý', '', '', '', '', 'Chỉ chia phạt', td.duyen.penFb, td.duyen.penRest, td.duyen.penCskh, td.duyen.total]);
   sale.push(['TỔNG', '', '', '', '', '', '', '', td.totals.penFb, td.totals.penRest, td.totals.penCskh, td.totals.total]);
   return { kenh: kenh, sale: sale };
