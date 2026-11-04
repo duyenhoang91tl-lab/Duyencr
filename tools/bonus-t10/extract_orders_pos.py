@@ -51,6 +51,11 @@ for rn, r in d['pos']:
          'maSanPham': str(r.get(9) or ''), 'sanPham': str(r.get(8) or ''), 'soLuong': qty if isinstance(qty, str) else '', 'giaTriDon': float(v),
          'ngayTao': xd(r[1]).strftime('%d/%m/%Y'), 'ghiChu': str(r.get(16) or ''), 'trangThai': str(r.get(14) or ''), 'giaTriTruocGiam': 0,
          'baoHanh': nguon.strip().lower() == 'bảo hành', 'sdt': str(int(ph)) if isinstance(ph, float) else str(ph or '')}
+    if o['maDon'] in OV and 'split' in OV[o['maDon']]:   # TACH 1 don Pos thanh nhieu don theo tung nguoi (gia tri rieng; 'giaTri' bo trong = phan con lai cua Pos) - Duyen chot 2026-11-04 cho M45869
+        rest = o['giaTriDon'] - sum(p.get('giaTri') or 0 for p in OV[o['maDon']]['split'])
+        for k, p in enumerate(OV[o['maDon']]['split']):
+            q = dict(o); q['id'] = o['id'] + 's%d' % k; q['saleBanGoc'] = o['saleBan']; q['saleBan'] = p['saleBan']; q['giaTriDon'] = float(p.get('giaTri') or rest); q['ghiChu'] = p['ghiChu']; orders.append(q)
+        continue
     if o['maDon'] in OV: o['saleBanGoc'] = o['saleBan']; o['saleBan'] = OV[o['maDon']]['saleBan']
     orders.append(o)
 ch = {}

@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 24) — THƯỞNG T10: Duyên chốt đơn M45869 (681T10+937T10) — BƯỚC 1/2 (code) xong, đã push
+- **Duyên chốt:** 937T10 là của Mai Huyền 3.550.000; 681T10 là của Ngọc (ngocNB2003saleoff). Tính thưởng theo đó.
+- **NGUYÊN NHÂN GỐC:** Pos M45869 (14.523.000) gắn 2 thẻ nên engine CHIA ĐỀU 2 sale → Mai Huyền nhận nhầm 10.000 (đơn "combo 2 SP" chia 2) dù phần của Mai chỉ 3,55tr (<10tr, không đạt mốc).
+- [x] `extract_orders_pos.py` hỗ trợ khoá `split` trong `order_overrides.json` (tách 1 đơn Pos thành nhiều đơn theo người, giá trị riêng; bỏ trống `giaTri` = phần còn lại của Pos). M45869 → Ngọc 10.973.000 (= Pos − 3.550.000, để tổng = Pos theo quy tắc phiên 16) + Mai Huyền 3.550.000. ⚠ Duyên nói Ngọc "14.523.000" — đã thử cả 2 cách, kết quả thưởng GIỐNG HỆT (Ngọc là thử việc, không có thưởng theo đơn; thưởng ngày thử việc không đổi).
+- **Kết quả:** tổng thưởng T10 3.833.340 → **3.823.340** (huyenmaii1990 −10.000: 516.668 → 506.668; Ngọc giữ 190.000).
+- [ ] **BƯỚC 2/2 (kế tiếp):** xuất file giao `build_delivery_xlsx.py` (tổng, chi tiết, CHECK TAY Pos-Base) từ `Check_DT_t10.xlsx` mới.
+
 ## 2026-11-04 (phiên 23) — BẢNG THƯỞNG T10 "chuẩn theo file KT C DUYÊN-lương sale" — BƯỚC 1/2 xong (đã push script), CHỜ file nguồn để chốt số cuối
 - **Yêu cầu Duyên:** gửi lại bảng thưởng T10 sale theo file KT `C DUYÊN-lương sale.xlsx`. File KT chỉ có HOA HỒNG (AO), không có thưởng, không có cột ngày/sản phẩm → KHÔNG tính lại thưởng trực tiếp từ KT được.
 - [x] **ĐÃ PUSH:** `tools/bonus-t10/build_thuong_chuan_kt.py <Thuong_T10_chuan_v2.xlsx> <C_DUYEN_luong_sale.xlsx> <ra.xlsx>` — lấy bảng thưởng engine, gán NHÓM KT (SALE ONL/SALE OFF/CSKH, cột Q) cho từng sale, đối chiếu từng dòng thưởng "Theo đơn" với đơn trên KT (mã đơn + thẻ sale). File ra giao qua chat, KHÔNG commit (có tiền từng người).
