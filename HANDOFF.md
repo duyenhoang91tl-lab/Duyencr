@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 8) — Báo cáo B (Pos): DOANH THU CHUẨN giữ nguyên + bảng TRỪ hoàn/hủy tháng trước hiện RIÊNG bên dưới (Duyên yêu cầu) — bước 1/3 (backend) đã push
+- **Yêu cầu:** "Trên CRM Pos cho doanh thu chuẩn của tháng 10 trước; ngay bên dưới là báo cáo phần trừ hoàn/hủy của tháng trước, KHÔNG trừ trực tiếp luôn."
+- **Hiện trạng cũ (nguyên nhân):** `applyPosMonthAdjustToReportB_` (gas_v13.js, sau khi bấm "Chốt tháng") GHI ĐÈ `bySale[].giaTri` và `totalGiaTri` bằng số ĐÃ TRỪ hoàn/hủy tháng trước → thẻ Tổng giá trị/bảng Theo Sale không còn là doanh thu chuẩn của tháng.
+- [x] **BƯỚC 1/3 ĐÃ PUSH (gas_v13.js + `gas/*.gs`):** `giaTri`/`totalGiaTri` GIỮ NGUYÊN (doanh thu chuẩn). Mỗi dòng Sale thêm `truHoanHuy` + `giaTriSauTru` (`giaTriGoc` = `giaTri`, giữ tên cũ); `res.totalGiaTriSauTru`; `posAdjust` thêm `rows[]` (name, orders, giaTri, truHoanHuy, giaTriSauTru — GỒM cả Sale chỉ có hoàn/hủy tháng trước mà tháng này không có đơn, KHÔNG còn chèn dòng âm vào bảng chính), `totalGiaTri`, `totalSauTru`, `totalDeduction`, `note`. Điều kiện áp dụng không đổi (xem đúng 1 tháng lịch, đã chốt tháng trước, không lọc Nguồn/MKT/Sản phẩm…). Test: `node tools/test-pos-month-adjust.js` (20 ca, cập nhật theo ngữ nghĩa mới).
+- ⚠ **Đang ĐỎ tạm (sửa ở bước 3):** `tools/test-report-b-export.js` (3 ca ghim ngữ nghĩa cũ "web = số đã trừ"); `test-pos-month-adjust-ui` / `test-recon-export` còn xanh vì dùng dữ liệu tự dựng.
+- [ ] **BƯỚC 2/3 (đang làm kế tiếp):** `js/11-fn-srload.js` `_srRenderB`: thẻ Tổng giá trị + bảng Theo Sale hiện DOANH THU CHUẨN (bỏ cột "Trừ hoàn/hủy" khỏi bảng chính); NGAY BÊN DƯỚI thêm khối "🔻 Trừ hoàn/hủy tháng trước" (Sale · DT chuẩn · Trừ hoàn/hủy · Sau trừ + dòng tổng) từ `posAdjust.rows`. **BƯỚC 3/3:** `js/13` `_srBuildExportB_` + `js/61` (Excel/đối soát đang nối "số sau trừ trên web") đổi cho khớp ngữ nghĩa mới.
+- **Ảnh hưởng cần biết:** các báo cáo khác đọc `giaTri` của B (E hoa hồng, G thưởng…) giờ nhận số CHUẨN (chưa trừ) khi tháng đã chốt.
+
 ## 2026-11-04 (chiều, bước 3) — Ô nhập "📌 Ép sale theo đơn" trong Sasum (thay cho sửa sheet Settings tay) — ĐÃ PUSH
 
 - [x] `js/65-order-sale-ovr.js` (mới) + nối `js/29-sidenav.js` (Cài đặt team → 📌 Ép sale theo đơn, chỉ admin) + `index.html` (`?v=20261104a`): bảng "Mã đơn (bộ đếm) → Tên sale", thêm/xoá dòng, kiểm tra mã sai/thiếu tên/trùng, lưu Settings `orderSaleOverride` (backend đã xử lý từ bước 2). Tải danh sách lỗi → khoá nút Lưu để không ghi đè mất dữ liệu cũ. Test: `node tools/test-order-sale-ovr-ui.js` (6 ca). Không đổi gas_v13.js ở bước này. `tools/build-dist.js` không chạy được ở máy chat (thiếu module) — để Actions build.

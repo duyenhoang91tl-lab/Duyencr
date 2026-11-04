@@ -40,13 +40,14 @@ const F11 = { dateFrom: '2026-11-01', dateTo: '2026-11-30' };
 let r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), ' + JSON.stringify(F11) + ')');
 const byN = n => r.bySale.find(x => x.name === n);
 ok(r.posAdjust && r.posAdjust.applied && r.posAdjust.prevMonth === '2026-10', 'thang 11: posAdjust.applied, tru hoan/huy cua thang 10');
-ok(byN('anhtrinh1995').giaTri === 550000 && byN('anhtrinh1995').giaTriGoc === 700000 && byN('anhtrinh1995').truHoanHuy === 150000, 'anhtrinh1995: 700.000 − 150.000 = 550.000');
-ok(byN('yenNTH2004').giaTri === 300000 && byN('menbui2002').giaTri === 200000, 'sale khong bi hoan: giu nguyen');
-ok(r.totalGiaTri === 1050000 && r.totalGiaTriGoc === 1200000 && r.posAdjust.totalDeduction === 150000, 'tong gia tri = 1.200.000 − 150.000 = 1.050.000');
-ok(r.bySale.map(x => x.name).join() === 'anhtrinh1995,yenNTH2004,menbui2002'.split(',').sort((a, b) => byN(b).giaTri - byN(a).giaTri).join(), 'sap xep lai theo gia tri sau tru');
+ok(byN('anhtrinh1995').giaTri === 700000 && byN('anhtrinh1995').giaTriGoc === 700000 && byN('anhtrinh1995').truHoanHuy === 150000 && byN('anhtrinh1995').giaTriSauTru === 550000, 'DOANH THU CHUAN giu nguyen 700.000 (KHONG tru truc tiep); phan tru 150.000 va sau tru 550.000 nam o cot rieng');
+ok(byN('yenNTH2004').giaTri === 300000 && byN('menbui2002').giaTri === 200000 && byN('yenNTH2004').truHoanHuy === 0 && byN('menbui2002').giaTriSauTru === 200000, 'sale khong bi hoan: giu nguyen, tru 0');
+ok(r.totalGiaTri === 1200000 && r.totalGiaTriGoc === 1200000 && r.totalGiaTriSauTru === 1050000 && r.posAdjust.totalDeduction === 150000 && r.posAdjust.totalGiaTri === 1200000 && r.posAdjust.totalSauTru === 1050000, 'TONG CHUAN 1.200.000 giu nguyen; tru rieng 150.000 -> sau tru 1.050.000');
+ok(r.bySale.map(x => x.name).join() === 'anhtrinh1995,yenNTH2004,menbui2002' && r.posAdjust.rows.map(x => x.name).join() === 'anhtrinh1995,yenNTH2004,menbui2002', 'bang chinh sap theo doanh thu chuan; bang tru (posAdjust.rows) sap theo so sau tru');
+ok(r.posAdjust.rows.length === 3 && r.posAdjust.rows[0].name === 'anhtrinh1995' && r.posAdjust.rows[0].giaTri === 700000 && r.posAdjust.rows[0].truHoanHuy === 150000 && r.posAdjust.rows[0].giaTriSauTru === 550000 && r.posAdjust.rows[0].orders === byN('anhtrinh1995').orders, 'posAdjust.rows: tung sale co chuan / tru / sau tru / so don de hien bang ben duoi');
 // khop voi nut "Xem sau khi tru hoan/huy" (posMonthAdjust_)
 const adj = run('posMonthAdjust_("2026-11")');
-ok(adj.rows.every(x => byN(x.name) && byN(x.name).giaTri === x.net) && adj.totalNet === r.totalGiaTri, 'bang Theo Sale = cot "Sau tru" cua nut Xem sau khi tru hoan/huy (cung 1 so)');
+ok(adj.rows.every(x => byN(x.name) && byN(x.name).giaTri === x.revenue && byN(x.name).giaTriSauTru === x.net) && adj.totalNet === r.totalGiaTriSauTru, 'cot chuan / sau tru khop nut Xem sau khi tru hoan/huy (posMonthAdjust_): cung 1 so');
 
 // ── 3. Cac truong hop KHONG ap ──
 r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-12-01",dateTo:"2026-12-31"}), {dateFrom:"2026-12-01",dateTo:"2026-12-31"})');
@@ -64,8 +65,8 @@ ok(r.posAdjust.totalDeduction === 150000, 'loc dung sale bi hoan: tru 150.000');
 // ── 4. Sale chi co hoan/huy, thang M khong co don -> van hien dong am ──
 ctx.__data = { '2026-10': { anhtrinh1995: 850000, yenNTH2004: 600000 }, '2026-11': { yenNTH2004: 300000 } };
 r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), {dateFrom:"2026-11-01",dateTo:"2026-11-30"})');
-ok(r.bySale.some(x => x.name === 'anhtrinh1995' && x.giaTri === -150000 && x.orders === 0), 'sale khong co don thang 11 nhung co hoan/huy thang 10: dong am −150.000');
-ok(r.totalGiaTri === 150000, 'tong = 300.000 − 150.000');
+ok(!r.bySale.some(x => x.name === 'anhtrinh1995') && r.posAdjust.rows.some(x => x.name === 'anhtrinh1995' && x.giaTri === 0 && x.orders === 0 && x.truHoanHuy === 150000 && x.giaTriSauTru === -150000), 'sale khong co don thang 11 nhung co hoan/huy thang 10: KHONG them dong vao bang chinh; chi co dong am −150.000 o bang tru');
+ok(r.totalGiaTri === 300000 && r.totalGiaTriSauTru === 150000, 'tong chuan 300.000; sau tru 150.000');
 
 // ── 5. Anh chup luc chot la so GOC (khong bi tru long nhau) ──
 ctx.__data = { '2026-10': { a: 100 }, '2026-11': { a: 80 } };
