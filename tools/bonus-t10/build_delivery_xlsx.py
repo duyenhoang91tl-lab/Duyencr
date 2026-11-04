@@ -61,12 +61,14 @@ ws.auto_filter.ref = 'A1:H%d' % (len(chk) + 1)
 def f(x):
     try: return float(str(x).replace(',', ''))
     except Exception: return 0.0
+# Ten sale tren BASE khac ten tren Pos (Thuy: Pos 'thuydinh95' = Base 'Thuydinh1995') -> neu khong gop alias, sheet doanh thu ngay rong.
+WALIAS = {'thuydinh95': {'thuydinh1995'}}
 b = openpyxl.load_workbook(SRC, read_only=True, data_only=True)['Base']
 day = collections.defaultdict(float); cnt = collections.defaultdict(list)
 for x in b.iter_rows(min_row=2, values_only=True):
     if not x[0] or not x[13] or str(x[7]) == 'Thất bại': continue
     sales = [s.strip() for s in str(x[13]).split(',') if s.strip()]
-    if WATCH not in [s.lower() for s in sales]: continue
+    if not ({WATCH} | WALIAS.get(WATCH, set())) & {s.lower() for s in sales}: continue
     d = str(x[0])[:10]; v = (f(x[17]) + f(x[18])) / len(sales); day[d] += v; cnt[d].append('%s (%s)' % (x[20], format(round(v), ',')))
 ws = wb.create_sheet('Doanh thu ngày ' + WATCH); hdr(ws, ['Ngày tạo đơn Base', 'Doanh thu ngày (đ)', 'Đạt mốc 60tr?', 'Đơn gốc trong ngày'], [18, 22, 14, 110])
 for i, d in enumerate(sorted(day), 2):

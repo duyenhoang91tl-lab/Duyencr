@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 32) — THƯỞNG T10: Thủy (thuydinh95) báo thiếu thưởng doanh thu ngày — ĐÃ KIỂM, KHÔNG SỬA ENGINE, sửa sheet xuất file — XONG, đã push
+- **Kết luận:** engine ĐÚNG, không sale nào lệch. Tính độc lập (ngày Base, chia theo số sale, bỏ đơn loại) cho cả 22 tài khoản: 0 lệch mốc (đội chính thức 60tr/100tr, thử việc 25/50/80tr). Thủy đạt 60tr đúng 2 ngày: 18/10 (62,5tr) + 20/10 (68,3tr) = 100.000.
+- **Ngày Thủy tưởng thiếu:** 15/10 = 58.499.000 (Pos) / 58.309.190 (Base thô) < 60tr (thiếu ~1,5tr); 622T10 (6,326tr) lên Base 16/10 nên không vào 15/10; 30/10 = 53,1tr (1270T10 5,65tr có Base nhưng KHÔNG có trên Pos → không tính, kể cả cộng vào = 58,7tr vẫn < 60tr). Sát mốc khác: huyenmaii1990 20/10 59,31tr, trangNH2005 20/10 59,41tr.
+- **NGUYÊN NHÂN GỐC sheet rỗng:** tên Thủy trên Base là `Thuydinh1995`, trên Pos là `thuydinh95` → `build_delivery_xlsx.py` (lọc theo tên Base) không khớp ai → sheet "Doanh thu ngày" rỗng. Đã thêm `WALIAS`.
+- ⚠ 563T10: Base ghi 190 (thiếu 000) vs Pos 190.000 — engine dùng Pos.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xác nhận 15/10 Thủy không đạt; 1270T10 cần lên đơn Pos nếu có thật. Không sửa gas_v13.js/extension → không cần deploy/reload.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 31) — THƯỞNG T10: ô "Chất liệu loại trừ" trên Cấu hình thưởng + tự nâng cấp 3 CT Tỳ hưu đã lưu — BƯỚC 1/2 xong, đã push
 - **Duyên yêu cầu:** chỉnh lại quy tắc trên CRM cho web ra đúng (Cấu hình đang lưu vẫn từ khoá cũ, UI chưa có ô loại trừ); thêm cột Sản phẩm vào file thưởng để theo dõi; gửi lại file.
 - **NGUYÊN NHÂN GỐC:** `Settings.bonusPrograms` đã lưu giữ từ khoá cũ ("Tourmaline Hồng, Tourmaline Xanh", "Aquamarine", "Tỳ hưu thiên lộc Moon, Thiên Lộc Moon") không khớp tên Pos (TOUR/AQUA); seed mới (js/13) chỉ có tác dụng khi bấm tạo lại mẫu; form `_bpEditFormHtml_` không có ô `excludeProduct` nên web không loại Ngọc/Ruby/Saphire.
