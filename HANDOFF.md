@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 29) — THƯỞNG T10: Hải Yến báo thiếu thưởng TỲ HƯU — ĐÃ KIỂM, CHƯA SỬA CODE (chờ Duyên chốt)
+- **Kết luận: ĐÚNG, thiếu chung cho nhiều sale.** Hải Yến (yenNTH2004) có 7 đơn Tỳ hưu Thiên Lộc (6 TOUR + 1 AQUA: 1264, 1249, 1185, 612, 442, 356, 351T10) → engine trả 0.
+- **NGUYÊN NHÂN GỐC 1:** `calc_bonus.js` PROGRAMS khớp CHUỖI CON "Tourmaline Hồng, Tourmaline Xanh" và "Aquamarine", nhưng tên SP trên Pos ghi "TOUR" và "AQUA" → 42 dòng TOUR + 4 dòng AQUA không bao giờ khớp; chỉ "MOON" khớp nên engine chỉ trả Moon.
+- **NGUYÊN NHÂN GỐC 2 (lỗi riêng Moon):** keyword "Tỳ hưu thiên lộc Moon" và "Thiên Lộc Moon" cùng khớp 1 SP → `_bonusProductQty_` (js/12) đếm 2 → 1 nhẫn Moon trả 20k thay vì 10k. Hàm cũng KHÔNG đọc cột Số lượng của Pos (đếm số lần từ khoá xuất hiện).
+- **Con số (22 TK đội Sale, T10):** nếu sửa đúng (TOUR/AQUA 8k, Moon 10k/SP, loại Lam Thủy/Ngọc Bích/Cẩm Thạch/Ruby/Saphire, SL theo dòng Pos, chia đều theo số sale): Tỳ hưu 140.001 → 422.667 (+282.666) nếu CỘNG DỒN với thưởng combo; hoặc +144.666 nếu giữ quy tắc engine hiện tại "mỗi đơn chỉ lấy mức cao nhất giữa CT sản phẩm và CT giá trị đơn". Hải Yến: +44.000 (cộng dồn) / +36.000 (lấy cao nhất). Cần thiết lập: trangNH2005 +48k, huyenmaii1990 +39k, thuydinh95 +26k, thuyha88 +24k, anhtrinh1995 +20k...
+- ⚠ Cần Duyên chốt: (a) "TOUR" trên Pos = Tourmaline Hồng/Xanh (8k)? (b) Tỳ hưu CỘNG THÊM vào thưởng combo (bảng ghi "cộng thưởng trực tiếp") hay lấy mức cao nhất như engine? (c) sửa lỗi đếm đôi Moon (giảm: thuydinh95 20k→10k, phuongthao2000 46.667→33.333...).
+- [ ] **VIỆC KẾ TIẾP:** sau khi Duyên chốt (a)(b)(c): sửa keyword/đếm SL trong `calc_bonus.js` (offline) và js/12 `_bonusProductQty_` + gas_v13.js (web; phải deploy lại GAS + đồng bộ khối gas-code-v9 trong index.html + reload extension nếu đụng); chạy lại pipeline; xuất file mới.
+- **ĐANG LÀM:** không có việc dở; không sửa code phiên này.
+
 ## 2026-11-04 (phiên 28) — THƯỞNG T10: chạy lại TOÀN pipeline trên Check_DT_t10_1.xlsx + đối chiếu bảng SALE TỰ NHẬP (PDF online/offline) — XONG, đã push
 - **Duyên yêu cầu:** check lại doanh thu T10 + kiểm các đơn sale tự nhập: chuẩn ngày lên Base, có đơn Pos, Base không Hủy/Thất bại thì tính.
 - [x] Chạy lại `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js` → `build_delivery_xlsx.py` trên file mới: tổng **3.986.673** (KHỚP v6, chi tiết từng dòng trùng v6). Dòng "giá niêm yết tour khôi phục" ra đúng 1301T10 (31.500.000).
