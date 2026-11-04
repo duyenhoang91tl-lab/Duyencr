@@ -49,6 +49,7 @@ Object.assign(ctx, { esc: s => String(s), _srMoney: n => Math.round(n || 0).toLo
 const html = vm.runInContext('(function(d){return _srThiDuaSectionHtml_(d);})', ctx)({ orders: [o2(1, 'menbui2002', 'Fb Phạm Thu Hiền', 750e6)] });
 ok(/Xuất Excel thi đua/.test(html) && /Ngô Việt Huy/.test(html) && /Bùi Mến/.test(html) && /Duyên/.test(html) && !/undefined|NaN/.test(html), 'render muc thi dua: co nut Xuat Excel, Huy, Men, Duyen; khong undefined/NaN');
 ctx._srState.eDateTo = '2026-09-30'; ok(vm.runInContext('_srThiDuaSectionHtml_({orders:[]})', ctx) === '', 'thang chua cau hinh -> khong hien muc');
+ok(/TỰ CHỊU phạt/.test(vm.runInContext('(function(d){return _srThiDuaSectionHtml_(d);})', Object.assign(ctx, { _srState: { eDateFrom: '2026-11-01', eDateTo: '2026-11-30' } }))({ orders: [o2(8, 'anhtrinh1995', 'Zalo', 1e6, 'Ngô Việt Huy')] })) && run([], '2026-11').marketing.length === 2, 'Marketing: the Huy/Hung ghi tu chiu phat theo ty le dat kenh');
 if (process.argv[2]) { // doi chieu voi bang tinh T10 (Phat_thi_dua_T10_2026.xlsx)
   // 24 dong cuoi sheet DON PT trong file KT (phan sale 30% cua don quay) khong co ngay, khong co trong Pos/CRM -> bang tinh T10 co tinh, nen gan ngay T10 de doi chieu dung bang tinh
   const ords = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).filter(x => x.sheet === 'ĐƠN PT').map(x => /^\d\d\/\d\d\/\d{4}/.test(x.ngayTao) ? x : { ...x, ngayTao: '15/10/2026' });
