@@ -45,6 +45,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - ⚠ CHƯA đổi cấu hình kênh trong CRM (không tự quyết): Duyên xác nhận 4 sale trên là OFF hay ON (thưởng không đổi theo kênh, chỉ % hoa hồng).
 - [ ] **VIỆC KẾ TIẾP:** Duyên chốt kênh từng sale → cập nhật Quản lý Sale (SALE_CHANNELS) trên CRM; check tay các sale KT có DT mà CRM thiếu Pos; sau đó chạy lại `recon_luong_kt.py`.
 
+## 2026-11-04 (phiên 22) — PHẠT THI ĐUA T10 v10: phần còn lại của đội Sale CHỈ trừ kênh FB chính — XONG, đã push
+- **Duyên chốt (18:24):** phần 8 tỷ = 22 tài khoản đội Sale − FB chính của đội, KHÔNG trừ Dược/mỹ phẩm nữa. **v10 thay v9.**
+- [x] **ĐÃ PUSH:** `tools/thidua-t10/build_phat_t10.py` — `Phat_theo_kenh!B17` bỏ điều kiện cột K (Dược/mỹ phẩm); B23 chỉ còn là thông tin (70.132.000, đã nằm trong phần còn lại); B30 = B6+B17+B24. File `Phat_thi_dua_T10_2026_v10.xlsx` giao qua chat, KHÔNG commit.
+- **Kết quả:** 6.608.471.967 − FB chính của đội 978.698.167 = **5.629.773.800 = 70,37% → mức 0,02% → phạt 1.600.000** (16 sale không đạt + Duyên = 17 đầu → 94.118đ). FB chính 280.000 (46.667đ/người). Tổng **1.880.000đ**. Lưu ý 70,37% sát ngưỡng 70%: lệch chỉ 29,7 triệu là nhảy sang 0,025%.
+- [ ] **VIỆC KẾ TIẾP:** KPI T10 Huy/Hưng (sheet Phat_MKT); `js/64-thidua.js` (web) chưa theo danh sách 22 tài khoản. Không sửa gas_v13.js/extension.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 21) — THƯỞNG T10: đơn có trên Pos nhưng Base Thất bại / không có trên Base → KHÔNG thưởng + CHECK TAY — XONG, đã push
 - **Duyên chốt:** VD 1015T09/2026 có trên Pos, Base không có (đơn Base đã hủy/thất bại) → không tính thưởng cho sale; tương tự mọi đơn có trên Pos mà không có trên Base → liệt kê check tay.
 - **CRM web/GAS ĐÃ làm đúng sẵn (không sửa):** `gas_v13.js` Báo cáo B: gốc Base toàn Huỷ/Hoàn/Thất bại → `gocBiLoai` (bỏ đơn Pos); đơn không khớp Base → `khongKhop` (check tay) và không có `donGoc` nên không vào thưởng (js/12 `_hasGocField`). Lỗi chỉ ở bản OFFLINE.
