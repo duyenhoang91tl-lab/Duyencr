@@ -115,3 +115,23 @@ html.ui-pro:not([data-theme="dark"]) .sidebar .cs-filter-label,
 html.ui-pro:not([data-theme="dark"]) .sidebar .sb-label,
 html.ui-pro:not([data-theme="dark"]) #ymf-bar .ymf-label,
 html.ui-pro:not([data-theme="dark"]) #col-toggle-bar .ymf-label{color:var(--text);}
+
+/* ── 8. NỀN PASTEL KIỂU CANVA / PANCAKE (Duyên yêu cầu 2026-11-04) ──
+   Tham khảo ảnh Canva (xanh ngọc → tím lavender → hồng) và Pancake (xanh → tím → hồng).
+   Yêu cầu: nền chuyển màu pastel nhã nhặn, NHẸ, đồng điệu với header hồng hoàng hôn.
+   Cách làm: chỉ đổi NỀN trang (body/.main) + sidebar lọc; không đụng header/menu/chữ (độ tương phản mục 7 giữ nguyên).
+   Nền sáng tới mức chữ #1a0f15 vẫn >= 15:1. Thẻ/bảng nền trắng (--surface) nên nổi rõ trên nền màu.
+   Gỡ phần này = xoá mục 8 → quay về nền hồng đào mục 2. */
+html.ui-pro:not([data-theme="dark"]){--bg:#f1eefb;--pro-soft:#f1eefb;}
+html.ui-pro:not([data-theme="dark"]) body,
+html.ui-pro:not([data-theme="dark"]) .main{
+  background:
+    radial-gradient(900px 420px at 8% -5%, rgba(168,236,232,.55) 0%, rgba(168,236,232,0) 70%),
+    radial-gradient(900px 480px at 100% 0%, rgba(214,200,247,.60) 0%, rgba(214,200,247,0) 70%),
+    radial-gradient(1000px 520px at 50% 105%, rgba(252,214,232,.70) 0%, rgba(252,214,232,0) 70%),
+    linear-gradient(180deg,#eef8fa 0%,#f1eefb 50%,#fdf0f6 100%) fixed;
+}
+html.ui-pro:not([data-theme="dark"]) .sidebar{
+  background:linear-gradient(180deg,rgba(214,242,241,.92) 0%,rgba(230,222,250,.92) 55%,rgba(252,226,238,.92) 100%);
+  border-right-color:#d8cdef;
+}

@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 33) — NỀN PASTEL KIỂU CANVA/PANCAKE cho CRM (Duyên yêu cầu) — XONG, đã push
+- **Yêu cầu:** tham khảo nền Canva (xanh ngọc→tím lavender→hồng) và Pancake (xanh→tím→hồng), cho nền CRM chuyển màu pastel nhã nhặn, nhẹ.
+- **Đã làm:** thêm mục 8 cuối `css/19-theme-sunset.css`: nền `body`/`.main` = 3 vầng radial (mint / lavender / hồng) trên nền gradient rất nhạt #eef8fa→#f1eefb→#fdf0f6; `.sidebar` lọc KH cùng bảng màu (mờ 92%). CHỈ đổi nền, không đụng header/menu/chữ; chữ #1a0f15 trên nền mới ≥ 15:1 (muted ≥ 9:1, hint ≥ 6:1) nên không mất độ tương phản bước 1b. Chế độ tối không đổi. Cache-bust `?v=20261104b`.
+- **Gỡ/quay lại nền hồng đào cũ:** xoá mục 8 trong file 19.
+- Không sửa js/gas/extension → KHÔNG cần deploy GAS, KHÔNG cần reload extension; chỉ Ctrl+F5 web.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem trên web; nếu muốn header cũng chuyển xanh→tím→hồng như Pancake (hiện còn rose→san hô) thì sửa mục 3. Extension Zalo/Pancake (panel zai-/pk-) chưa đổi màu — hỏi Duyên. Bước 2 quét màu cứng còn sót (xem phiên 8) vẫn mở.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-03 (phiên 8) — Bảng màu HỒNG HOÀNG HÔN pastel đồng nhất toàn CRM (Duyên yêu cầu) — ĐANG LÀM 1/3 (đã merge vào main)
 - **Yêu cầu Duyên:** "chỉnh màu sắc đồng nhất, chuyên nghiệp, màu hồng — hồng pastel kiểu ánh hoàng hôn".
 - **NGUYÊN NHÂN GỐC lộn xộn màu:** màu chính là biến `--green*` (xanh lá) + nhiều gradient xanh lá/tím/navy viết cứng trong `css/06-pro.css`, `13-shell.css`, `01-base.css` (#login-overlay) + vài hex cứng trong `index.html`. Header xanh lá, menu trái xanh/tím, nền trang xanh nhạt, nút phụ xanh dương → 3-4 tông khác nhau.
