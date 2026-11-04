@@ -11,7 +11,10 @@ F = 'Arial'; HDR = PatternFill('solid', fgColor='1F3A5F'); NEW = PatternFill('so
 thin = Side(style='thin', color='BFBFBF'); BOX = Border(left=thin, right=thin, top=thin, bottom=thin); MONEY = '#,##0;[Red]-#,##0;-'
 f = lambda **k: Font(name=F, size=k.pop('size', 10), **k)
 PT_ORDER = {'Theo đơn', 'Theo sản phẩm'}
-# thuong theo don/SP gom theo orderId
+# Don Pos TACH (calc_bonus.js gop "<ma>/2026/1", "/2" thanh 1 don): thuong nam o dong dau; cac dong con lai ghi chu "tinh gop" cho de doi chieu
+tach_sub = {}
+for g in res.get('tachGroups', []):
+    for i in g['ids'][1:]: tach_sub[i] = f"Đơn tách {g['key']}: thưởng tính GỘP ({' + '.join(g['maDon'])} = {g['tong']:,.0f}đ) — hiện ở dòng {g['maDon'][0]}".replace(',', '.')
 per = {}
 for s in res['bySale']:
     if s['name'] not in ch: continue
@@ -43,7 +46,7 @@ for sh, pre in (('ĐƠN PT', 'PT'),):   # ĐƠN MP (my pham) KHONG tinh thuong
         ws.cell(row=r, column=c0, value='/'.join(kenh))
         ws.cell(row=r, column=c0 + 1, value=e['don'] if e else 0); ws.cell(row=r, column=c0 + 2, value=e['sp'] if e else 0)
         ws.cell(row=r, column=c0 + 3, value=f'={L(1)}{r}+{L(2)}{r}')
-        ws.cell(row=r, column=c0 + 4, value='; '.join(e['ct']) if e else '')
+        ws.cell(row=r, column=c0 + 4, value='; '.join(e['ct']) if e else tach_sub.get(f'{pre}{r-2}', ''))
         for j in range(5):
             c = ws.cell(row=r, column=c0 + j); c.font = f(); c.fill = NEW
             if 1 <= j <= 3: c.number_format = MONEY

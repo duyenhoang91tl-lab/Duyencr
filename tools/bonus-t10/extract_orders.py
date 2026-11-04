@@ -21,6 +21,7 @@ for sh in ('ĐƠN PT', 'ĐƠN MP'):
             'soLuong': str(r['Số lượng']) if pd.notna(r['Số lượng']) else '',
             'giaTriDon': float(r[val]) if pd.notna(r[val]) else 0,
             'ngayTao': str(r['Ngày tạo đơn']), 'ghiChu': str(r['Ghi chú nội bộ']) if pd.notna(r['Ghi chú nội bộ']) else '',
+            'trangThai': str(r.get('Trạng thái') if pd.notna(r.get('Trạng thái')) else ''),   # de calc_bonus.js loai dong Huy/Hoan khoi viec gop don tach
             'baoHanh': nguon.strip().lower() == 'bảo hành'})
 s1 = x['1_Theo sale (final)']
 ch = {}

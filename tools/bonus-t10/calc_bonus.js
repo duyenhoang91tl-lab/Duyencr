@@ -8,7 +8,38 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const allOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+const rawOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+// GOP DON POS TACH (Duyen 2026-11-04): don Base "254T10/2026" len Pos tach 2 don, ghi chu "254T10/2026/1 TACH..", "254T10/2026/2 TACH.." -> la MOT don,
+// doanh thu = tong cac phan (9.000.000 + 8.500.000 = 17.500.000 -> moc 15tr). NGUYEN NHAN GOC truoc day: script nay doc tung dong Pos nhu 1 don rieng nen moi phan <10tr -> thuong 0.
+// Dung DUNG ham/regex cua CRM (gas_v13.js _tachDonParse_ / TACH_DON_RE_SRC_ / _mergeTachDon_): dong Huy/Hoan khong tham gia gop; trung ca dong (cung /so, SDT-gia-sp) chi giu 1.
+const gasSrc = R('gas_v13.js');
+const tachRe = new RegExp(eval(gasSrc.match(/var TACH_DON_RE_SRC_ = (\'.*\');/)[1]), 'i');
+const tachParse = note => { const str = String(note || ''); if (str.indexOf('/') < 0) return null; const m = tachRe.exec(str); if (!m) return null; let yr = m[3]; if (yr.length === 2) yr = '20' + yr; return { key: (m[2] + '/' + yr).replace(/\s+/g, '').toUpperCase(), n: parseInt(m[4], 10) }; };
+const excludedSt = v => /^(huy|hoan|da huy|da hoan|dang hoan|chuyen hoan)/.test(String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim());
+function mergeTach(list) {
+  const out = [], groups = {}, groupList = [];
+  list.forEach(o => {
+    const tp = excludedSt(o.trangThai) ? null : tachParse(o.ghiChu);
+    if (!tp) { out.push(o); return; }
+    let g = groups[tp.key]; if (!g) { g = groups[tp.key] = { pos: out.length, parts: [], seen: {} }; out.push(null); groupList.push(tp.key); }
+    const sig = [tp.n, o.maDon, o.giaTriDon].join('|'); if (g.seen[sig]) return; g.seen[sig] = 1; g.parts.push(o);
+  });
+  const info = [];
+  groupList.forEach(k => {
+    const g = groups[k], ps = g.parts;
+    if (ps.length === 1) { out[g.pos] = ps[0]; return; }
+    const m = Object.assign({}, ps[0]), sales = [], seen = {};
+    ps.forEach(p => String(p.saleBan || '').split(',').forEach(x => { x = x.trim(); if (x && !seen[x.toLowerCase()]) { seen[x.toLowerCase()] = 1; sales.push(x); } }));
+    m.giaTriDon = ps.reduce((a, p) => a + (Number(p.giaTriDon) || 0), 0); m.saleBan = sales.join(', ');
+    m.sanPham = ps.map(p => p.sanPham).filter(Boolean).join(', '); m.maSanPham = ps.map(p => p.maSanPham).filter(Boolean).join(';'); m.soLuong = ps.map(p => p.soLuong).filter(Boolean).join(', ');
+    m.ghiChu = ps.map(p => p.ghiChu).filter(Boolean).join(' | '); m.tachKey = k; m.tachSoDon = ps.length; m.tachGiaTri = ps.map(p => p.giaTriDon);
+    out[g.pos] = m; info.push({ key: k, firstId: ps[0].id, ids: ps.map(p => p.id), maDon: ps.map(p => p.maDon), tong: m.giaTriDon });
+  });
+  mergeTach.info = info; return out;
+}
+const allOrders = mergeTach(rawOrders);
+console.log('gop don tach:', (mergeTach.info || []).map(x => x.key + ' (' + x.maDon.join('+') + ' = ' + x.tong + ')').join(' | ') || 'khong co');
+
 const orders = allOrders;
 // CSKH menbui2002 (chua phan loai On/Off) duoc tinh THEM thuong theo CT Online chinh thuc CHI cho don co nguon don ten 'Facebook Pham Thu Hien'; sale khac tinh binh thuong nhu cu.
 const fold = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -62,7 +93,7 @@ res.extraCskh = { name: EXTRA_CSKH, nOrders: ctx.O.length, total: men ? men.tota
 if (men && !res.bySale.some(x => x.name === EXTRA_CSKH)) { res.bySale.push(men); res.total += men.total; }
 res.nOrders = orders.length;
 console.log('them CSKH', EXTRA_CSKH, '| don Facebook Pham Thu Hien:', ctx.O.length, '| thuong them:', res.extraCskh.total);
-res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
+res.tachGroups = mergeTach.info || []; res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
 res.bySale.slice(0, 40).forEach(s => console.log(s.name.padEnd(22), String(s.total).padStart(9), (chRaw[s.name] || '(chua phan loai)')));
