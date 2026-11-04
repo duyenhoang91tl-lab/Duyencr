@@ -84,6 +84,8 @@ ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: chi tiết − trừ
 ok(Xa.summary.some(r => /TRƯỚC trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && Math.abs(r[1] - Badj.totalGiaTriGoc) < 0.01) && Xa.summary.some(r => /Trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && r[1] === -150000), 'Tong quan ghi so truoc tru + so tru');
 const Xn = cctx._srBuildExportB_(B, {});   // khong posAdjust -> Excel y nhu cu (4 cot, khong dong noi)
 ok(Xn.bySaleRows[0].length === 4 && Xn.checkRows[0][1] === 'Giá trị — bảng web' && !Xn.checkRows.some(r => String(r[0]).indexOf('Nối với số trên web') === 0), 'khong co posAdjust: Excel nhu cu (4 cot, khong dong noi)');
+const Xb = cctx._srBuildExportB_(Object.assign({}, B, { bhPrepaid: { count: 27, total: 63405000 } }), {});
+ok(Xb.summary.some(r => /trừ tiền trả trước đơn Bảo hành có thẻ sale \(27 đơn\)/.test(r[0]) && r[1] === -63405000), 'Excel Tong quan ghi so tien tra truoc don Bao hanh da tru (27 don, −63.405.000)');
 // server cu (chua co bsx/bcx) -> canh bao, khong vo
 const old = JSON.parse(JSON.stringify(B)); old.orders.forEach(o => { delete o.bsx; delete o.bcx; });
 const Xo = cctx._srBuildExportB_(old, {});

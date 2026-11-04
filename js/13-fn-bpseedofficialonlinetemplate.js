@@ -1400,6 +1400,7 @@ function _srBuildExportB_(dB, info){
   var summary = [['Báo cáo B — Pos: Excel đối chiếu với kế toán'], ['Xuất lúc', info.at || ''], ['Khoảng ngày (theo ngày tạo đơn)', (info.dateFrom || '...') + ' → ' + (info.dateTo || '...')],
     ['Bộ lọc', (info.filters && info.filters.length) ? info.filters.join(' | ') : '(không lọc thêm)'], [],
     ['Chỉ số', 'Giá trị'], ['Số lượng đơn', dB.totalOrders], ['Tổng giá trị sau giảm giá (tính báo cáo)', dB.totalGiaTri], ['Tổng COD', dB.totalCod], ['Trung bình đơn', dB.trungBinhDon]];
+  if (dB.bhPrepaid && dB.bhPrepaid.count) summary.push(['  ↳ Đã trừ tiền trả trước đơn Bảo hành có thẻ sale (' + dB.bhPrepaid.count + ' đơn)', -(Number(dB.bhPrepaid.total) || 0)]);
   if (adj) summary.push(['  ↳ Tổng giá trị TRƯỚC trừ hoàn/hủy tháng ' + adj.prevMonth, totV], ['  ↳ Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ')', -(Number(adj.totalDeduction) || 0)]);
   if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]);
   summary.push([], ['Cách đọc file'], ['• "Chi tiết đơn": mỗi đơn 1 dòng; cột "Dòng trong sheet Pos" + "Ghi chú" để dò lại file Pancake gốc; "Giá trị Pos gốc" so với "Giá trị tính báo cáo" (đơn ghép Base/file kế toán/gộp tách có thể khác nhau).'],

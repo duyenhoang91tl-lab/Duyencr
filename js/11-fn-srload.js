@@ -1207,6 +1207,11 @@ function _srSaleNoFbHtml_(d){
   return h;
 }
 // Ghi chú "đã trừ hoàn/hủy tháng trước" ở đầu Báo cáo B (d.posAdjust do GAS trả khi xem đúng 1 tháng lịch). Không có posAdjust (xem khoảng ngày tuỳ ý) → không hiện gì.
+// Đơn nguồn Bảo hành CÓ gắn thẻ sale: GAS đã trừ cột S "Tiền trả trước" khỏi doanh thu sale (gas_v13.js _bhPrepaidDeduct_) → báo số đơn + tổng đã trừ để KT đối chiếu.
+function _srBhPrepaidBannerHtml_(b){
+  if (!b || !b.count) return '';
+  return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🛠 <b>Đã trừ tiền trả trước của đơn Bảo hành có gắn thẻ sale</b>: '+fmt(b.count)+' đơn, −'+_srMoney(b.total)+' (khách đã chuyển khoản trước nên hoàn lại khỏi doanh thu sale). Đã nằm sẵn trong bảng Theo Sale và thẻ Tổng giá trị.</div>';
+}
 function _srPosAdjustBannerHtml_(a){
   if (!a) return '';
   if (a.applied) return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🔒 <b>Đã trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</b> (mốc chốt '+esc(a.closedAt)+'): '+(a.totalDeduction?'−'+_srMoney(a.totalDeduction):'không có đơn nào phát sinh hoàn/hủy sau khi chốt')+'. Bảng Theo Sale và thẻ Tổng giá trị là số SAU TRỪ; bảng Theo Team/Nguồn/MKT chưa trừ.</div>';
@@ -1216,7 +1221,7 @@ function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
   var pAdj = d.posAdjust || null, pAdjOn = !!(pAdj && pAdj.applied);   // Chốt tháng Pos: GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale + tổng (gas_v13.js applyPosMonthAdjustToReportB_)
-  var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var html = _srPosAdjustBannerHtml_(pAdj) + _srBhPrepaidBannerHtml_(d.bhPrepaid) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá'+(pAdjOn?' <span style="font-weight:400">(đã trừ hoàn/hủy '+esc(pAdj.prevMonth)+')</span>':'')+'</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +

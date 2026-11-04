@@ -11,7 +11,7 @@ const ctx = { esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replac
   _srTotalRowHtml_: cells => '<tr class="tot">' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>', _srCloseRateKpiCard_: () => '', _srCloseRateBarHtml_: () => '',
   _SR_COLTH_ROWSFN_: {}, _SR_COLTH_GETTER_: {}, _srNoDataHtml_: () => 'NODATA', _srMergeStoreIntoBySale_: function(rows){ return { rows: rows, storeTotal: 0 }; }, _srPosMonthPanelHtml_: () => '', _srBaseCheckPanelHtml_: () => '', _srChartSvg: () => 'CHART' };
 vm.createContext(ctx);
-vm.runInContext(fnSrc('_srPosAdjustBannerHtml_') + '\n' + fnSrc('_srRenderB'), ctx);
+vm.runInContext(fnSrc('_srBhPrepaidBannerHtml_') + '\n' + fnSrc('_srPosAdjustBannerHtml_') + '\n' + fnSrc('_srRenderB'), ctx);
 let h;
 const base = { totalOrders: 10, totalGiaTri: 1050000, totalCod: 0, bySale: [
   { name: 'anhtrinh1995', orders: 6, giaTri: 550000, giaTriGoc: 700000, truHoanHuy: 150000, cod: 0 }, { name: 'yenNTH2004', orders: 4, giaTri: 500000, giaTriGoc: 500000, truHoanHuy: 0, cod: 0 }] };
@@ -28,6 +28,10 @@ h = vm.runInContext('_srRenderB', ctx)(Object.assign({ posAdjust: { applied: fal
 ok(!/Trừ hoàn\/hủy 2026-10/.test(h) && /Chưa chốt tháng 2026-10/.test(h) && /🔓/.test(h), 'chua chot: khong co cot tru, co ghi chu xam ly do');
 h = vm.runInContext('_srRenderB', ctx)(base);
 ok(!/🔒|🔓|Trừ hoàn/.test(h), 'khoang ngay tuy y (khong posAdjust): giao dien nhu cu, khong banner');
+h = vm.runInContext('_srRenderB', ctx)(Object.assign({ bhPrepaid: { count: 27, total: 63405000 } }, base));
+ok(/Đã trừ tiền trả trước của đơn Bảo hành/.test(h) && /27 đơn/.test(h) && /−63,405,000đ/.test(h), 'Bao cao B: banner vang "da tru tien tra truoc don Bao hanh" 27 don, −63.405.000');
+h = vm.runInContext('_srRenderB', ctx)(Object.assign({ bhPrepaid: { count: 0, total: 0 } }, base));
+ok(!/Đã trừ tiền trả trước/.test(h), 'khong co don BH tru: khong hien banner');
 // khung chot thang: mac dinh thang dung
 const panelSrc = fnSrc('_srPosMonthPanelHtml_');
 function panel(y, m, d) { const c2 = { _srIsAdmin: () => true, Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(y, m - 1, d); } } }; vm.createContext(c2); vm.runInContext(panelSrc, c2); return c2._srPosMonthPanelHtml_(); }
