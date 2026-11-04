@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 34) — MENU TRÁI: khung ngoài nền nhạt, ô tác vụ nền đậm cho chữ rõ (Duyên yêu cầu) — XONG, đã push
+- **Yêu cầu:** ảnh menu (Tải file Excel, Sync GS, mục SETTINGS...) khó đọc; muốn khung ngoài nhạt, ô nổi lên nền đậm.
+- **NGUYÊN NHÂN GỐC:** mục 4 của `css/19-theme-sunset.css` để khung menu là gradient hồng ĐẬM, còn mỗi ô chỉ là nền trắng trong suốt 5-14% (`css/06-pro.css` dòng 154-157) + chữ trắng 12.5px → ô và khung gần cùng màu, chữ trắng trên hồng giữa/nhạt chỉ ~3-4:1.
+- **Đã làm:** thêm mục 9 cuối file 19: khung `#data-view .tabs` gradient nhạt hồng→lavender→mint; ô `.tab`/`.sn-act`/nút `.sh-foot` nền mận đặc `#a8326c` + chữ trắng (>= 6:1), hover `#8f2a5e`, ô đang chọn `#5c1740` + vạch hồng; tiêu đề nhóm (SETTINGS...) chữ mận đậm. Dùng selector `html.ui-pro.ui-pro` để thắng `ui-shell` ở css/13-shell.css, có liệt kê `#reportsgroup-list .tab` (13-shell dùng 2 id). Cache-bust `?v=20261104c`. Đã render thử bằng Chromium với css thật: đúng ý. Chế độ tối không đổi.
+- **Gỡ:** xoá mục 9. Không sửa js/gas/extension → KHÔNG cần deploy GAS, KHÔNG reload extension; chỉ Ctrl+F5 web.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem menu thật; nếu ô trong nhóm con cần nhạt hơn/đậm hơn thì chỉnh `#a8326c` ở mục 9. Thanh tab hồ sơ đáy (#pro-tabbar) và header vẫn hồng rose, chưa đổi.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 33) — NỀN PASTEL KIỂU CANVA/PANCAKE cho CRM (Duyên yêu cầu) — XONG, đã push
 - **Yêu cầu:** tham khảo nền Canva (xanh ngọc→tím lavender→hồng) và Pancake (xanh→tím→hồng), cho nền CRM chuyển màu pastel nhã nhặn, nhẹ.
 - **Đã làm:** thêm mục 8 cuối `css/19-theme-sunset.css`: nền `body`/`.main` = 3 vầng radial (mint / lavender / hồng) trên nền gradient rất nhạt #eef8fa→#f1eefb→#fdf0f6; `.sidebar` lọc KH cùng bảng màu (mờ 92%). CHỈ đổi nền, không đụng header/menu/chữ; chữ #1a0f15 trên nền mới ≥ 15:1 (muted ≥ 9:1, hint ≥ 6:1) nên không mất độ tương phản bước 1b. Chế độ tối không đổi. Cache-bust `?v=20261104b`.

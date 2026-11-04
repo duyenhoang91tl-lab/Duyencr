@@ -135,3 +135,49 @@ html.ui-pro:not([data-theme="dark"]) .sidebar{
   background:linear-gradient(180deg,rgba(214,242,241,.92) 0%,rgba(230,222,250,.92) 55%,rgba(252,226,238,.92) 100%);
   border-right-color:#d8cdef;
 }
+
+/* ── 9. MENU TRÁI: KHUNG NGOÀI NỀN NHẠT, Ô TÁC VỤ NỀN ĐẬM (Duyên yêu cầu 2026-11-04) ──
+   NGUYÊN NHÂN GỐC khó đọc: mục 4 phía trên cho khung menu là gradient hồng ĐẬM (#8f2a5e→#d95f7c) còn mỗi ô tác vụ chỉ là
+   nền trắng trong suốt 5-14% (css/06-pro.css dòng 154-157) + chữ trắng 12.5px → ô và khung gần cùng màu, chữ trắng trên hồng
+   giữa/nhạt chỉ ~3-4:1. Đảo lại: khung nhạt (hồng→lavender→mint cùng bảng màu nền mục 8), ô nổi = nền hồng mận ĐẶC + chữ trắng
+   (>= 6:1), ô đang chọn đậm hơn nữa (mận #5c1740, chữ đậm). Tiêu đề nhóm (SETTINGS...) nằm trên nền nhạt nên dùng chữ mận đậm.
+   Dùng html.ui-pro.ui-pro (nhân đôi class) để ngang độ ưu tiên với html.ui-pro.ui-shell ở mục 4 / css/13-shell.css rồi thắng nhờ
+   nạp sau; phải liệt kê thêm #reportsgroup-list .tab vì css/13-shell.css dùng 2 id. Chỉ chế độ sáng; không đổi js. Gỡ = xoá mục 9. */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs{
+  background:linear-gradient(180deg,#fde4ee 0%,#f1e6fa 55%,#e3f1f5 100%);
+  border-right:1px solid #e3cde0;box-shadow:2px 0 14px rgba(168,50,108,.10);
+  scrollbar-width:thin;scrollbar-color:rgba(168,50,108,.40) transparent;
+}
+/* ô tác vụ: nền đậm đặc, nổi lên khỏi khung */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-act,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g]{
+  background:#a8326c;color:#fff;font-weight:600;border-radius:10px;
+  margin-top:0;margin-bottom:4px;box-shadow:0 1px 3px rgba(92,23,64,.25);
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-act:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g]:hover{
+  background:#8f2a5e;color:#fff;
+}
+/* ô đang chọn: đậm nhất + vạch nhấn hồng nhạt bên trái */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab.active,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab.active,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g].active{
+  background:#5c1740;color:#fff;font-weight:700;border-left:3px solid #ffb3cf;
+}
+/* tiêu đề nhóm nằm trên nền nhạt → chữ mận đậm */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh{
+  color:#5c1740;font-weight:800;background:none;border:none;box-shadow:none;
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh:hover{background:rgba(168,50,108,.10);color:#3d0f2b;}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh .sn-car::before,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh .sn-car::after{background:#5c1740;}
+/* chân menu (Ghim menu / Giao diện cũ): cùng kiểu ô đậm */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot{border-top:1px solid rgba(168,50,108,.25);}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button{
+  background:#a8326c;color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(92,23,64,.25);
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button:hover{background:#8f2a5e;color:#fff;}
