@@ -55,6 +55,38 @@ for s in ('Phat_theo_kenh', 'Phat_tung_nguoi'):
             if isinstance(c.value, str) and '1454' in c.value: c.value = c.value.replace('1454', str(last))
 wb['Cau_hinh']['A18'] = ('Dữ liệu T10 theo file FINAL "LƯƠNG SALE" (Duyên chốt 04/11): DT từng sale = cột TỔNG; Du_lieu = từng dòng thẻ chia đều theo số sale. '
                          'Nếu có dòng vàng "Điều chỉnh theo KT Huyền" = phần số chốt lệch cộng dòng (không rõ kênh → tính NGOÀI kênh FB chính).')
+# ── Duyên 04/11 (18:06): phần 8 tỷ phải TRỪ doanh thu nguồn mỹ phẩm/Dược; MKT (Huy, Hưng) tính theo kênh nguồn riêng ──
+ws['K1'] = 'Loại khỏi phần 8 tỷ (nguồn NGUỒN / Facebook=mỹ phẩm / Kênh Dược) (1/0)'; ws['K1']._style = copy.copy(ws['J1']._style)
+for r in range(r0, last + 1):
+    ws.cell(r, 11, f'=IF(OR(ISNUMBER(SEARCH("715661768577683",E{r})),LOWER(TRIM(E{r}))="facebook",LOWER(TRIM(E{r}))="kênh dược"),1,0)')
+ws.column_dimensions['K'].width = 24
+pk = wb['Phat_theo_kenh']
+pk['B17'] = f'=SUMIFS(Du_lieu!H2:H{last},Du_lieu!I2:I{last},0,Du_lieu!J2:J{last},0,Du_lieu!K2:K{last},0)'
+pk['A17'] = 'Doanh thu còn lại (đ) — đã trừ kênh FB chính, đơn ngoài FB của Mến, nguồn NGUỒN / Facebook (mỹ phẩm) / Kênh Dược'
+pk['A23'] = 'DT nguồn bị loại khỏi phần 8 tỷ (NGUỒN + Facebook mỹ phẩm + Kênh Dược) (đ)'
+pk['B23'] = f'=SUMIFS(Du_lieu!H2:H{last},Du_lieu!I2:I{last},0,Du_lieu!J2:J{last},0,Du_lieu!K2:K{last},1)'
+pk['B23'].number_format = '#,##0'
+pk['A30'] = 'Kiểm tra: DT kênh FB chính + DT còn lại + DT nguồn loại = tổng DT sau khi chia sale (đ)'
+pk['B30'] = '=B6+B17+B23'
+# Sheet MKT
+mk = wb.create_sheet('Phat_MKT')
+mk.append(['PHẠT MARKETING (Huy, Hưng) — theo KÊNH NGUỒN riêng. Nhập KPI tháng vào cột B (ô vàng); chưa có KPI thì chưa tính phạt.'])
+mk.append(['Marketer', 'KPI kênh (đ)', 'Mã kênh 1 (ID trong tên nguồn)', 'DT kênh 1 (đ)', 'Mã kênh 2', 'DT kênh 2 (đ)', 'Tổng DT (đ)', '% hoàn thành', 'Tỷ lệ phạt (× KPI)', 'Tiền phạt (đ)'])
+mkt = [('Ngô Việt Huy', '595079630356410', '108184481052869'), ('Nguyễn Văn Hưng', '503073659823687', '862972056891669')]
+for i, (n, a, b) in enumerate(mkt):
+    r = 3 + i
+    dsum = lambda c: f'=SUMIFS(Du_lieu!$H$2:$H${last},Du_lieu!$E$2:$E${last},"*"&{c}{r}&"*")'
+    mk.append([n, None, a, dsum('C'), b, dsum('E'), f'=D{r}+F{r}', f'=IF(B{r}>0,G{r}/B{r},"Chưa nhập KPI")',
+               f'=IF(B{r}>0,IF(H{r}>=1,0,IF(H{r}>Cau_hinh!$C$11,Cau_hinh!$B$11,IF(H{r}>Cau_hinh!$C$12,Cau_hinh!$B$12,IF(H{r}>Cau_hinh!$C$13,Cau_hinh!$B$13,Cau_hinh!$B$14)))),"")',
+               f'=IF(B{r}>0,B{r}*I{r},"")'])
+    mk.cell(r, 2).fill = PatternFill('solid', fgColor='FFF2CC')
+    for c in (2, 4, 6, 7, 10): mk.cell(r, c).number_format = '#,##0'
+    mk.cell(r, 8).number_format = '0.00%'; mk.cell(r, 9).number_format = '0.000%'
+mk.append([]); mk.append(['Ghi chú: DT kênh = tổng giá trị đơn (mỗi đơn 1 lần) theo nguồn đơn chứa mã kênh; MKT tự chịu phạt, KHÔNG cộng vào bảng phạt Sale.'])
+for c in mk[2]: c.font = Font(bold=True)
+mk['A1'].font = Font(bold=True)
+mk.column_dimensions['A'].width = 22
+for col in 'BCDEFGHIJ': mk.column_dimensions[col].width = 24
 # Sheet đối chiếu
 dc = wb.create_sheet('Doi_chieu_Huyen')
 dc.append(['Sale (CRM)', 'KT Huyền (cột TỔNG)', 'Tổng Du_lieu', 'Chênh (phải = 0)', 'Trong đó dòng điều chỉnh', 'DT kênh FB chính'])
