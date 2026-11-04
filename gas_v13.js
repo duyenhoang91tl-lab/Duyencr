@@ -6913,7 +6913,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     if (best) {
       var n = o.nSales > 1 ? o.nSales : 1, part = Math.round(best.amount / n); // chia deu cho sale tham gia
       bonusTotal += part;
-      bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: part, detail: best.detail + (o.ghepSoDon > 1 ? ' — GỘP ' + o.ghepSoDon + ' đơn ghép (' + o.ghepMaDon.join(' + ') + ')' : '') + (n > 1 ? ' — thưởng ' + _csMoney_(best.amount) + ' chia đều ' + n + ' sale' : '') });
+      bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: part, detail: best.detail + (o.ghepSoDon > 1 ? ' — GỘP ' + o.ghepSoDon + ' đơn ghép (' + (o.ghepMaDon || []).join(' + ') + ')' : '') + (n > 1 ? ' — thưởng ' + _csMoney_(best.amount) + ' chia đều ' + n + ' sale' : '') });
     }
   });
   bonusItems.sort(function(a, b) { return String(a.date).localeCompare(String(b.date)); });

@@ -326,7 +326,7 @@ function _computeBonusData_(orders){
         var rec = ensure(name);
         var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
         rec.total += part;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepSoDon>1 ? ' — GỘP '+o.ghepSoDon+' đơn ghép ('+o.ghepMaDon.join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepSoDon>1 ? ' — GỘP '+o.ghepSoDon+' đơn ghép ('+(o.ghepMaDon||[]).join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
       }
     });
   });
