@@ -76,6 +76,8 @@ const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { on
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
 const mk = o => Object.assign(base(), o);
 const rev = (scope, min, amt, o) => mk(Object.assign({ revenue: { enabled: true, scope, min, max: '' }, bonusAmount: amt }, o));
+// Tên Pos: TOUR = Tourmaline, AQUA = Aquamarine, MOON (Duyên 2026-11-04). "a+b" = dòng SP chứa cả a và b. Loại: Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire.
+const PK_MOON = 'tỳ hưu thiên lộc+moon, thmoon', PK_TOUR = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline', PK_AQUA = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine', PK_EX = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
 const PROGRAMS = [
   rev('order', 10e6, 20000, { name: 'Đơn từ 10tr (combo 2 sản phẩm)' }),
   rev('order', 15e6, 30000, { name: 'Đơn từ 15tr (combo 3 sản phẩm)' }),
@@ -84,9 +86,9 @@ const PROGRAMS = [
   rev('order', 15e6, 20000, { name: 'Bill vòng mix charm — đơn từ 15tr', requireProduct: 'vòng' }),
   rev('day', 60e6, 50000, { name: 'Thưởng doanh số/ngày — đạt từ 60tr' }),
   rev('day', 100e6, 100000, { name: 'Thưởng doanh số/ngày — đạt từ 100tr' }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: 'Aquamarine', bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   rev('order', 21.5e6, 100000, { name: 'Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' }),
   rev('order', 31.5e6, 200000, { name: 'Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' })
 ];
@@ -100,9 +102,9 @@ PROGRAMS.push(
   PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }),
   // Bang "Ap dung cho Sale thu viec" (Duyen gui 2026-11-04) co them dong 8-13: Ty huu Moon/Tourmaline Hong+Xanh/Aquamarine (tu 20/8) + Tourmaline cao cap T21/T31 (tu 21/9), ap dung tu ngay 1 thu viec.
   // CT chinh thuc online/offline KHONG ap cho sale thu viec (js/12 _bonusProgramApplies_) nen phai co ban rieng cho thu viec.
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Aquamarine', bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.

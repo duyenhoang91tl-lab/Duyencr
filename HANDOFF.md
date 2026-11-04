@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 30) — THƯỞNG T10: sửa thưởng theo SẢN PHẨM (Tỳ hưu Moon/Tour/Aqua) — BƯỚC 1/2 xong (js/12 + offline), đã push
+- **Duyên chốt:** (a) "TOUR" trên Pos = Tourmaline, "AQUA" = Aquamarine → thưởng trực tiếp; loại Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire; (b) thưởng sản phẩm CỘNG DỒN, không giới hạn, không tranh mức cao nhất với combo/doanh thu; (c) sửa lỗi đếm đôi Moon; (d) thử việc: CT số đơn/ngày và CT doanh thu ngày là 2 CT riêng (lấy cao nhất mỗi loại); chính thức: combo SP vs bill vòng mix charm lấy cao nhất, thưởng doanh số ngày là CT riêng.
+- **NGUYÊN NHÂN GỐC:** `_bonusProductQty_` (js/12) đếm số LẦN từ khoá xuất hiện trong cả chuỗi → 2 từ khoá chồng nhau đếm đôi Moon; không đọc cột Số lượng; từ khoá "Tourmaline Hồng/Xanh", "Aquamarine" không khớp tên Pos (TOUR/AQUA) → 0đ; kết quả còn tranh `best` với thưởng combo nên bị mất.
+- [x] js/12 `_bonusProductQty_(sanPham, kw, soLuong, excludeStr)`: đếm theo từng dòng SP + cột SL, từ khoá "a+b", loại chất liệu; thưởng SP đẩy vào `extra` (cộng dồn). `calc_bonus.js`: PK_MOON/PK_TOUR/PK_AQUA/PK_EX cho cả CT chính thức và TV.
+- **Kết quả T10:** tổng 3.986.673 → **4.296.671** (+309.998). Hải Yến +44.000 (356,351,442,612,1185,1264,1249T10 đúng). File `Thuong_T10_chuan_v7.xlsx` (giao qua chat, KHÔNG commit). Test thưởng cũ PASS.
+- ⚠ Web: `excludeProduct` chưa có ô nhập trong Cấu hình thưởng; CT web vẫn dùng từ khoá cũ cho tới khi sửa Cấu hình hoặc seed `js/13` (nên đổi sang "tỳ hưu thiên lộc+tour" ...).
+- [ ] **VIỆC KẾ TIẾP (bước 2/2):** port y hệt sang `gas_v13.js` (`_csBonusProductQty_` + vòng thưởng theo đơn trong `buildCsStats_`, đẩy SP vào danh sách cộng dồn), `node tools/split-gas.js` + `--check`; cập nhật seed js/13; workflow tự deploy GAS.
+- **ĐANG LÀM:** bước 2/2 (GAS). Chưa sửa extension.
+
 ## 2026-11-04 (phiên 29) — THƯỞNG T10: Hải Yến báo thiếu thưởng TỲ HƯU — ĐÃ KIỂM, CHƯA SỬA CODE (chờ Duyên chốt)
 - **Kết luận: ĐÚNG, thiếu chung cho nhiều sale.** Hải Yến (yenNTH2004) có 7 đơn Tỳ hưu Thiên Lộc (6 TOUR + 1 AQUA: 1264, 1249, 1185, 612, 442, 356, 351T10) → engine trả 0.
 - **NGUYÊN NHÂN GỐC 1:** `calc_bonus.js` PROGRAMS khớp CHUỖI CON "Tourmaline Hồng, Tourmaline Xanh" và "Aquamarine", nhưng tên SP trên Pos ghi "TOUR" và "AQUA" → 42 dòng TOUR + 4 dòng AQUA không bao giờ khớp; chỉ "MOON" khớp nên engine chỉ trả Moon.
