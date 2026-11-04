@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 31) — THƯỞNG T10: ô "Chất liệu loại trừ" trên Cấu hình thưởng + tự nâng cấp 3 CT Tỳ hưu đã lưu — BƯỚC 1/2 xong, đã push
+- **Duyên yêu cầu:** chỉnh lại quy tắc trên CRM cho web ra đúng (Cấu hình đang lưu vẫn từ khoá cũ, UI chưa có ô loại trừ); thêm cột Sản phẩm vào file thưởng để theo dõi; gửi lại file.
+- **NGUYÊN NHÂN GỐC:** `Settings.bonusPrograms` đã lưu giữ từ khoá cũ ("Tourmaline Hồng, Tourmaline Xanh", "Aquamarine", "Tỳ hưu thiên lộc Moon, Thiên Lộc Moon") không khớp tên Pos (TOUR/AQUA); seed mới (js/13) chỉ có tác dụng khi bấm tạo lại mẫu; form `_bpEditFormHtml_` không có ô `excludeProduct` nên web không loại Ngọc/Ruby/Saphire.
+- [x] js/12: ô **4b. Chất liệu LOẠI TRỪ** (`_bpDraft.excludeProduct`) + `_bpNewProgram` có field; hàm `_bpUpgradeTyHuu_(arr)` đổi đúng 3 CT theo TÊN (từ khoá chưa có dấu "+" = bản cũ) sang `tỳ hưu thiên lộc+moon/tour/aqua` + loại Ngọc Lam/Lam Thủy/Ngọc Bích/Cẩm Thạch/Ruby/Saphire, giữ nguyên tiền thưởng; idempotent. js/01 `_syncBonusProgramsFromGAS` gọi hàm này khi nạp, nếu có đổi thì `saveBonusPrograms()` → Settings (web + GAS `buildCsStats_` cùng dùng).
+- Test mới `tools/test-bp-upgrade-tyhuu.js` (PASS) + `test-bonus-programs.js` PASS. Không đổi gas_v13.js/extension → không cần split-gas / reload; web: Ctrl+F5, mở web 1 lần bằng tài khoản có quyền lưu Cài đặt để Settings được ghi lại.
+- [ ] **BƯỚC 2/2 (đang làm):** thêm cột **Sản phẩm** (và SL) vào `build_delivery_xlsx.py` sheet `4_Chi tiết thưởng` (+ CHECK TAY) rồi chạy lại pipeline trên `Check_DT_t10_1.xlsx` → `Thuong_T10_chuan_v8.xlsx` (giao qua chat, KHÔNG commit).
+
 ## 2026-11-04 (phiên 30) — THƯỞNG T10: sửa thưởng theo SẢN PHẨM (Tỳ hưu Moon/Tour/Aqua) — BƯỚC 1/2 xong (js/12 + offline), đã push
 - **Duyên chốt:** (a) "TOUR" trên Pos = Tourmaline, "AQUA" = Aquamarine → thưởng trực tiếp; loại Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire; (b) thưởng sản phẩm CỘNG DỒN, không giới hạn, không tranh mức cao nhất với combo/doanh thu; (c) sửa lỗi đếm đôi Moon; (d) thử việc: CT số đơn/ngày và CT doanh thu ngày là 2 CT riêng (lấy cao nhất mỗi loại); chính thức: combo SP vs bill vòng mix charm lấy cao nhất, thưởng doanh số ngày là CT riêng.
 - **NGUYÊN NHÂN GỐC:** `_bonusProductQty_` (js/12) đếm số LẦN từ khoá xuất hiện trong cả chuỗi → 2 từ khoá chồng nhau đếm đôi Moon; không đọc cột Số lượng; từ khoá "Tourmaline Hồng/Xanh", "Aquamarine" không khớp tên Pos (TOUR/AQUA) → 0đ; kết quả còn tranh `best` với thưởng combo nên bị mất.

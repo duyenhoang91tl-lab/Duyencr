@@ -1238,7 +1238,7 @@ function closeBonusProgramsModal(){
 }
 function _bpNewProgram(){
   return { id: 'bp_'+Date.now(), name: '', dateFrom:'', dateTo:'',
-    audience: {online:false, offline:false}, product:'', requireProduct:'', extraNote:'', exclusionNote:'',
+    audience: {online:false, offline:false}, product:'', excludeProduct:'', requireProduct:'', extraNote:'', exclusionNote:'',
     tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
     firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
     sources: [], excludeSources: [], prodRules: {enabled:false, items:[]},
@@ -1267,6 +1267,30 @@ function _bpNormalize_(p){
   if (!p.prodRules) p.prodRules = {enabled:false, items:[]};
   if (!Array.isArray(p.prodRules.items)) p.prodRules.items = [];
   return p;
+}
+// NÂNG CẤP cấu hình thưởng Tỳ hưu ĐÃ LƯU từ trước (Duyên 2026-11-04). NGUYÊN NHÂN GỐC: Settings.bonusPrograms vẫn giữ từ khoá cũ
+// ("Tourmaline Hồng, Tourmaline Xanh", "Aquamarine", "Tỳ hưu thiên lộc Moon, Thiên Lộc Moon") không khớp tên Pos (TOUR/AQUA) và chưa có
+// ô loại trừ chất liệu -> web không tính Tourmaline/Aquamarine, Moon đếm đôi, không loại Ngọc/Ruby/Saphire. Seed mới (js/13) chỉ có tác dụng khi
+// tạo lại mẫu, không đổi được cấu hình đã lưu. Hàm này đổi đúng 3 CT theo TÊN (chưa có dấu "+" trong từ khoá = bản cũ), giữ nguyên tiền thưởng;
+// chạy lại nhiều lần không đổi gì thêm. Trả về số CT đã nâng cấp.
+var _BP_TYHUU_EXCLUDE_ = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
+function _bpUpgradeTyHuu_(arr){
+  var n = 0;
+  (arr || []).forEach(function(p){
+    if (!p || typeof p !== 'object') return;
+    var name = String(p.name || '').normalize('NFC').toLowerCase();
+    if (name.indexOf('tỳ hưu thiên lộc') === -1) return;
+    if (String(p.product || '').indexOf('+') !== -1) return;   // đã là bản mới
+    var kw = '';
+    if (name.indexOf('moon') !== -1) kw = 'tỳ hưu thiên lộc+moon, thmoon';
+    else if (name.indexOf('tourmaline') !== -1) kw = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline';
+    else if (name.indexOf('aquamarine') !== -1) kw = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine';
+    if (!kw) return;
+    p.product = kw;
+    if (!String(p.excludeProduct || '').trim()) p.excludeProduct = _BP_TYHUU_EXCLUDE_;
+    n++;
+  });
+  return n;
 }
 function _renderBonusProgramsModal(){
   var body = document.getElementById('bp-body');
@@ -1330,6 +1354,9 @@ function _bpEditFormHtml_(p){
 
     '<div class="form-label">4. Sản phẩm áp dụng (từ khoá, cách nhau dấu phẩy — bỏ trống = mọi sản phẩm; nếu điền, thưởng sẽ NHÂN theo số lượng sản phẩm khớp bán được)</div>'+
     '<input type="text" value="'+esc(p.product)+'" oninput="_bpDraft.product=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: Tỳ hưu, Tourmaline">'+
+    '<div class=\"form-label\" style=\"font-size:11.5px\">4b. Chất liệu LOẠI TRỪ (từ khoá, cách nhau dấu phẩy — dòng sản phẩm có từ khoá này sẽ KHÔNG được tính thưởng mục 4; bỏ trống = không loại)</div>'+
+    '<input type=\"text\" value=\"'+esc(p.excludeProduct||'')+'\" oninput=\"_bpDraft.excludeProduct=this.value\" style=\"width:100%;margin-bottom:6px\" placeholder=\"VD: ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire\">'+
+    '<div class=\"guide-text\" style=\"font-size:10.5px;color:var(--hint);margin-bottom:10px\">Mẹo từ khoá mục 4: dùng dấu + để đòi CÙNG LÚC nhiều từ trong 1 dòng sản phẩm, VD <b>tỳ hưu thiên lộc+tour</b> chỉ khớp dòng có cả \"tỳ hưu thiên lộc\" và \"tour\".</div>'+
 
     _bpProdSectionHtml_(p)+
     _bpSrcSectionHtml_(p)+
