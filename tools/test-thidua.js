@@ -26,11 +26,12 @@ ok(mk(1.26e9).rate === 0.00015 && mk(1.4e9).penalty === 0 && mk(1.4e9).bonus ===
 // T11 (Duyen chot 2026-11-04): FB 1,5 ty + CSKH-Duyen 100tr (chua xac dinh cach tinh DT) + Duyen&MKT 6,9 ty; Men chia phat FB; Huy 6 ty & Hung 900tr la 2 kenh rieng
 r = run([], '2026-11');
 ok(r.rest.kpi === 6.9e9 && r.fb.kpi === 1.5e9 && r.cskh.kpi === 1e8 && r.rows.length === 16 && r.rows.reduce((s, x) => s + x.commit, 0) === 9.9e9, 'T11: KPI 1,5 + 0,1 + 6,9 = 8,5 ty; 15 sale + Men; tong cam ket 9,9 ty');
-ok(r.cskh.pending === false && r.cskh.rev === 0 && r.cskh.penalty === 25000 && r.perCs === Math.round(25000 / 16), 'kenh CSKH-Duyen 100tr: chua co don -> 0% -> phat 0,025% x 100tr = 25.000 chia 15 sale + Duyen = 16 nguoi (khong gom Men)');
+ok(r.cskh.pending === false && r.cskh.rev === 0 && r.cskh.penalty === 25000 && r.perCs === Math.round(25000 / 16), 'kenh CSKH-Duyen 100tr: chua co don -> 0% -> phat 0,025% x 100tr = 25.000 chia deu dau nguoi 15 sale + Duyen = 16 nguoi (khong gom Men)');
 const o2 = (id, sale, nguon, v, mk) => ({ id, saleBan: sale, nguonDon: nguon, giaTriDon: v, ngayTao: '12/11/2026', baoHanh: false, marketer: mk });
 r = run([o2(1, 'menbui2002', 'Fb Phạm Thu Hiền', 750e6), o2(2, 'ninhnga99', 'Facebook / Hiền Tour (1)', 3e9, 'Ngô Việt Huy'), o2(3, 'anhtrinh1995', 'Zalo', 450e6, 'Nguyễn Văn Hưng')], '2026-11');
-ok(r.fb.rev === 750e6 && r.fb.penalty === 375000 && r.nFb === 6 && r.perFb === 62500, 'T11 FB: 750tr/1,5ty = 50% -> 375.000 chia 6 (4 sale FB chinh + Men + Duyen) = 62.500');
-const gm = r.rows.find(x => x.user === 'menbui2002'); ok(gm.penFb === 62500 && gm.penRest === 0 && gm.ok && r.nRest === 14 + 1, 'Men: chia phat FB, khong xet cam ket, khong chia phan Duyen+MKT');
+ok(r.fb.rev === 750e6 && r.fb.penalty === 375000 && r.nFb === 5 && r.perFb === 75000, 'T11 FB: 750tr/1,5ty = 50% -> 375.000 chia 5 (3 sale FB chinh CHUA dat + Men + Duyen) = 75.000; ninhnga99 dat 100% cam ket -> khong bi phat');
+ok(r.rows.find(x => x.user === 'ninhnga99').ok && r.rows.find(x => x.user === 'ninhnga99').penFb === 0 && r.rows.find(x => x.user === 'ninhnga99').penRest === 0 && r.rows.find(x => x.user === 'biichnguyen1993').penFb === 75000, 'sale FB chinh dat 100% khong bi phat FB; sale FB chinh chua dat bi phat');
+const gm = r.rows.find(x => x.user === 'menbui2002'); ok(gm.penFb === 75000 && gm.penRest === 0 && gm.ok && r.nRest === 14 + 1, 'Men: chia phat FB, khong xet cam ket, khong chia phan Duyen+MKT');
 ok(r.rest.rev === 3.45e9 && r.rest.kpi === 6.9e9 && r.rest.penalty === 1725000, 'T11 Duyen+MKT: 3,45 ty/6,9 ty = 50% -> 0,025% x 6,9 ty = 1.725.000');
 const huy = r.marketing[0], hung = r.marketing[1];
 ok(huy.name === 'Ngô Việt Huy' && huy.rev === 3e9 && huy.penalty === 1500000 && hung.rev === 450e6 && hung.penalty === 225000 && huy.orders === 1, 'Huy 6 ty: 3 ty (50%) phat 1.500.000; Hung 900tr: 450tr phat 225.000 (kenh rieng theo cot Marketer)');
@@ -39,8 +40,8 @@ r = run([o2(4, 'menbui2002', 'Zalo / ZALO CSKH UP MỚI (1)', 50e6), o2(5, 'anht
 const mm = r.rows.find(x => x.user === 'menbui2002'), aa = r.rows.find(x => x.user === 'anhtrinh1995'), nn = r.rows.find(x => x.user === 'ninhnga99');
 ok(r.cskh.rev === 100e6 && r.cskh.pct === 1 && r.cskh.penalty === 0 && r.rest.rev === 500e6, 'CSKH-Duyen: Men 50tr + phan Men 50tr (don chia voi sale) = 100tr = 100% -> khong phat; phan cua sale (50tr) + 450tr van vao Duyen+MKT');
 ok(mm.rev === 0 && mm.penCskh === 0 && mm.penRest === 0 && mm.ok, 'Men khong chiu phat CSKH / Duyen+MKT, don ngoai FB khong tinh vao doanh thu ca nhan');
-r = run([o2(4, 'menbui2002', 'Zalo', 50e6)], '2026-11');   // 50% -> 25.000 chia 16 = 1.563
-ok(r.cskh.penalty === 25000 && r.perCs === 1563 && r.rows.find(x => x.user === 'ninhnga99').penCskh === 1563 && r.duyen.penCskh === 1563 && r.rows.find(x => x.user === 'menbui2002').penCskh === 0 && Math.abs(r.totals.penCskh - 25000) <= 20, 'CSKH-Duyen 50%: 25.000 chia Duyen + 15 sale chua dat (1.563/nguoi), Men 0');
+r = run([o2(4, 'menbui2002', 'Zalo', 50e6), o2(7, 'anhtrinh1995', 'Zalo', 2e9)], '2026-11');   // CSKH 50% -> 25.000 chia DEU DAU NGUOI 15 sale + Duyen = 16 (ke ca sale da dat 100%) = 1.563
+ok(r.cskh.penalty === 25000 && r.perCs === 1563 && r.nCs === 16 && r.rows.find(x => x.user === 'ninhnga99').penCskh === 1563 && r.rows.find(x => x.user === 'anhtrinh1995').ok && r.rows.find(x => x.user === 'anhtrinh1995').penCskh === 1563 && r.duyen.penCskh === 1563 && r.rows.find(x => x.user === 'menbui2002').penCskh === 0 && Math.abs(r.totals.penCskh - 25000) <= 20, 'CSKH-Duyen 50%: 25.000 chia deu dau nguoi Duyen + 15 sale (ke ca sale da dat 100%) = 1.563/nguoi, Men 0');
 const ex = vm.runInContext('(function(o,y){return _tdExportRows_(_computeThiDua_(o,y));})', ctx)([], '2026-11');
 ok(ex.kenh.length === 1 + 5 && ex.sale.length === 1 + 16 + 2 && ex.kenh.every(x => x.length === ex.kenh[0].length) && ex.sale.every(x => x.length === ex.sale[0].length), 'xuat Excel: 5 kenh (FB, Duyen+MKT, CSKH, Huy, Hung), 16 sale + Duyen + Tong, so cot deu');
 // Render HTML khong loi (stub esc/_srMoney/_srState) + nut Xuat Excel
