@@ -7,6 +7,15 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 src, W, out = sys.argv[1:4]
 res = json.load(open(W + '/bonus-result.json')); ch = res['channels']
 wb = load_workbook(src)
+import os
+OV = {k: v for k, v in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'order_overrides.json'), encoding='utf8')).items() if not k.startswith('_')}
+# ap sua nguoi huong thuong (order_overrides.json) len cot The cua sheet DON PT truoc khi tinh doanh thu/kenh -> file chuan nhat quan voi calc_bonus
+wsPT = wb['ĐƠN PT']; hdrPT = [c.value for c in wsPT[1]]; cMa = hdrPT.index('Mã đơn hàng') + 1; cEx = hdrPT.index('GIẢI THÍCH ĐỐI SOÁT (chỉ ghi đơn thay đổi/lệch)') + 1
+for rr in range(2, wsPT.max_row + 1):
+    ma = wsPT.cell(row=rr, column=cMa).value
+    if ma in OV:
+        old = wsPT.cell(row=rr, column=2).value; wsPT.cell(row=rr, column=2, value=OV[ma]['saleBan'] + ', ')
+        wsPT.cell(row=rr, column=cEx, value=(str(wsPT.cell(row=rr, column=cEx).value or '') + ' | ' if wsPT.cell(row=rr, column=cEx).value else '') + f"Duyên chốt 04/11: thẻ Pos '{str(old).strip(', ')}' → chỉ {OV[ma]['saleBan']} ({OV[ma]['lyDo']})")
 F = 'Arial'; HDR = PatternFill('solid', fgColor='1F3A5F'); NEW = PatternFill('solid', fgColor='E2F0D9')
 thin = Side(style='thin', color='BFBFBF'); BOX = Border(left=thin, right=thin, top=thin, bottom=thin); MONEY = '#,##0;[Red]-#,##0;-'
 f = lambda **k: Font(name=F, size=k.pop('size', 10), **k)
@@ -30,6 +39,8 @@ def kind(it): return TYPE.get(it['program'], KIND.get(it['scope'], it['scope']))
 # ---- cot thuong tung hang ----
 for sh, pre in (('ĐƠN PT', 'PT'),):   # ĐƠN MP (my pham) KHONG tinh thuong
     ws = wb[sh]; c0 = ws.max_column + 1
+    _h = [c.value for c in ws[1]]
+    if 'Kênh sale (On/Off)' in _h: c0 = _h.index('Kênh sale (On/Off)') + 1   # file da co cot thuong tu lan chay truoc -> GHI DE, khong them cot trung
     heads = ['Kênh sale (On/Off)', 'Thưởng THEO ĐƠN (đ)', 'Thưởng THEO SẢN PHẨM (đ)', 'Tổng thưởng đơn (đ)', 'Chi tiết thưởng (sale: chương trình +đ)']
     for j, h in enumerate(heads):
         c = ws.cell(row=1, column=c0 + j, value=h); c.font = f(bold=True, color='FFFFFF'); c.fill = HDR; c.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center'); c.border = BOX
