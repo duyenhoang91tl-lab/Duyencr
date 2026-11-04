@@ -14,22 +14,32 @@ function _csDaysSinceStart_(startYmd, dateYmd) {
   if (!s || !d) return null;
   return Math.round((Date.UTC(+d[1], +d[2] - 1, +d[3]) - Date.UTC(+s[1], +s[2] - 1, +s[3])) / 86400000) + 1;
 }
-function _csBonusProductQty_(sanPham, keywordsStr) {
-  var text = String(sanPham || '').toLowerCase();
-  var kws = String(keywordsStr || '').split(',').map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
-  if (!kws.length || !text) return { matched: false, qty: 0 };
-  var totalQty = 0, matched = false;
-  kws.forEach(function(kw) {
-    var idx = 0;
-    while (true) {
-      var pos = text.indexOf(kw, idx);
-      if (pos === -1) break;
-      matched = true;
-      var tail = text.substr(pos + kw.length, 10);
+function _csBonusProductQty_(sanPham, keywordsStr, soLuong, excludeStr) { // port y het js/12 _bonusProductQty_ (Duyen 2026-11-04): dem THEO TUNG DONG SP + cot SL, tu khoa "a+b", loai chat lieu
+  var low = function(s) { return String(s || '').normalize('NFC').toLowerCase(); };
+  var kws = String(keywordsStr || '').split(',').map(function(s) { return low(s).trim(); }).filter(Boolean);
+  var exs = String(excludeStr || '').split(',').map(function(s) { return low(s).trim(); }).filter(Boolean);
+  var lines = String(sanPham || '').split(',').map(function(s) { return low(s).trim(); }).filter(Boolean);
+  if (!kws.length || !lines.length) return { matched: false, qty: 0 };
+  var qs = String(soLuong || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var aligned = qs.length === lines.length, totalQty = 0, matched = false;
+  lines.forEach(function(line, i) {
+    var hitPos = -1, hitLen = 0;
+    kws.forEach(function(kw) {
+      if (hitPos >= 0) return;
+      var parts = kw.split('+').map(function(x) { return x.trim(); }).filter(Boolean);
+      if (!parts.length) return;
+      if (parts.every(function(x) { return line.indexOf(x) !== -1; })) { hitPos = line.indexOf(parts[0]); hitLen = parts[0].length; }
+    });
+    if (hitPos < 0) return;
+    if (exs.some(function(x) { return line.indexOf(x) !== -1; })) return;
+    matched = true;
+    var q = aligned ? (Number(String(qs[i]).replace(',', '.')) || 0) : 0;
+    if (!q) {
+      var tail = line.substr(hitPos + hitLen, 10);
       var m = tail.match(/^[\s]*[x×][\s]*([0-9]+)/) || tail.match(/^[\s]*\(([0-9]+)\)/);
-      totalQty += m ? (parseInt(m[1], 10) || 1) : 1;
-      idx = pos + kw.length;
+      q = m ? (parseInt(m[1], 10) || 1) : 1;
     }
+    totalQty += q;
   });
   return { matched: matched, qty: totalQty };
 }
@@ -390,14 +400,14 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     return o.ghepSoDon > 1 ? Object.assign({}, o, { info: _bcOrderInfo_(Object.assign({}, o, { giaTriDon: o.giaTri }), prodMap, orderOvr) }) : o;
   }).forEach(function(o) {
     if (!o.goc) return;   // thuong theo don cung chi tinh don goc
-    var best = null;
+    var best = null, extraSp = [];   // extraSp: thuong theo SAN PHAM = cong don, khong tranh "best" voi combo/gia tri don (Duyen 2026-11-04)
     programs.forEach(function(p) {
       if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;
       if (p.product && String(p.product).trim()) {
-        var pq = _csBonusProductQty_(o.sanPham, p.product);
+        var pq = _csBonusProductQty_(o.sanPham, p.product, o.soLuong, p.excludeProduct);
         if (pq.matched && pq.qty > 0) {
           var amt = (Number(p.bonusAmount) || 0) * pq.qty;
-          if (amt > 0 && (!best || amt > best.amount)) best = { amount: amt, program: p, detail: 'SL ước tính: ' + pq.qty + ' — SP: "' + String(o.sanPham || '') + '"' };
+          if (amt > 0) extraSp.push({ amount: amt, program: p, detail: 'SL: ' + pq.qty + ' × ' + _csMoney_(Number(p.bonusAmount) || 0) + ' — SP: "' + String(o.sanPham || '') + '"' });
         }
       }
       if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order') {
@@ -418,6 +428,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
           if (amt2 > 0 && (!best || amt2 > best.amount)) best = { amount: amt2, program: p, detail: dtl };
         }
       }
+    });
+    extraSp.forEach(function(ex) {
+      var nx = o.nSales > 1 ? o.nSales : 1, px = Math.round(ex.amount / nx);
+      bonusTotal += px;
+      bonusItems.push({ date: o.date, scope: 'Theo sản phẩm', program: ex.program.name, amount: px, detail: ex.detail + (nx > 1 ? ' — thưởng ' + _csMoney_(ex.amount) + ' chia đều ' + nx + ' sale' : '') });
     });
     if (best) {
       var n = o.nSales > 1 ? o.nSales : 1, part = Math.round(best.amount / n); // chia deu cho sale tham gia

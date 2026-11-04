@@ -17,8 +17,10 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [x] js/12 `_bonusProductQty_(sanPham, kw, soLuong, excludeStr)`: đếm theo từng dòng SP + cột SL, từ khoá "a+b", loại chất liệu; thưởng SP đẩy vào `extra` (cộng dồn). `calc_bonus.js`: PK_MOON/PK_TOUR/PK_AQUA/PK_EX cho cả CT chính thức và TV.
 - **Kết quả T10:** tổng 3.986.673 → **4.296.671** (+309.998). Hải Yến +44.000 (356,351,442,612,1185,1264,1249T10 đúng). File `Thuong_T10_chuan_v7.xlsx` (giao qua chat, KHÔNG commit). Test thưởng cũ PASS.
 - ⚠ Web: `excludeProduct` chưa có ô nhập trong Cấu hình thưởng; CT web vẫn dùng từ khoá cũ cho tới khi sửa Cấu hình hoặc seed `js/13` (nên đổi sang "tỳ hưu thiên lộc+tour" ...).
-- [ ] **VIỆC KẾ TIẾP (bước 2/2):** port y hệt sang `gas_v13.js` (`_csBonusProductQty_` + vòng thưởng theo đơn trong `buildCsStats_`, đẩy SP vào danh sách cộng dồn), `node tools/split-gas.js` + `--check`; cập nhật seed js/13; workflow tự deploy GAS.
-- **ĐANG LÀM:** bước 2/2 (GAS). Chưa sửa extension.
+- [x] **BƯỚC 2/2 XONG:** port sang `gas_v13.js` (`_csBonusProductQty_` + `extraSp` cộng dồn trong `buildCsStats_`), `split-gas.js` + `--check` OK; seed js/13 đổi từ khoá sang "tỳ hưu thiên lộc+tour/moon/aqua" + excludeProduct. Workflow Actions tự deploy GAS → kiểm tra xanh.
+- ⚠ Cấu hình thưởng ĐANG LƯU trong Settings của web vẫn là từ khoá cũ ("Tourmaline Hồng, ...") → muốn web ra đúng phải bấm tạo lại mẫu Thưởng online hoặc sửa từ khoá 3 CT Tỳ hưu (chưa có ô nhập 'loại trừ chất liệu' trên giao diện).
+- [ ] **VIỆC KẾ TIẾP:** Duyên xác nhận 5 mục ở tin nhắn giao file (menbui2002, tuoipham1993 +8.000, 1 đơn nhiều sale chia đều); ô nhập excludeProduct trên UI Cấu hình thưởng nếu cần.
+- **ĐANG LÀM:** không có việc dở. Không sửa extension → không cần reload.
 
 ## 2026-11-04 (phiên 29) — THƯỞNG T10: Hải Yến báo thiếu thưởng TỲ HƯU — ĐÃ KIỂM, CHƯA SỬA CODE (chờ Duyên chốt)
 - **Kết luận: ĐÚNG, thiếu chung cho nhiều sale.** Hải Yến (yenNTH2004) có 7 đơn Tỳ hưu Thiên Lộc (6 TOUR + 1 AQUA: 1264, 1249, 1185, 612, 442, 356, 351T10) → engine trả 0.
