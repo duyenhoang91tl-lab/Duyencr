@@ -104,7 +104,7 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: SCP, 
 vm.createContext(ctx);
 vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\nvar _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') +
   ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') +
-  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
+  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 ctx.O = orders;
 const res = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
 // Pass "Tourmaline cao cap" (CT "Don tu 21tr500" / "31tr500"): KT xet moc theo GIA NIEM YET truoc giam (don 1301T10: nhan tour 31.500.000, giam 5% con 29.925.000 van duoc T31 200.000 — bang thuong chinh thuc STT 105).
