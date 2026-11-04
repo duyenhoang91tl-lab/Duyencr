@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 8) — THI ĐUA T11: kênh FB / Duyên+MKT / CSKH-Duyên / Huy / Hưng + Mến chia phạt FB + XUẤT EXCEL (Duyên chốt) — XONG (còn 1 ô chờ Duyên chốt)
+- **Quy tắc Duyên chốt (thay giả định phiên 7 về T11):** KPI Sale T11 = 8,5 tỷ gồm **FB chính "Fb Phạm Thu Hiền" 1,5 tỷ** + **CSKH-Duyên 100tr (kênh riêng)** + **Duyên + MKT 6,9 tỷ (toàn bộ phần còn lại trừ FB và CSKH-Duyên)**; phạt = tỷ lệ × KPI từng kênh. **FB chính thêm menbui2002** (dùng cờ `fbOnly` do phiên khác thêm: chỉ tính đơn FB, không cam kết, không chia phần Duyên+MKT; chia phạt FB 4 sale + Mến + Duyên = 6 người). **Huy 6 tỷ / Hưng 900tr là 2 kênh RIÊNG**: doanh thu = đơn có cột Marketer khớp tên, phạt/thưởng của chính họ, không cộng vào bảng Sale. Phạt tính theo tỷ lệ × KPI (file Duyên gửi có 2 số in sai: Sale ≤80% phải 1.700.000, Huy ≤70% phải 1.500.000).
+- [x] **ĐÃ PUSH:** `js/64-thidua.js`: `_computeThiDua_` trả thêm `cskh`, `marketing[]`, `duyen.penCskh`; cấu hình T11 có `cskh`, `marketing`, dòng Mến `fbOnly`; báo cáo hiện thẻ từng kênh + cột "Phạt CSKH"; **nút "⬇ Xuất Excel thi đua"** (`_srThiDuaExportXlsx`, sheet Tong hop kenh + Tung sale; hàm thuần `_tdExportRows_`). Test `node tools/test-thidua.js [orders.json]` PASS (có đối chiếu T10 thật). `index.html` js/64 `?v=20261104b`. Cần **Ctrl+F5**; KHÔNG sửa gas_v13.js → không deploy GAS, không reload extension.
+- **NGUYÊN NHÂN GỐC xung đột lần push này:** 2 phiên cùng sửa `js/64-thidua.js` (phiên kia thêm Mến `fbOnly` cho T10, phiên này viết lại engine cho T11) → đã rebase, giữ engine mới + `fbOnly`, test chạy lại đủ.
+- **CHỜ DUYÊN CHỐT:** doanh thu kênh CSKH-Duyên 100tr xác định bằng gì — nguồn đơn có chữ "CSKH" (T10 có 107 đơn ≈ 729tr, quá lớn so với 100tr) hay thẻ sale = Mến/Duyên? Đang để `THIDUA_CONFIGS['2026-11'].cskh.sources=[]`/`users=[]` → báo "chưa xác định", chưa phạt. Điền `sources`/`users` rồi chạy test là xong. Phạt CSKH hiện do **Duyên chịu**.
+- **Lưu ý:** Huy/Hưng khớp theo cột Marketer = "Ngô Việt Huy"/"Nguyễn Văn Hưng" (nếu CRM ghi khác → báo cáo cảnh báo "chưa có đơn khớp", sửa mảng `match`); tài khoản Tuyết Mai=mainguyen97, Hoàng Tươi=tuoipham1993 vẫn là suy đoán; thưởng khi đạt KPI mới chỉ hiển thị.
+- **ĐANG LÀM:** không có việc dở. **Việc kế tiếp:** chốt kênh CSKH-Duyên; sang T12 thêm `THIDUA_CONFIGS['2026-12']`.
+
 ## 2026-11-04 (chiều, bước 2) — Ép sale theo TỪNG ĐƠN trên web CRM (Settings `orderSaleOverride`) — ĐÃ PUSH
 
 - [x] `gas_v13.js`: `_orderSaleOvrMap_()` + `_applyOrderSaleOvr_()` gọi trong `buildSalesReportB_` ngay sau bước ghép Base: đơn có mã bộ đếm khớp khoá → 100% doanh thu/số đơn/thưởng/hoa hồng thuộc đúng 1 người (giữ nguyên giá trị đơn đã tính, bỏ phần dư chia theo thẻ). Đơn ghép Base → `ghepShares=[{name,frac:1}]`; đơn không ghép → `theSale=name`. Chưa cài setting → KHÔNG đổi gì. `gas/*.gs` tách lại OK. Test: `node tools/test-order-sale-override.js`.
