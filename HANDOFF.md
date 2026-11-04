@@ -11,6 +11,17 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 27) — THƯỞNG T10: đơn tour 1301T10 của thuydinh95 phải xét theo GIÁ NIÊM YẾT (T31 200k) — XONG, đã push
+- **Duyên báo:** 1301T10 tour niêm yết 31.500k; 1326T10+NG139T10 và 254T10 "thiếu"; "quy tắc tính tour theo giá niêm yết mà giờ lại bỏ".
+- **NGUYÊN NHÂN GỐC:** từ khi chuyển sang đọc file Pos (`extract_orders_pos.py`) `giaTriTruocGiam` luôn = 0 → pass "Tourmaline cao cấp" của `calc_bonus.js` (chỉ chạy khi giaTriTruocGiam > giaTriDon) bị bỏ qua → 1301T10 (niêm yết 31.500.000, giảm 5% còn 29.925.000) chỉ được T21 100k thay vì T31 200k. Quy tắc giá niêm yết KHÔNG mất trong calc_bonus.js, mất ở khâu nạp dữ liệu.
+- [x] `tools/bonus-t10/add_base_date.py`: suy niêm yết từ mô tả Base ("Giảm X% còn Y" với Y ≈ giá Pos → niêm yết = Pos/(1−X%)); không khớp mẫu thì giữ 0 (không đoán). Đã test hàm + engine Node trên đúng đơn M47074: T21 100k → **T31 200k**.
+- **Kết quả T10:** thuydinh95 587.500 → **687.500**; tổng 3.886.673 → **3.986.673** (+100.000). File `Thuong_T10_chuan_v6.xlsx` (giao qua chat, KHÔNG commit). Soát các đơn tour khác T10: không đơn nào của 22 tài khoản đổi mốc (chỉ 1301T10 niêm yết ≥31,5tr).
+- **1326T10+NG139T10 và 254T10 KHÔNG mất:** vẫn có trong v5/v6 (1326+NG139 = 11,3tr gộp → 20k ngày 31/10; 254T10 = 17,5tr, 4 SP → 30k, ngày **06/10** theo ngày Base vì Base tạo 06/10 20:35, Pos 07/10 — luật phiên 20). Cùng lý do 147T10 chuyển 05/10 → 04/10.
+- ⚠ **Thủy mất 50k thưởng ngày 15/10** so với v2: v2 tính theo ngày Pos (69,7tr), v5/v6 theo ngày Base (58,5tr < 60tr). Đúng luật phiên 20 — Duyên xác nhận còn giữ luật Base không.
+- ⚠ Chưa chạy lại TOÀN pipeline: phiên này không có `Check_DT_t10.xlsx` + export Base. v6 = v5 + sửa đúng 1 dòng, tổng đã đối chiếu = cộng chi tiết.
+- [ ] **VIỆC KẾ TIẾP:** Duyên gửi `Check_DT_t10.xlsx` để chạy lại đủ `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js` → `build_delivery_xlsx.py` (xác nhận dòng "gia niem yet tour cao cap khoi phuc" in ra 1301T10); web CRM chưa có quy tắc niêm yết T21/T31 (muốn khớp phải sửa js/12 + gas_v13.js rồi deploy GAS).
+- **ĐANG LÀM:** không có việc dở. Không sửa gas_v13.js/extension → không cần deploy/reload.
+
 ## 2026-11-04 (phiên 26) — THƯỞNG T10: Duyên chốt 22 tài khoản đội Sale, 3 bạn THỬ VIỆC = ngocNB2003saleoff, haPTN, thanhNP — XONG, đã push
 - **Duyên chốt (18:21):** đội Sale gồm 19 chính thức (huyenmaii1990, minhquach1995, dungnguyen1995, thuyha88, biichnguyen1993, nonghong88, giangnguyen1990, mainguyen97, tuoipham1993, thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995, thuNH1986, dungNTK1987, anhNP1999, trangNH2005, yenNTH2004, ninhLTK1984) + 3 thử việc (ngocNB2003saleoff, haPTN, thanhNP).
 - **NGUYÊN NHÂN GỐC lệch:** `calc_bonus.js` chỉ khai Ngọc là thử việc → haPTN/thanhNP bị tính theo bảng chính thức (combo đơn 10tr/15tr…) trong khi họ thuộc bảng thử việc.
