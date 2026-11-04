@@ -11,6 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (chiều, bước 3) — Ô nhập "📌 Ép sale theo đơn" trong Sasum (thay cho sửa sheet Settings tay) — ĐÃ PUSH
+
+- [x] `js/65-order-sale-ovr.js` (mới) + nối `js/29-sidenav.js` (Cài đặt team → 📌 Ép sale theo đơn, chỉ admin) + `index.html` (`?v=20261104a`): bảng "Mã đơn (bộ đếm) → Tên sale", thêm/xoá dòng, kiểm tra mã sai/thiếu tên/trùng, lưu Settings `orderSaleOverride` (backend đã xử lý từ bước 2). Tải danh sách lỗi → khoá nút Lưu để không ghi đè mất dữ liệu cũ. Test: `node tools/test-order-sale-ovr-ui.js` (6 ca). Không đổi gas_v13.js ở bước này. `tools/build-dist.js` không chạy được ở máy chat (thiếu module) — để Actions build.
+- [ ] CẦN LÀM TIẾP: Duyên Ctrl+F5 → ☰ → Cài đặt team → 📌 Ép sale theo đơn → nhập `162T10/2026` = `yenNTH2004`, `430T10/2026` = `thuyha88` → Lưu → xem Báo cáo B/E của Yến & Hà sau ~2 phút. Chưa thử modal trên trình duyệt thật (chỉ test hàm thuần) — nếu modal lỗi hiển thị, báo kèm ảnh.
+
 ## 2026-11-04 (phiên 14) — File đối soát GỘP: thưởng Online/Offline vs Chính thức/Thử việc + hoa hồng + lệch đơn ghép Base (Duyên yêu cầu "gửi gộp") — XONG
 - **Duyên xác nhận NAME_MAP** (Trịnh Phương Anh = anhtrinh1995…) trong `diff_ghep_vs_pos.py` là ĐÚNG.
 - [x] **ĐÃ PUSH:** `tools/bonus-t10/run_all.sh <file_KT> <CheckNguocBase.xlsx> <thư_mục_work> <ra.xlsx>` chạy trọn: `prepare_base.py` (bỏ 5 cột thưởng cũ + sheet THUONG_*/TONG_*/LECH_*) → extract_orders → calc_bonus (script MỚI NHẤT: bỏ MP/bảo hành/nguồn NGUỒN, gộp đơn NG ghép cùng đơn, Tourmaline cao cấp theo giá niêm yết, override 162T10/430T10, Mến chỉ đơn Facebook) → build_into_source → calc_commission → build_commission_sheet → diff_ghep_vs_pos → `finalize_combined.py` (thêm LECH_Tong_theo_sale + LECH_tung_don; dựng lại sheet KT `total thưởng sale` bằng SUMIFS vì pivot cũ mất khi lưu lại) → recalc → fix_filters.

@@ -40,7 +40,7 @@
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:acct'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:ordersale','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
     { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
@@ -56,6 +56,7 @@
     conndiag:   { t:'🩺 Chẩn đoán kết nối', f:'openConnDiag' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
     salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
+    ordersale:  { t:'📌 Ép sale theo đơn', f:'openOrderSaleOvrModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
