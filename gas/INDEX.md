@@ -45,7 +45,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_KPI_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
-- Hàm: `_posGhepMinCodes_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_bhPrepaidDeduct_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_saleCanonOrders_`, `buildSalesReportB_`, `_goldChannelRule_`, `_csChannelCommissionOf_`
+- Hàm: `_posGhepMinCodes_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_bhPrepaidDeduct_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_saleCanonOrders_`, `_orderSaleOvrMap_`, `_applyOrderSaleOvr_`, `buildSalesReportB_`, `_goldChannelRule_`, `_csChannelCommissionOf_`
 - Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `POS_GHEP_MIN_CODES_`, `_posGhepMinMemo_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `_BASE_DETECT_DBG_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`, `ACCT_SPLIT_SS_ID_`, `GOLD_RULE_CHANNELS_`, `GOLD_RULE_MATERIALS_`
 
 ## 10_CSStats_KPI_ReportC.gs

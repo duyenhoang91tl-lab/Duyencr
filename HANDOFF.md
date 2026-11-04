@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (chiều, bước 2) — Ép sale theo TỪNG ĐƠN trên web CRM (Settings `orderSaleOverride`) — ĐÃ PUSH
+
+- [x] `gas_v13.js`: `_orderSaleOvrMap_()` + `_applyOrderSaleOvr_()` gọi trong `buildSalesReportB_` ngay sau bước ghép Base: đơn có mã bộ đếm khớp khoá → 100% doanh thu/số đơn/thưởng/hoa hồng thuộc đúng 1 người (giữ nguyên giá trị đơn đã tính, bỏ phần dư chia theo thẻ). Đơn ghép Base → `ghepShares=[{name,frac:1}]`; đơn không ghép → `theSale=name`. Chưa cài setting → KHÔNG đổi gì. `gas/*.gs` tách lại OK. Test: `node tools/test-order-sale-override.js`.
+- **NGUYÊN NHÂN GỐC cần cơ chế này:** engine web chia theo Base + phần dư theo thẻ Pos, không có chỗ ép tay; 162T10 (M44816) / 430T10 (M46322) chỉ có override trong tool offline `tools/bonus-t10/order_overrides.json`.
+- **CÁCH DÙNG (Duyên/admin):** mở sheet **Settings**, thêm 1 dòng: cột key = `orderSaleOverride`, cột value = `{"162T10/2026":"yenNTH2004","430T10/2026":"thuyha88"}` (khoá = mã bộ đếm đơn gốc, tên = tên sale; thêm đơn khác cùng cách). Báo cáo cache ~2 phút. Chưa có giao diện nhập.
+- [ ] CẦN LÀM TIẾP: Duyên thêm dòng Settings ở trên + Ctrl+F5, xem lại Báo cáo B/E của Yến & Hà (162T10 = 15.060k của Yến; 430T10 của Hà). Nếu muốn có ô nhập trong Sasum thay vì sửa sheet → báo, làm thành modal admin.
+
 ## 2026-11-04 (chiều) — Kiểm tra M44816 (162T10 Yến / 430T10 Hà) trên engine web CRM: CHƯA xác nhận được số thật
 
 - Máy chat KHÔNG đọc được sheet Base/Pos thật nên không xem được dòng M44816 trên CRM. Đã mô phỏng hàm thật `_resolveGhepDon_` (gas_v13.js) với Pos 15.060.000 + thẻ Pos "yenNTH2004, thuyha88": (a) Base 162T10 = 15,06tr bán Yến → Yến 100% (đúng ý Duyên); (b) Base thấp hơn Pos (vd 14tr) → phần dư 1,06tr chia đều theo THẺ Pos → Hà dính 530k; (c) Base ghi bán Yến+Hà → chia đôi 7,53tr; (d) Base không có mã 162T10 → `khongKhop`, quay về chia đều theo thẻ Pos (Yến 50/Hà 50).

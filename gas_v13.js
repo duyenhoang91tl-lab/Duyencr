@@ -6031,6 +6031,27 @@ function _saleCanonOrders_(orders) {
     }
   };
 }
+// ── ÉP SALE THEO TỪNG ĐƠN (Duyên 2026-11-04: 162T10 chỉ Yến, 430T10 chỉ Hà dù thẻ Pos/Base ghi 2 người) ──
+// Settings 'orderSaleOverride' = JSON { "162T10/2026": "yenNTH2004", "430T10/2026": "thuyha88" } (khoá = mã bộ đếm đơn gốc, không phân biệt hoa/thường, năm tuỳ chọn).
+// Đơn khớp → 100% doanh thu/số đơn/thưởng/hoa hồng thuộc đúng 1 người đó (giữ nguyên giá trị đơn đã tính). Không có setting → không đổi gì.
+function _orderSaleOvrMap_() {
+  var raw = _csJsonSetting_('orderSaleOverride', {}), out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  Object.keys(raw).forEach(function(k) {
+    var name = String(raw[k] == null ? '' : raw[k]).trim();
+    if (name) out[_counterCodeNoYear_(_normCounterCode_(k))] = name;
+  });
+  return out;
+}
+function _applyOrderSaleOvr_(effRow, codes, ovrMap) {
+  if (!ovrMap) return effRow;
+  var list = (codes && codes.length) ? codes : _extractCounterCodes_(effRow.ghiChu);
+  var name = '';
+  for (var i = 0; i < list.length && !name; i++) name = ovrMap[_counterCodeNoYear_(_normCounterCode_(list[i]))] || '';
+  if (!name) return effRow;
+  if (effRow.ghepShares) return Object.assign({}, effRow, { ghepShares: [{ name: name, frac: 1 }], ghepDu: undefined, ghepDuSale: undefined, saleOvr: name });
+  return Object.assign({}, effRow, { theSale: name, saleOvr: name });
+}
 function buildSalesReportB_(filters) {
   filters = filters || {};
   // Ho tro CA mang (multi-select) LAN chuoi don (tuong thich nguoc) cho ca 3 bo loc.
@@ -6123,6 +6144,7 @@ function buildSalesReportB_(filters) {
   // ke VI DU (toi da 30 dong) phia sau.
   var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, gocBiLoaiList: [], khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
   var hiddenB_ = _donHiddenChecker_();
+  var ovrSaleMap_ = _orderSaleOvrMap_();
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
@@ -6147,6 +6169,7 @@ function buildSalesReportB_(filters) {
         else { ghepStats.trungDonGocCount++; if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo); }
       }
     }
+    effRow = _applyOrderSaleOvr_(effRow, codesByRow[pj], ovrSaleMap_);   // ép sale theo từng đơn (Settings orderSaleOverride)
     // ── FILE KE TOAN: ma bo dem khop dong trong "THEO DOI DON CHIA SALE" -> dung ty le chia cua ke toan (xem chu thich o _loadAcctSplit_) ──
     if (!effRow.ghepShares && acctInfo.rows.length) {
       var cdsA = _extractCounterCodes_(rowP.ghiChu);
