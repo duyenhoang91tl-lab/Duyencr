@@ -8,20 +8,24 @@ Chạy xong phải recalc bằng LibreOffice. KHÔNG commit file xlsx ra repo (c
 import sys, copy, collections, openpyxl
 from openpyxl.styles import PatternFill, Font
 src, old, out = sys.argv[1:4]
-h = openpyxl.load_workbook(src, data_only=True)['HUYỀN']
+_wb = openpyxl.load_workbook(src, data_only=True)
+h = _wb['HUYỀN'] if 'HUYỀN' in _wb.sheetnames else _wb.worksheets[0]   # file Check_DT: sheet HUYỀN; file "LƯƠNG SALE" (Sheet1): bố cục khác
+hdr = {str(h.cell(2, c).value).strip(): c for c in range(1, 60) if h.cell(2, c).value is not None}
+cNote, cSrc, cVal = hdr['Ghi chú nội bộ'], hdr['Nguồn đơn'], hdr['Giá trị đơn hàng sau giảm giá']
+cName, cTot = hdr['Tên sale'], hdr['TỔNG']          # cột tên sale + cột TỔNG (số chốt từng sale)
 S = {}
-for i in range(3, 60):
-    n, v = h.cell(i, 18).value, h.cell(i, 19).value
-    if n and isinstance(v, (int, float)): S[n.strip()] = float(v)
+for i in range(3, 200):
+    n, v = h.cell(i, cName).value, h.cell(i, cTot).value
+    if n and isinstance(v, (int, float)): S[str(n).strip()] = float(v)
 canon = {k.lower(): k for k in S}
 rows = []  # (hrow, ma, sale, nguon, value, cnt)
-for i in range(3, 2000):
-    tags = [h.cell(i, c).value for c in range(1, 6)]
+for i in range(3, 3000):
+    tags = [h.cell(i, c).value for c in range(1, cNote)]
     tags = [t.strip() for t in tags if t and str(t).strip()]
-    val = h.cell(i, 8).value
+    val = h.cell(i, cVal).value
     if not tags or not isinstance(val, (int, float)): continue
-    nguon = h.cell(i, 7).value
-    ma = h.cell(i, 6).value
+    nguon = h.cell(i, cSrc).value
+    ma = h.cell(i, cNote).value
     cnt = len(tags)
     for t in tags: rows.append((i, ma, canon.get(t.lower(), t), nguon, float(val), cnt))
 tot = collections.defaultdict(float)
@@ -49,8 +53,8 @@ for s in ('Phat_theo_kenh', 'Phat_tung_nguoi'):
     for row in wb[s].iter_rows():
         for c in row:
             if isinstance(c.value, str) and '1454' in c.value: c.value = c.value.replace('1454', str(last))
-wb['Cau_hinh']['A18'] = ('Dữ liệu T10 cập nhật theo sheet HUYỀN (KT Huyền chốt, file Check_DT_t10.xlsx): DT từng sale = cột TỔNG; '
-                         'dòng vàng "Điều chỉnh theo KT Huyền" ở Du_lieu = phần KT sửa tay (không rõ kênh → tính NGOÀI kênh FB chính).')
+wb['Cau_hinh']['A18'] = ('Dữ liệu T10 theo file FINAL "LƯƠNG SALE" (Duyên chốt 04/11): DT từng sale = cột TỔNG; Du_lieu = từng dòng thẻ chia đều theo số sale. '
+                         'Nếu có dòng vàng "Điều chỉnh theo KT Huyền" = phần số chốt lệch cộng dòng (không rõ kênh → tính NGOÀI kênh FB chính).')
 # Sheet đối chiếu
 dc = wb.create_sheet('Doi_chieu_Huyen')
 dc.append(['Sale (CRM)', 'KT Huyền (cột TỔNG)', 'Tổng Du_lieu', 'Chênh (phải = 0)', 'Trong đó dòng điều chỉnh', 'DT kênh FB chính'])

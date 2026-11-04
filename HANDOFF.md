@@ -46,6 +46,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [ ] **BƯỚC 3/3:** xuất lại sheet `2_Tổng thưởng sale` + `4_Chi tiết thưởng` cho toàn team theo luật mới (giao qua chat, không commit vì có tiền từng người).
 - **ĐANG LÀM:** bước 2/3. Không sửa extension → không cần reload; bước 2 sẽ sửa gas_v13.js → phải deploy GAS (workflow Actions tự chạy).
 
+## 2026-11-04 (phiên 18) — PHẠT THI ĐUA T10 v6: theo file FINAL chuẩn "LƯƠNG SALE" Duyên gửi — XONG, đã push
+- **Yêu cầu Duyên:** file `C_DUYÊN-lương sale.xlsx` (Sheet1, bố cục mới: thẻ A:G, ghi chú I, nguồn J, giá trị K, tên sale S, cột kênh T:AK, TỔNG AL = 8.112.651.300) là FINAL chuẩn → gửi lại bảng phạt. **v6 thay v5** (v5 dùng cột TỔNG sheet HUYỀN 8.106.236.800, nay bỏ).
+- [x] **ĐÃ PUSH:** `tools/thidua-t10/build_phat_t10.py` nay nhận cả 2 bố cục (tự dò cột theo tiêu đề dòng 2: Ghi chú nội bộ / Nguồn đơn / Giá trị đơn hàng sau giảm giá / Tên sale / TỔNG). Số từng dòng cộng KHỚP cột TỔNG → 0 dòng điều chỉnh. File `Phat_thi_dua_T10_2026_v6.xlsx` giao qua chat, KHÔNG commit (có tiền từng người).
+- **Kết quả:** FB chính 1.074.770.000 = 76,77% → 0,02% → phạt 280.000 (6 đầu → 46.667đ). Phần còn lại 6.632.130.300 = 82,90% → 0,015% → 1.200.000, 16 sale không đạt + Duyên = 17 đầu → 70.588đ. Tổng 1.480.000đ. **ninhnga99 998.338.750 < 1 tỷ → KHÔNG đạt** (v5 từng đạt), phạt 117.255đ. Mến Bùi chỉ FB 96.071.833 → 46.667đ.
+- **NGUYÊN NHÂN GỐC số đổi so với v5:** v5 lấy cột TỔNG sheet HUYỀN (KT chốt tay); file FINAL mới là số cộng từ dòng thẻ đã cập nhật đơn → ninhnga99 −2.405.000, phuongthao2000 +10.831.333...
+- [ ] **VIỆC KẾ TIẾP:** Duyên chốt câu hỏi cũ (loại DT tài khoản không có trong bảng cam kết khỏi phần 8 tỷ? — phiên 8); `js/64-thidua.js` (web) chưa đổi. Không sửa gas_v13.js/extension → không cần deploy/reload.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 17) — PHẠT THI ĐUA T10: cập nhật lại theo sheet HUYỀN mới (KT Huyền đã chốt + khớp CRM) — XONG, đã push
 - **Yêu cầu Duyên:** sheet HUYỀN trong `Check_DT_t10.xlsx` đã tính chuẩn (đã cộng các đơn update + khớp chỉ số CRM mới nhất) → làm lại báo cáo phạt thi đua T10 theo số này, gửi lại file.
 - [x] **ĐÃ PUSH:** `tools/thidua-t10/build_phat_t10.py <Check_DT_t10.xlsx> <Phat_thi_dua_T10_2026_v4.xlsx> <ra.xlsx>` (rồi recalc bằng soffice). File `Phat_thi_dua_T10_2026_v5.xlsx` giao qua chat, KHÔNG commit (có tiền từng người, như quy ước phiên 8). Công thức/cấu hình v4 giữ nguyên; thêm sheet `Doi_chieu_Huyen` (chênh = 0 cho mọi sale, tổng 8.106.236.800).
