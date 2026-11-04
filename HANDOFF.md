@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 22) — ĐỐI CHIẾU file KT "C DUYÊN-lương sale.xlsx" với CRM — XONG, đã push (kết luận: CHƯA khớp, nguyên nhân rõ)
+- **File KT là gì:** Sheet1 = sổ HUYỀN + cột AO "LƯƠNG SALE" (= HOA HỒNG, KHÔNG gồm thưởng) và AP "LƯƠNG HỦY". Nên thưởng T10 (3.833.340) KHÔNG đối chiếu được với file này.
+- **Công thức KT = công thức CRM:** nhóm Q "SALE ONL" 1,5% (≥15tr)/1% (<15tr); "SALE OFF" 1%/0,8%; ngoại lệ KT: menbui2002 (CSKH) +432.345 (khoản CSKH FB Phạm Thu Hiền), linhNM1995 0,8% phẳng. Tự kiểm: KT đúng 0đ trên doanh thu của chính KT cho mọi sale còn lại.
+- **Kết quả (tool `tools/bonus-t10/recon_luong_kt.py`):** 2/38 sale khớp tuyệt đối. Tổng lương KT 78.732.223 vs CRM 69.841.134 (−8.891.090). **Nguyên nhân gốc lệch:** (1) KÊNH — KT xếp thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995 vào SALE OFF (1%/0,8%) nhưng `channels.json` (lấy từ file Check_DT_t10) để online (1,5%/1%) → CRM cao hơn KT ~6,9tr; (2) 17 sale (menbui2002, linhNM1995, kieuHT1997, thanhtam86...) CRM CHƯA phân loại kênh → lương CRM = 0; (3) DOANH THU: KT có sale/đơn mà CRM không có Pos (DIEUTAM 29,73tr, lanVH1995, tuanhTVBH96, NguyenXoan, VANALO, thomtran1993...) và Pos CRM lệch sổ KT ở nhiều sale (minhanh99 +77tr, ninhnga99 −35,6tr, phuongthao2000 −49,8tr...). Tổng DT KT 8.112.651.300 vs CRM 8.065.631.000.
+- ⚠ CHƯA đổi cấu hình kênh trong CRM (không tự quyết): Duyên xác nhận 4 sale trên là OFF hay ON (thưởng không đổi theo kênh, chỉ % hoa hồng).
+- [ ] **VIỆC KẾ TIẾP:** Duyên chốt kênh từng sale → cập nhật Quản lý Sale (SALE_CHANNELS) trên CRM; check tay các sale KT có DT mà CRM thiếu Pos; sau đó chạy lại `recon_luong_kt.py`.
+
 ## 2026-11-04 (phiên 21) — THƯỞNG T10: đơn có trên Pos nhưng Base Thất bại / không có trên Base → KHÔNG thưởng + CHECK TAY — XONG, đã push
 - **Duyên chốt:** VD 1015T09/2026 có trên Pos, Base không có (đơn Base đã hủy/thất bại) → không tính thưởng cho sale; tương tự mọi đơn có trên Pos mà không có trên Base → liệt kê check tay.
 - **CRM web/GAS ĐÃ làm đúng sẵn (không sửa):** `gas_v13.js` Báo cáo B: gốc Base toàn Huỷ/Hoàn/Thất bại → `gocBiLoai` (bỏ đơn Pos); đơn không khớp Base → `khongKhop` (check tay) và không có `donGoc` nên không vào thưởng (js/12 `_hasGocField`). Lỗi chỉ ở bản OFFLINE.
