@@ -183,7 +183,7 @@ function _bcRequireKw_(p){
   return /vòng/i.test(nm) ? 'vòng' : '';
 }
 // GỘP ĐƠN GHÉP KHI XÉT THƯỞNG "THEO ĐƠN" (Duyên 2026-11-04): 2 đơn gốc CÙNG KHÁCH (cùng SĐT) + CÙNG BỘ SALE mà ghi chú Pos của 1 đơn trỏ tới mã đơn kia
-// ("GHÉP CÙNG ĐƠN 663T10" / "GHÉP ĐƠN CÙNG 663T10" / "SHIP CÙNG ĐƠN ...") = MỘT bill: cộng giá trị + sản phẩm rồi mới xét mốc 10/15/20tr, thưởng 1 lần (chia đều sale chung).
+// ("GHÉP CÙNG ĐƠN 663T10" / "GHÉP ĐƠN CÙNG 663T10" / "SHIP CÙNG ĐƠN ...") = MỘT bill (phải cùng ngày lên đơn, lệch tối đa 1 ngày): cộng giá trị + sản phẩm rồi mới xét mốc 10/15/20tr, thưởng 1 lần (chia đều sale chung).
 // CHỈ dùng cho vòng thưởng "Theo đơn" — số đơn, doanh thu, hoa hồng, thưởng theo NGÀY vẫn tính từng đơn như cũ. Khác SĐT / khác bộ sale → vẫn 2 bill.
 // okFn(o) (tuỳ chọn): đơn nào được phép tham gia gộp (vd chỉ đơn gốc). Trả mảng mới: đơn gộp = bản sao đơn đầu + giaTriDon/giaTri cộng dồn, sanPham/maSanPham/soLuong nối, ghepSoDon, ghepMaDon.
 function _bcGhepCodes_(note){
@@ -199,6 +199,9 @@ function _bcMergeGhepBills_(list, okFn){
   function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
   function skey(o){ return String(o.saleBan == null ? '' : o.saleBan).toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(','); }
   function phone(o){ return String(o.soDienThoai || o.sdt || '').replace(/\D/g, '').replace(/^84/, '0'); }
+  // CÙNG NGÀY LÊN ĐƠN (Duyên 2026-11-04): ngày lên đơn = ngày tạo đơn trên Base (baseNgayTao/date), thiếu thì ngày Pos. Cách nhau tối đa GHEP_MAX_DAYS ngày mới gộp (663T10 16/10 23:50 + 704T10 17/10 19:12 = sát nhau → gộp).
+  function ymd(o){ var d = o.baseNgayTao || o.date || ''; if (!d){ var m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(o.ngayTao || '')); d = m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : String(o.ngayTao || '').slice(0, 10); } return String(d).slice(0, 10); }
+  function dayGapOk(a, b){ var x = Date.parse(ymd(a)), y = Date.parse(ymd(b)); return !isNaN(x) && !isNaN(y) && Math.abs(x - y) <= 86400000 * 1; }
   function excl(o){ return /^(huy|hoan|da huy|da hoan|dang hoan|chuyen hoan)/.test(_bcFold_(o.trangThai)); }
   var ok = [], sk = [], ph = [], codes = [];
   for (i = 0; i < n; i++){
@@ -212,7 +215,7 @@ function _bcMergeGhepBills_(list, okFn){
     var m = GR.exec(String(list[i].ghiChu == null ? '' : list[i].ghiChu).normalize('NFC').toUpperCase());
     if (!m) continue;
     for (j = 0; j < n; j++){
-      if (j === i || !ok[j] || sk[j] !== sk[i] || !sk[i] || !ph[i] || ph[i] !== ph[j] || !codes[j][m[1]]) continue;
+      if (j === i || !ok[j] || sk[j] !== sk[i] || !sk[i] || !ph[i] || ph[i] !== ph[j] || !codes[j][m[1]] || !dayGapOk(list[i], list[j])) continue;
       if (find(i) !== find(j)){ par[find(i)] = find(j); any = true; }
     }
   }

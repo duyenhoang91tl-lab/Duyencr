@@ -25,6 +25,9 @@ r = calc([o663, Object.assign({}, o704, { trangThai: 'Đã hủy' })]); ok(tot(r
 // thứ tự chữ kiểu cũ vẫn nhận; không gộp đơn không phải đơn gốc
 r = calc([o663, Object.assign({}, o704, { ghiChu: '704T10/2026 GHÉP CÙNG ĐƠN 663T10' })]); ok(tot(r, 'trangNH2005') === 30000, '"GHÉP CÙNG ĐƠN 663T10" vẫn nhận');
 r = calc([o663, Object.assign({}, o704, { donGoc: false })]); ok(tot(r, 'trangNH2005') === 20000, 'đơn không phải đơn gốc không gộp');
+// CÙNG NGÀY LÊN ĐƠN: lệch >1 ngày (Base) → không gộp; lệch đúng 1 ngày → gộp
+r = calc([o663, Object.assign({}, o704, { baseNgayTao: '2026-10-17' })]); ok(tot(r, 'trangNH2005') === 30000, 'lệch 1 ngày (16/10 23:50 → 17/10) vẫn gộp');
+r = calc([o663, Object.assign({}, o704, { baseNgayTao: '2026-10-19' })]); ok(tot(r, 'trangNH2005') === 20000, 'lệch 3 ngày → KHÔNG gộp');
 // 2 sale chung: thưởng gộp chia đều
 const sh = (o) => Object.assign({}, o, { saleBan: 'A, B', saleShares: [{ name: 'A', frac: .5 }, { name: 'B', frac: .5 }] });
 r = calc([sh(o663), sh(o704)]); ok(tot(r, 'A') === 15000 && tot(r, 'B') === 15000, 'bill gộp 2 sale: 30.000 chia đều 15.000/người');

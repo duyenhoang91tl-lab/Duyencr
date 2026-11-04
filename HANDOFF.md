@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 20) — THƯỞNG T10: Duyên chốt luật gộp GHÉP phải CÙNG NGÀY LÊN ĐƠN + thưởng ngày tính theo ngày Base — BƯỚC 1/2 (code) xong, đã push
+- **Duyên chốt:** (1) 3 ngày của trangNH2005 (3/10, 5/10, 6/10) phải xét doanh thu NGÀY theo ngày lên đơn GỐC trên Base xem có đạt mốc 60tr không; (2) 886T10/129T10 không thưởng là ĐÚNG; (3) đơn ghép cùng khách + cùng sale + cùng ngày lên đơn → gộp.
+- **Kết quả kiểm theo ngày Base (trangNH2005, chia đều theo số sale):** 3/10 = 34,75tr; 5/10 = 12,47tr; 6/10 = 36,45tr → KHÔNG đạt 60tr. Ngày gần mốc nhất: 20/10 = 58,73tr (thiếu 1,27tr), 23/10 chỉ 17,4tr theo Base.
+- **NGUYÊN NHÂN GỐC lệch ở bản offline:** `calc_bonus.js` tính ngày theo ngày POS (23/10 = 62,12tr → thưởng ngày 50k) trong khi CRM (js/12 `_bonusYmd_`) dùng ngày Base. MỚI `tools/bonus-t10/add_base_date.py <xlsx> <work>` gán `baseNgayTao` (+ `donGoc`) vào orders.json, chạy SAU `extract_orders_pos.py`, TRƯỚC `calc_bonus.js`.
+- **Luật gộp GHÉP (js/27 + gas_v13.js + calc_bonus.js):** thêm điều kiện ngày lên đơn (Base, thiếu thì Pos) lệch tối đa 1 ngày. ⚠ DIỄN GIẢI cần Duyên xác nhận: 663T10 (Base 16/10 23:50) + 704T10 (17/10 19:12) lệch 1 ngày nhưng Duyên yêu cầu gộp → cho phép lệch ≤1 ngày; 807+702 (17→19/10), 802+89, 1149+967 lệch >1 ngày → KHÔNG gộp. Muốn "đúng cùng ngày" thì đổi hằng `1` trong `dayGapOk` thành `0` (sẽ làm 663+704 không gộp).
+- [ ] **BƯỚC 2/2 (kế tiếp):** chạy lại pipeline offline, xuất file bảng thưởng chuẩn gửi Duyên (không commit).
+
 ## 2026-11-04 (phiên 19) — THƯỞNG T10: gộp đơn GHÉP lên WEB + GAS — BƯỚC 2/3 xong, đã push (Duyên gửi lại cùng yêu cầu + file Check_DT_t10.xlsx)
 - [x] **BƯỚC 2/3 ĐÃ PUSH:** `_bcMergeGhepBills_(list, okFn)` + `_bcGhepCodes_` thêm cuối `js/27-fn-bonuscore.js` và BẢN SAO NGUYÊN VĂN trong khối BONUS CORE của `gas_v13.js` (+ `gas/*.gs` qua `split-gas.js`, `--check` OK). Luật: 2 đơn gốc CÙNG SĐT + CÙNG bộ sale, ghi chú đơn này trỏ mã đơn kia ("GHÉP ĐƠN CÙNG 663T10" / "GHÉP CÙNG ĐƠN" / "SHIP CÙNG ĐƠN"), không Huỷ/Hoàn → 1 bill (giá trị + SP cộng lại, đếm lại số sản phẩm).
 - **Chỗ gọi:** `js/12 _computeBonusData_` vòng "Theo đơn" (CHỈ vòng này; số đơn/doanh thu/thưởng THEO NGÀY giữ từng đơn) và `gas_v13.js buildCsStats_` (mảng `mine` → Pancake AI csStats). Dòng thưởng ghi "GỘP N đơn ghép (mã + mã)". Test mới `tools/test-bonus-ghep-bill.js` (12 ca) + các test thưởng cũ đều PASS.

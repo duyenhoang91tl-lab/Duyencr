@@ -42,12 +42,14 @@ function mergeTach(list) {
 // = MOT bill -> cong gia tri xet moc (11.300.000 -> combo 2 SP 20.000 trong bang thuong chinh thuc "1326t10+ ng139t10"). Chi gop khi cung bo sale va 1 ben la don them "NG" (khop bang thuong chinh thuc: 1326t10+ng139t10, 1292T10+ng132t10, 693t10+NG75; con 702t10 / 807T10 tinh rieng), khong phai don Bao hanh/DMP/Huy-Hoan, doi tac co trong du lieu thang.
 const sKey = o => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(',');
 const codeTok = note => { const t = new Set(); String(note || '').normalize('NFC').toUpperCase().replace(/(?<![A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, (m, c) => { t.add(c); return m; }); return t; };
+const dayOf = o => String(o.baseNgayTao || (/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(o.ngayTao || '') || []).slice(1).reverse().map((x, i) => i ? x.padStart(2, '0') : x).join('-')).slice(0, 10);
+const gapOk = (a, b) => { const x = Date.parse(dayOf(a)), y = Date.parse(dayOf(b)); return !isNaN(x) && !isNaN(y) && Math.abs(x - y) <= 864e5; };   // cung ngay len don (Base), lech toi da 1 ngay — chi cho nhanh gop theo SDT
 function mergeGhep(list) {
   const GR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
   const par = list.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i])), uni = (a, b) => { par[find(a)] = find(b); };
   list.forEach((a, i) => {
     if (excludedSt(a.trangThai)) return; const m = GR.exec(String(a.ghiChu || '').normalize('NFC').toUpperCase()); if (!m) return;
-    list.forEach((b, j) => { if (j === i || excludedSt(b.trangThai) || sKey(b) !== sKey(a) || b.maDon === a.maDon) return; if (codeTok(b.ghiChu).has(m[1]) && (/^NG/.test(m[1]) || [...codeTok(a.ghiChu)].some(c => /^NG/.test(c)) || [...codeTok(b.ghiChu)].some(c => /^NG/.test(c)) || (a.sdt && b.sdt && a.sdt === b.sdt))) uni(i, j); });   // gop khi (1) 1 trong 2 la don them "NG..." (NG139T10 + 1326T10) HOAC (2) Duyen 2026-11-04: 2 don goc Base rieng nhung CUNG KHACH (cung SDT) + CUNG BO SALE + ghi chu tro den nhau (704T10 "GHEP DON CUNG 663T10" + 663T10, trangNH2005, cung SDT) = 1 bill khi xet moc; khac SDT/khac sale van la 2 bill
+    list.forEach((b, j) => { if (j === i || excludedSt(b.trangThai) || sKey(b) !== sKey(a) || b.maDon === a.maDon) return; if (codeTok(b.ghiChu).has(m[1]) && (/^NG/.test(m[1]) || [...codeTok(a.ghiChu)].some(c => /^NG/.test(c)) || [...codeTok(b.ghiChu)].some(c => /^NG/.test(c)) || (a.sdt && b.sdt && a.sdt === b.sdt && gapOk(a, b)))) uni(i, j); });   // gop khi (1) 1 trong 2 la don them "NG..." (NG139T10 + 1326T10) HOAC (2) Duyen 2026-11-04: 2 don goc Base rieng nhung CUNG KHACH (cung SDT) + CUNG BO SALE + ghi chu tro den nhau (704T10 "GHEP DON CUNG 663T10" + 663T10, trangNH2005, cung SDT) = 1 bill khi xet moc; khac SDT/khac sale van la 2 bill
   });
   const grp = {}; list.forEach((o, i) => { const r = find(i); (grp[r] = grp[r] || []).push(i); });
   const out = [], info = [];
