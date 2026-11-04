@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 — Thưởng Sale thử việc/chính thức: tính theo ĐƠN GỐC Base, đơn chia A+B (Duyên yêu cầu) — BƯỚC 1/2 web đã push
+
+- [x] **Web `js/12` `_computeBonusData_`** (Báo cáo E/G + `_computeSaleIncome_` js/63 dùng chung): (1) thêm `_bonusParticipants_(o)` — người tham gia đơn = người có phần chia > 0 trong `saleShares` (người bán trên BASE); đơn không có saleShares thì theo thẻ Pos như cũ; (2) đơn KHÔNG phải đơn gốc (khi backend có `baseNgayTao`) bị bỏ khỏi cả số đơn/ngày, đơn đầu tiên và thưởng theo đơn (trước đây vẫn đếm số đơn). Doanh thu ngày = doanh thu gốc đơn riêng + phần được chia của đơn chia (đã đúng từ `_orderRevenueShares_`). Thưởng của A không liên quan B.
+- **NGUYÊN NHÂN GỐC:** số đơn lấy tên từ THẺ POS còn doanh thu lấy theo saleShares (Base) → 2 nguồn tên khác nhau; sale có phần chia nhưng không có tên trên thẻ Pos bị đếm 0 đơn, đơn không gốc vẫn bị đếm.
+- Test: `node tools/test-bonus-goc-split.js` (ví dụ Duyên: A 1 đơn riêng + 1 đơn chia A+B → A có 2 đơn; doanh số ngày A = gốc + phần chia, B độc lập). Các test thưởng cũ vẫn pass. Bump js/12 `?v=20261104a`.
+- [ ] **BƯỚC 2 (ĐANG LÀM):** `gas_v13.js` `buildCsStats_` (thưởng hiển thị cho CS trong extension) — cùng quy tắc: chỉ đếm đơn gốc cho số đơn/đơn đầu tiên/thưởng theo đơn; sau đó `node tools/split-gas.js`, đồng bộ khối `gas-code-v9` trong index.html, nhắc Duyên deploy GAS thủ công.
+- [ ] Giả định cần Duyên xác nhận: thưởng "theo đơn" (giá trị đơn/sản phẩm) cũng chỉ tính đơn gốc (trước đây đơn không gốc vẫn được thưởng theo đơn). Nếu muốn giữ nguyên thì bỏ dòng `if (_hasGocField && !o.donGoc) return;` ở vòng "Chấm các CT phạm vi theo đơn".
+
 ## 2026-11-04 — Thưởng chi tiết T10 thiếu đơn Pos TÁCH (254T10: M45018 + M45016) — ĐÃ SỬA tool bonus-t10
 - **Triệu chứng:** sheet `THUONG_Chi_tiet` (từ CRM/tool) không có thưởng đơn 254T10 của thuydinh95 dù bảng thưởng chính thức có (Thủy 15tr = 30.000). Pos tách 2 đơn (M45018 9.000.000, M45016 8.500.000; ghi chú "254T10/2026/1 TÁCH", "/2 TÁCH").
 - **NGUYÊN NHÂN GỐC:** web CRM/GAS đã gộp đơn tách (`_mergeTachDon_`, gas_v13.js, dùng trong `buildSalesReportB_`) nhưng chuỗi tool offline `tools/bonus-t10` (extract_orders.py → calc_bonus.js) đọc MỖI dòng Pos là 1 đơn riêng → mỗi phần <10tr nên thưởng = 0. Không phải lỗi `_computeBonusData_`.

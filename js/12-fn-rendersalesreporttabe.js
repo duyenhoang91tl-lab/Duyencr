@@ -118,6 +118,18 @@ function _bonusNamesOfOrder_(o){
   splitMulti_(o.saleBan, ',').forEach(function(n){ if (n && !isNumTagSale_(n)) set[n] = true; });
   return set;
 }
+// NGƯỜI THAM GIA 1 ĐƠN để tính THƯỞNG (thử việc/chính thức) — theo ĐƠN GỐC trên Base (Duyên 04/11/2026).
+// NGUYÊN NHÂN GỐC cũ: số đơn/ngày lấy tên từ THẺ POS (_bonusNamesOfOrder_) còn doanh thu lấy từ saleShares (người bán trên Base) → 2 nguồn tên khác nhau,
+// sale có phần chia doanh thu nhưng không có tên trên thẻ Pos bị đếm 0 đơn (và ngược lại); đơn không phải đơn gốc vẫn được đếm số đơn.
+// Quy tắc: đơn gốc có saleShares → người tham gia = người có phần chia > 0 (mỗi người +1 đơn, doanh thu = phần được chia); không có saleShares → thẻ Pos như cũ.
+function _bonusParticipants_(o){
+  var set = {};
+  if (o && o.saleShares && o.saleShares.length){
+    o.saleShares.forEach(function(x){ if (x && x.name && Number(x.frac) > 0) set[x.name] = true; });
+    if (Object.keys(set).length) return set;
+  }
+  return _bonusNamesOfOrder_(o);
+}
 // Doanh thu CHIA cho từng sale của 1 đơn — cùng quy ước với _computeCommissionData_ (saleShares nếu đơn ghép Base,
 // ngược lại chia đều theo thẻ sale; saleRatio 0.3 = đơn Quầy 30/70).
 function _orderRevenueShares_(o){
@@ -185,12 +197,13 @@ function _computeBonusData_(orders){
   var _hasGocField = orders.some(function(o){ return !!o.baseNgayTao; });
   function _bonusYmd_(o){ return o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao); }
   orders.forEach(function(o){
+    if (_hasGocField && !o.donGoc) return;   // thưởng CHỈ tính đơn gốc (số đơn + doanh thu + đơn đầu tiên); đơn không phải đơn gốc không được đếm
     var dateStr = _bonusYmd_(o);
     var timeMatch = String(o.ngayTao||'').match(/(\d{1,2}):(\d{2})/);
     var timeStr = timeMatch ? timeMatch[0] : '';
     // Mọi sale tham gia đều tính số đơn/đơn đầu tiên trong ngày; doanh thu ngày dùng phần CHIA của từng sale.
-    var bonusSet = _bonusNamesOfOrder_(o);
-    var revShares = (_hasGocField && !o.donGoc) ? [] : _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale; đơn KHÔNG phải đơn gốc: không cộng vào doanh thu ngày
+    var bonusSet = _bonusParticipants_(o);
+    var revShares = _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale (đơn của 1 sale = doanh thu gốc; đơn chia A+B = phần chia của từng người)
     var perName = {};
     revShares.forEach(function(x){ perName[x.name] = {share:x.share, bonus:false}; });
     Object.keys(bonusSet).forEach(function(nm){ if (!perName[nm]) perName[nm] = {share:0, bonus:true}; else perName[nm].bonus = true; });
@@ -253,11 +266,12 @@ function _computeBonusData_(orders){
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
   var review = [];   // đơn cần kiểm tra tay (mã SP chưa xác nhận, đơn vòng thiếu doanh thu dòng...) — hiện ở tab "Chi tiết thưởng"
   orders.forEach(function(o){
+    if (_hasGocField && !o.donGoc) return;   // thưởng theo đơn cũng chỉ tính đơn gốc
     var dateStr = _bonusYmd_(o);
     var giaTri = Number(o.giaTriDon)||0;
     var binfo = _bcOrderInfo_(o);   // đếm sản phẩm + phần vòng/charm mix (27-fn-bonuscore.js)
     if (binfo.needReview && (!_hasGocField || o.donGoc)) review.push({ date:dateStr, counter:binfo.counter, ghiChu:String(o.ghiChu||''), reasons:binfo.reasons, sale:String(o.saleBan||'') });
-    var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
+    var orderNames = Object.keys(_bonusParticipants_(o)).filter(Boolean), nParts = orderNames.length || 1;
     orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
       var channel = _saleChannelOn_(name, dateStr);   // loại Sale TẠI NGÀY ĐƠN (mốc ngày ở js/62)
