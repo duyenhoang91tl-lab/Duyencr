@@ -24,5 +24,10 @@
     ],
     "don": "681T10+937T10",
     "lyDo": "Duyen chot 2026-11-04: 937T10 la cua Mai Huyen 3.550.000; 681T10 la cua Ngoc (phan con lai cua Pos 14.523.000 = 10.973.000, de tong = Pos)"
+  },
+  "M47074": {
+    "don": "1301T10",
+    "giaTriTruocGiam": 31500000,
+    "lyDo": "Duyen chot 2026-11-04: nhan Tourmaline cao cap niem yet 31.500.000, giam 5% con 29.925.000; T21/T31 xet theo GIA NIEM YET -> T31 200.000. File Check_DT_t10 khong co cot gia niem yet nen khai o day."
   }
 }

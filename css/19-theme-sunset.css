@@ -98,3 +98,107 @@ html.ui-pro:not([data-theme="dark"]) #boot-splash > div:first-child{border-top-c
 /* vòng xoay "Đang tải dữ liệu" (index.html <style> dòng 22-23 đặt tím #4a2c8f cứng) */
 html.ui-pro:not([data-theme="dark"]) .ev-spin{color:#a8326c;}
 html.ui-pro:not([data-theme="dark"]) .ev-spin i{border-color:rgba(214,71,122,.18);border-top-color:#d6477a;}
+
+/* ── 7. ĐỘ TƯƠNG PHẢN CAO (Duyên báo 2026-11-04: "chữ nhòe mờ khó nhìn") ──
+   NGUYÊN NHÂN GỐC: chữ phụ dùng --muted/--hint (tông hồng xám nhạt #7a5f6b/#ad97a1) cỡ 10-11px, trên nền hồng pastel
+   → tương phản chỉ ~2.3-4:1 (chuẩn đọc tốt là >= 4.5:1, chữ nhỏ nên >= 7:1); thêm body đặt -webkit-font-smoothing:antialiased
+   làm nét chữ mảnh/nhạt trên Mac. Chữ trong bảng KH để weight 400 nên càng mảnh.
+   Cách sửa: đậm hoá 3 biến chữ (mọi chỗ dùng var(--text/--muted/--hint) tự đậm theo), bỏ antialiased, tiêu đề cột + ô bảng đậm hơn. */
+html.ui-pro:not([data-theme="dark"]){
+  --text:#1a0f15; --muted:#4f3443; --hint:#6b4f5e;
+}
+html.ui-pro:not([data-theme="dark"]) body{-webkit-font-smoothing:auto;text-rendering:auto;}
+html.ui-pro:not([data-theme="dark"]) #main-table thead th{color:var(--text);font-size:11.5px;}
+html.ui-pro:not([data-theme="dark"]) #main-table thead th .th-filter-icon{color:var(--muted);}
+html.ui-pro:not([data-theme="dark"]) #main-table tbody td{color:var(--text);font-weight:500;}
+html.ui-pro:not([data-theme="dark"]) .sidebar .cs-filter-label,
+html.ui-pro:not([data-theme="dark"]) .sidebar .sb-label,
+html.ui-pro:not([data-theme="dark"]) #ymf-bar .ymf-label,
+html.ui-pro:not([data-theme="dark"]) #col-toggle-bar .ymf-label{color:var(--text);}
+
+/* ── 8. NỀN PASTEL KIỂU CANVA / PANCAKE (Duyên yêu cầu 2026-11-04) ──
+   Tham khảo ảnh Canva (xanh ngọc → tím lavender → hồng) và Pancake (xanh → tím → hồng).
+   Yêu cầu: nền chuyển màu pastel nhã nhặn, NHẸ, đồng điệu với header hồng hoàng hôn.
+   Cách làm: chỉ đổi NỀN trang (body/.main) + sidebar lọc; không đụng header/menu/chữ (độ tương phản mục 7 giữ nguyên).
+   Nền sáng tới mức chữ #1a0f15 vẫn >= 15:1. Thẻ/bảng nền trắng (--surface) nên nổi rõ trên nền màu.
+   Gỡ phần này = xoá mục 8 → quay về nền hồng đào mục 2. */
+html.ui-pro:not([data-theme="dark"]){--bg:#f1eefb;--pro-soft:#f1eefb;}
+html.ui-pro:not([data-theme="dark"]) body,
+html.ui-pro:not([data-theme="dark"]) .main{
+  background:
+    radial-gradient(900px 420px at 8% -5%, rgba(168,236,232,.55) 0%, rgba(168,236,232,0) 70%),
+    radial-gradient(900px 480px at 100% 0%, rgba(214,200,247,.60) 0%, rgba(214,200,247,0) 70%),
+    radial-gradient(1000px 520px at 50% 105%, rgba(252,214,232,.70) 0%, rgba(252,214,232,0) 70%),
+    linear-gradient(180deg,#eef8fa 0%,#f1eefb 50%,#fdf0f6 100%) fixed;
+}
+html.ui-pro:not([data-theme="dark"]) .sidebar{
+  background:linear-gradient(180deg,rgba(214,242,241,.92) 0%,rgba(230,222,250,.92) 55%,rgba(252,226,238,.92) 100%);
+  border-right-color:#d8cdef;
+}
+
+/* ── 9. MENU TRÁI: KHUNG NGOÀI NỀN NHẠT, Ô TÁC VỤ NỀN ĐẬM (Duyên yêu cầu 2026-11-04) ──
+   NGUYÊN NHÂN GỐC khó đọc: mục 4 phía trên cho khung menu là gradient hồng ĐẬM (#8f2a5e→#d95f7c) còn mỗi ô tác vụ chỉ là
+   nền trắng trong suốt 5-14% (css/06-pro.css dòng 154-157) + chữ trắng 12.5px → ô và khung gần cùng màu, chữ trắng trên hồng
+   giữa/nhạt chỉ ~3-4:1. Đảo lại: khung nhạt (hồng→lavender→mint cùng bảng màu nền mục 8), ô nổi = nền hồng mận ĐẶC + chữ trắng
+   (>= 6:1), ô đang chọn đậm hơn nữa (mận #5c1740, chữ đậm). Tiêu đề nhóm (SETTINGS...) nằm trên nền nhạt nên dùng chữ mận đậm.
+   Dùng html.ui-pro.ui-pro (nhân đôi class) để ngang độ ưu tiên với html.ui-pro.ui-shell ở mục 4 / css/13-shell.css rồi thắng nhờ
+   nạp sau; phải liệt kê thêm #reportsgroup-list .tab vì css/13-shell.css dùng 2 id. Chỉ chế độ sáng; không đổi js. Gỡ = xoá mục 9. */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs{
+  background:linear-gradient(180deg,#fde4ee 0%,#f1e6fa 55%,#e3f1f5 100%);
+  border-right:1px solid #e3cde0;box-shadow:2px 0 14px rgba(168,50,108,.10);
+  scrollbar-width:thin;scrollbar-color:rgba(168,50,108,.40) transparent;
+}
+/* ô tác vụ: nền đậm đặc, nổi lên khỏi khung */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-act,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g]{
+  background:#a8326c;color:#fff;font-weight:600;border-radius:10px;
+  margin-top:0;margin-bottom:4px;box-shadow:0 1px 3px rgba(92,23,64,.25);
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-act:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab:hover,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g]:hover{
+  background:#8f2a5e;color:#fff;
+}
+/* ô đang chọn: đậm nhất + vạch nhấn hồng nhạt bên trái */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab.active,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab.active,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .tab[data-sn-g].active{
+  background:#5c1740;color:#fff;font-weight:700;border-left:3px solid #ffb3cf;
+}
+/* tiêu đề nhóm nằm trên nền nhạt → chữ mận đậm */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh{
+  color:#5c1740;font-weight:800;background:none;border:none;box-shadow:none;
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh:hover{background:rgba(168,50,108,.10);color:#3d0f2b;}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh .sn-car::before,
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sn-gh .sn-car::after{background:#5c1740;}
+/* chân menu (Ghim menu / Giao diện cũ): cùng kiểu ô đậm */
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot{border-top:1px solid rgba(168,50,108,.25);}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button{
+  background:#a8326c;color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(92,23,64,.25);
+}
+html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button:hover{background:#8f2a5e;color:#fff;}
+
+/* ── 10. MENU TRÁI: CÁC Ô CÙNG LỀ TRÁI/PHẢI, CÙNG CỠ (Duyên yêu cầu 2026-11-05) ──
+   NGUYÊN NHÂN GỐC lệch: css/06-pro.css dòng 154 cho mục con [data-sn-g] và .sn-act `margin-left:14px; width:calc(100% - 14px)`
+   (thụt vào), còn 4-6 mục cha trong #reportsgroup-list (Báo cáo doanh số, Pancake, KPI, Checklist MKT, Báo cáo ngày) bị style
+   INLINE do js/14-fn-aasplit.js đặt `margin:0;padding:8px 10px;display:block` đè mất margin → chúng nằm sát mép trái, mép phải
+   hụt 14px, còn Dashboard / Chăm sóc theo mốc / AI phân tích team / Chẩn đoán kết nối thụt 14px chạm mép phải → hai cột
+   so le, cỡ chữ 12.5 vs 13 và padding 8/9px cũng khác nhau. Sửa: ép mọi ô dùng chung lề 0, rộng 100%, padding và cỡ chữ
+   giống nhau (cần !important vì style inline). Chỉ hình học, không đổi màu/js; áp cho cả chế độ tối. Gỡ = xoá mục 10. */
+html.ui-pro #data-view .tabs .tab,
+html.ui-pro #data-view .tabs .sn-act,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab,
+html.ui-pro #data-view .tabs .tab[data-sn-g]{
+  box-sizing:border-box!important;width:100%!important;
+  margin-left:0!important;margin-right:0!important;
+  padding:9px 12px!important;
+  font-size:13px!important;line-height:1.35!important;
+  border-left:3px solid transparent;
+}
+html.ui-pro #data-view .tabs .tab.active,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab.active,
+html.ui-pro #data-view .tabs .tab[data-sn-g].active{border-left-width:3px!important;}
