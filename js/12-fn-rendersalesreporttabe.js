@@ -263,9 +263,58 @@ function _computeBonusData_(orders){
     });
   });
 
+  // GỘP BILL GHÉP (Duyên 2026-11-04): 2 đơn Pos ghi chú trỏ vào nhau ("GHÉP CÙNG ĐƠN 1326T10" / "SHIP CÙNG ĐƠN ..." / "GHÉP ĐƠN CÙNG 663T10"),
+  // CÙNG BỘ SALE tham gia và (1 trong 2 là đơn thêm "NG…" HOẶC CÙNG SĐT khách) = MỘT bill khi xét thưởng THEO ĐƠN: giá trị + số sản phẩm cộng lại, thưởng 1 lần
+  // (chia đều cho sale chung). Chỉ ảnh hưởng vòng "Theo đơn" bên dưới — số đơn/ngày, doanh số ngày, đơn đầu tiên giữ nguyên theo từng đơn.
+  // NGUYÊN NHÂN GỐC cần luật này: 704T10 (7,742tr) "GHÉP ĐƠN CÙNG 663T10" (10,26tr) cùng khách cùng sale chỉ được 663 mốc 10tr/20k thay vì bill 18tr/3 SP/30k;
+  // web CRM trước đó không có luật gộp GHÉP nào (chỉ gộp TÁCH ở backend). BẢN SAO ở gas_v13.js buildCsStats_ và tools/bonus-t10/calc_bonus.js mergeGhep — sửa 1 nơi phải sửa cả 3.
+  function _mergeGhepBills(list){
+    var PTR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+    var TOK = /(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g;
+    function toks(note){ var t = {}, str = String(note==null?'':note).normalize('NFC').toUpperCase(), m; TOK.lastIndex = 0; while ((m = TOK.exec(str))) t[m[2]] = true; return t; }
+    function phone(o){ var d = String(o.soDienThoai || o.sdt || '').replace(/\D/g, ''); if (d.indexOf('84') === 0 && d.length > 9) d = d.slice(2); return d.replace(/^0+/, ''); }
+    function who(o){ return Object.keys(_bonusParticipants_(o)).filter(Boolean).map(function(x){ return String(x).toLowerCase(); }).sort().join(','); }
+    function bad(o){ return /h[uủ]y|ho[aà]n/i.test(String(o.trangThai||'')); }
+    var n = list.length, par = [], T = [], W = [], P = [], i, j;
+    for (i = 0; i < n; i++){ par[i] = i; T[i] = toks(list[i].ghiChu); W[i] = who(list[i]); P[i] = phone(list[i]); }
+    function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
+    for (i = 0; i < n; i++){
+      if (bad(list[i])) continue;
+      var m = PTR.exec(String(list[i].ghiChu==null?'':list[i].ghiChu).normalize('NFC').toUpperCase()); if (!m) continue;
+      for (j = 0; j < n; j++){
+        if (j === i || bad(list[j]) || !W[i] || W[j] !== W[i] || !T[j][m[1]]) continue;
+        var hasNg = /^NG/.test(m[1]) || Object.keys(T[i]).some(function(c){ return /^NG/.test(c); }) || Object.keys(T[j]).some(function(c){ return /^NG/.test(c); });
+        if (hasNg || (P[i] && P[i] === P[j])) par[find(i)] = find(j);
+      }
+    }
+    var grp = {}, order = [];
+    list.forEach(function(o, k){ var r = find(k); if (!grp[r]){ grp[r] = []; order.push(r); } grp[r].push(k); });
+    var out = [];
+    order.forEach(function(r){
+      var g = grp[r];
+      if (g.length < 2){ out.push(list[g[0]]); return; }
+      var gocs = g.filter(function(k){ return !_hasGocField || list[k].donGoc; });
+      if (!gocs.length){ g.forEach(function(k){ out.push(list[k]); }); return; }   // không có đơn gốc nào → các đơn tự bị lọc như cũ
+      gocs.sort(function(a, b){ return (_bonusYmd_(list[a]) || '').localeCompare(_bonusYmd_(list[b]) || '') || (a - b); });
+      var head = list[gocs[0]], m2 = Object.assign({}, head), codes = [], notes = [], ma = [], sl = [], sp = [], tot = 0;
+      g.slice().sort(function(a, b){ return (a === gocs[0] ? -1 : b === gocs[0] ? 1 : a - b); }).forEach(function(k){
+        var o = list[k], cs = splitMulti_(o.maSanPham, ';').map(function(x){ return String(x||'').trim(); }).filter(Boolean), qs = splitMulti_(o.soLuong, ',').map(function(x){ return String(x||'').trim(); });
+        while (qs.length < cs.length) qs.push('1');
+        qs.length = cs.length;
+        tot += Number(o.giaTriDon) || 0; if (cs.length){ ma.push(cs.join(';')); sl.push(qs.join(', ')); }
+        if (o.sanPham) sp.push(String(o.sanPham)); if (o.ghiChu) notes.push(String(o.ghiChu));
+        var f = String(o.ghiChu||'').split(/[\r\n]/)[0].trim(); if (f) codes.push(f);
+      });
+      m2.giaTriDon = tot; m2.maSanPham = ma.join(';'); m2.soLuong = sl.join(', '); m2.sanPham = sp.join(', '); m2.ghiChu = notes.join(' | ');
+      m2.ghepBillSoDon = g.length; m2.ghepBillCodes = codes;
+      out.push(m2);
+    });
+    return out;
+  }
+
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
   var review = [];   // đơn cần kiểm tra tay (mã SP chưa xác nhận, đơn vòng thiếu doanh thu dòng...) — hiện ở tab "Chi tiết thưởng"
-  orders.forEach(function(o){
+  _mergeGhepBills(orders).forEach(function(o){   // đã gộp bill GHÉP (xem _mergeGhepBills)
     if (_hasGocField && !o.donGoc) return;   // thưởng theo đơn cũng chỉ tính đơn gốc
     var dateStr = _bonusYmd_(o);
     var giaTri = Number(o.giaTriDon)||0;
@@ -324,7 +373,7 @@ function _computeBonusData_(orders){
         var rec = ensure(name);
         var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
         rec.total += part;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepBillSoDon>1 ? ' — gộp '+o.ghepBillSoDon+' đơn GHÉP ('+o.ghepBillCodes.join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
       }
     });
   });
