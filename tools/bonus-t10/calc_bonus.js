@@ -69,7 +69,22 @@ function mergeGhep(list) {
   });
   mergeGhep.info = info; return out;
 }
-const afterTach = mergeTach(rawOrders), allOrders = mergeGhep(afterTach);
+const afterTach = mergeTach(rawOrders);
+// CHE DO CHIA THEO DON GOC BASE (Duyen 2026-11-04): co base_split.json (apply_base_split.py tu file xuat 'Check nguoc Base') -> don ghep Base chia theo don goc Base + phan con lai theo The Pos
+// (giaTriDon, saleShares, baseNgayTao, donGoc nhu buildSalesReportB_), KHONG gop 'GHEP CUNG DON' kieu cu (don goc Base da tach rieng). Them tham so 'the-pos' de chay lai che do cu.
+const BASE_MODE = fs.existsSync(W + '/base_split.json') && process.argv[3] !== 'the-pos';
+let baseInfo = null;
+const allOrders = (function () {
+  if (!BASE_MODE) return mergeGhep(afterTach);
+  baseInfo = require('./base_enrich.js')(afterTach, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
+  const d2y = v => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v || '')); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : ''; };
+  const keep = baseInfo.orders.filter(o => { const y = o.baseNgayTao || d2y(o.ngayTao); return y >= '2026-10-01' && y <= '2026-10-31'; });   // ngay len don tren BASE trong thang 10
+  baseInfo.dropped = baseInfo.orders.length - keep.length;
+  // BASE_COUNT_ALL=1: don CHUA ghep duoc Base (khong co ma Base) van tinh thuong theo The Pos + ngay Pos (khong bi loai vi khong phai don goc) — de so sanh kich ban
+  if (process.env.BASE_COUNT_ALL === '1') keep.forEach(o => { if (!o.baseNgayTao) o.donGoc = true; });
+  console.log('CHE DO DON GOC BASE: ghep duoc', baseInfo.matched, 'don Pos; khong khop (file xuat co, orders khong co):', baseInfo.unmatched.length, '; bo vi ngay Base ngoai T10:', baseInfo.dropped);
+  return keep;
+})();
 const mergedInfo = (mergeTach.info || []).concat(mergeGhep.info || []);
 console.log('gop don tach/ghep:', mergedInfo.map(x => x.key + ' (' + x.maDon.join('+') + ' = ' + x.tong + ')').join(' | ') || 'khong co');
 
@@ -125,7 +140,7 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: SCP, 
 vm.createContext(ctx);
 vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\nvar _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') +
   ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') +
-  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
+  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_bonusCodeTokens_', '_bonusMergeGhep_', '_bonusIsTourCaoCap_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 ctx.O = orders;
 const res = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
 // Pass "Tourmaline cao cap" (CT "Don tu 21tr500" / "31tr500"): KT xet moc theo GIA NIEM YET truoc giam (don 1301T10: nhan tour 31.500.000, giam 5% con 29.925.000 van duoc T31 200.000 — bang thuong chinh thuc STT 105).
@@ -155,6 +170,21 @@ res.extraCskh = { name: EXTRA_CSKH, nOrders: ctx.O.length, total: men ? men.tota
 if (men && !res.bySale.some(x => x.name === EXTRA_CSKH)) { res.bySale.push(men); res.total += men.total; }
 res.nOrders = orders.length;
 console.log('them CSKH', EXTRA_CSKH, '| don Facebook Pham Thu Hien:', ctx.O.length, '| thuong them:', res.extraCskh.total);
+res.mode = BASE_MODE ? (process.env.BASE_COUNT_ALL === '1' ? 'don-goc-base+don-chua-ghep-tinh-the-pos' : 'don-goc-base') : 'the-pos';
+res.orderInfo = {}; res.excludedBase = [];
+if (BASE_MODE) {
+  const classified = n => Object.prototype.hasOwnProperty.call(chRaw, n);
+  orders.forEach(o => {
+    if (o.baseNgayTao) res.orderInfo[o.id] = { maBase: o.maBase || '', giaTinh: o.giaTriDon, giaPos: o.giaTriPos, ngayBase: o.baseNgayTao, donGoc: !!o.donGoc, chia: (o.saleShares || []).map(x => x.name + ' ' + Math.round(x.frac * 100) + '%').join(', ') };
+    const names = (o.saleShares && o.saleShares.length ? o.saleShares.map(x => x.name) : String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean)).filter(classified);
+    if (!o.donGoc && names.length) res.excludedBase.push({ id: o.id, maDon: o.maDon, ghiChu: String(o.ghiChu || '').split(/[\r\n]/)[0].slice(0, 60), ngay: o.ngayTao, giaTri: o.giaTriDon, sale: names.join(', '),
+      lyDo: o.baseNgayTao ? 'Đã ghép Base nhưng ghi chú Pos không phải mã bộ đếm gốc (tách/thêm/BH…)' : 'Chưa ghép được Base (mã không có/không khớp trên DT TỔNG)' });
+  });
+  res.baseStats = { matched: baseInfo.matched, unmatchedExport: baseInfo.unmatched.length, droppedByDate: baseInfo.dropped };
+}
+{ const lcCh = {}; Object.keys(chRaw).forEach(k => { lcCh[k.toLowerCase()] = k; }); res.revBySale = {};
+  orders.forEach(o => { const gt = Number(o.giaTriDon) || 0, ls = o.saleShares && o.saleShares.length ? o.saleShares.map(x => [x.name, gt * x.frac]) : (() => { const l = String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean); return l.map(n => [n, gt / l.length]); })();
+    ls.forEach(([n, v]) => { const k = lcCh[String(n).toLowerCase()]; if (k) res.revBySale[k] = (res.revBySale[k] || 0) + v; }); }); }
 res.tachGroups = mergedInfo; res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
