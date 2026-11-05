@@ -321,6 +321,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - **Việc kế tiếp (cần quyết định của Duyên/KT, không tự sửa số):** (1) với từng đơn trong Lech_tung_don chốt bên nào đúng (Base hay Thẻ Pos) → nếu Base đúng thì KT sửa file; nếu Pos đúng thì sửa đơn gốc Base / bật loại trừ. (2) Thưởng + hoa hồng T10 đã gửi KT tính theo Thẻ Pos chia đều → nếu chốt theo Base phải chạy lại `calc_bonus.js` với đơn đã chia theo Base. (3) Còn lệch đơn quầy (phiên 11) và M46575.
 - **ĐANG LÀM:** chờ Duyên chốt từng đơn lệch.
 
+## 2026-11-04 22:40 — CRM không tải được (allCustomers=0, `customers` timeout 60s) — đã sửa phía trình duyệt, nguyên nhân phía Apps Script CHƯA xác nhận
+- **Triệu chứng Duyên báo:** Tải FULL `customers` bị hủy sau 60.005ms, các action khác HTTP 200 nhưng chậm 3–6s (chatPoll/notifications/users); banner "Apps Script chưa được deploy đúng" (thông báo chung, KHÔNG đúng ở đây vì các action vẫn 200).
+- **Đã loại trừ:** không phải do deploy (Actions: GAS/Cloudflare/pages đều success, GAS deploy cuối 20:19 giờ VN); đường `customers` (readCare_/Supabase) không bị các commit trong ngày (BH trả trước, chốt tháng, thưởng) đụng tới.
+- [x] **Sửa (js/01, js/05, test `tools/test-autosync-backoff.js`):** (1) FULL `customers` chờ tối đa 150s (delta vẫn 60s) — hủy ở 60s thì Apps Script VẪN chạy tiếp (bỏ phí) mà máy lại xin FULL mới → nhiều tab chồng nhau làm server chậm; (2) `_autoSyncDelayMs_`: từ lần lỗi thứ 2 lùi nhịp 10s/20s/40s tối đa 60s (trước: luôn 5s); (3) BUG cũ: `_autoSyncFailCount` chỉ tăng, không bao giờ về 0 → "lỗi liên tiếp" thực ra là tổng lỗi từ lúc mở trang; nay đồng bộ thành công (không thêm lỗi) thì đặt lại 0.
+- [ ] **CHƯA XÁC NHẬN nguyên nhân phía Apps Script (không truy cập được từ phiên này):** mở Apps Script → Executions, lọc `doGet`, xem các lần `customers`: thời gian chạy, trạng thái (Exceeded maximum execution time / Service invoked too many times / Rate limit), và có bao nhiêu execution chạy song song lúc 22:00–22:10. Nếu `customers` FULL thường > 60s → cân nhắc bật đọc Supabase cho FULL (`sbCareListEnable_('SB_CARE_FULL_READ')`) để khỏi đọc nguyên sheet. Nếu có nhiều execution Running cùng lúc → tạm đóng bớt tab CRM, đừng bấm Sync thủ công liên tục.
+- [ ] Phần "ĐO TRỰC TIẾP TỪ MÁY NÀY" Duyên dán bị cụt (chưa có số đo) — nếu còn lỗi, chạy lại nút chẩn đoán và dán đủ phần đó.
+
+
 ## 2026-11-04 (tiếp) — BH trả trước: CHẶN KHÔNG ÂM (Duyên yêu cầu) — đã push
 - **Yêu cầu:** tiền trả trước vượt giá trị đơn thì phần dư là TIỀN SHIP → không tính; doanh thu sale không âm. (Duyên ghi thêm "cột S k…" bị cụt — giữ cột S, chờ Duyên xác nhận nếu ý khác.)
 - [x] `_bhPrepaidDeduct_` (gas_v13.js): trừ = `min(tiền trả trước, max(0, giá trị đơn))`; `bhPrepaid.total` cũng là số đã chặn. Ví dụ: đơn 95.000 trả trước 135.000 → trừ 95.000, doanh thu 0 (40.000 là ship). Test `tools/test-bh-prepaid.js` sửa ca âm + thêm ca 2 sale (13 ca).
