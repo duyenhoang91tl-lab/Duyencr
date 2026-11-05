@@ -63,7 +63,22 @@ function mergeGhep(list) {
   });
   mergeGhep.info = info; return out;
 }
-const afterTach = mergeTach(rawOrders), allOrders = mergeGhep(afterTach);
+const afterTach = mergeTach(rawOrders);
+// CHE DO CHIA THEO DON GOC BASE (Duyen 2026-11-04): co base_split.json (apply_base_split.py tu file xuat 'Check nguoc Base') -> don ghep Base chia theo don goc Base + phan con lai theo The Pos
+// (giaTriDon, saleShares, baseNgayTao, donGoc nhu buildSalesReportB_), KHONG gop 'GHEP CUNG DON' kieu cu (don goc Base da tach rieng). Them tham so 'the-pos' de chay lai che do cu.
+const BASE_MODE = fs.existsSync(W + '/base_split.json') && process.argv[3] !== 'the-pos';
+let baseInfo = null;
+const allOrders = (function () {
+  if (!BASE_MODE) return mergeGhep(afterTach);
+  baseInfo = require('./base_enrich.js')(afterTach, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
+  const d2y = v => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v || '')); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : ''; };
+  const keep = baseInfo.orders.filter(o => { const y = o.baseNgayTao || d2y(o.ngayTao); return y >= '2026-10-01' && y <= '2026-10-31'; });   // ngay len don tren BASE trong thang 10
+  baseInfo.dropped = baseInfo.orders.length - keep.length;
+  // BASE_COUNT_ALL=1: don CHUA ghep duoc Base (khong co ma Base) van tinh thuong theo The Pos + ngay Pos (khong bi loai vi khong phai don goc) — de so sanh kich ban
+  if (process.env.BASE_COUNT_ALL === '1') keep.forEach(o => { if (!o.baseNgayTao) o.donGoc = true; });
+  console.log('CHE DO DON GOC BASE: ghep duoc', baseInfo.matched, 'don Pos; khong khop (file xuat co, orders khong co):', baseInfo.unmatched.length, '; bo vi ngay Base ngoai T10:', baseInfo.dropped);
+  return keep;
+})();
 const mergedInfo = (mergeTach.info || []).concat(mergeGhep.info || []);
 console.log('gop don tach/ghep:', mergedInfo.map(x => x.key + ' (' + x.maDon.join('+') + ' = ' + x.tong + ')').join(' | ') || 'khong co');
 
@@ -76,6 +91,8 @@ const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { on
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
 const mk = o => Object.assign(base(), o);
 const rev = (scope, min, amt, o) => mk(Object.assign({ revenue: { enabled: true, scope, min, max: '' }, bonusAmount: amt }, o));
+// Tên Pos: TOUR = Tourmaline, AQUA = Aquamarine, MOON (Duyên 2026-11-04). "a+b" = dòng SP chứa cả a và b. Loại: Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire.
+const PK_MOON = 'tỳ hưu thiên lộc+moon, thmoon', PK_TOUR = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline', PK_AQUA = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine', PK_EX = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
 const PROGRAMS = [
   rev('order', 10e6, 20000, { name: 'Đơn từ 10tr (combo 2 sản phẩm)' }),
   rev('order', 15e6, 30000, { name: 'Đơn từ 15tr (combo 3 sản phẩm)' }),
@@ -84,9 +101,9 @@ const PROGRAMS = [
   rev('order', 15e6, 20000, { name: 'Bill vòng mix charm — đơn từ 15tr', requireProduct: 'vòng' }),
   rev('day', 60e6, 50000, { name: 'Thưởng doanh số/ngày — đạt từ 60tr' }),
   rev('day', 100e6, 100000, { name: 'Thưởng doanh số/ngày — đạt từ 100tr' }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: 'Aquamarine', bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   rev('order', 21.5e6, 100000, { name: 'Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' }),
   rev('order', 31.5e6, 200000, { name: 'Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' })
 ];
@@ -100,9 +117,9 @@ PROGRAMS.push(
   PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }),
   // Bang "Ap dung cho Sale thu viec" (Duyen gui 2026-11-04) co them dong 8-13: Ty huu Moon/Tourmaline Hong+Xanh/Aquamarine (tu 20/8) + Tourmaline cao cap T21/T31 (tu 21/9), ap dung tu ngay 1 thu viec.
   // CT chinh thuc online/offline KHONG ap cho sale thu viec (js/12 _bonusProgramApplies_) nen phai co ban rieng cho thu viec.
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: 'Aquamarine', bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
@@ -145,6 +162,21 @@ res.extraCskh = { name: EXTRA_CSKH, nOrders: ctx.O.length, total: men ? men.tota
 if (men && !res.bySale.some(x => x.name === EXTRA_CSKH)) { res.bySale.push(men); res.total += men.total; }
 res.nOrders = orders.length;
 console.log('them CSKH', EXTRA_CSKH, '| don Facebook Pham Thu Hien:', ctx.O.length, '| thuong them:', res.extraCskh.total);
+res.mode = BASE_MODE ? (process.env.BASE_COUNT_ALL === '1' ? 'don-goc-base+don-chua-ghep-tinh-the-pos' : 'don-goc-base') : 'the-pos';
+res.orderInfo = {}; res.excludedBase = [];
+if (BASE_MODE) {
+  const classified = n => Object.prototype.hasOwnProperty.call(chRaw, n);
+  orders.forEach(o => {
+    if (o.baseNgayTao) res.orderInfo[o.id] = { maBase: o.maBase || '', giaTinh: o.giaTriDon, giaPos: o.giaTriPos, ngayBase: o.baseNgayTao, donGoc: !!o.donGoc, chia: (o.saleShares || []).map(x => x.name + ' ' + Math.round(x.frac * 100) + '%').join(', ') };
+    const names = (o.saleShares && o.saleShares.length ? o.saleShares.map(x => x.name) : String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean)).filter(classified);
+    if (!o.donGoc && names.length) res.excludedBase.push({ id: o.id, maDon: o.maDon, ghiChu: String(o.ghiChu || '').split(/[\r\n]/)[0].slice(0, 60), ngay: o.ngayTao, giaTri: o.giaTriDon, sale: names.join(', '),
+      lyDo: o.baseNgayTao ? 'Đã ghép Base nhưng ghi chú Pos không phải mã bộ đếm gốc (tách/thêm/BH…)' : 'Chưa ghép được Base (mã không có/không khớp trên DT TỔNG)' });
+  });
+  res.baseStats = { matched: baseInfo.matched, unmatchedExport: baseInfo.unmatched.length, droppedByDate: baseInfo.dropped };
+}
+{ const lcCh = {}; Object.keys(chRaw).forEach(k => { lcCh[k.toLowerCase()] = k; }); res.revBySale = {};
+  orders.forEach(o => { const gt = Number(o.giaTriDon) || 0, ls = o.saleShares && o.saleShares.length ? o.saleShares.map(x => [x.name, gt * x.frac]) : (() => { const l = String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean); return l.map(n => [n, gt / l.length]); })();
+    ls.forEach(([n, v]) => { const k = lcCh[String(n).toLowerCase()]; if (k) res.revBySale[k] = (res.revBySale[k] || 0) + v; }); }); }
 res.tachGroups = mergedInfo; res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
