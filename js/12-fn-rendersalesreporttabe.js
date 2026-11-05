@@ -243,6 +243,17 @@ function _bonusMergeGhep_(orders){
   return out;
 }
 function _computeBonusData_(orders){
+  // THÁNG THEO MÃ ĐƠN (Duyên 2026-11-04): 563T10 = tháng 10, 563T9 = tháng 9, 563T11 = tháng 11 → đơn quy ước tháng nào chỉ được thưởng ở tháng đó.
+  // NGUYÊN NHÂN GỐC: thưởng chỉ lọc theo ngày lên Base nên đơn mã tháng trước (VD "14K NG5T09 + 248T09/2026", Base 05/10) vẫn được thưởng tháng 10.
+  // Lấy MÃ ĐẦU TIÊN trong ghi chú ("1053T10 + BH316T09" vẫn là đơn T10); không nhận ra mã/thiếu ngày → giữ. Phải khớp gas_v13.js _csCodeMonthOk_ + tools/bonus-t10/calc_bonus.js.
+  function _bonusCodeMonthOk_(o){
+    var g = String(o.ghiChu||'').toUpperCase().replace(/\s+/g,' ');
+    var m = /(?:^|[^0-9A-Z])(?:[A-Z]*\d*)T(\d{1,2})\b/.exec(g);
+    var ymd = o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao);
+    var d = /^\d{4}-(\d{2})/.exec(String(ymd||''));
+    return !(m && d) || parseInt(m[1],10) === parseInt(d[1],10);
+  }
+  orders = (orders||[]).filter(_bonusCodeMonthOk_);   // đơn mã tháng khác ngày lên đơn → không thưởng tháng này
   orders = _bonusMergeGhep_(orders || []);   // gộp đơn NG "ghép/ship cùng đơn" thành 1 bill trước khi chấm thưởng
   var bySale = {};
   function ensure(name){ if (!bySale[name]) bySale[name] = {total:0, items:[]}; return bySale[name]; }

@@ -4,6 +4,15 @@ function _csJsonSetting_(key, fallback) {
   try { var raw = getSetting_(key); if (!raw) return fallback; var v = JSON.parse(raw); return (v === null || v === undefined) ? fallback : v; }
   catch (e) { return fallback; }
 }
+// THANG THEO MA DON (Duyen 2026-11-04): 563T10 = thang 10, 563T9 = thang 9, 563T11 = thang 11 -> don quy uoc thang nao chi duoc thuong o thang do.
+// NGUYEN NHAN GOC: thuong chi loc theo ngay len Base nen don ma thang truoc (VD "14K NG5T09 + 248T09/2026" len Base 05/10) van duoc thuong thang 10.
+// Lay MA DAU TIEN trong ghi chu ("1053T10 + BH316T09" van la don T10); khong nhan ra ma thang hoac thieu ngay -> giu (khong doan). Phai khop js/12 _bonusCodeMonthOk_ + tools/bonus-t10/calc_bonus.js.
+function _csCodeMonthOk_(ghiChu, ymd) {
+  var g = String(ghiChu || '').toUpperCase().replace(/\s+/g, ' ');
+  var m = /(?:^|[^0-9A-Z])(?:[A-Z]*\d*)T(\d{1,2})\b/.exec(g);
+  var d = /^\d{4}-(\d{2})/.exec(String(ymd || ''));
+  return !(m && d) || parseInt(m[1], 10) === parseInt(d[1], 10);
+}
 function _csYmdFromDmy_(s) {
   var m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!m) return '';
@@ -334,7 +343,8 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     var nSales = (o.saleShares && o.saleShares.length) ? (o.saleShares.filter(function(x) { return Number(x.frac) > 0; }).length || o.saleShares.length)
       : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
-    mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
+    var _mDate = o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon);
+    if (_csCodeMonthOk_(o.ghiChu, _mDate)) mine.push({ date: _mDate, time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
       goc: !hasGocField || !!o.donGoc, info: bInfo,
       // truong phuc vu gop don GHEP khi xet thuong theo don (_bcMergeGhepBills_): ghi chu, SDT, bo sale, trang thai, ma SP/SL
       ghiChu: o.ghiChu, soDienThoai: o.soDienThoai, saleBan: o.saleBanValid, trangThai: o.trangThai, maSanPham: o.maSanPham, soLuong: o.soLuong });
