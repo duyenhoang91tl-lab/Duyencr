@@ -181,3 +181,24 @@ html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button{
   background:#a8326c;color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(92,23,64,.25);
 }
 html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button:hover{background:#8f2a5e;color:#fff;}
+
+/* ── 10. MENU TRÁI: CÁC Ô CÙNG LỀ TRÁI/PHẢI, CÙNG CỠ (Duyên yêu cầu 2026-11-05) ──
+   NGUYÊN NHÂN GỐC lệch: css/06-pro.css dòng 154 cho mục con [data-sn-g] và .sn-act `margin-left:14px; width:calc(100% - 14px)`
+   (thụt vào), còn 4-6 mục cha trong #reportsgroup-list (Báo cáo doanh số, Pancake, KPI, Checklist MKT, Báo cáo ngày) bị style
+   INLINE do js/14-fn-aasplit.js đặt `margin:0;padding:8px 10px;display:block` đè mất margin → chúng nằm sát mép trái, mép phải
+   hụt 14px, còn Dashboard / Chăm sóc theo mốc / AI phân tích team / Chẩn đoán kết nối thụt 14px chạm mép phải → hai cột
+   so le, cỡ chữ 12.5 vs 13 và padding 8/9px cũng khác nhau. Sửa: ép mọi ô dùng chung lề 0, rộng 100%, padding và cỡ chữ
+   giống nhau (cần !important vì style inline). Chỉ hình học, không đổi màu/js; áp cho cả chế độ tối. Gỡ = xoá mục 10. */
+html.ui-pro #data-view .tabs .tab,
+html.ui-pro #data-view .tabs .sn-act,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab,
+html.ui-pro #data-view .tabs .tab[data-sn-g]{
+  box-sizing:border-box!important;width:100%!important;
+  margin-left:0!important;margin-right:0!important;
+  padding:9px 12px!important;
+  font-size:13px!important;line-height:1.35!important;
+  border-left:3px solid transparent;
+}
+html.ui-pro #data-view .tabs .tab.active,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab.active,
+html.ui-pro #data-view .tabs .tab[data-sn-g].active{border-left-width:3px!important;}

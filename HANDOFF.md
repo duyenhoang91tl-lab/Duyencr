@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-05 (phiên 35) — MENU TRÁI: nhóm "Báo cáo" các ô cùng lề, cân xứng (Duyên yêu cầu) — XONG, đã push
+- **Yêu cầu:** ảnh menu nhóm BÁO CÁO: 5 mục cha (Báo cáo doanh số... Báo cáo ngày) và 3 mục con (Dashboard, Chăm sóc theo mốc, AI phân tích team) so le, nhìn lệch.
+- **NGUYÊN NHÂN GỐC:** `css/06-pro.css` dòng 154 thụt `[data-sn-g]`/`.sn-act` 14px (`margin-left:14px;width:calc(100% - 14px)`), còn các mục trong `#reportsgroup-list` bị style INLINE từ `js/14-fn-aasplit.js` (`margin:0;padding:8px 10px;display:block`) đè mất margin → mục cha sát mép trái và hụt 14px bên phải, mục con thụt chạm mép phải; thêm cỡ chữ 12.5 vs 13 và padding 8 vs 9px khác nhau.
+- **Đã làm:** mục 10 cuối `css/19-theme-sunset.css`: mọi ô `.tab`/`.sn-act`/`[data-sn-g]`/`#reportsgroup-list .tab` cùng `width:100%`, lề 0, padding 9px 12px, chữ 13px (`!important` vì style inline). Chỉ hình học, không đổi màu; áp cả chế độ tối. Đã render Chromium với DOM mô phỏng: 8 ô đều trái 12 / phải 227 / cao 36px. Cache-bust `?v=20261105a`.
+- **Gỡ:** xoá mục 10. Không sửa js/gas/extension → KHÔNG cần deploy GAS, KHÔNG reload extension; chỉ Ctrl+F5 web.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem menu thật; nếu muốn mục con thụt nhẹ so với mục cha (phân cấp) thì đổi `margin-left:0` ở mục 10 thành ~8px cho `[data-sn-g]` và `.sn-act` (nhớ trừ width tương ứng).
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 34) — MENU TRÁI: khung ngoài nền nhạt, ô tác vụ nền đậm cho chữ rõ (Duyên yêu cầu) — XONG, đã push
 - **Yêu cầu:** ảnh menu (Tải file Excel, Sync GS, mục SETTINGS...) khó đọc; muốn khung ngoài nhạt, ô nổi lên nền đậm.
 - **NGUYÊN NHÂN GỐC:** mục 4 của `css/19-theme-sunset.css` để khung menu là gradient hồng ĐẬM, còn mỗi ô chỉ là nền trắng trong suốt 5-14% (`css/06-pro.css` dòng 154-157) + chữ trắng 12.5px → ô và khung gần cùng màu, chữ trắng trên hồng giữa/nhạt chỉ ~3-4:1.
