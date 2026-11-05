@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 27) — THƯỞNG T10: Duyên báo sai 1301T10 (tour 31.500), 1326T10+NG139T10, 254T10, "bỏ đơn của Thủy" — BƯỚC 1/3 xong (đã push)
+- **NGUYÊN NHÂN GỐC chung:** pipeline từ `Check_DT_t10.xlsx` (extract_orders_pos.py) KHÔNG có giá niêm yết (`giaTriTruocGiam`=0) và phiên 21 loại đơn "không có Base"/"Base Thất bại" — trong khi bản dựng từ file KT (phiên 22, HANDOFF mục "4 đơn Duyên báo") đã có: Tourmaline cao cấp theo giá niêm yết, gộp NG-ghép, và KT vẫn tính các đơn đó. Làm lại bằng Check_DT nên mất các quy tắc đó.
+- [x] **Bước 1/3:** `extract_orders_pos.py` đọc `giaTriTruocGiam` từ `order_overrides.json`; khai M47074 (1301T10) = 31.500.000 → T31 200.000 (thuydinh95 587.500 → 687.500). Quy tắc override `saleBan` vẫn chạy như cũ (khoá không có saleBan không còn lỗi).
+- [ ] **Bước 2/3:** đơn Pos bị loại "không có Base" nhưng file KT vẫn tính (4 đơn Thủy: 823T09+BH91T10 11,0tr, 1008T09 6,0tr, 162T09 5,15tr, 826T10 3,94tr) → đưa lại theo KT.
+- [ ] **Bước 3/3:** xuất `Thuong_T10_chuan_v6.xlsx` + sheet đối chiếu từng đơn của Thủy; kiểm 1326T10+NG139T10 và 254T10.
+
 ## 2026-11-04 (phiên 26) — THƯỞNG T10: Duyên chốt 22 tài khoản đội Sale, 3 bạn THỬ VIỆC = ngocNB2003saleoff, haPTN, thanhNP — XONG, đã push
 - **Duyên chốt (18:21):** đội Sale gồm 19 chính thức (huyenmaii1990, minhquach1995, dungnguyen1995, thuyha88, biichnguyen1993, nonghong88, giangnguyen1990, mainguyen97, tuoipham1993, thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995, thuNH1986, dungNTK1987, anhNP1999, trangNH2005, yenNTH2004, ninhLTK1984) + 3 thử việc (ngocNB2003saleoff, haPTN, thanhNP).
 - **NGUYÊN NHÂN GỐC lệch:** `calc_bonus.js` chỉ khai Ngọc là thử việc → haPTN/thanhNP bị tính theo bảng chính thức (combo đơn 10tr/15tr…) trong khi họ thuộc bảng thử việc.
