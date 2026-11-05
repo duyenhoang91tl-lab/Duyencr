@@ -21,6 +21,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Tìm hàm GAS nằm file `gas/*.gs` nào (file tự sinh, không sửa tay) | `gas/INDEX.md` hoặc `node tools/split-gas.js --where <hàm>` | `gas_v13.js` là nguồn chính |
 | CI deploy GAS bị đỏ / cài secret `CLASPRC_JSON`, `GAS_SCRIPT_ID` | `docs/GAS-AUTO-DEPLOY.md` (mục "Xử lý lỗi thường gặp") | `.github/workflows/deploy-gas.yml` |
 | Thêm/sửa tính năng cho Zalo AI hoặc Pancake AI (QUY TẮC SONG SONG: bên này có thì bên kia cũng có) | `08-extension-parity.md` | cả `extension-zalo/*` VÀ `extension-pancake/*` + `tools/ext-parity-allow.json` |
+| Tính/đối chiếu THƯỞNG Sale (bảng chính thức / thử việc, mốc ≥, gộp NG-ghép, giá niêm yết Tourmaline, đơn Base) | `09-thuong-t10-cach-tinh-chuan.md` | `tools/bonus-t10/*`, `js/12` (`_computeBonusData_`), `gas_v13.js` (`buildCsStats_`) |
 
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |

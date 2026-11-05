@@ -1,0 +1,5 @@
+{
+ "_huong_dan": "gia_tri: {mã Base: giá trị được tính} sau khi Duyên mở đơn gốc xem Pos giảm ở đơn nào (chỉ cần cho ca A ở sheet 5). nguoi_ban: {mã Base: [sale,...]} nếu người bán trên Base ghi sai. Để {} = dùng đúng dữ liệu Base.",
+ "gia_tri": {},
+ "nguoi_ban": {}
+}

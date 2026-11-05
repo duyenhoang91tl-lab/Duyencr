@@ -35,6 +35,10 @@ var DON_CHITIET_SHEET = 'dữ liệu đơn';
 // len 17 de 2 dong giong het A:O nhung KHAC ghi chu Q (vd 2 don ghep khac nhau) KHONG bi xoa nham la trung.
 var DON_CHITIET_WIDTH = 17; // A:Q
 var DON_COL_GHICHU = 16;    // cot Q (thu 17) trong "dữ liệu đơn"
+// Cot S (thu 19) "Tiền trả trước" (KT yeu cau 2026-11-03): CHI doc them o readDonChiTiet_ (DON_CHITIET_WIDTH van 17 de khong doi khoa dedup/nhap file/Supabase).
+var DON_COL_TRATRUOC = 18;
+// Cot T (thu 20) "Đơn giá" (Duyen 2026-11-05) = GIA NIEM YET truoc giam cua tung san pham (cung thu tu voi cot Ma san pham ';' / So luong ','). CHI doc o readDonChiTiet_ (DON_CHITIET_WIDTH van 17).
+var DON_COL_DONGIA = 19;
 
 
 // ─── DT TỔNG = nguon "don hang" CHUAN MOI (thay the hoan toan OrderData21_22..26 cu) ───

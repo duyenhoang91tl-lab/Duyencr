@@ -8,7 +8,80 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const allOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.loaiThuong).filter(   // loaiThuong (add_base_date.py): don Base That bai / khong co tren Base -> khong thuong, check tay (Duyen 2026-11-04)
+  o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+const rawOrders = rawOrders0;
+// GOP DON POS TACH (Duyen 2026-11-04): don Base "254T10/2026" len Pos tach 2 don, ghi chu "254T10/2026/1 TACH..", "254T10/2026/2 TACH.." -> la MOT don,
+// doanh thu = tong cac phan (9.000.000 + 8.500.000 = 17.500.000 -> moc 15tr). NGUYEN NHAN GOC truoc day: script nay doc tung dong Pos nhu 1 don rieng nen moi phan <10tr -> thuong 0.
+// Dung DUNG ham/regex cua CRM (gas_v13.js _tachDonParse_ / TACH_DON_RE_SRC_ / _mergeTachDon_): dong Huy/Hoan khong tham gia gop; trung ca dong (cung /so, SDT-gia-sp) chi giu 1.
+const gasSrc = R('gas_v13.js');
+const tachRe = new RegExp(eval(gasSrc.match(/var TACH_DON_RE_SRC_ = (\'.*\');/)[1]), 'i');
+const tachParse = note => { const str = String(note || ''); if (str.indexOf('/') < 0) return null; const m = tachRe.exec(str); if (!m) return null; let yr = m[3]; if (yr.length === 2) yr = '20' + yr; return { key: (m[2] + '/' + yr).replace(/\s+/g, '').toUpperCase(), n: parseInt(m[4], 10) }; };
+const excludedSt = v => /^(huy|hoan|da huy|da hoan|dang hoan|chuyen hoan)/.test(String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim());
+function mergeTach(list) {
+  const out = [], groups = {}, groupList = [];
+  list.forEach(o => {
+    const tp = excludedSt(o.trangThai) ? null : tachParse(o.ghiChu);
+    if (!tp) { out.push(o); return; }
+    let g = groups[tp.key]; if (!g) { g = groups[tp.key] = { pos: out.length, parts: [], seen: {} }; out.push(null); groupList.push(tp.key); }
+    const sig = [tp.n, o.maDon, o.giaTriDon].join('|'); if (g.seen[sig]) return; g.seen[sig] = 1; g.parts.push(o);
+  });
+  const info = [];
+  groupList.forEach(k => {
+    const g = groups[k], ps = g.parts;
+    if (ps.length === 1) { out[g.pos] = ps[0]; return; }
+    const m = Object.assign({}, ps[0]), sales = [], seen = {};
+    ps.forEach(p => String(p.saleBan || '').split(',').forEach(x => { x = x.trim(); if (x && !seen[x.toLowerCase()]) { seen[x.toLowerCase()] = 1; sales.push(x); } }));
+    m.giaTriDon = ps.reduce((a, p) => a + (Number(p.giaTriDon) || 0), 0); m.saleBan = sales.join(', ');
+    m.sanPham = ps.map(p => p.sanPham).filter(Boolean).join(', '); m.maSanPham = ps.map(p => p.maSanPham).filter(Boolean).join(';'); m.soLuong = ps.map(p => p.soLuong).filter(Boolean).join(', ');
+    m.ghiChu = ps.map(p => p.ghiChu).filter(Boolean).join(' | '); m.tachKey = k; m.tachSoDon = ps.length; m.tachGiaTri = ps.map(p => p.giaTriDon);
+    out[g.pos] = m; info.push({ key: k, firstId: ps[0].id, ids: ps.map(p => p.id), maDon: ps.map(p => p.maDon), tong: m.giaTriDon });
+  });
+  mergeTach.info = info; return out;
+}
+// GOP DON "GHEP / SHIP CUNG DON" (Duyen 2026-11-04): don B co ghi chu "NG139T10/2026 GHEP CUNG DON 1326T10/2026" (hoac "SHIP CUNG DON ...") + don A mang ma 1326T10 CUNG MOT SALE
+// = MOT bill -> cong gia tri xet moc (11.300.000 -> combo 2 SP 20.000 trong bang thuong chinh thuc "1326t10+ ng139t10"). Chi gop khi cung bo sale va 1 ben la don them "NG" (khop bang thuong chinh thuc: 1326t10+ng139t10, 1292T10+ng132t10, 693t10+NG75; con 702t10 / 807T10 tinh rieng), khong phai don Bao hanh/DMP/Huy-Hoan, doi tac co trong du lieu thang.
+const sKey = o => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(',');
+const codeTok = note => { const t = new Set(); String(note || '').normalize('NFC').toUpperCase().replace(/(?<![A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, (m, c) => { t.add(c); return m; }); return t; };
+const dayOf = o => String(o.baseNgayTao || (/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(o.ngayTao || '') || []).slice(1).reverse().map((x, i) => i ? x.padStart(2, '0') : x).join('-')).slice(0, 10);
+const gapOk = (a, b) => { const x = Date.parse(dayOf(a)), y = Date.parse(dayOf(b)); return !isNaN(x) && !isNaN(y) && Math.abs(x - y) <= 864e5; };   // cung ngay len don (Base), lech toi da 1 ngay — chi cho nhanh gop theo SDT
+function mergeGhep(list) {
+  const GR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+  const par = list.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i])), uni = (a, b) => { par[find(a)] = find(b); };
+  list.forEach((a, i) => {
+    if (excludedSt(a.trangThai)) return; const m = GR.exec(String(a.ghiChu || '').normalize('NFC').toUpperCase()); if (!m) return;
+    list.forEach((b, j) => { if (j === i || excludedSt(b.trangThai) || sKey(b) !== sKey(a) || b.maDon === a.maDon) return; if (codeTok(b.ghiChu).has(m[1]) && (/^NG/.test(m[1]) || [...codeTok(a.ghiChu)].some(c => /^NG/.test(c)) || [...codeTok(b.ghiChu)].some(c => /^NG/.test(c)) || (a.sdt && b.sdt && a.sdt === b.sdt && gapOk(a, b)))) uni(i, j); });   // gop khi (1) 1 trong 2 la don them "NG..." (NG139T10 + 1326T10) HOAC (2) Duyen 2026-11-04: 2 don goc Base rieng nhung CUNG KHACH (cung SDT) + CUNG BO SALE + ghi chu tro den nhau (704T10 "GHEP DON CUNG 663T10" + 663T10, trangNH2005, cung SDT) = 1 bill khi xet moc; khac SDT/khac sale van la 2 bill
+  });
+  const grp = {}; list.forEach((o, i) => { const r = find(i); (grp[r] = grp[r] || []).push(i); });
+  const out = [], info = [];
+  list.forEach((o, i) => {
+    const r = find(i), g = grp[r]; if (g.length < 2) { out.push(o); return; } if (g[0] !== i) return;
+    const ps = g.map(k => list[k]), m = Object.assign({}, ps[0]);
+    m.giaTriDon = ps.reduce((a, p) => a + (Number(p.giaTriDon) || 0), 0); m.sanPham = ps.map(p => p.sanPham).filter(Boolean).join(', '); m.maSanPham = ps.map(p => p.maSanPham).filter(Boolean).join(';');
+    m.soLuong = ps.map(p => p.soLuong).filter(Boolean).join(', '); m.ghiChu = ps.map(p => p.ghiChu).filter(Boolean).join(' | '); m.ghepSoDon = ps.length;
+    out.push(m); info.push({ key: 'GHEP ' + ps.map(p => [...codeTok(p.ghiChu)].join('+')).join(' / '), firstId: ps[0].id, ids: ps.map(p => p.id), maDon: ps.map(p => p.maDon), tong: m.giaTriDon, loai: 'ghep' });
+  });
+  mergeGhep.info = info; return out;
+}
+const afterTach = mergeTach(rawOrders);
+// CHE DO CHIA THEO DON GOC BASE (Duyen 2026-11-04): co base_split.json (apply_base_split.py tu file xuat 'Check nguoc Base') -> don ghep Base chia theo don goc Base + phan con lai theo The Pos
+// (giaTriDon, saleShares, baseNgayTao, donGoc nhu buildSalesReportB_), KHONG gop 'GHEP CUNG DON' kieu cu (don goc Base da tach rieng). Them tham so 'the-pos' de chay lai che do cu.
+const BASE_MODE = fs.existsSync(W + '/base_split.json') && process.argv[3] !== 'the-pos';
+let baseInfo = null;
+const allOrders = (function () {
+  if (!BASE_MODE) return mergeGhep(afterTach);
+  baseInfo = require('./base_enrich.js')(afterTach, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
+  const d2y = v => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v || '')); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : ''; };
+  const keep = baseInfo.orders.filter(o => { const y = o.baseNgayTao || d2y(o.ngayTao); return y >= '2026-10-01' && y <= '2026-10-31'; });   // ngay len don tren BASE trong thang 10
+  baseInfo.dropped = baseInfo.orders.length - keep.length;
+  // BASE_COUNT_ALL=1: don CHUA ghep duoc Base (khong co ma Base) van tinh thuong theo The Pos + ngay Pos (khong bi loai vi khong phai don goc) — de so sanh kich ban
+  if (process.env.BASE_COUNT_ALL === '1') keep.forEach(o => { if (!o.baseNgayTao) o.donGoc = true; });
+  console.log('CHE DO DON GOC BASE: ghep duoc', baseInfo.matched, 'don Pos; khong khop (file xuat co, orders khong co):', baseInfo.unmatched.length, '; bo vi ngay Base ngoai T10:', baseInfo.dropped);
+  return keep;
+})();
+const mergedInfo = (mergeTach.info || []).concat(mergeGhep.info || []);
+console.log('gop don tach/ghep:', mergedInfo.map(x => x.key + ' (' + x.maDon.join('+') + ' = ' + x.tong + ')').join(' | ') || 'khong co');
+
 const orders = allOrders;
 // CSKH menbui2002 (chua phan loai On/Off) duoc tinh THEM thuong theo CT Online chinh thuc CHI cho don co nguon don ten 'Facebook Pham Thu Hien'; sale khac tinh binh thuong nhu cu.
 const fold = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -18,6 +91,8 @@ const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { on
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
 const mk = o => Object.assign(base(), o);
 const rev = (scope, min, amt, o) => mk(Object.assign({ revenue: { enabled: true, scope, min, max: '' }, bonusAmount: amt }, o));
+// Tên Pos: TOUR = Tourmaline, AQUA = Aquamarine, MOON (Duyên 2026-11-04). "a+b" = dòng SP chứa cả a và b. Loại: Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire.
+const PK_MOON = 'tỳ hưu thiên lộc+moon, thmoon', PK_TOUR = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline', PK_AQUA = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine', PK_EX = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
 const PROGRAMS = [
   rev('order', 10e6, 20000, { name: 'Đơn từ 10tr (combo 2 sản phẩm)' }),
   rev('order', 15e6, 30000, { name: 'Đơn từ 15tr (combo 3 sản phẩm)' }),
@@ -26,9 +101,9 @@ const PROGRAMS = [
   rev('order', 15e6, 20000, { name: 'Bill vòng mix charm — đơn từ 15tr', requireProduct: 'vòng' }),
   rev('day', 60e6, 50000, { name: 'Thưởng doanh số/ngày — đạt từ 60tr' }),
   rev('day', 100e6, 100000, { name: 'Thưởng doanh số/ngày — đạt từ 100tr' }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: 'Aquamarine', bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   rev('order', 21.5e6, 100000, { name: 'Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' }),
   rev('order', 31.5e6, 200000, { name: 'Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' })
 ];
@@ -39,9 +114,17 @@ PROGRAMS.push(
   PM({ name: 'GĐ2 — Bậc số đơn/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, tier: { enabled: true, rows: [{ count: 2, bonus: 30000 }, { count: 3, bonus: 50000 }, { count: 5, bonus: 100000 }] } }),
   PM({ name: 'GĐ2 — Doanh số ≥25 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 25e6, max: '' }, bonusAmount: 30000 }),
   PM({ name: 'GĐ2 — Doanh số ≥50 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 50e6, max: '' }, bonusAmount: 50000 }),
-  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }));
+  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }),
+  // Bang "Ap dung cho Sale thu viec" (Duyen gui 2026-11-04) co them dong 8-13: Ty huu Moon/Tourmaline Hong+Xanh/Aquamarine (tu 20/8) + Tourmaline cao cap T21/T31 (tu 21/9), ap dung tu ngay 1 thu viec.
+  // CT chinh thuc online/offline KHONG ap cho sale thu viec (js/12 _bonusProgramApplies_) nen phai co ban rieng cho thu viec.
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
-const PROBATION = { 'ngocNB2003saleoff': '2026-10-14' };
+// Duyen chot 2026-11-04: 3 sale thu viec = ngocNB2003saleoff (bat dau 14/10), haPTN + thanhNP (bat dau 10/10 - theo Duyen bao o phien truoc). Con lai (19 tai khoan doi Sale) la chinh thuc.
+const PROBATION = { 'ngocNB2003saleoff': '2026-10-14', 'haPTN': '2026-10-10', 'thanhNP': '2026-10-10' };
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
 const SC = {}; Object.keys(chRaw).forEach(k => { SC[k] = chRaw[k]; });
 const SCP = {}; Object.keys(PROBATION).forEach(k => { SC[k] = 'probation'; chRaw[k] = 'probation'; SCP[k] = [{ from: PROBATION[k], channel: 'probation', bonusFrom: PROBATION[k] }]; });
@@ -49,9 +132,26 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: SCP, 
 vm.createContext(ctx);
 vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\nvar _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') +
   ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') +
-  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
+  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_bonusCodeTokens_', '_bonusMergeGhep_', '_bonusIsTourCaoCap_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 ctx.O = orders;
 const res = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
+// Pass "Tourmaline cao cap" (CT "Don tu 21tr500" / "31tr500"): KT xet moc theo GIA NIEM YET truoc giam (don 1301T10: nhan tour 31.500.000, giam 5% con 29.925.000 van duoc T31 200.000 — bang thuong chinh thuc STT 105).
+// NGUYEN NHAN GOC truoc day: engine do tren "Gia tri sau giam" nen 29.925.000 < 31.500.000 chi duoc T21 100.000. CHI chay lai 2 CT T21/T31 cho don co SP cao cap bi giam; cac CT khac (10tr/15tr/20tr, doanh so ngay) van tinh theo gia sau giam nhu cu.
+const caoCap = orders.filter(o => /NH[AẪ]N TOUR TR[OƠ]N CAO C[AẤ]P/i.test(o.sanPham || '') && (o.giaTriTruocGiam || 0) > (o.giaTriDon || 0));
+res.caoCapAdjusted = [];
+if (caoCap.length) {
+  const allProg = ctx.BONUS_PROGRAMS; ctx.BONUS_PROGRAMS = allProg.filter(p => /^Tourmaline cao cấp/.test(p.name)); ctx.O = caoCap.map(o => Object.assign({}, o, { giaTriDon: o.giaTriTruocGiam }));
+  const rc = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx)); ctx.BONUS_PROGRAMS = allProg;
+  rc.bySale.forEach(sc => sc.items.forEach(it => {
+    if (!it.orderId || it.scope !== 'Theo đơn') return;
+    let s1 = res.bySale.find(x => x.name === sc.name); if (!s1) { s1 = { name: sc.name, total: 0, items: [] }; res.bySale.push(s1); }
+    const cur = s1.items.find(x => x.orderId === it.orderId && x.scope === 'Theo đơn');
+    if (cur && cur.amount >= it.amount) return;
+    if (cur) { s1.total += it.amount - cur.amount; res.total += it.amount - cur.amount; res.caoCapAdjusted.push({ sale: sc.name, orderId: it.orderId, tu: cur.program + ' ' + cur.amount, den: it.program + ' ' + it.amount }); Object.assign(cur, it, { detail: it.detail + ' (xét theo giá niêm yết trước giảm)' }); }
+    else { s1.items.push(Object.assign({}, it, { detail: it.detail + ' (xét theo giá niêm yết trước giảm)' })); s1.total += it.amount; res.total += it.amount; res.caoCapAdjusted.push({ sale: sc.name, orderId: it.orderId, tu: '(khong co)', den: it.program + ' ' + it.amount }); }
+  }));
+  res.bySale.sort((a, b) => b.total - a.total); console.log('cao cap xet theo gia niem yet:', JSON.stringify(res.caoCapAdjusted));
+}
 // Pass 2: chi don nguon 'Facebook Pham Thu Hien' co the cua menbui2002, coi la Online -> thuong "them" cho Men (khong dung vao thuong cua sale o pass 1)
 ctx.O = allOrders.filter(o => isFbSrc(o) && hasName(o, EXTRA_CSKH)); const hadCh = Object.prototype.hasOwnProperty.call(ctx.SALE_CHANNELS, EXTRA_CSKH);
 ctx.SALE_CHANNELS[EXTRA_CSKH] = 'online';
@@ -62,7 +162,22 @@ res.extraCskh = { name: EXTRA_CSKH, nOrders: ctx.O.length, total: men ? men.tota
 if (men && !res.bySale.some(x => x.name === EXTRA_CSKH)) { res.bySale.push(men); res.total += men.total; }
 res.nOrders = orders.length;
 console.log('them CSKH', EXTRA_CSKH, '| don Facebook Pham Thu Hien:', ctx.O.length, '| thuong them:', res.extraCskh.total);
-res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
+res.mode = BASE_MODE ? (process.env.BASE_COUNT_ALL === '1' ? 'don-goc-base+don-chua-ghep-tinh-the-pos' : 'don-goc-base') : 'the-pos';
+res.orderInfo = {}; res.excludedBase = [];
+if (BASE_MODE) {
+  const classified = n => Object.prototype.hasOwnProperty.call(chRaw, n);
+  orders.forEach(o => {
+    if (o.baseNgayTao) res.orderInfo[o.id] = { maBase: o.maBase || '', giaTinh: o.giaTriDon, giaPos: o.giaTriPos, ngayBase: o.baseNgayTao, donGoc: !!o.donGoc, chia: (o.saleShares || []).map(x => x.name + ' ' + Math.round(x.frac * 100) + '%').join(', ') };
+    const names = (o.saleShares && o.saleShares.length ? o.saleShares.map(x => x.name) : String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean)).filter(classified);
+    if (!o.donGoc && names.length) res.excludedBase.push({ id: o.id, maDon: o.maDon, ghiChu: String(o.ghiChu || '').split(/[\r\n]/)[0].slice(0, 60), ngay: o.ngayTao, giaTri: o.giaTriDon, sale: names.join(', '),
+      lyDo: o.baseNgayTao ? 'Đã ghép Base nhưng ghi chú Pos không phải mã bộ đếm gốc (tách/thêm/BH…)' : 'Chưa ghép được Base (mã không có/không khớp trên DT TỔNG)' });
+  });
+  res.baseStats = { matched: baseInfo.matched, unmatchedExport: baseInfo.unmatched.length, droppedByDate: baseInfo.dropped };
+}
+{ const lcCh = {}; Object.keys(chRaw).forEach(k => { lcCh[k.toLowerCase()] = k; }); res.revBySale = {};
+  orders.forEach(o => { const gt = Number(o.giaTriDon) || 0, ls = o.saleShares && o.saleShares.length ? o.saleShares.map(x => [x.name, gt * x.frac]) : (() => { const l = String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean); return l.map(n => [n, gt / l.length]); })();
+    ls.forEach(([n, v]) => { const k = lcCh[String(n).toLowerCase()]; if (k) res.revBySale[k] = (res.revBySale[k] || 0) + v; }); }); }
+res.tachGroups = mergedInfo; res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
 res.bySale.slice(0, 40).forEach(s => console.log(s.name.padEnd(22), String(s.total).padStart(9), (chRaw[s.name] || '(chua phan loai)')));

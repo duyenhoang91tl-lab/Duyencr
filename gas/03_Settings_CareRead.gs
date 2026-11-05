@@ -110,16 +110,20 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
   var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
   var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
-  var totalDed = 0, rows = res.bySale || [], seen = {};
-  rows.forEach(function(r) { seen[r.name] = 1; r.giaTriGoc = r.giaTri; r.truHoanHuy = ded[r.name] || 0; r.giaTri = r.giaTri - r.truHoanHuy; totalDed += r.truHoanHuy; });
-  Object.keys(ded).forEach(function(n) { if (!seen[n]) { rows.push({ name: n, orders: 0, giaTri: -ded[n], cod: 0, giaTriGoc: 0, truHoanHuy: ded[n] }); totalDed += ded[n]; } });
-  rows.sort(function(a, b) { return b.giaTri - a.giaTri; });
-  res.bySale = rows;
-  res.totalGiaTriGoc = res.totalGiaTri;
-  res.totalGiaTri = res.totalGiaTri - totalDed;
-  res.trungBinhDon = res.totalOrders ? Math.round(res.totalGiaTri / res.totalOrders) : 0;
-  info.applied = true; info.closedAt = snap.closedAt; info.totalDeduction = totalDed;
-  info.note = 'Đã trừ phần hoàn/hủy của tháng ' + prev + ' (mốc chốt ' + snap.closedAt + ') vào bảng Theo Sale và tổng giá trị. Bảng Theo Team/Nguồn/MKT chưa trừ.';
+  // DOANH THU CHUAN cua thang (bang Theo Sale + tong) GIU NGUYEN — KHONG tru truc tiep (Duyen chot 2026-11-03: "cho doanh thu chuan cua thang truoc, ngay ben duoi la bao cao
+  // phan tru hoan/huy cua thang truoc"). Phan tru tra RIENG: moi dong co truHoanHuy + giaTriSauTru, va posAdjust.rows (ca sale chi co hoan/huy thang truoc, khong co don thang nay)
+  // de giao dien hien bang "Tru hoan/huy thang truoc" ngay duoi bang chinh.
+  var totalDed = 0, rows = res.bySale || [], seen = {}, adjRows = [];
+  rows.forEach(function(r) {
+    seen[r.name] = 1; r.giaTriGoc = r.giaTri; r.truHoanHuy = ded[r.name] || 0; r.giaTriSauTru = r.giaTri - r.truHoanHuy; totalDed += r.truHoanHuy;
+    adjRows.push({ name: r.name, orders: r.orders || 0, giaTri: r.giaTri, truHoanHuy: r.truHoanHuy, giaTriSauTru: r.giaTriSauTru });
+  });
+  Object.keys(ded).forEach(function(n) { if (!seen[n]) { totalDed += ded[n]; adjRows.push({ name: n, orders: 0, giaTri: 0, truHoanHuy: ded[n], giaTriSauTru: -ded[n] }); } });
+  adjRows.sort(function(a, b) { return b.giaTriSauTru - a.giaTriSauTru || (a.name < b.name ? -1 : 1); });
+  res.totalGiaTriGoc = res.totalGiaTri;   // = tong chuan (giu ten cu cho cac cho dang doc)
+  res.totalGiaTriSauTru = res.totalGiaTri - totalDed;
+  info.applied = true; info.closedAt = snap.closedAt; info.totalDeduction = totalDed; info.totalGiaTri = res.totalGiaTri; info.totalSauTru = res.totalGiaTriSauTru; info.rows = adjRows;
+  info.note = 'Doanh thu chuẩn tháng ' + month + ' ở trên KHÔNG bị trừ. Bảng bên dưới là phần hoàn/hủy của tháng ' + prev + ' (mốc chốt ' + snap.closedAt + ') trừ riêng theo từng Sale. Bảng Theo Team/Nguồn/MKT không có phần trừ.';
   return res;
 }
 function closePosMonth_(month, force) {
@@ -1266,6 +1270,8 @@ function _scopeGate_(action, token, phone, via) {
 function _reportCacheKey_(prefix, filters) {
   // Cong tac "don 1 ma chia theo Base" (Settings POS_GHEP_MIN_CODES=1) doi so lieu bao cao => dua vao khoa cache de bat/tat co hieu luc NGAY (khong doi het cache cu).
   try { if (_posGhepMinCodes_() === 1) prefix = prefix + 'g1_'; } catch (eG) {}
+  // Bang chia bo sung (acctSplitExtra) doi so lieu B => dua dau van tay vao khoa cache de co hieu luc NGAY khi admin sua.
+  try { var _exRaw = _acctExtraRaw_(); if (_exRaw) { var _h = 5381; for (var _hi = 0; _hi < _exRaw.length; _hi++) _h = ((_h << 5) + _h + _exRaw.charCodeAt(_hi)) | 0; prefix = prefix + 'x' + (_h >>> 0).toString(36) + '_'; } } catch (eX) {}
   var js = JSON.stringify(filters);
   if ((prefix + js).length <= 200) return prefix + js;
   var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, js, Utilities.Charset.UTF_8);

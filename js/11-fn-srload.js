@@ -28,6 +28,14 @@ async function _srLoad(){
       careStatus: (_srState.bCareStatus||[]).join(','), khStatus: (_srState.bKhStatus||[]).join(','),
       zaloStatus: (_srState.bZaloStatus||[]).join(','), nickZalo: _srState.bNickZalo || ''
     });
+    // Phan Sale 30% DON QUAY (Bao cao L) gop vao bieu do/bang "Theo Sale" cho du doanh thu sale (Duyen 2026-11-03); loi/thieu quyen KHONG lam hong Bao cao B.
+    _srState.dataBStore = null;
+    if (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) {
+      try {
+        var dStoreB = await _srFetch('storeCaseReport', { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, sale: (_srState.bSale||[]).join(',') });
+        if (dStoreB && dStoreB.ok !== false && !dStoreB.error) _srState.dataBStore = dStoreB;
+      } catch (eStoreB) { /* bo qua: B van hien thi doanh thu Pos nhu cu */ }
+    }
   } else if (_srState.sub === 'C') {
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
@@ -1199,18 +1207,49 @@ function _srSaleNoFbHtml_(d){
   return h;
 }
 // Ghi chú "đã trừ hoàn/hủy tháng trước" ở đầu Báo cáo B (d.posAdjust do GAS trả khi xem đúng 1 tháng lịch). Không có posAdjust (xem khoảng ngày tuỳ ý) → không hiện gì.
+// Đơn nguồn Bảo hành CÓ gắn thẻ sale: GAS đã trừ cột S "Tiền trả trước" khỏi doanh thu sale (gas_v13.js _bhPrepaidDeduct_) → báo số đơn + tổng đã trừ để KT đối chiếu.
+function _srBhPrepaidBannerHtml_(b){
+  if (!b || !b.count) return '';
+  return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🛠 <b>Đã trừ tiền trả trước của đơn Bảo hành có gắn thẻ sale</b>: '+fmt(b.count)+' đơn, −'+_srMoney(b.total)+' (khách đã chuyển khoản trước nên hoàn lại khỏi doanh thu sale). Đã nằm sẵn trong bảng Theo Sale và thẻ Tổng giá trị.</div>';
+}
+// Duyên 2026-11-05: Báo cáo B LUÔN hiện FULL doanh thu chuẩn của tháng (thẻ Tổng giá trị + bảng Theo Sale KHÔNG bị trừ). Cuối tháng (xem đúng 1 tháng lịch + đã chốt tháng trước)
+// mới có THÊM khối riêng "Chốt tháng — trừ hoàn/hủy tháng trước" ngay dưới bảng Theo Sale (_srPosAdjustBlockHtml_). Vì khối đó tự giải thích nên đã bỏ banner xanh cũ ở đầu trang.
 function _srPosAdjustBannerHtml_(a){
-  if (!a) return '';
-  if (a.applied) return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🔒 <b>Đã trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</b> (mốc chốt '+esc(a.closedAt)+'): '+(a.totalDeduction?'−'+_srMoney(a.totalDeduction):'không có đơn nào phát sinh hoàn/hủy sau khi chốt')+'. Bảng Theo Sale và thẻ Tổng giá trị là số SAU TRỪ; bảng Theo Team/Nguồn/MKT chưa trừ.</div>';
+  if (!a || a.applied) return '';
   return '<div style="background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:11.5px;color:var(--muted)">🔓 '+esc(a.reason||'Chưa trừ hoàn/hủy tháng trước.')+'</div>';
+}
+// Khối "🔒 Chốt tháng — trừ hoàn/hủy tháng trước" (chỉ có khi d.posAdjust.applied): Sale · Doanh thu chuẩn tháng này · Trừ hoàn/hủy tháng trước · Sau trừ. Doanh thu chuẩn lấy đúng số đang hiện ở
+// bảng Theo Sale phía trên (mergedRows, đã gồm Sale 30% đơn quầy nếu có) để người xem so từng dòng; sale chỉ có hoàn/hủy mà tháng này không có đơn vẫn hiện (doanh thu chuẩn 0).
+function _srPosAdjustBlockHtml_(a, mergedRows){
+  if (!a || !a.applied) return '';
+  var gt = {}; (mergedRows || []).forEach(function(r){ gt[String(r.name || '').toLowerCase()] = Number(r.giaTri) || 0; });
+  var q = String(_srState.bSaleSearch || '').toLowerCase();
+  var rows = (a.rows || []).filter(function(r){ return !q || String(r.name || '').toLowerCase().indexOf(q) !== -1; }).map(function(r){
+    var k = String(r.name || '').toLowerCase(), chuan = (k in gt) ? gt[k] : (Number(r.giaTri) || 0), tru = Number(r.truHoanHuy) || 0;
+    return { name: r.name, chuan: chuan, tru: tru, sau: chuan - tru };
+  }).sort(function(x, y){ return (y.sau - x.sau) || (x.name < y.name ? -1 : 1); });
+  var h = '<div class="dash-section-title" style="margin-top:18px">🔒 Chốt tháng '+esc(a.month)+': trừ hoàn/hủy tháng '+esc(a.prevMonth)+' <span class="sr-sub">(mốc chốt '+esc(a.closedAt)+' — doanh thu chuẩn ở trên KHÔNG bị trừ)</span></div>';
+  h += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin:6px 0 8px;font-size:12px">'+
+    (a.totalDeduction ? 'Đơn tháng '+esc(a.prevMonth)+' bị hoàn/hủy SAU khi chốt: <b style="color:#dc2626">−'+_srMoney(a.totalDeduction)+'</b>. ' : 'Không có đơn tháng '+esc(a.prevMonth)+' nào phát sinh hoàn/hủy sau khi chốt. ')+
+    'Bảng Theo Team/Nguồn/MKT không có phần trừ.</div>';
+  h += '<table class="dash-table"><thead><tr><th>Sale</th><th class="r">Doanh thu chuẩn tháng '+esc(a.month)+'</th><th class="r">Trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</th><th class="r">Sau trừ</th></tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="4" class="sr-empty">Không có dữ liệu</td></tr>';
+  else {
+    rows.forEach(function(r){
+      h += '<tr><td>'+esc(r.name)+'</td><td class="r">'+_srMoney(r.chuan)+'</td><td class="r" style="color:'+(r.tru ? '#dc2626' : 'var(--muted)')+'">'+(r.tru ? ((r.tru > 0 ? '−' : '+') + _srMoney(Math.abs(r.tru))) : '—')+'</td><td class="r"><b>'+_srMoney(r.sau)+'</b></td></tr>';
+    });
+    var tc = rows.reduce(function(s, r){ return s + r.chuan; }, 0), tt = rows.reduce(function(s, r){ return s + r.tru; }, 0);
+    h += _srTotalRowHtml_(['Tổng', _srMoney(tc), tt ? ((tt > 0 ? '−' : '+') + _srMoney(Math.abs(tt))) : '—', _srMoney(tc - tt)]);
+  }
+  return h + '</tbody></table>';
 }
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
-  var pAdj = d.posAdjust || null, pAdjOn = !!(pAdj && pAdj.applied);   // Chốt tháng Pos: GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale + tổng (gas_v13.js applyPosMonthAdjustToReportB_)
-  var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var pAdj = d.posAdjust || null;   // Chốt tháng Pos: GAS giữ doanh thu CHUẨN, chỉ trả thêm phần trừ hoàn/hủy tháng trước (gas_v13.js applyPosMonthAdjustToReportB_) → hiện ở khối riêng dưới bảng Theo Sale
+  var html = _srPosAdjustBannerHtml_(pAdj) + _srBhPrepaidBannerHtml_(d.bhPrepaid) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá'+(pAdjOn?' <span style="font-weight:400">(đã trừ hoàn/hủy '+esc(pAdj.prevMonth)+')</span>':'')+'</b></div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
     _srCloseRateKpiCard_(d) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
@@ -1221,19 +1260,20 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  var bSaleMerged_ = _srMergeStoreIntoBySale_(d.bySale||[], (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) ? _srState.dataBStore : null);   // Pos + phần Sale 30% đơn quầy (Báo cáo L)
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span class="sr-sub">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
+  if (bSaleMerged_.storeTotal) saleHtmlB_ += '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:11.5px">🏬 Doanh thu từng sale <b>đã gồm phần Sale 30% đơn quầy</b> (Báo cáo L): <b>'+_srMoney(bSaleMerged_.storeTotal)+'</b> / '+fmt(bSaleMerged_.storeOrders)+' lượt đơn. Thẻ "Số lượng đơn" và "Tổng giá trị" phía trên vẫn chỉ tính đơn Pos.</div>';
   if (_srState.bSaleView === 'table'){
-    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th class="r">Số đơn</th><th class="r">Giá trị sau giảm giá'+(pAdjOn?' <span style="font-weight:400;font-size:10.5px">(sau trừ)</span>':'')+'</th>'+(pAdjOn?'<th style="text-align:right" title="Phần hoàn/hủy của tháng '+esc(pAdj.prevMonth)+' phát sinh sau khi chốt">Trừ hoàn/hủy '+esc(pAdj.prevMonth)+'</th>':'')+'<th class="r">TB đơn</th><th class="r">COD</th></tr></thead><tbody>';
+    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th class="r">Số đơn</th><th class="r">Giá trị sau giảm giá</th><th class="r">TB đơn</th><th class="r">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
       var tb = s.orders ? Math.round(s.giaTri/s.orders) : 0;
-      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td class="r">'+fmt(s.orders)+'</td><td class="r">'+_srMoney(s.giaTri)+'</td>'+(pAdjOn?'<td style="text-align:right;color:'+(s.truHoanHuy?'#dc2626':'var(--muted)')+'">'+(s.truHoanHuy?((s.truHoanHuy>0?'−':'+')+_srMoney(Math.abs(s.truHoanHuy))):'—')+'</td>':'')+'<td class="r">'+_srMoney(tb)+'</td><td class="r">'+_srMoney(s.cod)+'</td></tr>';
+      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td class="r">'+fmt(s.orders)+'</td><td class="r">'+_srMoney(s.giaTri)+'</td><td class="r">'+_srMoney(tb)+'</td><td class="r">'+_srMoney(s.cod)+'</td></tr>';
     });
-    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="'+(pAdjOn?6:5)+'" class="sr-empty">Không có dữ liệu</td></tr>';
+    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="5" class="sr-empty">Không có dữ liệu</td></tr>';
     else { var bSOrd=saleRows.reduce(function(s,r){return s+(r.orders||0);},0), bSGt=saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
       var bSTotCells = ['Tổng', fmt(bSOrd), _srMoney(bSGt)];
-      if (pAdjOn) bSTotCells.push(_srMoney(saleRows.reduce(function(s,r){return s+(r.truHoanHuy||0);},0)));
       bSTotCells.push(_srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0)));
       saleHtmlB_ += _srTotalRowHtml_(bSTotCells); }
     saleHtmlB_ += '</tbody></table>';
@@ -1249,6 +1289,7 @@ function _srRenderB(d){
     '<div class="sr-col-lg">'+saleHtmlB_+'</div>'+
     '<div class="sr-col-md">'+saleCloseHtmlB_+'</div>'+
     '</div>';
+  html += _srPosAdjustBlockHtml_(pAdj, bSaleMerged_.rows);   // cuối tháng (đã chốt tháng trước): khối trừ hoàn/hủy NGAY DƯỚI bảng Theo Sale; không thì trả '' (B giữ như thường)
 
   // Tỷ lệ chốt theo Sale — từng Page (chỉ gồm Page đã trích được ID từ "Nguồn đơn" và khớp PancakePageMap).
   if (d.saleCloseByPage && d.saleCloseByPage.pages && d.saleCloseByPage.pages.length){
@@ -1592,6 +1633,12 @@ function _srBaseCheckExport_(){
     ['— mã trùng đơn gốc đã dùng', g.trungDonGocCount || 0],
     ['— bị bỏ vì mọi đơn gốc Base Thất bại', g.gocBiLoai || 0],
     ['Nghi ghép nhưng CHƯA ghép', (d.ghepCheck && d.ghepCheck.count) || 0],
+    // CHAN DOAN khi "da ghep duoc" = 0: backend doc Base (DT TONG) co that bai khong? (cotBase: -1 = khong tim thay cot ma bo dem, -2 = loi khi doc, so >= 0 = cot da dung)
+    ['Chẩn đoán — cột mã bộ đếm trên Base (−1: không thấy cột, −2: lỗi đọc)', g.cotBase === undefined || g.cotBase === null ? '(backend chưa trả — cần deploy bản mới)' : g.cotBase],
+    ['Chẩn đoán — lỗi đọc Base', g.loi ? String(g.loi) : '(không có)'],
+    ['Chẩn đoán — thời gian đọc Base (ms)', g.msDocBase === undefined ? '' : g.msDocBase],
+    ['Chẩn đoán — phiên bản dò cột (bodem-u-v3 = bản mới đã chạy)', g.ver || '(không có → backend CŨ hoặc dữ liệu cũ: bấm Lọc lại rồi xuất)'],
+    ['Chẩn đoán — chi tiết dò cột Base (dòng/cột sheet, cột có nhiều mã nhất)', g.dbgBase ? JSON.stringify(g.dbgBase) : '(không có — kết quả dò lấy từ cache, hoặc backend cũ)'],
     ['', ''],
     ['Cách đọc', 'Sheet "Check ngược từng đơn": mỗi dòng = 1 đơn Pos × 1 đơn gốc Base; các cột tiền của đơn Pos chỉ ghi ở dòng đầu mỗi đơn nên SUM cột không bị lặp.'],
     ['', 'Sheet "Chia theo sale": phần tiền từng sale của mỗi đơn Pos theo đơn gốc Base (đã gồm quầy 30/70 nếu có). Lọc cột Sale rồi SUM "Tiền chia" = số trên bảng Theo Sale.'],

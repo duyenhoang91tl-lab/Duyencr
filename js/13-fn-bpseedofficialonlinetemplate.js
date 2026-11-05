@@ -37,13 +37,13 @@ function _bpSeedOfficialOnlineTemplate_(){
     mk({ name: 'Thưởng doanh số/ngày — đạt từ 100tr',
       revenue: {enabled:true, scope:'day', min:100000000, max:''}, bonusAmount: 100000 }),
     mk({ name: 'Tỳ Hưu Thiên Lộc Moon',
-      product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000,
+      product: 'tỳ hưu thiên lộc+moon, thmoon', excludeProduct: 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire', bonusAmount: 10000,
       extraNote: 'Cộng thưởng trực tiếp theo số lượng sản phẩm bán ra (nhẫn, vòng cổ, lắc, charm vàng bất kỳ) — Kế toán tự update theo đúng văn bản gốc.',
       exclusionNote: 'Không áp dụng cho Tỳ Hưu chế tác từ chất liệu Ngọc (Ngọc Lam, Ngọc Bích, Ngọc Cẩm Thạch B), Ruby, Saphire.' }),
     mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)',
-      product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
+      product: 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline', excludeProduct: 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire', bonusAmount: 8000 }),
     mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine',
-      product: 'Aquamarine', bonusAmount: 8000 }),
+      product: 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine', excludeProduct: 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire', bonusAmount: 8000 }),
     mk({ name: 'Tourmaline cao cấp — đơn từ 21tr500',
       dateFrom: '2026-09-21',
       revenue: {enabled:true, scope:'order', min:21500000, max:''}, bonusAmount: 100000,
@@ -1390,17 +1390,18 @@ function _srBuildExportB_(dB, info){
   info = info || {};
   var orders = dB.orders || [], r2 = function(n){ return Math.round((Number(n) || 0) * 100) / 100; };
   var bsxOf = function(o){ return o.bsx || []; }, bcxOf = function(o){ return o.bcx || []; };
-  // Chốt tháng Pos (Duyên 2026-11-02): khi GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale (dB.posAdjust.applied), "Chia theo Sale"/"Chi tiết đơn" vẫn là số GỐC
-  // (bsx/bcx không trừ) → sheet Đối chiếu tổng so với số TRƯỚC TRỪ (webV/totV) rồi ghi riêng dòng trừ hoàn/hủy để cộng lại ra đúng số sau trừ trên web.
+  // Chốt tháng Pos (Duyên 2026-11-05): bảng Theo Sale / thẻ Tổng giá trị trên web LUÔN là doanh thu CHUẨN (GAS không trừ trực tiếp); cuối tháng đã chốt tháng trước thì có THÊM khối
+  // "Chốt tháng — trừ hoàn/hủy" (dB.posAdjust.applied). Excel giữ doanh thu chuẩn ở các cột cũ (Đối chiếu tổng vẫn so thẳng với chi tiết đơn) và chỉ THÊM cột/dòng trừ hoàn/hủy + sau trừ.
   var adj = (dB.posAdjust && dB.posAdjust.applied) ? dB.posAdjust : null;
-  var webV = function(x){ return (adj && x.giaTriGoc != null) ? x.giaTriGoc : x.giaTri; };
-  var totV = (adj && dB.totalGiaTriGoc != null) ? dB.totalGiaTriGoc : dB.totalGiaTri;
+  var adjDed = adj ? r2(adj.totalDeduction || 0) : 0;
+  var adjSau = adj ? r2(dB.totalGiaTriSauTru != null ? dB.totalGiaTriSauTru : (Number(dB.totalGiaTri) || 0) - adjDed) : 0;
   var missing = orders.length && !orders.every(function(o){ return Array.isArray(o.bsx) && Array.isArray(o.bcx); });
   var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null;
   var summary = [['Báo cáo B — Pos: Excel đối chiếu với kế toán'], ['Xuất lúc', info.at || ''], ['Khoảng ngày (theo ngày tạo đơn)', (info.dateFrom || '...') + ' → ' + (info.dateTo || '...')],
     ['Bộ lọc', (info.filters && info.filters.length) ? info.filters.join(' | ') : '(không lọc thêm)'], [],
     ['Chỉ số', 'Giá trị'], ['Số lượng đơn', dB.totalOrders], ['Tổng giá trị sau giảm giá (tính báo cáo)', dB.totalGiaTri], ['Tổng COD', dB.totalCod], ['Trung bình đơn', dB.trungBinhDon]];
-  if (adj) summary.push(['  ↳ Tổng giá trị TRƯỚC trừ hoàn/hủy tháng ' + adj.prevMonth, totV], ['  ↳ Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ')', -(Number(adj.totalDeduction) || 0)]);
+  if (dB.bhPrepaid && dB.bhPrepaid.count) summary.push(['  ↳ Đã trừ tiền trả trước đơn Bảo hành có thẻ sale (' + dB.bhPrepaid.count + ' đơn)', -(Number(dB.bhPrepaid.total) || 0)]);
+  if (adj) summary.push(['  ↳ Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ') — khối "Chốt tháng" trên web; doanh thu ở trên KHÔNG bị trừ', -adjDed], ['  ↳ Sau trừ hoàn/hủy tháng ' + adj.prevMonth, adjSau]);
   if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]);
   summary.push([], ['Cách đọc file'], ['• "Chi tiết đơn": mỗi đơn 1 dòng; cột "Dòng trong sheet Pos" + "Ghi chú" để dò lại file Pancake gốc; "Giá trị Pos gốc" so với "Giá trị tính báo cáo" (đơn ghép Base/file kế toán/gộp tách có thể khác nhau).'],
     ['• "Chia theo Sale": mỗi đơn × mỗi sale 1 dòng — số CHÍNH XÁC (2 chữ số thập phân) cộng lại đúng bảng "Theo Sale" của web.'],
@@ -1409,11 +1410,18 @@ function _srBuildExportB_(dB, info){
 
   // Theo Sale (đúng bảng web) + dòng Tổng
   var bySaleRows = [['Sale', 'Số đơn', 'Giá trị sau giảm giá', 'COD']];
-  if (adj) bySaleRows[0].push('Giá trị gốc (trước trừ hoàn/hủy)', 'Trừ hoàn/hủy tháng ' + adj.prevMonth);   // 4 cột đầu giữ nguyên; 2 cột thêm ở cuối
-  var tOrd = 0, tVal = 0, tCod = 0, tGoc = 0, tTru = 0;
-  (dB.bySale || []).forEach(function(x){ var row = [x.name, x.orders, r2(x.giaTri), r2(x.cod)]; if (adj) row.push(r2(webV(x)), r2(x.truHoanHuy || 0)); bySaleRows.push(row); tOrd += x.orders; tVal += x.giaTri; tCod += x.cod; tGoc += webV(x); tTru += (x.truHoanHuy || 0); });
-  var totRowS = ['TỔNG (các sale trong bảng — chưa gồm "(chưa gán sale)")', tOrd, r2(tVal), r2(tCod)]; if (adj) totRowS.push(r2(tGoc), r2(tTru));
+  if (adj) bySaleRows[0].push('Trừ hoàn/hủy tháng ' + adj.prevMonth, 'Sau trừ hoàn/hủy');   // 4 cột đầu giữ nguyên (doanh thu chuẩn); 2 cột thêm ở cuối
+  var tOrd = 0, tVal = 0, tCod = 0, tTru = 0, seenSale = {};
+  (dB.bySale || []).forEach(function(x){ var tru = x.truHoanHuy || 0, row = [x.name, x.orders, r2(x.giaTri), r2(x.cod)]; seenSale[x.name] = 1; if (adj) row.push(r2(tru), r2(x.giaTriSauTru != null ? x.giaTriSauTru : x.giaTri - tru)); bySaleRows.push(row); tOrd += x.orders; tVal += x.giaTri; tCod += x.cod; tTru += tru; });
+  var totRowS = ['TỔNG (các sale trong bảng — chưa gồm "(chưa gán sale)")', tOrd, r2(tVal), r2(tCod)]; if (adj) totRowS.push(r2(tTru), r2(tVal - tTru));
   bySaleRows.push(totRowS);
+  if (adj){   // sale chỉ có hoàn/hủy tháng trước mà tháng này không có đơn: không nằm trong bảng chính → liệt kê riêng để cộng đủ tổng trừ hoàn/hủy
+    var onlyRefund = (adj.rows || []).filter(function(r){ return !seenSale[r.name] && r.truHoanHuy; });
+    if (onlyRefund.length){
+      bySaleRows.push([], ['Sale chỉ có hoàn/hủy tháng ' + adj.prevMonth + ' (tháng này không có đơn) — không nằm trong bảng trên', '', '', '', 'Trừ hoàn/hủy', 'Sau trừ hoàn/hủy']);
+      onlyRefund.forEach(function(r){ bySaleRows.push([r.name, 0, 0, 0, r2(r.truHoanHuy), r2(-r.truHoanHuy)]); });
+    }
+  }
 
   // Chi tiết đơn
   var detailRows = [['STT', 'Ngày tạo đơn', 'Dòng trong sheet Pos', 'Ghi chú đơn (mã bộ đếm / mã đơn Pos)', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale (gốc)', 'Sale tính doanh thu', 'Trạng thái',
@@ -1440,11 +1448,11 @@ function _srBuildExportB_(dB, info){
   var sum = {}, sumCod = {}, cnt = {}, grandV = 0, grandC = 0;
   allocRows.slice(1).forEach(function(r){ var k = r[6]; sum[k] = (sum[k] || 0) + r[8]; sumCod[k] = (sumCod[k] || 0) + r[9]; cnt[k] = (cnt[k] || 0) + 1; grandV += r[8]; grandC += r[9]; });
   var AL = "'" + (info.allocSheet || 'Chia theo Sale') + "'!";   // file gộp "Excel đối soát" gắn tiền tố "B " vào tên sheet → công thức SUMIF phải trỏ đúng tên đó
-  var checkRows = [['Sale', adj ? 'Giá trị — bảng web (TRƯỚC trừ hoàn/hủy)' : 'Giá trị — bảng web', 'Giá trị — cộng từ chi tiết', 'Chênh lệch giá trị', 'COD — bảng web', 'COD — cộng từ chi tiết', 'Chênh lệch COD', 'Số dòng chia']];
+  var checkRows = [['Sale', 'Giá trị — bảng web', 'Giá trị — cộng từ chi tiết', 'Chênh lệch giá trị', 'COD — bảng web', 'COD — cộng từ chi tiết', 'Chênh lệch COD', 'Số dòng chia']];
   var seen = {};
   (dB.bySale || []).forEach(function(x, i){
     seen[x.name] = true; var row = i + 2;
-    checkRows.push([x.name, r2(webV(x)), { t: 'n', v: r2(sum[x.name] || 0), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$I:$I)' }, { t: 'n', v: r2(r2(webV(x)) - r2(sum[x.name] || 0)), f: 'ROUND(B' + row + '-C' + row + ',2)' },
+    checkRows.push([x.name, r2(x.giaTri), { t: 'n', v: r2(sum[x.name] || 0), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$I:$I)' }, { t: 'n', v: r2(r2(x.giaTri) - r2(sum[x.name] || 0)), f: 'ROUND(B' + row + '-C' + row + ',2)' },
       r2(x.cod), { t: 'n', v: r2(sumCod[x.name] || 0), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$J:$J)' }, { t: 'n', v: r2(r2(x.cod) - r2(sumCod[x.name] || 0)), f: 'ROUND(E' + row + '-F' + row + ',2)' },
       { t: 'n', v: cnt[x.name] || 0, f: 'COUNTIF(' + AL + '$G:$G,A' + row + ')' }]);
   });
@@ -1457,17 +1465,17 @@ function _srBuildExportB_(dB, info){
   var last = checkRows.length;
   checkRows.push([]);
   var totRow = checkRows.length + 1;
-  checkRows.push(['TỔNG báo cáo ↔ tổng mọi dòng chia (gồm "(chưa gán sale)")', r2(totV), { t: 'n', v: r2(grandV), f: 'SUM(C2:C' + last + ')' }, { t: 'n', v: r2(r2(totV) - r2(grandV)), f: 'ROUND(B' + totRow + '-C' + totRow + ',2)' },
+  checkRows.push(['TỔNG báo cáo ↔ tổng mọi dòng chia (gồm "(chưa gán sale)")', r2(dB.totalGiaTri), { t: 'n', v: r2(grandV), f: 'SUM(C2:C' + last + ')' }, { t: 'n', v: r2(r2(dB.totalGiaTri) - r2(grandV)), f: 'ROUND(B' + totRow + '-C' + totRow + ',2)' },
     r2(dB.totalCod), { t: 'n', v: r2(grandC), f: 'SUM(F2:F' + last + ')' }, { t: 'n', v: r2(r2(dB.totalCod) - r2(grandC)), f: 'ROUND(E' + totRow + '-F' + totRow + ',2)' }, { t: 'n', v: allocRows.length - 1, f: 'SUM(H2:H' + last + ')' }]);
-  var diffs = Math.abs(r2(totV) - r2(grandV)) + Math.abs(r2(dB.totalCod) - r2(grandC));
+  var diffs = Math.abs(r2(dB.totalGiaTri) - r2(grandV)) + Math.abs(r2(dB.totalCod) - r2(grandC));
   checkRows.push([diffs < 1 ? '✅ KHỚP: tổng báo cáo = tổng cộng lại từ chi tiết (sai số < 1đ)' : '⚠ LỆCH ' + r2(diffs) + 'đ giữa tổng báo cáo và tổng chi tiết — kiểm tra "Chia theo Sale"']);
-  if (adj){   // nối số trước trừ → số SAU TRỪ đang hiện ở thẻ Tổng giá trị / bảng Theo Sale trên web
-    var tru = r2(adj.totalDeduction || 0);
-    checkRows.push([], ['Nối với số trên web (đã trừ hoàn/hủy tháng trước)', 'Giá trị'],
-      ['Tổng cộng lại từ chi tiết (trước trừ)', r2(grandV)],
+  if (adj){   // nối doanh thu chuẩn → số SAU TRỪ ở khối "Chốt tháng" trên web
+    var tru = adjDed;
+    checkRows.push([], ['Nối với khối "Chốt tháng" trên web (trừ hoàn/hủy tháng trước)', 'Giá trị'],
+      ['Tổng cộng lại từ chi tiết (doanh thu chuẩn, KHÔNG bị trừ)', r2(grandV)],
       ['Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ') — đơn tháng ' + adj.prevMonth + ' bị hoàn/hủy SAU khi chốt', -tru],
-      ['= Tổng giá trị sau trừ (thẻ "Tổng giá trị" trên web)', r2(dB.totalGiaTri)],
-      [Math.abs(r2(grandV) - tru - r2(dB.totalGiaTri)) < 1 ? '✅ KHỚP: chi tiết − trừ hoàn/hủy = số sau trừ trên web' : '⚠ LỆCH ' + r2(Math.abs(r2(grandV) - tru - r2(dB.totalGiaTri))) + 'đ giữa (chi tiết − trừ) và số sau trừ trên web']);
+      ['= Tổng sau trừ (dòng Tổng cột "Sau trừ" ở khối Chốt tháng; chưa gồm Sale 30% đơn quầy)', adjSau],
+      [Math.abs(r2(grandV) - tru - adjSau) < 1 ? '✅ KHỚP: chi tiết − trừ hoàn/hủy = số sau trừ trên web' : '⚠ LỆCH ' + r2(Math.abs(r2(grandV) - tru - adjSau)) + 'đ giữa (chi tiết − trừ) và số sau trừ trên web']);
   }
   checkRows.push(['Ghi chú: bảng "Theo Sale" của web ẩn dòng "(chưa gán sale)" nên tổng các sale trong bảng có thể nhỏ hơn Tổng giá trị; phần chênh = đơn không có sale (xem dòng "(chưa gán sale)" ở trên).']);
   return { summary: summary, bySaleRows: bySaleRows, detailRows: detailRows, allocRows: allocRows, checkRows: checkRows, grandV: grandV, grandC: grandC, missing: !!missing };
@@ -1479,7 +1487,7 @@ function _srBuildExportBSheets_(dB, info, prefix, admin){
   var xb = _srBuildExportB_(dB, Object.assign({}, info || {}, { allocSheet: prefix + 'Chia theo Sale' }));
   var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
   (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
-  var sheets = [{ name: prefix + 'Tổng quan', rows: xb.summary, widths: [48, 60] }, { name: prefix + 'Theo Sale', rows: xb.bySaleRows, widths: [44, 10, 22, 18] }];
+  var sheets = [{ name: prefix + 'Tổng quan', rows: xb.summary, widths: [48, 60] }, { name: prefix + 'Theo Sale', rows: xb.bySaleRows, widths: [44, 10, 22, 18, 24, 22] }];
   if (admin) sheets.push({ name: prefix + 'Báo cáo sản phẩm', rows: productRows });
   sheets.push({ name: prefix + 'Chi tiết đơn', rows: xb.detailRows, widths: [6, 12, 10, 30, 22, 14, 28, 26, 26, 14, 34, 18, 10, 16, 18, 16, 14, 16, 30, 40] },
     { name: prefix + 'Chia theo Sale', rows: xb.allocRows, widths: [12, 10, 28, 22, 14, 26, 22, 10, 18, 16, 20, 30] },
