@@ -60,6 +60,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [ ] **VIỆC KẾ TIẾP:** Duyên xem menu thật; nếu muốn mục con thụt nhẹ so với mục cha (phân cấp) thì đổi `margin-left:0` ở mục 10 thành ~8px cho `[data-sn-g]` và `.sn-act` (nhớ trừ width tương ứng).
 - **ĐANG LÀM:** không có việc dở.
 
+## 2026-11-05 (phiên 37) — ĐIỆN THOẠI: thanh lọc Báo cáo gọn, không cắt ô (Duyên báo qua ảnh chụp Báo cáo B) — XONG, đã push
+- **Triệu chứng:** màn điện thoại, ô mẫu "⚡ Phòng kinh doanh" bị cắt còn "kinh doa", "Tác vụ" và "⚙ Mẫu" rơi lẻ thành 3–4 hàng.
+- **NGUYÊN NHÂN GỐC:** `css/17-reports-pro.css` (≤640px) có `#salesreport-wrap .srb-bar > *{flex:1 1 140px}` (có #id nên mạnh hơn) → đè `.fp-ctl{flex:1 1 100%}` của `css/10-filter-presets.css`; cụm mẫu `.fp-ctl` chỉ còn ~167px và nằm CẠNH nút Tác vụ; trong cụm đó `.fp-one` (flex 1 1 0 + overflow hidden) bị "✕ Tắt lọc nhanh" + "⚙ Mẫu" giành chỗ → 46px. Đã dựng lại đúng lỗi bằng Chromium 390px với CSS thật trước khi sửa.
+- **Đã làm:** mục 11 cuối `css/19-theme-sunset.css` (chỉ ≤640px): thanh thành LƯỚI 12 cột, 4 hàng cố định — [Chọn báo cáo | Khoảng nhanh] · [Từ → Đến] · [Bộ lọc | Lọc | Tác vụ] · [⚡ mẫu | ✕ Tắt | ⚙ Mẫu]; ô cao 34px, lề nhỏ lại (thanh cao 234px → 172px). Tên mẫu dài cắt bằng "…". `js/48-filter-presets.js`: nút tắt bọc " lọc nhanh" trong `<span class="fp-off-x">` (mobile chỉ còn "✕ Tắt", tooltip giữ nguyên; máy tính y như cũ, chữ không đổi). Bump `?v=`: 19-theme-sunset `20261105b`, js/48 `20261105b`. Đã đo ở 390/360/320px: không ô nào bị cắt, không tràn ngang. Máy tính (1200px) không đổi.
+- **Gỡ:** xoá mục 11 css/19 (+ span trong js/48 vô hại). Không sửa GAS/extension → KHÔNG cần deploy; chỉ Ctrl+F5.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem thật trên điện thoại. Các báo cáo khác có ô thêm (`c.extra`) mặc định chiếm nửa hàng — nếu chỗ nào lệch thì chụp ảnh gửi để chỉnh. Nút "✕ Xoá lọc" (khi lọc tay, không dùng mẫu) chiếm 1 hàng riêng.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-05 (phiên 36) — BÁO CÁO B: luôn FULL doanh thu chuẩn; cuối tháng chỉ THÊM mục "Chốt tháng — trừ hoàn/hủy tháng trước" (Duyên yêu cầu) — XONG CẢ 3 BƯỚC, đã push
 - **Yêu cầu:** "Báo cáo B vẫn full doanh thu như bình thường; chỉ cuối tháng thì B có thêm mục chốt trừ doanh thu hoàn/hủy tháng trước thôi." Đây là bước 2/3 + 3/3 còn dở của phiên 8 (03/11, backend bước 1/3 đã push).
 - **NGUYÊN NHÂN GỐC còn lệch:** backend (`gas_v13.js applyPosMonthAdjustToReportB_`) đã giữ `giaTri`/`totalGiaTri` = doanh thu chuẩn, nhưng `js/11 _srRenderB` vẫn theo ngữ nghĩa cũ: thẻ Tổng giá trị ghi "(đã trừ hoàn/hủy…)", bảng Theo Sale thêm cột "Trừ hoàn/hủy" + nhãn "(sau trừ)", banner xanh nói "là số SAU TRỪ"; test `test-pos-month-adjust-ui.js` ghim đúng ngữ nghĩa cũ.
