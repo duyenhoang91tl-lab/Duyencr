@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 33) — THƯỞNG: tháng theo MÃ ĐƠN + haPTN/thanhNP OFF từ T11 + test dữ liệu giả — BƯỚC 1/2 (offline) xong, đã push
+- **Duyên chốt:** 563T10 → tháng 10, 563T9 → tháng 9, 563T11 → tháng 11: đơn quy ước tháng nào thì tính tháng đó. Hà (haPTN) và Thanh (thanhNP) đã off → bỏ qua từ tháng mới.
+- **NGUYÊN NHÂN GỐC:** `calc_bonus.js` chỉ lọc theo ngày Base nên đơn mã tháng trước (M44893 "14K NG5T09 + 248T09/2026", Base 05/10, 22,04tr, biichnguyen1993 + menbui2002) vẫn được thưởng T10 (30.000 chia đôi).
+- [x] `calc_bonus.js <work> [tháng=10]`: lọc theo MÃ ĐẦU TIÊN trong ghi chú ("1053T10 + BH316T09" vẫn là đơn T10; không nhận ra mã → giữ); `OFF_FROM` bỏ haPTN/thanhNP từ tháng ≥11 (T10 vẫn giữ).
+- [x] MỚI `tools/test-bonus-t10-day-month.js` (dữ liệu giả, PASS 10): mốc 60tr/100tr theo ngày Base sau chia, mã T09/T11 bị loại, "T10 + BH..T09" được tính, tháng 11 không lấy đơn T10.
+- **Kết quả T10:** tổng 4.296.671 → **4.266.671** (−30.000: biichnguyen1993 −15.000, menbui2002 −15.000). File `Thuong_T10_chuan_v10.xlsx` (giao qua chat, KHÔNG commit).
+- [ ] **VIỆC KẾ TIẾP (BƯỚC 2/2, chờ Duyên chốt):** web CRM (js/12 `_computeBonusData_` + gas_v13.js `buildCsStats_`) CHƯA lọc theo mã tháng — sửa thì phải deploy lại GAS + đồng bộ khối gas-code-v9 trong index.html. Cần: web xác định "tháng của báo cáo" từ kỳ đang xem. Kênh "Thử việc" của haPTN/thanhNP trên web: gỡ khỏi Quản lý Sale từ T11.
+- **ĐANG LÀM:** không có việc dở. Chưa sửa gas_v13.js/extension → chưa cần deploy/reload.
+
 ## 2026-11-04 (phiên 32) — THƯỞNG T10: Thủy (thuydinh95) báo thiếu thưởng doanh thu ngày — ĐÃ KIỂM, KHÔNG SỬA ENGINE, sửa sheet xuất file — XONG, đã push
 - **Kết luận:** engine ĐÚNG, không sale nào lệch. Tính độc lập (ngày Base, chia theo số sale, bỏ đơn loại) cho cả 22 tài khoản: 0 lệch mốc (đội chính thức 60tr/100tr, thử việc 25/50/80tr). Thủy đạt 60tr đúng 2 ngày: 18/10 (62,5tr) + 20/10 (68,3tr) = 100.000.
 - **Ngày Thủy tưởng thiếu:** 15/10 = 58.499.000 (Pos) / 58.309.190 (Base thô) < 60tr (thiếu ~1,5tr); 622T10 (6,326tr) lên Base 16/10 nên không vào 15/10; 30/10 = 53,1tr (1270T10 5,65tr có Base nhưng KHÔNG có trên Pos → không tính, kể cả cộng vào = 58,7tr vẫn < 60tr). Sát mốc khác: huyenmaii1990 20/10 59,31tr, trangNH2005 20/10 59,41tr.
