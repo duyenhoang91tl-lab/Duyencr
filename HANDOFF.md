@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-05 (phiên 35) — 🌸 HIỆU ỨNG CÁNH ĐÀO RƠI RẤT NHẸ (Duyên yêu cầu) — XONG, đã push
+- **Yêu cầu:** CRM có thêm hiệu ứng cánh đào rơi rất nhẹ.
+- **Đã làm:** file mới `js/66-sakura-petals.js` (tự chạy, 1 `<canvas id="sakura-fx">` phủ trang, `pointer-events:none`, z-index 250 = trên nội dung/header 200, DƯỚI dock/tabbar/modal ≥300 nên không che thao tác). 8–16 cánh nhỏ 5–9px, rơi 16–32px/giây, mờ 38–68%, đung đưa + xoay + lật; tự dừng khi tab ẩn; không chạy nếu hệ điều hành bật "giảm chuyển động"; ẩn khi in. Menu ☰ → ⚙ Settings có mục **"🌸 Tắt/Bật cánh đào rơi"** (mọi vai trò; lưu localStorage `ome_sakura`, '0' = tắt, mặc định bật). Thêm thẻ script cuối index.html + mục `act:sakura` ở `js/29-sidenav.js`.
+- **Đã test:** node -c, test-ui-pro, render Chromium (canvas không chặn click, bật/tắt + nhớ sau reload). Chưa thử trên web thật + chế độ tối (cánh hồng nhạt vẫn hiện được trên nền tối).
+- **Gỡ:** xoá thẻ `<script src="js/66-sakura-petals.js">` trong index.html + mục `sakura` ở js/29-sidenav.js (2 chỗ) + file 66. Không sửa gas/extension → không cần deploy GAS, không reload extension; chỉ Ctrl+F5 web.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem trên web; nếu muốn dày/đậm/chậm hơn chỉnh `targetCount()`, `vy`, `a` trong file 66. Extension Zalo/Pancake chưa có hiệu ứng này (không bắt buộc).
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 34) — MENU TRÁI: khung ngoài nền nhạt, ô tác vụ nền đậm cho chữ rõ (Duyên yêu cầu) — XONG, đã push
 - **Yêu cầu:** ảnh menu (Tải file Excel, Sync GS, mục SETTINGS...) khó đọc; muốn khung ngoài nhạt, ô nổi lên nền đậm.
 - **NGUYÊN NHÂN GỐC:** mục 4 của `css/19-theme-sunset.css` để khung menu là gradient hồng ĐẬM, còn mỗi ô chỉ là nền trắng trong suốt 5-14% (`css/06-pro.css` dòng 154-157) + chữ trắng 12.5px → ô và khung gần cùng màu, chữ trắng trên hồng giữa/nhạt chỉ ~3-4:1.
