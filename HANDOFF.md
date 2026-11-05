@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-05 (phiên 38) — THƯỞNG T10: Duyên chốt mốc "từ" = ≥ và yêu cầu ghi CÁCH TÍNH CHUẨN lên main — XONG, đã push
+- **Duyên chốt:** chữ "đơn trên 10tr/15tr/20tr" trong bảng = **TỪ** (≥). Đơn M46214 (NG90T10) đúng 10.000.000 vẫn được combo 2 SP (3 sale × 6.667 = 20.000) → KHÔNG đổi số.
+- [x] **Kiểm code:** web `js/12` (`gs.revenue>=min` thưởng ngày, `measured>=min` thưởng đơn) và tool offline đã dùng ≥ → không cần sửa code, không cần deploy GAS/reload extension.
+- [x] **File mới `docs/crm-kb/09-thuong-t10-cach-tinh-chuan.md`** (+ dòng chỉ đường trong `00-READ-FIRST.md`): ai thuộc bảng nào (19 chính thức / 3 thử việc + ngày bắt đầu), 2 bảng chương trình, 10 quy tắc tính (≥, bậc cao nhất, Tỳ hưu cộng dồn + loại trừ chất liệu, chia đều, ngày Base, NG-ghép/tách, giá niêm yết Tourmaline, override người đúng, đơn loại Base), quy trình chạy từng lệnh, việc chờ chốt.
+- [x] `audit_bonus_file.py` bỏ cờ "biên" (đã chốt ≥); chạy lại trên v9 → 0 lỗi.
+- [ ] **VIỆC KẾ TIẾP (chờ Duyên):** (1) tính lại đơn T09 cho sale khác ngoài Thủy (+~78.000) hay không; (2) 826T10 của Thủy; (3) menbui2002 còn giữ; (4) xác nhận ngày bắt đầu haPTN/thanhNP = 10/10. Bản chuẩn hiện tại: `Thuong_T10_chuan_v9.xlsx` = 4.304.671.
+
 ## 2026-11-05 (phiên 37) — THƯỞNG T10: Duyên hỏi file `Thưởng_T10.xlsx` (= v8, tổng 4.296.671) đã chuẩn chưa — ĐÃ KIỂM ĐỘC LẬP, đã push
 - [x] `tools/bonus-t10/audit_bonus_file.py <file.xlsx> <work>`: kiểm KHÔNG dùng calc_bonus.js — tổng sheet 2 = sheet 4; bậc combo 10/15/20tr (SP + giá trị + chia đều k sale); bill vòng mix 15/20tr; thưởng Tỳ hưu = SL × mức / số sale + không dính chất liệu loại trừ; doanh số ngày 60/100tr (chính thức) và 25/50/80tr (thử việc, từ ngày 4) tính lại từ orders.json theo ngày Base; dòng trùng.
 - **Kết quả trên v8:** 252 dòng, 18 sale — 0 lỗi tính. Khác bản v9 đúng 1 dòng: thuydinh95 thiếu +8.000 (Tỳ hưu TOUR trên 1008T09, đơn Pos-không-Base mà KT vẫn tính — `kt_include.py`, phiên 27) → v8 713.500, v9 721.500.

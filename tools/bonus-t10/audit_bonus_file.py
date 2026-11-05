@@ -24,7 +24,7 @@ for r in det:
     m = re.match(r'Giá trị đơn (\d+) — (\d+) sản phẩm', c)
     if r[4].startswith('Đơn từ') and m:
         v, n = float(m.group(1)), int(m.group(2)); tier = next(((nn, th, a) for nn, th, a in COMBO if n >= nn and v >= th), None); exp = tier[2] if tier else 0
-        if tier and v == tier[1]: flag('BIEN', r, 'gia tri DUNG BANG moc %d: bang ghi "don TREN 10tr/15tr/20tr" (>) nhung engine/KT tinh >= -> Duyen chot' % v)
+        # Duyen chot 05/11: moc 'tu' = >= (don dung 10.000.000 duoc combo 2 SP) - khong con bao bien
         if kenh.get(r[1]) != 'probation' and abs(exp / k - r[5]) > 1: flag('COMBO', r, 'gia tri %d, %d SP -> ky vong %d /%d sale = %d, file ghi %d' % (v, n, exp, k, exp / k, r[5]))
         if kenh.get(r[1]) == 'probation': flag('COMBO', r, 'sale THU VIEC khong co CT combo (bang thu viec khong co)')
     m = re.match(r'Phần vòng \+ charm mix (\d+)', c)
