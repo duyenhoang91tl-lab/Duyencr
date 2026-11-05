@@ -1,5 +1,28 @@
 {
   "_ghi_chu": "Sua nguoi huong thuong cua tung don Pos (khoa = Ma don hang Pos). Duyen chot 2026-11-04. KHONG chua SDT/dia chi khach.",
-  "M44816": { "saleBan": "yenNTH2004", "don": "162T10/2026", "lyDo": "The Pos gan thuong yenNTH2004 + thuyha88 nhung don 162T10 la cua Yen" },
-  "M46322": { "saleBan": "thuyha88", "don": "430T10/2026", "lyDo": "The Pos gan thuong yenNTH2004 + thuyha88 nhung don 430T10 la cua rieng Ha" }
+  "M44816": {
+    "saleBan": "yenNTH2004",
+    "don": "162T10/2026",
+    "lyDo": "The Pos gan thuong yenNTH2004 + thuyha88 nhung don 162T10 la cua Yen"
+  },
+  "M46322": {
+    "saleBan": "thuyha88",
+    "don": "430T10/2026",
+    "lyDo": "The Pos gan thuong yenNTH2004 + thuyha88 nhung don 430T10 la cua rieng Ha"
+  },
+  "M45869": {
+    "split": [
+      {
+        "saleBan": "ngocNB2003saleoff",
+        "ghiChu": "681T10/2026"
+      },
+      {
+        "saleBan": "huyenmaii1990",
+        "giaTri": 3550000,
+        "ghiChu": "937T10/2026"
+      }
+    ],
+    "don": "681T10+937T10",
+    "lyDo": "Duyen chot 2026-11-04: 937T10 la cua Mai Huyen 3.550.000; 681T10 la cua Ngoc (phan con lai cua Pos 14.523.000 = 10.973.000, de tong = Pos)"
+  }
 }

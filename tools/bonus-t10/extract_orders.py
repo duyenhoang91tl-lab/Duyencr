@@ -26,7 +26,8 @@ for sh in ('ĐƠN PT', 'ĐƠN MP'):
             'ngayTao': str(r['Ngày tạo đơn']), 'ghiChu': str(r['Ghi chú nội bộ']) if pd.notna(r['Ghi chú nội bộ']) else '',
             'trangThai': str(r.get('Trạng thái') if pd.notna(r.get('Trạng thái')) else ''),   # de calc_bonus.js loai dong Huy/Hoan khoi viec gop don tach
             'giaTriTruocGiam': float(r['Trị giá đơn hàng']) if pd.notna(r.get('Trị giá đơn hàng')) else 0,   # gia niem yet truoc giam (don Tourmaline cao cap xet moc 21,5tr/31,5tr theo gia nay)
-            'baoHanh': nguon.strip().lower() == 'bảo hành'})
+            'baoHanh': nguon.strip().lower() == 'bảo hành',
+            'sdt': str(int(r['Số điện thoại'])) if pd.notna(r.get('Số điện thoại')) and str(r.get('Số điện thoại')).replace('.0','').isdigit() else ''})   # sdt: calc_bonus.js gop don GHEP khong-NG khi cung khach (cung SDT)
         if str(r['Mã đơn hàng']) in OV: orders[-1]['saleBanGoc'] = orders[-1]['saleBan']; orders[-1]['saleBan'] = OV[str(r['Mã đơn hàng'])]['saleBan']
 s1 = x['1_Theo sale (final)']
 ch = {}
