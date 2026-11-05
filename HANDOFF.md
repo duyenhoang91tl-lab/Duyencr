@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-05 (phiên 37) — THƯỞNG T10: Duyên hỏi file `Thưởng_T10.xlsx` (= v8, tổng 4.296.671) đã chuẩn chưa — ĐÃ KIỂM ĐỘC LẬP, đã push
+- [x] `tools/bonus-t10/audit_bonus_file.py <file.xlsx> <work>`: kiểm KHÔNG dùng calc_bonus.js — tổng sheet 2 = sheet 4; bậc combo 10/15/20tr (SP + giá trị + chia đều k sale); bill vòng mix 15/20tr; thưởng Tỳ hưu = SL × mức / số sale + không dính chất liệu loại trừ; doanh số ngày 60/100tr (chính thức) và 25/50/80tr (thử việc, từ ngày 4) tính lại từ orders.json theo ngày Base; dòng trùng.
+- **Kết quả trên v8:** 252 dòng, 18 sale — 0 lỗi tính. Khác bản v9 đúng 1 dòng: thuydinh95 thiếu +8.000 (Tỳ hưu TOUR trên 1008T09, đơn Pos-không-Base mà KT vẫn tính — `kt_include.py`, phiên 27) → v8 713.500, v9 721.500.
+- **Nghi vấn biên (chờ Duyên chốt):** đơn M46214 (NG90T10) giá trị ĐÚNG 10.000.000, 2 SP, chia 3 sale (ninhnga99, huyenmaii1990, biichnguyen1993) → mỗi người 6.667 (tổng 20.000). Bảng ghi "Bill combo 2 SP: đơn TRÊN 10tr" (>) nhưng engine tính ≥. Nếu hiểu ">" thì −20.000.
+- **Đã xác nhận không phải lỗi:** nonghong88, giangnguyen1990, thuNH1986, dungNTK1987 = 0 đơn trên cả Pos lẫn Base T10 (không thiếu do lệch tên); mainguyen97 7 đơn 24,4tr không đạt mốc nào; menbui2002 không kiểm được doanh số ngày từ tổng đơn (chỉ tính đơn Facebook Phạm Thu Hiền) — vẫn chờ Duyên xác nhận còn giữ.
+- [ ] **VIỆC KẾ TIẾP:** Duyên chốt (1) mốc ">" hay "≥" ở đúng 10tr/15tr/20tr, (2) tính lại đơn T09 cho Thủy (v9) và các sale khác, (3) menbui2002. Không sửa gas_v13.js/extension → không cần deploy/reload.
+
 ## 2026-11-04 (tối) — Web: gộp đơn NG "ghép/ship cùng đơn" khi chấm thưởng — BƯỚC 1/2 ĐÃ PUSH
 
 - [x] `js/12` `_bonusMergeGhep_` + `_bonusCodeTokens_` (port từ `tools/bonus-t10/calc_bonus.js`), gọi đầu `_computeBonusData_`: đơn ghi chú "NG139T10/2026 GHÉP/SHIP CÙNG ĐƠN 1326T10/2026" + đơn mang mã 1326T10, CÙNG BỘ SALE, 1 trong 2 là đơn NG → 1 bill (cộng giá trị, sản phẩm; ngày/saleShares lấy đơn GỐC; donGoc = có ít nhất 1 đơn gốc). 2 đơn gốc Base riêng (807T10+702T10) KHÔNG gộp. Test thêm 4 ca ở `tools/test-bonus-goc-split.js`; thêm 2 hàm vào danh sách nạp hàm của `test-bonus-programs.js` và `bonus-t10/calc_bonus.js`. js/12 `?v=20261104b`.
