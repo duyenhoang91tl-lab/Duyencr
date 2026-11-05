@@ -163,10 +163,11 @@ ok(/Báo cáo B/.test(thrown), 'chua co du lieu B: bao loi ro, khong xuat file r
 w.__Bz = { orders: [], bySale: [], totalOrders: 0, totalGiaTri: 0, totalCod: 0 }; let pz = null, thrownZ = '';
 try { pz = vm.runInContext('_reconCollect_(__Bz, __L, __info)', w); } catch (e) { thrownZ = e.message; }
 ok(!thrownZ && pz && pz.items.length > 10, 'khong co don nao: van dung duoc file (khong loi): ' + thrownZ);
-// B co posAdjust (chot thang): so sanh voi so TRUOC tru
-const Badj = J(B); Badj.posAdjust = { applied: true, prevMonth: '2026-09', closedAt: '2026-09-30', totalDeduction: 150000 }; Badj.totalGiaTriGoc = B.totalGiaTri; Badj.totalGiaTri = B.totalGiaTri - 150000;
+// B co posAdjust (chot thang, ngu nghia moi 2026-11-05): totalGiaTri = doanh thu CHUAN (khong tru); phan tru chi la khoi rieng -> doi chieu cheo so thang voi so chuan
+const Badj = J(B); Badj.posAdjust = { applied: true, prevMonth: '2026-09', closedAt: '2026-09-30', totalDeduction: 150000 }; Badj.totalGiaTriGoc = B.totalGiaTri; Badj.totalGiaTriSauTru = B.totalGiaTri - 150000;
 w.__Ba = Badj; const pa = vm.runInContext('_reconCollect_(__Ba, __L, __info)', w);
-ok(pa.checks.filter(c => c.ok !== null).every(c => c.ok) && JSON.stringify(pa.items[0].rows).includes('TRƯỚC trừ hoàn/hủy tháng 2026-09'), 'co posAdjust (chot thang): doi chieu cheo so voi so TRUOC tru, van ✅ KHOP');
+const paTxt = JSON.stringify(pa.items[0].rows);
+ok(pa.checks.filter(c => c.ok !== null).every(c => c.ok) && !paTxt.includes('TRƯỚC trừ') && paTxt.includes('KHÔNG bị trừ hoàn/hủy'), 'co posAdjust (chot thang): doi chieu cheo so voi doanh thu CHUAN (khong "TRUOC tru"), van ✅ KHOP')
 
 // ===== 3b) Nut "Excel doi soat" o Bao cao B: exportReconAll_ =====
 const alerts = [], calls = [], saved = [];

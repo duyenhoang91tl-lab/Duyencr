@@ -181,3 +181,59 @@ html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button{
   background:#a8326c;color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(92,23,64,.25);
 }
 html.ui-pro.ui-pro:not([data-theme="dark"]) #data-view .tabs .sh-foot button:hover{background:#8f2a5e;color:#fff;}
+
+/* ── 10. MENU TRÁI: CÁC Ô CÙNG LỀ TRÁI/PHẢI, CÙNG CỠ (Duyên yêu cầu 2026-11-05) ──
+   NGUYÊN NHÂN GỐC lệch: css/06-pro.css dòng 154 cho mục con [data-sn-g] và .sn-act `margin-left:14px; width:calc(100% - 14px)`
+   (thụt vào), còn 4-6 mục cha trong #reportsgroup-list (Báo cáo doanh số, Pancake, KPI, Checklist MKT, Báo cáo ngày) bị style
+   INLINE do js/14-fn-aasplit.js đặt `margin:0;padding:8px 10px;display:block` đè mất margin → chúng nằm sát mép trái, mép phải
+   hụt 14px, còn Dashboard / Chăm sóc theo mốc / AI phân tích team / Chẩn đoán kết nối thụt 14px chạm mép phải → hai cột
+   so le, cỡ chữ 12.5 vs 13 và padding 8/9px cũng khác nhau. Sửa: ép mọi ô dùng chung lề 0, rộng 100%, padding và cỡ chữ
+   giống nhau (cần !important vì style inline). Chỉ hình học, không đổi màu/js; áp cho cả chế độ tối. Gỡ = xoá mục 10. */
+html.ui-pro #data-view .tabs .tab,
+html.ui-pro #data-view .tabs .sn-act,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab,
+html.ui-pro #data-view .tabs .tab[data-sn-g]{
+  box-sizing:border-box!important;width:100%!important;
+  margin-left:0!important;margin-right:0!important;
+  padding:9px 12px!important;
+  font-size:13px!important;line-height:1.35!important;
+  border-left:3px solid transparent;
+}
+html.ui-pro #data-view .tabs .tab.active,
+html.ui-pro #data-view .tabs #reportsgroup-list .tab.active,
+html.ui-pro #data-view .tabs .tab[data-sn-g].active{border-left-width:3px!important;}
+
+/* ── 11. ĐIỆN THOẠI: THANH LỌC BÁO CÁO GỌN, KHÔNG CẮT Ô (Duyên báo 2026-11-05: ô "Phòng kinh doanh" bị cắt còn "kinh doa", Tác vụ/Mẫu rơi lẻ 3 hàng) ──
+   NGUYÊN NHÂN GỐC: css/17-reports-pro.css (≤640px) đặt `#salesreport-wrap .srb-bar > *{flex:1 1 140px}` (specificity có #id) → ĐÈ `.fp-ctl{flex:1 1 100%}` của css/10-filter-presets.css,
+   nên cụm mẫu .fp-ctl chỉ còn ~167px, nằm CẠNH nút 🧰 Tác vụ; trong cụm đó nút mẫu `.fp-one` (flex:1 1 0 + overflow:hidden) bị 2 nút kia (✕ Tắt lọc nhanh, ⚙ Mẫu) giành chỗ → còn 46px → cắt chữ.
+   Sửa: đổi thanh sang LƯỚI 12 CỘT (flex-wrap tự dồn ô nên hàng nào cũng lệch) với 4 hàng cố định — [Chọn báo cáo 7 | Khoảng nhanh 5] · [Từ 5 → 2 · Đến 5] · [🔎 Bộ lọc 4 | Lọc 4 | 🧰 Tác vụ 4] ·
+   [⚡ mẫu | ✕ Tắt lọc nhanh | ⚙ Mẫu] (cụm mẫu độc chiếm hàng cuối; tên mẫu dài cắt bằng "…"). Ô thấp 34px, lề/khoảng cách nhỏ, ẩn "23 sale" ở nút mẫu (đã có trong tooltip).
+   Ô lạ do báo cáo khác thêm (c.extra) mặc định chiếm nửa hàng. Chỉ áp ≤640px; máy tính giữ nguyên. Gỡ = xoá mục 11. */
+@media (max-width:640px){
+  #salesreport-wrap{--rp-ctl-h:34px;}
+  #salesreport-wrap .srb-bar{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;padding:8px;margin-bottom:10px;align-items:center;}
+  #salesreport-wrap .srb-bar > *{grid-column:span 6;min-width:0;width:auto;}
+  #salesreport-wrap .srb-bar select,#salesreport-wrap .srb-bar input[type=date]{width:100%;min-width:0;max-width:none;}
+  /* hàng 1 */
+  #salesreport-wrap .srb-bar > select[onchange^="_srSetSub"]{grid-column:span 7;min-width:0;}
+  #salesreport-wrap .srb-bar > select:not([onchange^="_srSetSub"]){grid-column:span 5;}
+  /* hàng 2 */
+  #salesreport-wrap .srb-bar > input[type=date]{grid-column:span 5;font-size:13px !important;padding:0 6px !important;}
+  #salesreport-wrap .srb-bar > .srb-bar-arrow{grid-column:span 2;text-align:center;padding:0;}
+  /* hàng 3 */
+  #salesreport-wrap .srb-bar #srb-menu-btn,   /* nằm trong .srb-menu{display:contents} nên KHÔNG dùng ">" */
+  #salesreport-wrap .srb-bar > button[onclick="_srApply()"],
+  #salesreport-wrap .srb-bar > .gear-menu{grid-column:span 4;}
+  #salesreport-wrap .srb-bar #srb-menu-btn,#salesreport-wrap .srb-bar > button[onclick="_srApply()"]{width:100%;min-width:0;}
+  #salesreport-wrap .srb-bar > .gear-menu > .btn{width:100%;}
+  #salesreport-wrap .srb-bar .btn.sm{height:var(--rp-ctl-h);min-height:0;padding:0 8px;font-size:12.5px;}
+  #salesreport-wrap .srb-bar .srb-m-x,#salesreport-wrap .srb-bar > .srb-bar-lock{grid-column:1 / -1;font-size:12px;}
+  /* hàng 4: cụm mẫu lọc nhanh trọn hàng */
+  #salesreport-wrap .srb-bar > .fp-ctl{grid-column:1 / -1;display:flex;flex-wrap:nowrap;gap:6px;width:100%;}
+  #salesreport-wrap .srb-bar .fp-ctl .btn.sm{min-height:0;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-one{flex:1 1 0;min-width:0;max-width:none;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-sel{flex:1 1 0;min-width:0;height:var(--rp-ctl-h);}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-off,
+  #salesreport-wrap .srb-bar .fp-ctl > .gear-menu{flex:0 0 auto;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-n,#salesreport-wrap .srb-bar .fp-ctl .fp-off-x{display:none;}   /* nút ✕ chỉ còn "✕ Tắt" cho gọn (js/48 bọc " lọc nhanh" trong .fp-off-x) */
+}

@@ -1178,6 +1178,7 @@ async function syncFromGS(opts) {
   opts = opts || {};
   const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
   const isManual = !!opts.manual;
+  const _failAtStart = _autoSyncFailCount || 0;   // de biet nhip nay co them loi nao khong (thanh cong that -> dat lai 0 o cuoi try)
   if (!gsUrl) { if (isManual) toast('Chưa kết nối Google Sheets'); return; }
   if (isManual) { txt('ltext', 'Đang tải từ Google Sheets...'); show('loverlay'); }
   try {
@@ -1186,7 +1187,7 @@ async function syncFromGS(opts) {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
     const _wantCareFull = !_careSince || isManual || (Date.now() - _careFullAt) > CARE_FULL_EVERY_MS;
     const careUrl = gsUrl + sepChar + 'action=customers' + (_wantCareFull ? '' : '&since=' + encodeURIComponent(_careSince));
-    const careR = await _gsFetchTO_(careUrl, 60000);
+    const careR = await _gsFetchTO_(careUrl, _wantCareFull ? 150000 : 60000);   // FULL doc ca CareData rat nang: huy o 60s thi Apps Script VAN chay tiep (bo phi) ma may lai xin FULL moi -> chong tai len server; cho toi 150s
     const careText = await careR.text();
     let _careSame = false, _isDelta = false;   // _careSame: khong ai sua CareData tu nhip truoc
     let d;
@@ -1438,6 +1439,9 @@ async function syncFromGS(opts) {
         syncToast(`✓ Xong — đã đồng bộ ${count} bản ghi CS`);
       }
     }
+    // NGUYEN NHAN GOC (2026-11-04): _autoSyncFailCount CHI TANG, khong bao gio ve 0 -> "so lan loi LIEN TIEP" thuc ra la tong loi tu luc mo trang;
+    // gap 3 loi roi rac la banner "Auto-sync that bai" hien mai va (nay co lui nhip) may se bi cham mai. Nhip nay khong them loi nao -> dat lai 0.
+    if ((_autoSyncFailCount || 0) === _failAtStart) _autoSyncFailCount = 0;
   } catch(e) {
     if (isManual) { hide('loverlay'); toast('❌ Lỗi sync: ' + e.message + ' — Kiểm tra quyền deploy Apps Script'); }
     else {

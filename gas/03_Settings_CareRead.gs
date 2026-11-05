@@ -1270,6 +1270,8 @@ function _scopeGate_(action, token, phone, via) {
 function _reportCacheKey_(prefix, filters) {
   // Cong tac "don 1 ma chia theo Base" (Settings POS_GHEP_MIN_CODES=1) doi so lieu bao cao => dua vao khoa cache de bat/tat co hieu luc NGAY (khong doi het cache cu).
   try { if (_posGhepMinCodes_() === 1) prefix = prefix + 'g1_'; } catch (eG) {}
+  // Bang chia bo sung (acctSplitExtra) doi so lieu B => dua dau van tay vao khoa cache de co hieu luc NGAY khi admin sua.
+  try { var _exRaw = _acctExtraRaw_(); if (_exRaw) { var _h = 5381; for (var _hi = 0; _hi < _exRaw.length; _hi++) _h = ((_h << 5) + _h + _exRaw.charCodeAt(_hi)) | 0; prefix = prefix + 'x' + (_h >>> 0).toString(36) + '_'; } } catch (eX) {}
   var js = JSON.stringify(filters);
   if ((prefix + js).length <= 200) return prefix + js;
   var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, js, Utilities.Charset.UTF_8);

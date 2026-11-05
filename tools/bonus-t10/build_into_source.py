@@ -61,6 +61,17 @@ for sh, pre in (('ĐƠN PT', 'PT'),):   # ĐƠN MP (my pham) KHONG tinh thuong
         for j in range(5):
             c = ws.cell(row=r, column=c0 + j); c.font = f(); c.fill = NEW
             if 1 <= j <= 3: c.number_format = MONEY
+    OI = res.get('orderInfo') or {}
+    if OI:   # CHE DO DON GOC BASE: 2 cot thong tin (header bat dau bang 'Thưởng' de prepare_base.py go lai duoc)
+        for j, h in enumerate(['Thưởng — mã đơn gốc Base', 'Thưởng — giá tính (Base + phần dư) | chia']):
+            c = ws.cell(row=1, column=c0 + 5 + j, value=h); c.font = f(bold=True, color='FFFFFF'); c.fill = HDR; c.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center'); c.border = BOX
+        ws.column_dimensions[ws.cell(row=1, column=c0 + 5).column_letter].width = 18; ws.column_dimensions[ws.cell(row=1, column=c0 + 6).column_letter].width = 60
+        for r in range(2, ws.max_row + 1):
+            e = OI.get(f'{pre}{r-2}')
+            if not e: continue
+            ws.cell(row=r, column=c0 + 5, value=e['maBase']).font = f()
+            ws.cell(row=r, column=c0 + 6, value=f"{round(e['giaTinh']):,} (Pos {round(e['giaPos']):,}) | {e['chia']}".replace(',', '.') + ('' if e['donGoc'] else ' | KHÔNG phải đơn gốc')).font = f()
+            for j in (5, 6): ws.cell(row=r, column=c0 + j).fill = NEW
     ws.freeze_panes = ws.freeze_panes or 'C2'
     print(sh, 'cot thuong tu cot', c0)
 # ---- sheet THUONG_Chi_tiet (don + SP + doanh so ngay) ----
@@ -93,10 +104,12 @@ for r in wb['ĐƠN PT'].iter_rows(min_row=2, values_only=True):
     for n in names:
         k = lc.get(n.lower())
         if k: rev[k] = rev.get(k, 0) + float(r[23]) / len(names)
+BASEMODE = bool(res.get('orderInfo'))
+if BASEMODE: rev = res.get('revBySale', {})   # doanh thu theo DON GOC BASE (Base + phan du theo The Pos) cua cac don trong T10 (ngay len Base), khong MP/bao hanh/NGUON
 t = sheet('THUONG_Tong_theo_sale', 0)
 t['A1'] = 'BẢNG THƯỞNG ONLINE / OFFLINE — T10/2026'; t['A1'].font = f(bold=True, size=14, color='1F3A5F')
-t['A2'] = 'Chỉ đội Online + Offline (18 sale đã phân loại). Doanh thu = đơn PT chia đều theo thẻ (không gồm đơn MP mỹ phẩm). Thưởng tính bằng hàm _computeBonusData_ của CRM trên sheet ĐƠN PT (đã trừ bảo hành, KHÔNG tính đơn MP mỹ phẩm); cộng bằng SUMIFS từ THUONG_Chi_tiet.'; t['A2'].font = f(italic=True, color='666666')
-head(t, 4, ['Sale', 'Kênh', 'Doanh thu đơn PT T10 (đ, không MP)', 'Thưởng THEO ĐƠN (giá trị đơn)', 'Thưởng THEO DOANH SỐ NGÀY', 'Thưởng THEO SẢN PHẨM', 'Thưởng THỬ VIỆC (đơn đầu / số đơn)', 'TỔNG THƯỞNG'], [24, 10, 22, 20, 20, 20, 22, 18])
+t['A2'] = 'Chỉ đội Online + Offline (18 sale đã phân loại). ' + ('CHIA THEO ĐƠN GỐC BASE (Base + phần Pos tăng thêm chia theo thẻ Pos); ngày tính = ngày lên đơn trên Base; chỉ đơn gốc đã ghép Base được tính thưởng.' if BASEMODE else 'Doanh thu = đơn PT chia đều theo thẻ (không gồm đơn MP mỹ phẩm).') + ' Thưởng tính bằng hàm _computeBonusData_ của CRM trên sheet ĐƠN PT (đã trừ bảo hành, KHÔNG tính đơn MP mỹ phẩm); cộng bằng SUMIFS từ THUONG_Chi_tiet.'; t['A2'].font = f(italic=True, color='666666')
+head(t, 4, ['Sale', 'Kênh', ('Doanh thu theo đơn gốc Base T10 (đ)' if BASEMODE else 'Doanh thu đơn PT T10 (đ, không MP)'), 'Thưởng THEO ĐƠN (giá trị đơn)', 'Thưởng THEO DOANH SỐ NGÀY', 'Thưởng THEO SẢN PHẨM', 'Thưởng THỬ VIỆC (đơn đầu / số đơn)', 'TỔNG THƯỞNG'], [24, 10, 22, 20, 20, 20, 22, 18])
 order = sorted(ch, key=lambda n: ({'online': 0, 'offline': 1, 'probation': 2}[ch[n]], -rev.get(n, 0)))
 row = 5
 for n in order:
@@ -123,4 +136,14 @@ for r in range(last + 1, row + 1):
         if j >= 3: c.number_format = MONEY
 for i, s in enumerate(['LƯU Ý:', '1) Ước tính theo 12 CT mẫu "Thưởng online chính thức" trong CRM — đối chiếu Báo cáo G (CT bật thật có thể khác).', '2) Không tự loại Tỳ Hưu Ngọc/Ruby/Saphire và đơn huỷ; đơn chia tay chưa có tỷ lệ tính chia đều theo thẻ.', '3) Ngọc (ngocNB2003saleoff) là Sale THỬ VIỆC, bắt đầu tính thưởng 14/10/2026: ngày 1-3 (14,15,16/10) thưởng ĐƠN ĐẦU TIÊN TRONG NGÀY 50.000đ; từ ngày 4 (17/10) thưởng bậc số đơn/ngày và doanh số ngày (mẫu "Cơ chế thưởng kích hoạt Sale mới"). Không dùng bảng thưởng chính thức.', '4) Thưởng THEO ĐƠN/SẢN PHẨM nằm ở 5 cột cuối từng hàng sheet ĐƠN PT; thưởng DOANH SỐ NGÀY tính theo sale-ngày nên chỉ có ở THUONG_Chi_tiet.']):
     t.cell(row=row + 2 + i, column=1, value=s).font = f(bold=(i == 0), italic=(i > 0), color='444444')
+EX = res.get('excludedBase') or []
+if EX:   # don cua 18 sale KHONG duoc tinh thuong trong che do don goc Base (chua ghep Base / khong phai don goc) — KT doi chieu tay
+    x = sheet('THUONG_Don_khong_tinh')
+    x['A1'] = 'ĐƠN CỦA 18 SALE KHÔNG ĐƯỢC TÍNH THƯỞNG (chế độ đơn gốc Base: chỉ đơn gốc đã ghép Base được tính)'; x['A1'].font = f(bold=True, size=13, color='1F3A5F')
+    head(x, 3, ['Mã đơn Pos', 'Ghi chú Pos (dòng 1)', 'Ngày Pos', 'Giá trị (đ)', 'Sale', 'Lý do'], [14, 34, 12, 16, 34, 70])
+    for i, e in enumerate(sorted(EX, key=lambda e: (e['lyDo'], e['ngay'])), 4):
+        for j, v in enumerate((e['maDon'], e['ghiChu'], e['ngay'], e['giaTri'], e['sale'], e['lyDo']), 1):
+            c = x.cell(row=i, column=j, value=v); c.font = f(); c.border = BOX
+            if j == 4: c.number_format = MONEY
+    x.freeze_panes = 'A4'
 wb.save(out); print('saved', out, len(rows), 'dong chi tiet')
