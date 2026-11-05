@@ -199,6 +199,10 @@ function _bonusAggSources_(g, sources, exclude){
 // (hoặc "SHIP CÙNG ĐƠN …") + đơn A mang mã 1326T10, CÙNG BỘ SALE = MỘT bill → cộng giá trị/sản phẩm để xét mốc thưởng. CHỈ gộp khi 1 trong 2 là đơn thêm "NG…"
 // (2 đơn gốc Base riêng như 807T10 + 702T10 là 2 bill khác nhau, KHÔNG gộp). Đơn gộp lấy ngày/saleShares của đơn GỐC; donGoc = có ít nhất 1 đơn gốc.
 // NGUYÊN NHÂN GỐC: đơn NG không phải đơn gốc (ghi chú dòng đầu không phải mã sạch) nên bị bỏ khỏi thưởng, còn từng đơn lẻ <10tr (5,85tr + 5,45tr) không đủ mốc dù cùng 1 bill 11,3tr.
+// CT "Tourmaline cao cấp" (tên CT bắt đầu bằng đó) + đơn có nhẫn Tourmaline trơn cao cấp → xét mốc theo giá niêm yết trước giảm.
+function _bonusIsTourCaoCap_(p, o){
+  return /^tourmaline cao c[aấ]p/i.test(String(p && p.name || '').normalize('NFC')) && /NH[AẪ]N TOUR TR[OƠ]N CAO C[AẤ]P/i.test(String(o && o.sanPham || '').normalize('NFC'));
+}
 function _bonusCodeTokens_(note){
   var t = {}, up = String(note == null ? '' : note).normalize('NFC').toUpperCase(), re = /(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, m;
   while ((m = re.exec(up))) { t[m[2]] = true; }
@@ -233,6 +237,7 @@ function _bonusMergeGhep_(orders){
     m.sanPham = join('sanPham', ', '); m.maSanPham = join('maSanPham', ';'); m.soLuong = join('soLuong', ', '); m.ghiChu = join('ghiChu', ' | ');
     m.donGoc = ps.some(function(p){ return p.donGoc; }) ? true : base.donGoc;
     m.ghepSoDon = ps.length;
+    if (ps.some(function(p){ return Number(p.giaTriTruocGiam) > 0; })) m.giaTriTruocGiam = ps.reduce(function(a, p){ return a + (Number(p.giaTriTruocGiam) || Number(p.giaTriDon) || 0); }, 0);
     out.push(m);
   });
   return out;
@@ -363,6 +368,8 @@ function _computeBonusData_(orders){
             var rk = _bcRequireKw_(p);
             if (rk && p.requireProduct === undefined) okP = _bonusRequireProductOk_({requireProduct: rk}, o.sanPham);
             if (minSP > 0){ okP = okP && binfo.nProducts >= minSP; dtl += ' — '+binfo.nProducts+' sản phẩm'; }
+            // CT "Tourmaline cao cấp": KT xét mốc theo GIÁ NIÊM YẾT trước giảm (cột T "Đơn giá" × SL của sheet dữ liệu đơn; đơn 1301T10 nhẫn 31,5tr giảm 5% còn 29,925tr vẫn được T31).
+            if (_bonusIsTourCaoCap_(p, o) && Number(o.giaTriTruocGiam) > measured){ measured = Number(o.giaTriTruocGiam); dtl = 'Giá niêm yết trước giảm '+_srMoney(measured)+' (đơn sau giảm '+_srMoney(giaTri)+')'; }
           }
           if (okP && (min===null || measured>=min) && (max===null || measured<=max)){
             var amt2 = Number(p.bonusAmount)||0;
