@@ -86,27 +86,38 @@ function _saleStartDate_(name){
   }
   return '';
 }
-// Ước lượng số lượng sản phẩm khớp từ khoá trong ô "Sản phẩm" (văn bản tự do, vd "Tỳ hưu x2, Vòng tay x1")
-// — tìm dạng "x2"/"×2"/"(2)" ngay sau từ khoá, không thấy thì tính là 1. Đây là ƯỚC LƯỢNG, hiển thị
-// kèm nguyên văn ô sản phẩm để kế toán đối chiếu lại, KHÔNG nên dùng để tự động chi tiền hàng loạt
-// mà không kiểm tra khi số tiền lớn.
-function _bonusProductQty_(sanPham, keywordsStr){
-  var text = String(sanPham||'').toLowerCase();
-  var kws = String(keywordsStr||'').split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
-  if (!kws.length || !text) return {matched:false, qty:0};
+// Đếm số lượng sản phẩm khớp từ khoá, THEO TỪNG DÒNG sản phẩm của đơn (Duyên 2026-11-04).
+// NGUYÊN NHÂN GỐC cũ: đếm số LẦN từ khoá xuất hiện trong cả chuỗi -> 2 từ khoá chồng nhau ("Tỳ hưu thiên lộc Moon" + "Thiên Lộc Moon") cùng khớp 1 nhẫn nên đếm đôi (20k thay vì 10k);
+// không đọc cột Số lượng; từ khoá "Tourmaline Hồng/Xanh", "Aquamarine" không khớp tên Pos ("...THIÊN LỘC TOUR", "...AQUA") nên thưởng = 0.
+// Nay: tách sanPham theo ',' (ghép vị trí với soLuong nếu cùng số dòng), mỗi dòng khớp tối đa 1 lần, SL = cột Số lượng (không có = 1).
+// Từ khoá "a+b" = dòng phải chứa CẢ a và b. excludeStr = từ khoá chất liệu bị LOẠI. Văn bản tự do ("Tỳ hưu x2") vẫn đọc "x2"/"(2)" sau từ khoá.
+function _bonusProductQty_(sanPham, keywordsStr, soLuong, excludeStr){
+  var low = function(s){ return String(s||'').normalize('NFC').toLowerCase(); };
+  var kws = String(keywordsStr||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  var exs = String(excludeStr||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  var lines = String(sanPham||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  if (!kws.length || !lines.length) return {matched:false, qty:0};
+  var qs = String(soLuong||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  var aligned = qs.length === lines.length;
   var totalQty = 0, matched = false;
-  kws.forEach(function(kw){
-    if (!kw) return;
-    var idx = 0;
-    while (true){
-      var pos = text.indexOf(kw, idx);
-      if (pos === -1) break;
-      matched = true;
-      var tail = text.substr(pos+kw.length, 10);
+  lines.forEach(function(line, i){
+    var hitPos = -1, hitLen = 0;
+    kws.forEach(function(kw){
+      if (hitPos >= 0) return;
+      var parts = kw.split('+').map(function(x){ return x.trim(); }).filter(Boolean);
+      if (!parts.length) return;
+      if (parts.every(function(x){ return line.indexOf(x) !== -1; })){ hitPos = line.indexOf(parts[0]); hitLen = parts[0].length; }
+    });
+    if (hitPos < 0) return;
+    if (exs.some(function(x){ return line.indexOf(x) !== -1; })) return;
+    matched = true;
+    var q = aligned ? (Number(String(qs[i]).replace(',', '.')) || 0) : 0;
+    if (!q){
+      var tail = line.substr(hitPos + hitLen, 10);
       var m = tail.match(/^[\s]*[x×][\s]*([0-9]+)/) || tail.match(/^[\s]*\(([0-9]+)\)/);
-      totalQty += m ? (parseInt(m[1],10)||1) : 1;
-      idx = pos + kw.length;
+      q = m ? (parseInt(m[1],10)||1) : 1;
     }
+    totalQty += q;
   });
   return {matched:matched, qty:totalQty};
 }
@@ -263,58 +274,11 @@ function _computeBonusData_(orders){
     });
   });
 
-  // GỘP BILL GHÉP (Duyên 2026-11-04): 2 đơn Pos ghi chú trỏ vào nhau ("GHÉP CÙNG ĐƠN 1326T10" / "SHIP CÙNG ĐƠN ..." / "GHÉP ĐƠN CÙNG 663T10"),
-  // CÙNG BỘ SALE tham gia và (1 trong 2 là đơn thêm "NG…" HOẶC CÙNG SĐT khách) = MỘT bill khi xét thưởng THEO ĐƠN: giá trị + số sản phẩm cộng lại, thưởng 1 lần
-  // (chia đều cho sale chung). Chỉ ảnh hưởng vòng "Theo đơn" bên dưới — số đơn/ngày, doanh số ngày, đơn đầu tiên giữ nguyên theo từng đơn.
-  // NGUYÊN NHÂN GỐC cần luật này: 704T10 (7,742tr) "GHÉP ĐƠN CÙNG 663T10" (10,26tr) cùng khách cùng sale chỉ được 663 mốc 10tr/20k thay vì bill 18tr/3 SP/30k;
-  // web CRM trước đó không có luật gộp GHÉP nào (chỉ gộp TÁCH ở backend). BẢN SAO ở gas_v13.js buildCsStats_ và tools/bonus-t10/calc_bonus.js mergeGhep — sửa 1 nơi phải sửa cả 3.
-  function _mergeGhepBills(list){
-    var PTR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
-    var TOK = /(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g;
-    function toks(note){ var t = {}, str = String(note==null?'':note).normalize('NFC').toUpperCase(), m; TOK.lastIndex = 0; while ((m = TOK.exec(str))) t[m[2]] = true; return t; }
-    function phone(o){ var d = String(o.soDienThoai || o.sdt || '').replace(/\D/g, ''); if (d.indexOf('84') === 0 && d.length > 9) d = d.slice(2); return d.replace(/^0+/, ''); }
-    function who(o){ return Object.keys(_bonusParticipants_(o)).filter(Boolean).map(function(x){ return String(x).toLowerCase(); }).sort().join(','); }
-    function bad(o){ return /h[uủ]y|ho[aà]n/i.test(String(o.trangThai||'')); }
-    var n = list.length, par = [], T = [], W = [], P = [], i, j;
-    for (i = 0; i < n; i++){ par[i] = i; T[i] = toks(list[i].ghiChu); W[i] = who(list[i]); P[i] = phone(list[i]); }
-    function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
-    for (i = 0; i < n; i++){
-      if (bad(list[i])) continue;
-      var m = PTR.exec(String(list[i].ghiChu==null?'':list[i].ghiChu).normalize('NFC').toUpperCase()); if (!m) continue;
-      for (j = 0; j < n; j++){
-        if (j === i || bad(list[j]) || !W[i] || W[j] !== W[i] || !T[j][m[1]]) continue;
-        var hasNg = /^NG/.test(m[1]) || Object.keys(T[i]).some(function(c){ return /^NG/.test(c); }) || Object.keys(T[j]).some(function(c){ return /^NG/.test(c); });
-        if (hasNg || (P[i] && P[i] === P[j])) par[find(i)] = find(j);
-      }
-    }
-    var grp = {}, order = [];
-    list.forEach(function(o, k){ var r = find(k); if (!grp[r]){ grp[r] = []; order.push(r); } grp[r].push(k); });
-    var out = [];
-    order.forEach(function(r){
-      var g = grp[r];
-      if (g.length < 2){ out.push(list[g[0]]); return; }
-      var gocs = g.filter(function(k){ return !_hasGocField || list[k].donGoc; });
-      if (!gocs.length){ g.forEach(function(k){ out.push(list[k]); }); return; }   // không có đơn gốc nào → các đơn tự bị lọc như cũ
-      gocs.sort(function(a, b){ return (_bonusYmd_(list[a]) || '').localeCompare(_bonusYmd_(list[b]) || '') || (a - b); });
-      var head = list[gocs[0]], m2 = Object.assign({}, head), codes = [], notes = [], ma = [], sl = [], sp = [], tot = 0;
-      g.slice().sort(function(a, b){ return (a === gocs[0] ? -1 : b === gocs[0] ? 1 : a - b); }).forEach(function(k){
-        var o = list[k], cs = splitMulti_(o.maSanPham, ';').map(function(x){ return String(x||'').trim(); }).filter(Boolean), qs = splitMulti_(o.soLuong, ',').map(function(x){ return String(x||'').trim(); });
-        while (qs.length < cs.length) qs.push('1');
-        qs.length = cs.length;
-        tot += Number(o.giaTriDon) || 0; if (cs.length){ ma.push(cs.join(';')); sl.push(qs.join(', ')); }
-        if (o.sanPham) sp.push(String(o.sanPham)); if (o.ghiChu) notes.push(String(o.ghiChu));
-        var f = String(o.ghiChu||'').split(/[\r\n]/)[0].trim(); if (f) codes.push(f);
-      });
-      m2.giaTriDon = tot; m2.maSanPham = ma.join(';'); m2.soLuong = sl.join(', '); m2.sanPham = sp.join(', '); m2.ghiChu = notes.join(' | ');
-      m2.ghepBillSoDon = g.length; m2.ghepBillCodes = codes;
-      out.push(m2);
-    });
-    return out;
-  }
-
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
   var review = [];   // đơn cần kiểm tra tay (mã SP chưa xác nhận, đơn vòng thiếu doanh thu dòng...) — hiện ở tab "Chi tiết thưởng"
-  _mergeGhepBills(orders).forEach(function(o){   // đã gộp bill GHÉP (xem _mergeGhepBills)
+  // GỘP ĐƠN GHÉP (Duyên 2026-11-04): 704T10 "GHÉP ĐƠN CÙNG 663T10" = 2 đơn gốc cùng khách + cùng sale → 1 bill khi xét mốc (giá trị + sản phẩm cộng lại). CHỈ vòng "Theo đơn" này; vòng "theo ngày" ở trên giữ từng đơn.
+  var _ghepBills = (typeof _bcMergeGhepBills_ === 'function') ? _bcMergeGhepBills_(orders, function(o){ return !_hasGocField || !!o.donGoc; }) : orders;
+  _ghepBills.forEach(function(o){
     if (_hasGocField && !o.donGoc) return;   // thưởng theo đơn cũng chỉ tính đơn gốc
     var dateStr = _bonusYmd_(o);
     var giaTri = Number(o.giaTriDon)||0;
@@ -338,10 +302,10 @@ function _computeBonusData_(orders){
           if (tot>0) extra.push({amount:tot, program:p, detail:'Sản phẩm: '+esc(parts.join('; '))});
         }
         if (p.product && p.product.trim()){
-          var pq = _bonusProductQty_(o.sanPham, p.product);
-          if (pq.matched && pq.qty>0){
+          var pq = _bonusProductQty_(o.sanPham, p.product, o.soLuong, p.excludeProduct);
+          if (pq.matched && pq.qty>0){   // thưởng THEO SẢN PHẨM = cộng trực tiếp, không giới hạn, KHÔNG tranh "best" với thưởng combo/giá trị đơn (Duyên 2026-11-04)
             var amt = (Number(p.bonusAmount)||0) * pq.qty;
-            if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'SL ước tính: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'};
+            if (amt>0) extra.push({amount:amt, program:p, detail:'SL: '+pq.qty+' × '+_srMoney(Number(p.bonusAmount)||0)+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'});
           }
         }
         if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order'){
@@ -373,7 +337,7 @@ function _computeBonusData_(orders){
         var rec = ensure(name);
         var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
         rec.total += part;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepBillSoDon>1 ? ' — gộp '+o.ghepBillSoDon+' đơn GHÉP ('+o.ghepBillCodes.join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(o.ghepSoDon>1 ? ' — GỘP '+o.ghepSoDon+' đơn ghép ('+(o.ghepMaDon||[]).join(' + ')+')' : '')+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
       }
     });
   });
@@ -1274,7 +1238,7 @@ function closeBonusProgramsModal(){
 }
 function _bpNewProgram(){
   return { id: 'bp_'+Date.now(), name: '', dateFrom:'', dateTo:'',
-    audience: {online:false, offline:false}, product:'', requireProduct:'', extraNote:'', exclusionNote:'',
+    audience: {online:false, offline:false}, product:'', excludeProduct:'', requireProduct:'', extraNote:'', exclusionNote:'',
     tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
     firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
     sources: [], excludeSources: [], prodRules: {enabled:false, items:[]},
@@ -1303,6 +1267,30 @@ function _bpNormalize_(p){
   if (!p.prodRules) p.prodRules = {enabled:false, items:[]};
   if (!Array.isArray(p.prodRules.items)) p.prodRules.items = [];
   return p;
+}
+// NÂNG CẤP cấu hình thưởng Tỳ hưu ĐÃ LƯU từ trước (Duyên 2026-11-04). NGUYÊN NHÂN GỐC: Settings.bonusPrograms vẫn giữ từ khoá cũ
+// ("Tourmaline Hồng, Tourmaline Xanh", "Aquamarine", "Tỳ hưu thiên lộc Moon, Thiên Lộc Moon") không khớp tên Pos (TOUR/AQUA) và chưa có
+// ô loại trừ chất liệu -> web không tính Tourmaline/Aquamarine, Moon đếm đôi, không loại Ngọc/Ruby/Saphire. Seed mới (js/13) chỉ có tác dụng khi
+// tạo lại mẫu, không đổi được cấu hình đã lưu. Hàm này đổi đúng 3 CT theo TÊN (chưa có dấu "+" trong từ khoá = bản cũ), giữ nguyên tiền thưởng;
+// chạy lại nhiều lần không đổi gì thêm. Trả về số CT đã nâng cấp.
+var _BP_TYHUU_EXCLUDE_ = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
+function _bpUpgradeTyHuu_(arr){
+  var n = 0;
+  (arr || []).forEach(function(p){
+    if (!p || typeof p !== 'object') return;
+    var name = String(p.name || '').normalize('NFC').toLowerCase();
+    if (name.indexOf('tỳ hưu thiên lộc') === -1) return;
+    if (String(p.product || '').indexOf('+') !== -1) return;   // đã là bản mới
+    var kw = '';
+    if (name.indexOf('moon') !== -1) kw = 'tỳ hưu thiên lộc+moon, thmoon';
+    else if (name.indexOf('tourmaline') !== -1) kw = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline';
+    else if (name.indexOf('aquamarine') !== -1) kw = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine';
+    if (!kw) return;
+    p.product = kw;
+    if (!String(p.excludeProduct || '').trim()) p.excludeProduct = _BP_TYHUU_EXCLUDE_;
+    n++;
+  });
+  return n;
 }
 function _renderBonusProgramsModal(){
   var body = document.getElementById('bp-body');
@@ -1366,6 +1354,9 @@ function _bpEditFormHtml_(p){
 
     '<div class="form-label">4. Sản phẩm áp dụng (từ khoá, cách nhau dấu phẩy — bỏ trống = mọi sản phẩm; nếu điền, thưởng sẽ NHÂN theo số lượng sản phẩm khớp bán được)</div>'+
     '<input type="text" value="'+esc(p.product)+'" oninput="_bpDraft.product=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: Tỳ hưu, Tourmaline">'+
+    '<div class=\"form-label\" style=\"font-size:11.5px\">4b. Chất liệu LOẠI TRỪ (từ khoá, cách nhau dấu phẩy — dòng sản phẩm có từ khoá này sẽ KHÔNG được tính thưởng mục 4; bỏ trống = không loại)</div>'+
+    '<input type=\"text\" value=\"'+esc(p.excludeProduct||'')+'\" oninput=\"_bpDraft.excludeProduct=this.value\" style=\"width:100%;margin-bottom:6px\" placeholder=\"VD: ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire\">'+
+    '<div class=\"guide-text\" style=\"font-size:10.5px;color:var(--hint);margin-bottom:10px\">Mẹo từ khoá mục 4: dùng dấu + để đòi CÙNG LÚC nhiều từ trong 1 dòng sản phẩm, VD <b>tỳ hưu thiên lộc+tour</b> chỉ khớp dòng có cả \"tỳ hưu thiên lộc\" và \"tour\".</div>'+
 
     _bpProdSectionHtml_(p)+
     _bpSrcSectionHtml_(p)+
