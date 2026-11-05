@@ -19,7 +19,12 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: chRaw, teams: [], INDIVIDUAL_RA
 vm.createContext(ctx);
 vm.runInContext([line(/var GOLD_RULE_CHANNELS = [^\n]*/), line(/var GOLD_RULE_MATERIALS = [^\n]*/), 'var _SALE_ALIAS_MAP = {};',
   line(/function isNumTagSale_\(x\)\{[^\n]*\}/)].concat(['splitMulti_', '_cfgAliasesOf', '_cfgByAlias', '_saleChannelOf_', '_teamRateForName_', '_resolveCommissionRate_', '_goldFold_', '_goldChannelRule_', '_channelCommissionRate_', '_computeCommissionData_'].map(n => fn(j01, n))).join('\n'), ctx);
-ctx.O = orders.filter(o => !/hủy|huỷ/i.test(o.ghiChu || '') || true);
+let ordersUse = orders;   // CHE DO DON GOC BASE: giaTriDon = Base + phan con lai theo The Pos, saleShares (don tach chua gop o buoc nay -> giu chia theo The Pos)
+if (fs.existsSync(W + '/base_split.json') && process.argv[3] !== 'the-pos') {
+  const er = require('./base_enrich.js')(orders, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
+  ordersUse = er.orders; console.log('HOA HONG theo don goc Base: ghep', er.matched, 'don; khong khop', er.unmatched.length);
+}
+ctx.O = ordersUse.filter(o => !/hủy|huỷ/i.test(o.ghiChu || '') || true);
 const c = JSON.parse(vm.runInContext('JSON.stringify(_computeCommissionData_(O))', ctx));
 const out = c.bySale.map(s => {
   const kb = s.channelBreakdown || {}, g10 = { revenue: 0, commission: 0 }, g14 = { revenue: 0, commission: 0 }, mp = { revenue: 0, commission: 0 }, other = { revenue: 0, commission: 0 };
