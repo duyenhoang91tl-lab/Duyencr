@@ -392,7 +392,9 @@ async function _syncBonusProgramsFromGAS() {
       var arr = JSON.parse(data.value);
       if (Array.isArray(arr)) {
         BONUS_PROGRAMS = arr;
+        var _upg = (typeof _bpUpgradeTyHuu_ === 'function') ? _bpUpgradeTyHuu_(BONUS_PROGRAMS) : 0;
         saveLS('ome_bonus_programs', BONUS_PROGRAMS);
+        if (_upg) { try { saveBonusPrograms(); } catch(e) {} }   // ghi lại Settings để web + GAS cùng dùng từ khoá mới
         if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
       }
     }

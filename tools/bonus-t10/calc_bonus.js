@@ -8,7 +8,8 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.loaiThuong).filter(   // loaiThuong (add_base_date.py): don Base That bai / khong co tren Base -> khong thuong, check tay (Duyen 2026-11-04)
+  o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
 const rawOrders = rawOrders0;
 // GOP DON POS TACH (Duyen 2026-11-04): don Base "254T10/2026" len Pos tach 2 don, ghi chu "254T10/2026/1 TACH..", "254T10/2026/2 TACH.." -> la MOT don,
 // doanh thu = tong cac phan (9.000.000 + 8.500.000 = 17.500.000 -> moc 15tr). NGUYEN NHAN GOC truoc day: script nay doc tung dong Pos nhu 1 don rieng nen moi phan <10tr -> thuong 0.
@@ -42,12 +43,14 @@ function mergeTach(list) {
 // = MOT bill -> cong gia tri xet moc (11.300.000 -> combo 2 SP 20.000 trong bang thuong chinh thuc "1326t10+ ng139t10"). Chi gop khi cung bo sale va 1 ben la don them "NG" (khop bang thuong chinh thuc: 1326t10+ng139t10, 1292T10+ng132t10, 693t10+NG75; con 702t10 / 807T10 tinh rieng), khong phai don Bao hanh/DMP/Huy-Hoan, doi tac co trong du lieu thang.
 const sKey = o => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(',');
 const codeTok = note => { const t = new Set(); String(note || '').normalize('NFC').toUpperCase().replace(/(?<![A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, (m, c) => { t.add(c); return m; }); return t; };
+const dayOf = o => String(o.baseNgayTao || (/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(o.ngayTao || '') || []).slice(1).reverse().map((x, i) => i ? x.padStart(2, '0') : x).join('-')).slice(0, 10);
+const gapOk = (a, b) => { const x = Date.parse(dayOf(a)), y = Date.parse(dayOf(b)); return !isNaN(x) && !isNaN(y) && Math.abs(x - y) <= 864e5; };   // cung ngay len don (Base), lech toi da 1 ngay — chi cho nhanh gop theo SDT
 function mergeGhep(list) {
-  const GR = /(?:GH[EÉ]P|SHIP)\s+C[UÙ]NG\s+[ĐD][OƠ]N\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+  const GR = /(?:GH[EÉ]P|SHIP)\s+(?:C[UÙ]NG\s+[ĐD][OƠ]N|[ĐD][OƠ]N\s+C[UÙ]NG)\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
   const par = list.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i])), uni = (a, b) => { par[find(a)] = find(b); };
   list.forEach((a, i) => {
     if (excludedSt(a.trangThai)) return; const m = GR.exec(String(a.ghiChu || '').normalize('NFC').toUpperCase()); if (!m) return;
-    list.forEach((b, j) => { if (j === i || excludedSt(b.trangThai) || sKey(b) !== sKey(a) || b.maDon === a.maDon) return; if (codeTok(b.ghiChu).has(m[1]) && (/^NG/.test(m[1]) || [...codeTok(a.ghiChu)].some(c => /^NG/.test(c)) || [...codeTok(b.ghiChu)].some(c => /^NG/.test(c)))) uni(i, j); });   // CHI gop khi 1 trong 2 la don them "NG..." (NG139T10 + 1326T10); 2 don goc Base rieng (807T10 + 702T10) la 2 bill khac nhau
+    list.forEach((b, j) => { if (j === i || excludedSt(b.trangThai) || sKey(b) !== sKey(a) || b.maDon === a.maDon) return; if (codeTok(b.ghiChu).has(m[1]) && (/^NG/.test(m[1]) || [...codeTok(a.ghiChu)].some(c => /^NG/.test(c)) || [...codeTok(b.ghiChu)].some(c => /^NG/.test(c)) || (a.sdt && b.sdt && a.sdt === b.sdt && gapOk(a, b)))) uni(i, j); });   // gop khi (1) 1 trong 2 la don them "NG..." (NG139T10 + 1326T10) HOAC (2) Duyen 2026-11-04: 2 don goc Base rieng nhung CUNG KHACH (cung SDT) + CUNG BO SALE + ghi chu tro den nhau (704T10 "GHEP DON CUNG 663T10" + 663T10, trangNH2005, cung SDT) = 1 bill khi xet moc; khac SDT/khac sale van la 2 bill
   });
   const grp = {}; list.forEach((o, i) => { const r = find(i); (grp[r] = grp[r] || []).push(i); });
   const out = [], info = [];
@@ -73,6 +76,8 @@ const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { on
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
 const mk = o => Object.assign(base(), o);
 const rev = (scope, min, amt, o) => mk(Object.assign({ revenue: { enabled: true, scope, min, max: '' }, bonusAmount: amt }, o));
+// Tên Pos: TOUR = Tourmaline, AQUA = Aquamarine, MOON (Duyên 2026-11-04). "a+b" = dòng SP chứa cả a và b. Loại: Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire.
+const PK_MOON = 'tỳ hưu thiên lộc+moon, thmoon', PK_TOUR = 'tỳ hưu thiên lộc+tour, tỳ hưu thiên lộc+tourmaline', PK_AQUA = 'tỳ hưu thiên lộc+aqua, tỳ hưu thiên lộc+aquamarine', PK_EX = 'ngọc lam, lam thủy, ngọc bích, cẩm thạch, ruby, saphire, saphia, sapphire';
 const PROGRAMS = [
   rev('order', 10e6, 20000, { name: 'Đơn từ 10tr (combo 2 sản phẩm)' }),
   rev('order', 15e6, 30000, { name: 'Đơn từ 15tr (combo 3 sản phẩm)' }),
@@ -81,9 +86,9 @@ const PROGRAMS = [
   rev('order', 15e6, 20000, { name: 'Bill vòng mix charm — đơn từ 15tr', requireProduct: 'vòng' }),
   rev('day', 60e6, 50000, { name: 'Thưởng doanh số/ngày — đạt từ 60tr' }),
   rev('day', 100e6, 100000, { name: 'Thưởng doanh số/ngày — đạt từ 100tr' }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
-  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: 'Aquamarine', bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Moon', product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine', product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
   rev('order', 21.5e6, 100000, { name: 'Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' }),
   rev('order', 31.5e6, 200000, { name: 'Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP' })
 ];
@@ -94,9 +99,17 @@ PROGRAMS.push(
   PM({ name: 'GĐ2 — Bậc số đơn/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, tier: { enabled: true, rows: [{ count: 2, bonus: 30000 }, { count: 3, bonus: 50000 }, { count: 5, bonus: 100000 }] } }),
   PM({ name: 'GĐ2 — Doanh số ≥25 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 25e6, max: '' }, bonusAmount: 30000 }),
   PM({ name: 'GĐ2 — Doanh số ≥50 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 50e6, max: '' }, bonusAmount: 50000 }),
-  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }));
+  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }),
+  // Bang "Ap dung cho Sale thu viec" (Duyen gui 2026-11-04) co them dong 8-13: Ty huu Moon/Tourmaline Hong+Xanh/Aquamarine (tu 20/8) + Tourmaline cao cap T21/T31 (tu 21/9), ap dung tu ngay 1 thu viec.
+  // CT chinh thuc online/offline KHONG ap cho sale thu viec (js/12 _bonusProgramApplies_) nen phai co ban rieng cho thu viec.
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Moon', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_MOON, excludeProduct: PK_EX, bonusAmount: 10000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_TOUR, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tỳ Hưu Thiên Lộc Aquamarine', dateFrom: '2026-08-20', probationDay: { enabled: true, from: 1, to: '' }, product: PK_AQUA, excludeProduct: PK_EX, bonusAmount: 8000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21.5e6, max: '' }, bonusAmount: 100000 }),
+  PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
-const PROBATION = { 'ngocNB2003saleoff': '2026-10-14' };
+// Duyen chot 2026-11-04: 3 sale thu viec = ngocNB2003saleoff (bat dau 14/10), haPTN + thanhNP (bat dau 10/10 - theo Duyen bao o phien truoc). Con lai (19 tai khoan doi Sale) la chinh thuc.
+const PROBATION = { 'ngocNB2003saleoff': '2026-10-14', 'haPTN': '2026-10-10', 'thanhNP': '2026-10-10' };
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
 const SC = {}; Object.keys(chRaw).forEach(k => { SC[k] = chRaw[k]; });
 const SCP = {}; Object.keys(PROBATION).forEach(k => { SC[k] = 'probation'; chRaw[k] = 'probation'; SCP[k] = [{ from: PROBATION[k], channel: 'probation', bonusFrom: PROBATION[k] }]; });
