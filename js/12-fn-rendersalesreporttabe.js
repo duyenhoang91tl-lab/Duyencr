@@ -646,6 +646,17 @@ function _srGFilterByBaseDate_(orders, from, to){
   info.kept = out.length;
   return { orders: out, info: info };
 }
+// Dong ghi chu cach loc cua G (info = dataG.baseBasis tu _srGFilterByBaseDate_): noi ro dang loc theo NGAY LEN DON TREN BASE hay con theo ngay Pos
+function _srGBasisNoteHtml_(info, hasRange){
+  if (!info || !hasRange) return '';
+  var st = 'font-size:11.5px;color:var(--muted);margin:-4px 0 10px';
+  if (info.basis !== 'base') return info.total ? '<div style="'+st+'">⚠ Chưa có đơn nào ghép được đơn gốc Base trong dữ liệu → đang tính theo <b>ngày Pos</b> như cũ (kiểm tra bản GAS đã deploy và ghi chú mã bộ đếm trên đơn Pos).</div>' : '';
+  var parts = ['giữ <b>'+fmt(info.kept)+'/'+fmt(info.total)+'</b> đơn'];
+  if (info.extra) parts.push('kéo thêm <b>'+fmt(info.extra)+'</b> đơn lên Base trong kỳ nhưng Pos nhập sau kỳ');
+  if (info.dropBefore) parts.push('loại <b>'+fmt(info.dropBefore)+'</b> đơn lên Base TRƯỚC kỳ');
+  if (info.dropAfter) parts.push('loại <b>'+fmt(info.dropAfter)+'</b> đơn lên Base SAU kỳ');
+  return '<div style="'+st+'">📅 Đã lọc theo <b>ngày lên đơn trên Base</b> (đơn chưa ghép được Base theo ngày Pos): '+parts.join(' · ')+'.</div>';
+}
 function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);
   var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: 0, programs: {}, skipped: [] };
@@ -710,7 +721,7 @@ function _srGProbationHints_(g, orders){
     var reason;
     if (!sd) reason = 'chưa đặt <b>Ngày bắt đầu tính thưởng</b> → các chương trình theo ngày thử việc không áp dụng (🏷️ Phân loại đội Sale → Sửa mốc → ô "Bắt đầu tính thưởng", rồi Lưu mốc)';
     else if (rt && rt < sd) reason = 'kỳ đang xem'+rng+' kết thúc <b>trước Ngày bắt đầu '+esc(sd)+'</b> — chọn kỳ có ngày từ '+esc(sd)+' trở đi (vd Tháng trước)';
-    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn Pos nào mang tên Sale này</b> trong kỳ'+rng+' — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không, và bộ lọc Sale đang chọn có gồm Sale này không';
+    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn gốc nào (lên Base trong kỳ và đã có đơn Pos) mang tên Sale này</b> trong kỳ'+rng+' — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không, và bộ lọc Sale đang chọn có gồm Sale này không';
     else {
       var nBase = mine.filter(function(o){ return !!o.baseNgayTao; }).length, nGoc = mine.filter(function(o){ return !!o.donGoc; }).length;
       var nSau = mine.filter(function(o){ var y = ymdOf(o); return y && y >= sd; }).length;
@@ -729,15 +740,16 @@ function _srRenderG_(d){
   }
   var g = _srGBuildGroups_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Thưởng tính theo đúng các chương trình đã cài ở "🏆 Chương trình thưởng" (cùng cách tính với mục c) của Báo cáo E), '+
-    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale đội Online / Văn phòng (phòng Kinh doanh). Sale chưa phân loại hoặc thuộc đội khác không được tính thưởng.'+
+    'trên <b>đơn gốc</b>: tính theo <b>ngày lên đơn trên Base</b> và đơn đó phải <b>có trên Pos</b> (đơn Pos nhập muộn hơn vẫn tính vào kỳ lên đơn trên Base). <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale đội Online / Văn phòng (phòng Kinh doanh). Sale chưa phân loại hoặc thuộc đội khác không được tính thưởng.'+
     'Nhóm cơ chế "theo ngày" chỉ lấy mức cao nhất; các nhóm khác nhau cộng dồn.</div>';
 
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(g.total)+'</div><div class="kpi-label"><b>Tổng thưởng</b></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.tv.total)+'</div><div class="kpi-label">Thưởng Thử việc ('+fmt(g.tv.rows.length)+' Sale)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn gốc (có đơn Pos) dùng để tính</div></div>'+
     '</div>';
+  html += _srGBasisNoteHtml_(d.baseBasis, !!(_srState.gDateFrom || _srState.gDateTo));   // ghi chu: dang loc theo NGAY LEN DON TREN BASE (kéo thêm / loại bao nhiêu đơn)
   if (g.skipped.length) html += '<div style="font-size:11.5px;color:#9a3412;margin-bottom:10px">Không tính thưởng cho '+g.skipped.length+' Sale chưa thuộc đội Online/Văn phòng: '+esc(g.skipped.slice(0,8).join(', '))+(g.skipped.length>8?'…':'')+' — phân loại ở Báo cáo E → "Phân loại Sale" nếu cần.</div>';
   _srGProbationHints_(g, d.orders || []).forEach(function(h){
     html += '<div style="font-size:11.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ Sale Thử việc <b>'+esc(h.name)+'</b> chưa có thưởng: '+h.reason+'.</div>';
