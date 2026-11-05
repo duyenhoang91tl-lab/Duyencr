@@ -11,13 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-<<<<<<< HEAD
 ## 2026-11-04 (phiên 27) — THƯỞNG T10: Duyên báo sai 1301T10 (tour 31.500), 1326T10+NG139T10, 254T10, "bỏ đơn của Thủy" — BƯỚC 1/3 xong (đã push)
 - **NGUYÊN NHÂN GỐC chung:** pipeline từ `Check_DT_t10.xlsx` (extract_orders_pos.py) KHÔNG có giá niêm yết (`giaTriTruocGiam`=0) và phiên 21 loại đơn "không có Base"/"Base Thất bại" — trong khi bản dựng từ file KT (phiên 22, HANDOFF mục "4 đơn Duyên báo") đã có: Tourmaline cao cấp theo giá niêm yết, gộp NG-ghép, và KT vẫn tính các đơn đó. Làm lại bằng Check_DT nên mất các quy tắc đó.
 - [x] **Bước 1/3:** `extract_orders_pos.py` đọc `giaTriTruocGiam` từ `order_overrides.json`; khai M47074 (1301T10) = 31.500.000 → T31 200.000 (thuydinh95 587.500 → 687.500). Quy tắc override `saleBan` vẫn chạy như cũ (khoá không có saleBan không còn lỗi).
 - [ ] **Bước 2/3:** đơn Pos bị loại "không có Base" nhưng file KT vẫn tính (4 đơn Thủy: 823T09+BH91T10 11,0tr, 1008T09 6,0tr, 162T09 5,15tr, 826T10 3,94tr) → đưa lại theo KT.
 - [ ] **Bước 3/3:** xuất `Thuong_T10_chuan_v6.xlsx` + sheet đối chiếu từng đơn của Thủy; kiểm 1326T10+NG139T10 và 254T10.
-=======
 ## 2026-11-03 (phiên 7) — Chỉnh quy tắc CRM để Báo cáo B khớp KT (sheet HUYỀN): BẢNG CHIA BỔ SUNG `acctSplitExtra` — BƯỚC 1/4 đã push (GAS)
 - **Duyên chốt:** 268T10 (Pos 14.960.000) = 10.780.000 chia đều Ninh+Ngà (ninhLTK1984 + ninhnga99) + 4.180.000 của Ngà (Duyên gõ "10tr790k", cộng ra 14.970.000 ≠ Pos → hiểu là 10.780.000, **cần Duyên xác nhận lại**); BH386T10/2026/6190 tính THEO POS (không đổi); M44707 tính 1.335.000; 1162T10 thu COD tính theo KT 5.664.000; đơn bảo hành tính theo cách KT.
 - **NGUYÊN NHÂN GỐC:** KT sửa tay giá trị/thẻ từng đơn (bảo hành, COD, đơn quầy); file "THEO DÕI ĐƠN CHIA SALE" là file Google riêng CRM không ghi được; đơn quầy ghi chú chỉ là mã đơn Pos (`M44707`) nên `_extractCounterCodes_` = rỗng, không khớp được; và KT cộng khác Pos thì CRM chưa dùng nếu thiếu dấu x. Quy luật giá trị bảo hành của KT là số nhập tay từng đơn (không suy ra từ Pos) → không thể là 1 công thức, phải là BẢNG DỮ LIỆU trong Cấu hình (không gõ cứng số T10 vào code).
@@ -127,7 +125,6 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - ⚠ Chưa chạy lại TOÀN pipeline: phiên này không có `Check_DT_t10.xlsx` + export Base. v6 = v5 + sửa đúng 1 dòng, tổng đã đối chiếu = cộng chi tiết.
 - [ ] **VIỆC KẾ TIẾP:** Duyên gửi `Check_DT_t10.xlsx` để chạy lại đủ `extract_orders_pos.py` → `add_base_date.py` → `calc_bonus.js` → `build_delivery_xlsx.py` (xác nhận dòng "gia niem yet tour cao cap khoi phuc" in ra 1301T10); web CRM chưa có quy tắc niêm yết T21/T31 (muốn khớp phải sửa js/12 + gas_v13.js rồi deploy GAS).
 - **ĐANG LÀM:** không có việc dở. Không sửa gas_v13.js/extension → không cần deploy/reload.
->>>>>>> origin/main
 
 ## 2026-11-04 (phiên 26) — THƯỞNG T10: Duyên chốt 22 tài khoản đội Sale, 3 bạn THỬ VIỆC = ngocNB2003saleoff, haPTN, thanhNP — XONG, đã push
 - **Duyên chốt (18:21):** đội Sale gồm 19 chính thức (huyenmaii1990, minhquach1995, dungnguyen1995, thuyha88, biichnguyen1993, nonghong88, giangnguyen1990, mainguyen97, tuoipham1993, thuydinh95, ninhnga99, phuongthao2000, anhtrinh1995, thuNH1986, dungNTK1987, anhNP1999, trangNH2005, yenNTH2004, ninhLTK1984) + 3 thử việc (ngocNB2003saleoff, haPTN, thanhNP).
