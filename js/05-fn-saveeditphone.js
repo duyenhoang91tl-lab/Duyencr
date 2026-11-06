@@ -1179,6 +1179,13 @@ function closeAdvModal() {
     if (typeof renderAssignCreate === 'function') renderAssignCreate();
   }
 }
+// Nhip thu lai sau loi (2026-11-04): truoc day loi/timeout van thu lai sau dung 5s -> moi lan huy o 60s may lai xin FULL CareData moi trong khi Apps Script
+// van dang chay lan cu => N tab x FULL chong nhau, ca server cham (users/chatPoll 3-6s). Nay tu lan loi thu 2 tro di lui dan 10s,20s,40s,toi da 60s; thanh cong (fail=0) ve 5s.
+function _autoSyncDelayMs_(failCount) {
+  var f = Number(failCount) || 0;
+  if (f < 2) return AUTO_SYNC_MS;
+  return Math.min(AUTO_SYNC_MS * Math.pow(2, f - 1), 60000);
+}
 async function autoSyncLoop() {
   if (!gsUrl || _autoSyncRunning) return;
   if (document.hidden) {
@@ -1209,7 +1216,7 @@ async function autoSyncLoop() {
     if (_autoSyncFailCount >= 3) showSyncErrorBanner('Lỗi xử lý dữ liệu sau khi tải: ' + (e?.message || e) + ' (xem chi tiết ở Console - F12)');
   }
   _autoSyncRunning = false;
-  _autoSyncTimer = setTimeout(autoSyncLoop, AUTO_SYNC_MS);
+  _autoSyncTimer = setTimeout(autoSyncLoop, _autoSyncDelayMs_(_autoSyncFailCount));
 }
 
 // Bảng Danh sách KH trên điện thoại (css/15-mobile.css): cột TÊN KHÁCH được ghim khi vuốt ngang. Nền đặc CHỈ cần khi đã vuốt (lúc chưa vuốt, ô tên trong suốt để cùng màu nền với cả hàng) → đánh dấu class x-scrolled.

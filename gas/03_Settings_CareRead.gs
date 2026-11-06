@@ -96,6 +96,29 @@ function _posFullMonthOfRange_(from, to) {
 // NGUYEN NHAN GOC truoc day: so tru chi hien o khung rieng cuoi trang, con bang Theo Sale / the Tong gia tri van la so goc nen KHONG khop bao cao da chot.
 // CHI ap o lop tra ve cua action salesReportB — buildSalesReportB_ van tra so GOC, vi anh chup luc chot (_posRevenueBySale_) phai la so goc (khong tru long nhau).
 // Chi ap khi bo loc la ngay (+ danh sach sale); bo loc Nguon/MKT/San pham/Trang thai... thi khong ap vi so tru la so cua toan thang, khong loc theo cac chieu do.
+// BAO CAO DON HOAN/HUY THANG TRUOC (Duyen chot 2026-11-05: "bao cao don hoan huy thang truoc, KHONG tru doanh thu; chi co khi da chot thang"). Chi LIET KE don thang `ym`
+// hien dang co trang thai hoan/huy (cot O, cung quy tac _donHasExcludedStatus_ cua bao cao B). Loc sale nhu bao cao B: ten chuan <-> ten Pancake qua _expandSaleFilterWithPancakeAliases_,
+// khop theo cac ten tren cot "The" cua don (nen Sale chi thay don co ten minh tren the). Tra toi da 3000 don (truncated=true neu con nua); soDon/tongGiaTri tinh tren TAT CA.
+function _posRefundOrders_(ym, saleFilter) {
+  var from = _ymFirstDay_(ym), to = _ymLastDay_(ym), arr = Array.isArray(saleFilter) ? saleFilter.filter(Boolean) : (saleFilter ? [String(saleFilter)] : []);
+  var want = _saleWantedFn_(_expandSaleFilterWithPancakeAliases_(arr).map(_normTxt_));
+  var out = [], tot = 0, cnt = 0;
+  readDonChiTiet_().forEach(function(row) {
+    if (!_donHasExcludedStatus_(row.trangThai)) return;
+    var mDt = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(row.ngayTaoDon || '').trim());   // Pos: 'dd/MM/yyyy[ gio]' -> 'yyyy-MM-dd' (so sanh chuoi, khong phu thuoc mui gio)
+    var ymd = mDt ? mDt[3] + '-' + ('0' + mDt[2]).slice(-2) + '-' + ('0' + mDt[1]).slice(-2) : _dateStrToVnYmd_(row.ngayTaoDon);
+    if (!ymd || ymd < from || ymd > to) return;
+    var names = _donSaleNamesFromThe_(row.theSale);
+    if (arr.length && !names.some(function(n) { return want(n); })) return;
+    var v = Number(row.giaTriSauGiam) || 0;
+    cnt++; tot += v;
+    if (out.length < 3000) out.push({ _t: ymd, ngay: row.ngayTaoDon, posRow: row.posRow || '', nguonDon: row.nguonDon || '', theSale: row.theSale || '', sales: names, giaTri: v,
+      trangThai: row.trangThai || '', khachHang: row.khachHang || '', soDienThoai: row.soDienThoai || '', sanPham: String(row.sanPham || '').substring(0, 160), ghiChu: String(row.ghiChu || '').substring(0, 120) });
+  });
+  out.sort(function(x, y) { return x._t < y._t ? -1 : x._t > y._t ? 1 : (x.posRow < y.posRow ? -1 : 1); });
+  out.forEach(function(o) { delete o._t; });
+  return { month: ym, soDon: cnt, tongGiaTri: Math.round(tot * 100) / 100, orders: out, truncated: cnt > out.length };
+}
 function applyPosMonthAdjustToReportB_(res, filters) {
   filters = filters || {};
   var month = _posFullMonthOfRange_(filters.dateFrom, filters.dateTo);
@@ -123,7 +146,8 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   res.totalGiaTriGoc = res.totalGiaTri;   // = tong chuan (giu ten cu cho cac cho dang doc)
   res.totalGiaTriSauTru = res.totalGiaTri - totalDed;
   info.applied = true; info.closedAt = snap.closedAt; info.totalDeduction = totalDed; info.totalGiaTri = res.totalGiaTri; info.totalSauTru = res.totalGiaTriSauTru; info.rows = adjRows;
-  info.note = 'Doanh thu chuẩn tháng ' + month + ' ở trên KHÔNG bị trừ. Bảng bên dưới là phần hoàn/hủy của tháng ' + prev + ' (mốc chốt ' + snap.closedAt + ') trừ riêng theo từng Sale. Bảng Theo Team/Nguồn/MKT không có phần trừ.';
+  info.refund = _posRefundOrders_(prev, filters.sale);   // danh sach DON hoan/huy thang truoc (chi liet ke, khong tru doanh thu)
+  info.note = 'Doanh thu chuẩn tháng ' + month + ' ở trên KHÔNG bị trừ. Bên dưới là báo cáo đơn hoàn/hủy của tháng ' + prev + ' (đã chốt ' + snap.closedAt + ') để đối chiếu. Bảng Theo Team/Nguồn/MKT không có phần này.';
   return res;
 }
 function closePosMonth_(month, force) {
@@ -1270,6 +1294,8 @@ function _scopeGate_(action, token, phone, via) {
 function _reportCacheKey_(prefix, filters) {
   // Cong tac "don 1 ma chia theo Base" (Settings POS_GHEP_MIN_CODES=1) doi so lieu bao cao => dua vao khoa cache de bat/tat co hieu luc NGAY (khong doi het cache cu).
   try { if (_posGhepMinCodes_() === 1) prefix = prefix + 'g1_'; } catch (eG) {}
+  // Bang chia bo sung (acctSplitExtra) doi so lieu B => dua dau van tay vao khoa cache de co hieu luc NGAY khi admin sua.
+  try { var _exRaw = _acctExtraRaw_(); if (_exRaw) { var _h = 5381; for (var _hi = 0; _hi < _exRaw.length; _hi++) _h = ((_h << 5) + _h + _exRaw.charCodeAt(_hi)) | 0; prefix = prefix + 'x' + (_h >>> 0).toString(36) + '_'; } } catch (eX) {}
   var js = JSON.stringify(filters);
   if ((prefix + js).length <= 200) return prefix + js;
   var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, js, Utilities.Charset.UTF_8);

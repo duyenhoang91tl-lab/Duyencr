@@ -16,6 +16,8 @@ vm.runInContext(`
   var __today = '2026-11', __last = false; _todayYm_ = function() { return __today; }; _isLastDayOfMonthVn_ = function() { return __last; };
   _vnYmd_ = function() { return '2026-10-31'; };
   var __data = {};   // ym -> { sale: giaTri }  (so HIEN TAI cua tung thang)
+  var __ord = []; readDonChiTiet_ = function() { return __ord; };   // don Pos (bao cao hoan/huy thang truoc doc don that -> phai gia lap cho MOI ca)
+  _expandSaleFilterWithPancakeAliases_ = function(a) { return a; };
   buildSalesReportB_ = function(f) { var ym = f.dateFrom.slice(0, 7), d = __data[ym] || {}; var bs = Object.keys(d).map(function(n) { return { name: n, orders: 5, giaTri: d[n], cod: 0 }; });
     return { totalOrders: 5 * bs.length, totalGiaTri: bs.reduce(function(s, r) { return s + r.giaTri; }, 0), bySale: bs, trungBinhDon: 0 }; };
 `, ctx);
@@ -76,4 +78,24 @@ run('closePosMonth_("2026-11", false)');   // thang 11 chua ket thuc -> bi chan
 const snaps = JSON.parse(vm.runInContext('__settings.posMonthSnapshots', ctx));
 ok(snaps['2026-10'] && snaps['2026-10'].bySale.a === 100 && !snaps['2026-11'], 'snapshot thang 10 = so goc 100; thang 11 chua ket thuc nen khong chot');
 console.log(fails ? '\n' + fails + ' LOI' : '\nTAT CA QUA');
+// ── 6. BAO CAO DON HOAN/HUY THANG TRUOC (2026-11-05): chi liet ke don, khong tru; chi co khi da chot; sale chi thay don cua minh ──
+const od = (posRow, ngay, the, gt, tt) => ({ posRow, ngayTaoDon: ngay, theSale: the, giaTriSauGiam: gt, trangThai: tt, nguonDon: 'Facebook', khachHang: 'K' + posRow, soDienThoai: '09' + posRow, sanPham: 'SP', ghiChu: '' });
+ctx.__ord = [od(2, '05/10/2026', 'anhtrinh1995', 150000, 'Đã hoàn'), od(3, '20/10/2026', 'yenNTH2004, anhtrinh1995', 400000, 'Đang hoàn'), od(4, '12/10/2026', 'yenNTH2004', 300000, 'Thành công'),
+  od(5, '28/10/2026', 'menbui2002', 90000, 'Đã hoàn'), od(6, '03/11/2026', 'menbui2002', 70000, 'Đã hoàn'), od(7, '30/09/2026', 'yenNTH2004', 50000, 'Đã hoàn')];
+let q = run('applyPosMonthAdjustToReportB_(buildSalesReportB_(' + JSON.stringify(F11) + '), ' + JSON.stringify(F11) + ')');
+const rf = q.posAdjust.refund;
+ok(rf && rf.month === '2026-10' && rf.soDon === 3 && rf.tongGiaTri === 640000, 'da chot thang 10: bao cao hoan/huy thang 10 = 3 don (Da hoan + Dang hoan, KHONG lan thang 9/11 va don Thanh cong) tong 640.000');
+ok(rf.orders.map(o => o.posRow).join() === '2,3,5' && rf.orders[0].ngay === '05/10/2026' && rf.orders[0].trangThai === 'Đã hoàn' && rf.orders[1].sales.join() === 'yenNTH2004,anhtrinh1995', 'danh sach sap theo ngay, kem trang thai + cac ten sale tren the');
+ok(q.totalGiaTri === q.totalGiaTriGoc && q.totalGiaTri === q.bySale.reduce((a, x) => a + x.giaTri, 0) && q.bySale.every(x => x.giaTri === x.giaTriGoc), 'doanh thu chuan KHONG doi (tong = tong cac dong = so goc) khi co bao cao hoan/huy');
+const fS = JSON.stringify(Object.assign({ sale: ['yenNTH2004'] }, F11));
+q = run('applyPosMonthAdjustToReportB_(buildSalesReportB_(' + fS + '), ' + fS + ')');
+ok(q.posAdjust.refund && q.posAdjust.refund.orders.map(o => o.posRow).join() === '3' && q.posAdjust.refund.soDon === 1 && q.posAdjust.refund.tongGiaTri === 400000, 'Sale chi xem DON CUA MINH (yenNTH2004: 1 don 400.000, khong thay don cua nguoi khac)');
+q = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-12-01",dateTo:"2026-12-31"}), {dateFrom:"2026-12-01",dateTo:"2026-12-31"})');
+ok(q.posAdjust && q.posAdjust.applied === false && q.posAdjust.refund === undefined, 'thang 12: thang 11 CHUA chot -> KHONG co bao cao hoan/huy');
+q = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-15"}), {dateFrom:"2026-11-01",dateTo:"2026-11-15"})');
+ok(q.posAdjust === undefined || !q.posAdjust.refund, 'xem khoang ngay khong tron thang -> khong co bao cao hoan/huy');
+ctx.__ord = Array.from({ length: 3100 }, (_, i) => od(1000 + i, '10/10/2026', 'anhtrinh1995', 10, 'Đã hoàn'));
+q = run('applyPosMonthAdjustToReportB_(buildSalesReportB_(' + JSON.stringify(F11) + '), ' + JSON.stringify(F11) + ')');
+ok(q.posAdjust.refund.orders.length === 3000 && q.posAdjust.refund.soDon === 3100 && q.posAdjust.refund.truncated === true && q.posAdjust.refund.tongGiaTri === 31000, 'qua 3000 don: cat danh sach, van tinh dung so don + tong tren TAT CA, truncated = true');
+
 process.exit(fails ? 1 : 0);

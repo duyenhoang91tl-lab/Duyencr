@@ -69,19 +69,25 @@ ok(X.missing === false, 'khong thieu bsx/bcx -> khong canh bao');
 // nhan "cach tinh"
 const L = cctx._srExportBLabel_;
 ok(L({}) === 'Chia đều theo cột Thẻ' && L({ dieuChinh: 'acct' }) === 'Chia theo file kế toán' && L({ dieuChinh: 'base' }) === 'Ghép đơn Base' && L({ saleRatio: 0.3 }) === 'Quầy 30/70 (sale hưởng 30%)' && L({ dieuChinh: 'base', tachSoDon: 2 }) === 'Ghép đơn Base + Gộp đơn tách 2 phần', 'nhan "Cach tinh" cho tung truong hop');
-// ===== Chot thang Pos (2026-11-02): GAS da tru hoan/huy thang truoc vao bang Theo Sale -> Excel van phai KHOP ===== 
+// ===== Chot thang Pos (NGU NGHIA MOI 2026-11-05): GAS GIU doanh thu chuan, chi tra them truHoanHuy/giaTriSauTru + posAdjust.rows -> Excel giu chuan, THEM cot tru + sau tru =====
 ctx.__settings_snap = JSON.stringify({ '2026-09': { closedAt: '2026-09-30', total: 1300000, bySale: { anhtrinh1995: 1000000, yenNTH2004: 300000 } } });
 vm.runInContext('getSetting_ = function(k) { return k === "posMonthSnapshots" ? __settings_snap : null; }; _posRevenueBySale_ = function() { return { bySale: { anhtrinh1995: 850000, yenNTH2004: 300000 }, total: 1150000 }; };', ctx);
 const Badj = J(vm.runInContext('applyPosMonthAdjustToReportB_(buildSalesReportB_({ dateFrom: "2026-10-01", dateTo: "2026-10-31" }), { dateFrom: "2026-10-01", dateTo: "2026-10-31" })', ctx));
-ok(Badj.posAdjust && Badj.posAdjust.applied && Badj.posAdjust.totalDeduction === 150000 && Math.abs(Badj.totalGiaTri - (Badj.totalGiaTriGoc - 150000)) < 0.01, 'GAS: thang 10 da tru 150.000 hoan/huy thang 9 (tong sau tru = goc − 150.000)');
+ok(Badj.posAdjust && Badj.posAdjust.applied && Badj.posAdjust.totalDeduction === 150000 && Math.abs(Badj.totalGiaTri - B.totalGiaTri) < 0.01 && Math.abs(Badj.totalGiaTriSauTru - (B.totalGiaTri - 150000)) < 0.01, 'GAS: thang 10 giu doanh thu CHUAN (tong khong doi), tong sau tru = chuan − 150.000 (tra rieng)');
 const Xa = cctx._srBuildExportB_(Badj, { dateFrom: '2026-10-01', dateTo: '2026-10-31', at: 'luc test' });
-ok(Xa.bySaleRows[0].length === 6 && Xa.bySaleRows[0].slice(0, 4).join('|') === 'Sale|Số đơn|Giá trị sau giảm giá|COD' && /Trừ hoàn\/hủy tháng 2026-09/.test(Xa.bySaleRows[0][5]), 'Theo Sale: 4 cot dau giu nguyen + them cot Gia tri goc, Tru hoan/huy');
+ok(Xa.bySaleRows[0].length === 6 && Xa.bySaleRows[0].slice(0, 4).join('|') === 'Sale|Số đơn|Giá trị sau giảm giá|COD' && /Trừ hoàn\/hủy tháng 2026-09/.test(Xa.bySaleRows[0][4]) && Xa.bySaleRows[0][5] === 'Sau trừ hoàn/hủy', 'Theo Sale: 4 cot dau giu nguyen (doanh thu chuan) + them cot Tru hoan/huy, Sau tru');
 const rowA = Xa.bySaleRows.find(r => r[0] === 'anhtrinh1995');
-ok(Math.abs(rowA[2] - Badj.bySale.find(r => r.name === 'anhtrinh1995').giaTri) < 0.01 && Math.abs(rowA[4] - rowA[2] - 150000) < 0.02 && rowA[5] === 150000, 'Theo Sale: anhtrinh1995 = gia tri sau tru; goc − sau tru = 150.000');
-ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: tổng báo cáo') === 0) && !Xa.checkRows.some(r => String(r[0]).indexOf('⚠ LỆCH') === 0), 'Doi chieu tong: so voi chi tiet (TRUOC tru) van KHOP — khong bao lech gia');
-ok(Xa.checkRows[0][1] === 'Giá trị — bảng web (TRƯỚC trừ hoàn/hủy)' && Xa.checkRows.slice(1, 1 + Badj.bySale.length).every(r => Math.abs(r[3].v) < 0.05), 'Doi chieu tong: moi sale chenh ~0 (so truoc tru)');
-ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: chi tiết − trừ hoàn/hủy') === 0), 'Doi chieu tong: dong noi chi tiet − tru hoan/huy = so sau tru tren web — KHOP');
-ok(Xa.summary.some(r => /TRƯỚC trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && Math.abs(r[1] - Badj.totalGiaTriGoc) < 0.01) && Xa.summary.some(r => /Trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && r[1] === -150000), 'Tong quan ghi so truoc tru + so tru');
+ok(Math.abs(rowA[2] - B.bySale.find(r => r.name === 'anhtrinh1995').giaTri) < 0.01 && rowA[4] === 150000 && Math.abs(rowA[5] - (rowA[2] - 150000)) < 0.02, 'Theo Sale: anhtrinh1995 giu doanh thu CHUAN; tru 150.000; sau tru = chuan − 150.000');
+const rowTot = Xa.bySaleRows.find(r => String(r[0]).indexOf('TỔNG') === 0);
+ok(Math.abs(rowTot[4] - 150000) < 0.02 && Math.abs(rowTot[5] - (rowTot[2] - 150000)) < 0.02, 'dong TONG Theo Sale: tru 150.000, sau tru = tong chuan − 150.000');
+ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: tổng báo cáo') === 0) && !Xa.checkRows.some(r => String(r[0]).indexOf('⚠ LỆCH') === 0), 'Doi chieu tong: so thang voi chi tiet (chuan) KHOP — khong bao lech gia');
+ok(Xa.checkRows[0][1] === 'Giá trị — bảng web' && Xa.checkRows.slice(1, 1 + Badj.bySale.length).every(r => Math.abs(r[3].v) < 0.05), 'Doi chieu tong: tieu de cot khong con "TRUOC tru"; moi sale chenh ~0');
+ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: chi tiết − trừ hoàn/hủy') === 0), 'Doi chieu tong: dong noi chi tiet − tru hoan/huy = so sau tru (khoi Chot thang) — KHOP');
+ok(!Xa.summary.some(r => /TRƯỚC trừ/.test(r[0])) && Xa.summary.some(r => /Trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && r[1] === -150000) && Xa.summary.some(r => /Sau trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && Math.abs(r[1] - Badj.totalGiaTriSauTru) < 0.01) && Xa.summary.some(r => r[0] === 'Tổng giá trị sau giảm giá (tính báo cáo)' && Math.abs(r[1] - B.totalGiaTri) < 0.01), 'Tong quan: tong gia tri = CHUAN; them dong tru hoan/huy + sau tru');
+// sale chi co hoan/huy thang truoc (tháng nay khong co don): liet ke rieng de cong du tong tru
+const Bonly = J(Badj); Bonly.posAdjust.rows = Bonly.posAdjust.rows.concat([{ name: 'chiCoHoan', orders: 0, giaTri: 0, truHoanHuy: 30000, giaTriSauTru: -30000 }]); Bonly.posAdjust.totalDeduction = 180000; Bonly.totalGiaTriSauTru = Badj.totalGiaTriSauTru - 30000;
+const XonlyRef = cctx._srBuildExportB_(Bonly, {});
+ok(XonlyRef.bySaleRows.some(r => r[0] === 'chiCoHoan' && r[4] === 30000 && r[5] === -30000), 'sale chi co hoan/huy thang truoc duoc liet ke rieng duoi dong Tong');
 const Xn = cctx._srBuildExportB_(B, {});   // khong posAdjust -> Excel y nhu cu (4 cot, khong dong noi)
 ok(Xn.bySaleRows[0].length === 4 && Xn.checkRows[0][1] === 'Giá trị — bảng web' && !Xn.checkRows.some(r => String(r[0]).indexOf('Nối với số trên web') === 0), 'khong co posAdjust: Excel nhu cu (4 cot, khong dong noi)');
 const Xb = cctx._srBuildExportB_(Object.assign({}, B, { bhPrepaid: { count: 27, total: 63405000 } }), {});
