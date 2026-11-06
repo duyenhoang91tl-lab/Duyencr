@@ -29,6 +29,20 @@ const after=ctx._srGFilterByBaseDate_(pos,FROM,TO).orders;
 const has=(list,id)=>list.some(o=>o.id===id&&Object.keys(ctx._bonusNamesOfOrder_(o)).indexOf('haPTN')>=0);
 ok(!has(before,'B')&&has(after,'B'),'CA TRONG ẢNH: đơn gốc haPTN lên Base 15/10, Pos nhập 20/10 — CÁCH CŨ bị sót (báo "không thấy đơn Pos nào mang tên Sale này"), CÁCH MỚI có trong khung tính thưởng');
 ok(has(before,'C')&&!has(after,'C'),'đơn Base 08/10 (trước ngày bắt đầu 10/10) mà Pos nhập 11/10: cách cũ lọt vào kỳ, cách mới đúng là loại');
+
+// ── Phần 2: GIAO DIỆN báo cáo G (js/12): lời giải thích, thẻ KPI, cảnh báo và dòng ghi chú cách lọc ──
+const sctx={String,Math,Object,Array,fmt:n=>(Math.round(Number(n)||0)).toLocaleString('vi-VN')};vm.createContext(sctx);
+vm.runInContext(fn(j12,'_srGBasisNoteHtml_'),sctx);
+const nb=sctx._srGBasisNoteHtml_({basis:'base',total:8,kept:5,dropBefore:1,dropAfter:2,extra:1},true);
+ok(nb.includes('ngày lên đơn trên Base')&&nb.includes('<b>5/8</b>')&&nb.includes('kéo thêm <b>1</b> đơn lên Base trong kỳ nhưng Pos nhập sau kỳ')&&nb.includes('loại <b>1</b> đơn lên Base TRƯỚC kỳ')&&nb.includes('loại <b>2</b> đơn lên Base SAU kỳ'),'UI·ghi chú: nêu giữ 5/8 đơn, kéo thêm 1 đơn Pos nhập muộn, loại 1 đơn trước kỳ + 2 sau kỳ');
+const nb2=sctx._srGBasisNoteHtml_({basis:'base',total:3,kept:3,dropBefore:0,dropAfter:0,extra:0},true);ok(nb2.includes('<b>3/3</b>')&&!nb2.includes('kéo thêm')&&!nb2.includes('loại'),'UI·ghi chú: không có đơn kéo/loại thì không liệt kê phần thừa');
+ok(sctx._srGBasisNoteHtml_({basis:'pos',total:4,kept:4},true).includes('ngày Pos</b> như cũ')&&sctx._srGBasisNoteHtml_({basis:'pos',total:0,kept:0},true)==='','UI·ghi chú: chưa ghép được đơn gốc Base → báo "tính theo ngày Pos như cũ"; không có đơn thì im lặng');
+ok(sctx._srGBasisNoteHtml_(null,true)===''&&sctx._srGBasisNoteHtml_({basis:'base',total:1,kept:1},false)==='','UI·ghi chú: không có thông tin / không chọn khoảng ngày → không hiện');
+ok(j12.includes('trên <b>đơn gốc</b>: tính theo <b>ngày lên đơn trên Base</b> và đơn đó phải <b>có trên Pos</b>')&&!j12.includes('trên đơn Pos trong khoảng ngày lọc'),'UI·lời giải thích đầu báo cáo G: nêu đúng bản chất (đơn gốc, ngày lên đơn Base, có đơn Pos) — hết câu cũ "trên đơn Pos trong khoảng ngày lọc"');
+ok(j12.includes('Đơn gốc (có đơn Pos) dùng để tính')&&!j12.includes('>Đơn Pos dùng để tính<'),'UI·thẻ KPI đổi nhãn thành "Đơn gốc (có đơn Pos) dùng để tính"');
+ok(j12.includes('không thấy đơn gốc nào (lên Base trong kỳ và đã có đơn Pos) mang tên Sale này')&&!j12.includes('không thấy đơn Pos nào mang tên Sale này'),'UI·cảnh báo Sale thử việc: nói đúng "không thấy ĐƠN GỐC nào (lên Base trong kỳ và đã có đơn Pos)" thay câu cũ gây hiểu nhầm');
+ok(j12.indexOf('Đơn gốc (có đơn Pos) dùng để tính')<j12.indexOf('html += _srGBasisNoteHtml_(d.baseBasis')&&j12.indexOf('html += _srGBasisNoteHtml_(d.baseBasis')<j12.indexOf("if (g.skipped.length) html +="),'UI·dòng ghi chú nằm ngay dưới hàng thẻ KPI, trước cảnh báo Sale ngoài đội');
+
 // — nối dây —
 ok(/dateTo: _srGPosTo_\(_srState\.gDateTo\)/.test(j11)&&/_srGFilterByBaseDate_\(dPosG\.orders, _srState\.gDateFrom, _srState\.gDateTo\)/.test(j11)&&/dPosG\.baseBasis = flG\.info/.test(j11),'js/11 nhánh G: tải Pos với dateTo kéo thêm, rồi lọc theo ngày Base và lưu baseBasis để hiện ghi chú');
 ok(j11.indexOf('_srGPosTo_(')<j11.indexOf('_srGFilterByBaseDate_(dPosG.orders')&&j11.indexOf('_srGFilterByBaseDate_(dPosG.orders')<j11.indexOf('_srState.dataG = dPosG'),'thứ tự: tải → lọc theo ngày Base → mới gán dataG (các báo cáo con G/K dùng chung dữ liệu đã lọc)');

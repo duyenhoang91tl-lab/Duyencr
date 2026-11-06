@@ -304,10 +304,11 @@ function _mergeTachDon_(rows) {
     var g = groups[k], parts = g.parts;
     if (parts.length === 1) { out[g.pos] = parts[0]; return; }
     var m = Object.assign({}, parts[0]);
+    var listT = 0, anyList = false;
     var total = 0, cod = 0, ttt = 0, vals = [], sales = [], seenSale = {}, sp = [], ma = [], sl = [], notes = [], seenNote = {};
     var best = null, bestT = null;
     parts.forEach(function(p) {
-      total += Number(p.giaTriSauGiam) || 0; cod += Number(p.cod) || 0; ttt += Number(p.tienTraTruoc) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
+      total += Number(p.giaTriSauGiam) || 0; listT += Number(p.giaNiemYet) || Number(p.giaTriSauGiam) || 0; anyList = anyList || (Number(p.giaNiemYet) > 0); cod += Number(p.cod) || 0; ttt += Number(p.tienTraTruoc) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
       String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !_isNumericTag_(x) && !seenSale[f]) { seenSale[f] = true; sales.push(x); } }); // loai STT Pancake
       if (p.sanPham) sp.push(String(p.sanPham)); if (p.maSanPham) ma.push(String(p.maSanPham)); if (p.soLuong) sl.push(String(p.soLuong));
       var nt = String(p.ghiChu || '').trim(); if (nt && !seenNote[nt]) { seenNote[nt] = true; notes.push(nt); }
@@ -317,6 +318,7 @@ function _mergeTachDon_(rows) {
       if (!isNaN(t) && (bestT === null || t < bestT)) { bestT = t; best = p.ngayTaoDon; }
     });
     m.giaTriSauGiam = total; m.cod = cod; m.tienTraTruoc = ttt; m.theSale = sales.join(', ');
+    m.giaNiemYet = anyList ? listT : 0;   // gia niem yet cua don tach = tong cac phan (phan thieu cot T lay gia sau giam)
     m.sanPham = sp.join(', '); m.maSanPham = ma.join(';'); m.soLuong = sl.join(', ');
     m.ghiChu = notes.join(' | ');
     if (best !== null) m.ngayTaoDon = best;
@@ -947,6 +949,7 @@ function buildSalesReportB_(filters) {
         posRow: m.posRow || undefined,   // dong that trong sheet "dữ liệu đơn" (de doi chieu tung don voi file Pancake goc — xem sheet chi tiet cua nut Xuat Excel doi chieu Bao cao B)
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer,
+        giaTriTruocGiam: (Number(m.giaNiemYet) > 0) ? Number(m.giaNiemYet) : undefined,   // gia niem yet truoc giam (cot T "Đơn giá" x so luong) — thuong "Tourmaline cao cap" xet moc theo gia nay
         // Ghi chu don Pos (cot Q) — CHUA ma don Pos de ke toan doi chieu (xuat Excel Bao cao G dung field nay). Cat 300 ky tu de payload khong phinh.
         ghiChu: String(m.ghiChu || '').substring(0, 300),
         // Don GHEP voi Base: giaTriSauGiam o tren = tong doanh thu cac don goc Base (da thay gia tri Pos); giaTriPos = gia tri Pos

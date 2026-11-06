@@ -10,7 +10,13 @@ const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i <
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
 const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.loaiThuong).filter(   // loaiThuong (add_base_date.py): don Base That bai / khong co tren Base -> khong thuong, check tay (Duyen 2026-11-04)
   o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
-const rawOrders = rawOrders0;
+// THANG THEO MA DON (Duyen 2026-11-04): don 563T10 -> thang 10, 563T9 -> thang 9, 563T11 -> thang 11; don nao quy uoc thang nao thi tinh thang do.
+// NGUYEN NHAN GOC: chi loc theo ngay -> don co ma thang truoc (VD "14K NG5T09 + 248T09/2026" len Base 05/10) bi tinh thuong thang 10. Dung MA DAU TIEN trong ghi chu (dong "T10 + BH..T09" van la don T10).
+// Dung: node calc_bonus.js <work> [thang=10]. Khong nhan ra ma thang -> giu (khong doan).
+const MONTH = parseInt(process.argv[3] || '10', 10);
+const codeMonth = o => { const m = /(?:^|[^0-9A-Z])(?:[A-Z]*\d*)T(\d{1,2})\b/.exec(String(o.ghiChu || '').toUpperCase().replace(/\s+/g, ' ')); return m ? parseInt(m[1], 10) : 0; };
+const rawOrders = rawOrders0.filter(o => { const cm = codeMonth(o); return !cm || cm === MONTH; });
+console.log('thang ' + MONTH + ': loai ' + (rawOrders0.length - rawOrders.length) + ' don co ma thang khac');
 // GOP DON POS TACH (Duyen 2026-11-04): don Base "254T10/2026" len Pos tach 2 don, ghi chu "254T10/2026/1 TACH..", "254T10/2026/2 TACH.." -> la MOT don,
 // doanh thu = tong cac phan (9.000.000 + 8.500.000 = 17.500.000 -> moc 15tr). NGUYEN NHAN GOC truoc day: script nay doc tung dong Pos nhu 1 don rieng nen moi phan <10tr -> thuong 0.
 // Dung DUNG ham/regex cua CRM (gas_v13.js _tachDonParse_ / TACH_DON_RE_SRC_ / _mergeTachDon_): dong Huy/Hoan khong tham gia gop; trung ca dong (cung /so, SDT-gia-sp) chi giu 1.
@@ -124,7 +130,9 @@ PROGRAMS.push(
   PM({ name: 'TV — Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21', probationDay: { enabled: true, from: 1, to: '' }, requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31.5e6, max: '' }, bonusAmount: 200000 }));
 // Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
 // Duyen chot 2026-11-04: 3 sale thu viec = ngocNB2003saleoff (bat dau 14/10), haPTN + thanhNP (bat dau 10/10 - theo Duyen bao o phien truoc). Con lai (19 tai khoan doi Sale) la chinh thuc.
-const PROBATION = { 'ngocNB2003saleoff': '2026-10-14', 'haPTN': '2026-10-10', 'thanhNP': '2026-10-10' };
+// haPTN, thanhNP da OFF (Duyen 2026-11-04): giu cho T10, BO QUA tu thang 11 tro di.
+const OFF_FROM = { haPTN: 11, thanhNP: 11 };
+const PROBATION = {}; Object.entries({ 'ngocNB2003saleoff': '2026-10-14', 'haPTN': '2026-10-10', 'thanhNP': '2026-10-10' }).forEach(([k, v]) => { if (!(OFF_FROM[k] && MONTH >= OFF_FROM[k])) PROBATION[k] = v; });
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
 const SC = {}; Object.keys(chRaw).forEach(k => { SC[k] = chRaw[k]; });
 const SCP = {}; Object.keys(PROBATION).forEach(k => { SC[k] = 'probation'; chRaw[k] = 'probation'; SCP[k] = [{ from: PROBATION[k], channel: 'probation', bonusFrom: PROBATION[k] }]; });
@@ -132,7 +140,7 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: SCP, 
 vm.createContext(ctx);
 vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\nvar _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') +
   ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') +
-  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
+  ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_bonusParticipants_', '_bonusCodeTokens_', '_bonusMergeGhep_', '_bonusIsTourCaoCap_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 ctx.O = orders;
 const res = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
 // Pass "Tourmaline cao cap" (CT "Don tu 21tr500" / "31tr500"): KT xet moc theo GIA NIEM YET truoc giam (don 1301T10: nhan tour 31.500.000, giam 5% con 29.925.000 van duoc T31 200.000 — bang thuong chinh thuc STT 105).

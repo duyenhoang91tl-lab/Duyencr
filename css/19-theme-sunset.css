@@ -202,3 +202,38 @@ html.ui-pro #data-view .tabs .tab[data-sn-g]{
 html.ui-pro #data-view .tabs .tab.active,
 html.ui-pro #data-view .tabs #reportsgroup-list .tab.active,
 html.ui-pro #data-view .tabs .tab[data-sn-g].active{border-left-width:3px!important;}
+
+/* ── 11. ĐIỆN THOẠI: THANH LỌC BÁO CÁO GỌN, KHÔNG CẮT Ô (Duyên báo 2026-11-05: ô "Phòng kinh doanh" bị cắt còn "kinh doa", Tác vụ/Mẫu rơi lẻ 3 hàng) ──
+   NGUYÊN NHÂN GỐC: css/17-reports-pro.css (≤640px) đặt `#salesreport-wrap .srb-bar > *{flex:1 1 140px}` (specificity có #id) → ĐÈ `.fp-ctl{flex:1 1 100%}` của css/10-filter-presets.css,
+   nên cụm mẫu .fp-ctl chỉ còn ~167px, nằm CẠNH nút 🧰 Tác vụ; trong cụm đó nút mẫu `.fp-one` (flex:1 1 0 + overflow:hidden) bị 2 nút kia (✕ Tắt lọc nhanh, ⚙ Mẫu) giành chỗ → còn 46px → cắt chữ.
+   Sửa: đổi thanh sang LƯỚI 12 CỘT (flex-wrap tự dồn ô nên hàng nào cũng lệch) với 4 hàng cố định — [Chọn báo cáo 7 | Khoảng nhanh 5] · [Từ 5 → 2 · Đến 5] · [🔎 Bộ lọc 4 | Lọc 4 | 🧰 Tác vụ 4] ·
+   [⚡ mẫu | ✕ Tắt lọc nhanh | ⚙ Mẫu] (cụm mẫu độc chiếm hàng cuối; tên mẫu dài cắt bằng "…"). Ô thấp 34px, lề/khoảng cách nhỏ, ẩn "23 sale" ở nút mẫu (đã có trong tooltip).
+   Ô lạ do báo cáo khác thêm (c.extra) mặc định chiếm nửa hàng. Chỉ áp ≤640px; máy tính giữ nguyên. Gỡ = xoá mục 11. */
+@media (max-width:640px){
+  #salesreport-wrap{--rp-ctl-h:34px;}
+  #salesreport-wrap .srb-bar{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;padding:8px;margin-bottom:10px;align-items:center;}
+  #salesreport-wrap .srb-bar > *{grid-column:span 6;min-width:0;width:auto;}
+  #salesreport-wrap .srb-bar select,#salesreport-wrap .srb-bar input[type=date]{width:100%;min-width:0;max-width:none;}
+  /* hàng 1 */
+  #salesreport-wrap .srb-bar > select[onchange^="_srSetSub"]{grid-column:span 7;min-width:0;}
+  #salesreport-wrap .srb-bar > select:not([onchange^="_srSetSub"]){grid-column:span 5;}
+  /* hàng 2 */
+  #salesreport-wrap .srb-bar > input[type=date]{grid-column:span 5;font-size:13px !important;padding:0 6px !important;}
+  #salesreport-wrap .srb-bar > .srb-bar-arrow{grid-column:span 2;text-align:center;padding:0;}
+  /* hàng 3 */
+  #salesreport-wrap .srb-bar #srb-menu-btn,   /* nằm trong .srb-menu{display:contents} nên KHÔNG dùng ">" */
+  #salesreport-wrap .srb-bar > button[onclick="_srApply()"],
+  #salesreport-wrap .srb-bar > .gear-menu{grid-column:span 4;}
+  #salesreport-wrap .srb-bar #srb-menu-btn,#salesreport-wrap .srb-bar > button[onclick="_srApply()"]{width:100%;min-width:0;}
+  #salesreport-wrap .srb-bar > .gear-menu > .btn{width:100%;}
+  #salesreport-wrap .srb-bar .btn.sm{height:var(--rp-ctl-h);min-height:0;padding:0 8px;font-size:12.5px;}
+  #salesreport-wrap .srb-bar .srb-m-x,#salesreport-wrap .srb-bar > .srb-bar-lock{grid-column:1 / -1;font-size:12px;}
+  /* hàng 4: cụm mẫu lọc nhanh trọn hàng */
+  #salesreport-wrap .srb-bar > .fp-ctl{grid-column:1 / -1;display:flex;flex-wrap:nowrap;gap:6px;width:100%;}
+  #salesreport-wrap .srb-bar .fp-ctl .btn.sm{min-height:0;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-one{flex:1 1 0;min-width:0;max-width:none;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-sel{flex:1 1 0;min-width:0;height:var(--rp-ctl-h);}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-off,
+  #salesreport-wrap .srb-bar .fp-ctl > .gear-menu{flex:0 0 auto;}
+  #salesreport-wrap .srb-bar .fp-ctl .fp-n,#salesreport-wrap .srb-bar .fp-ctl .fp-off-x{display:none;}   /* nút ✕ chỉ còn "✕ Tắt" cho gọn (js/48 bọc " lọc nhanh" trong .fp-off-x) */
+}
