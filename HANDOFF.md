@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 30) — THƯỞNG TỲ HƯU ĐÃ SỬA (Duyên chốt 4 điểm) — XONG, đã push; T10 = 4.296.671
+- **Duyên chốt:** (1) "TOUR"=Tourmaline, "AQUA"=Aquamarine trên Pos; thưởng theo SẢN PHẨM = **cộng trực tiếp**, bán bao nhiêu thưởng bấy nhiêu, không giới hạn, loại Ngọc Lam/Bích/Cẩm Thạch B, Ruby, Saphire; (2) sửa đếm đôi Moon; (3) kiểm lại 6 đơn Tỳ hưu của Hải Yến; (4) thử việc: nhóm số đơn/ngày và nhóm doanh thu là 2 CT riêng, mỗi nhóm lấy mức CAO nhất; chính thức: bill combo vs bill vòng mix charm lấy cái cao nhất, doanh số ngày CT riêng lấy mốc cao nhất; thưởng sản phẩm cộng riêng.
+- **NGUYÊN NHÂN GỐC đã sửa:** (a) keyword không khớp tên Pos → thêm cú pháp `a+b` (cả hai cùng 1 dòng SP) và đổi keyword Tour/Aqua; (b) `_bonusProductQty_` đếm theo SỐ LẦN TỪ KHOÁ xuất hiện nên "tỳ hưu thiên lộc moon" + "thiên lộc moon" đếm 2 → nay đếm THEO DÒNG SP (1 dòng 1 lần), SL lấy từ cột Số lượng Pos khi khớp số dòng, loại dòng Tỳ hưu chất liệu Ngọc; (c) thưởng sản phẩm trước đây tranh "best" với combo/vòng (mất thưởng) → nay đẩy vào `extra` (cộng riêng).
+- [x] `js/12` `_bonusProductQty_(sanPham, kw, soLuong)` + caller; `js/13` seed Tour/Aqua; `tools/bonus-t10/calc_bonus.js` keyword; `index.html` js/12,13 `?v=20261104e`; test mới `tools/test-bonus-product-qty.js` (6 ca PASS) + các test thưởng cũ PASS.
+- **Kết quả T10:** 3.986.673 → **4.296.671** (+309.998). Hải Yến +44.000: 6 đơn Duyên nêu (1249, 1185, 612, 442, 356, 351T10) đều đúng — Pos+Base cùng sale, Base không Hủy/Thất bại; engine tìm thêm **1264T10** (charm Tỳ hưu TOUR, chia 2 sale với biichnguyen1993, +4.000). 3 đơn Lam Thủy/Ngọc Bích (1233, 954, 162T10) đúng quy định bị loại. Kiểm quy tắc (4): không có sale nào trùng 2 mức trong cùng nhóm cùng ngày, mỗi đơn 1 bill.
+- ⚠ **WEB CRM:** thưởng Tỳ hưu đang BẬT trong Cấu hình lưu keyword CŨ ("Tourmaline Hồng, Tourmaline Xanh" / "Aquamarine") — seed chỉ áp khi tạo mẫu mới → phải SỬA TAY keyword 2 CT này trong Cài đặt chương trình thưởng thành `Tourmaline Hồng, Tourmaline Xanh, Tỳ hưu thiên lộc+tour` và `Aquamarine, Tỳ hưu thiên lộc+aqua`, rồi Ctrl+F5. Không sửa gas_v13.js/extension → không deploy GAS, không reload extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên duyệt file `Thuong_T10_chuan_FINAL_v2.xlsx` (sheet Đối chiếu sale tự nhập còn 26 LỆCH MỨC + 7 ENGINE=0 do đếm SP/V15 — chưa đổi); menbui2002 (chưa phân loại) +7.333 do Tỳ hưu trên đơn có tên Mến, cùng cách tính như combo của Mến — Duyên xác nhận.
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-04 (phiên 29) — THƯỞNG T10: Hải Yến báo thiếu thưởng TỲ HƯU — ĐÃ KIỂM, CHƯA SỬA CODE (chờ Duyên chốt)
 - **Kết luận: ĐÚNG, thiếu chung cho nhiều sale.** Hải Yến (yenNTH2004) có 7 đơn Tỳ hưu Thiên Lộc (6 TOUR + 1 AQUA: 1264, 1249, 1185, 612, 442, 356, 351T10) → engine trả 0.
 - **NGUYÊN NHÂN GỐC 1:** `calc_bonus.js` PROGRAMS khớp CHUỖI CON "Tourmaline Hồng, Tourmaline Xanh" và "Aquamarine", nhưng tên SP trên Pos ghi "TOUR" và "AQUA" → 42 dòng TOUR + 4 dòng AQUA không bao giờ khớp; chỉ "MOON" khớp nên engine chỉ trả Moon.

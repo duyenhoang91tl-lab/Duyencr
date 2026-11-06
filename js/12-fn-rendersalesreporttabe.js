@@ -90,23 +90,29 @@ function _saleStartDate_(name){
 // — tìm dạng "x2"/"×2"/"(2)" ngay sau từ khoá, không thấy thì tính là 1. Đây là ƯỚC LƯỢNG, hiển thị
 // kèm nguyên văn ô sản phẩm để kế toán đối chiếu lại, KHÔNG nên dùng để tự động chi tiền hàng loạt
 // mà không kiểm tra khi số tiền lớn.
-function _bonusProductQty_(sanPham, keywordsStr){
-  var text = String(sanPham||'').toLowerCase();
-  var kws = String(keywordsStr||'').split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
-  if (!kws.length || !text) return {matched:false, qty:0};
+function _bonusProductQty_(sanPham, keywordsStr, soLuong){
+  // Duyên 2026-11-04: đếm THEO TỪNG DÒNG sản phẩm (1 dòng chỉ tính 1 lần dù khớp nhiều từ khoá → hết đếm đôi Moon),
+  // từ khoá dạng "a+b" = cả a và b cùng nằm trong 1 dòng (Pos ghi TOUR/AQUA chứ không ghi Tourmaline/Aquamarine),
+  // loại mẫu Tỳ Hưu chất liệu Ngọc (Ngọc Lam/Lam Thủy, Ngọc Bích, Cẩm Thạch, Ruby, Saphire), số lượng theo cột Số lượng của Pos khi khớp số dòng.
+  var nz = function(s){ return String(s==null?'':s).normalize('NFC').toLowerCase(); };
+  var text = String(sanPham==null?'':sanPham);
+  var kws = nz(keywordsStr).split(',').map(function(s){ return s.trim(); }).filter(Boolean).map(function(k){ return k.split('+').map(function(x){ return x.trim(); }).filter(Boolean); });
+  if (!kws.length || !text.trim()) return {matched:false, qty:0};
+  var SEP = /\s+,\s*|\n/.test(text) ? /\s+,\s*|\n/ : /\s*,\s*|\n/;
+  var lines = text.split(SEP).filter(function(x){ return x.trim(); });
+  var sl = String(soLuong==null?'':soLuong).split(SEP).map(function(x){ return x.trim(); }).filter(function(x){ return x!==''; });
+  var aligned = sl.length === lines.length;
   var totalQty = 0, matched = false;
-  kws.forEach(function(kw){
-    if (!kw) return;
-    var idx = 0;
-    while (true){
-      var pos = text.indexOf(kw, idx);
-      if (pos === -1) break;
-      matched = true;
-      var tail = text.substr(pos+kw.length, 10);
-      var m = tail.match(/^[\s]*[x×][\s]*([0-9]+)/) || tail.match(/^[\s]*\(([0-9]+)\)/);
-      totalQty += m ? (parseInt(m[1],10)||1) : 1;
-      idx = pos + kw.length;
-    }
+  lines.forEach(function(line, i){
+    var ln = nz(line);
+    if (/tỳ hưu/.test(ln) && /ngọc|cẩm thạch|lam thủy|ruby|saph/.test(ln)) return;
+    var hit = kws.some(function(parts){ return parts.length && parts.every(function(pt){ return ln.indexOf(pt) !== -1; }); });
+    if (!hit) return;
+    matched = true;
+    var q = 1;
+    if (aligned){ q = parseInt(sl[i].replace(/\D/g,''),10) || 1; }
+    else { var m = ln.match(/[x×]\s*([0-9]+)/) || ln.match(/\(([0-9]+)\)\s*$/); if (m) q = parseInt(m[1],10) || 1; }
+    totalQty += q;
   });
   return {matched:matched, qty:totalQty};
 }
@@ -291,10 +297,10 @@ function _computeBonusData_(orders){
           if (tot>0) extra.push({amount:tot, program:p, detail:'Sản phẩm: '+esc(parts.join('; '))});
         }
         if (p.product && p.product.trim()){
-          var pq = _bonusProductQty_(o.sanPham, p.product);
-          if (pq.matched && pq.qty>0){
+          var pq = _bonusProductQty_(o.sanPham, p.product, o.soLuong);
+          if (pq.matched && pq.qty>0){   // Duyên 2026-11-04: thưởng theo SẢN PHẨM = cộng trực tiếp, bán nhiều thưởng nhiều, KHÔNG tranh "best" với bill combo/vòng
             var amt = (Number(p.bonusAmount)||0) * pq.qty;
-            if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'SL ước tính: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'};
+            if (amt>0) extra.push({amount:amt, program:p, detail:'SL: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'});
           }
         }
         if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order'){
