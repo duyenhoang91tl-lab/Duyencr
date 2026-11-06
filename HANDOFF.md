@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-06 (phiên 40) — THƯỞNG T10: Duyên báo file `Thuong_T10_chuan_FINAL.xlsx` sai → xuất lại v10 từ engine đã sửa — XONG, đã push
+- File FINAL Duyên gửi = bản CŨ (3.986.673: Tỳ hưu TOUR/AQUA = 0, Moon đếm đôi 20k/nhẫn). Code Tỳ hưu (cộng dồn, đếm theo dòng SP + SL, loại chất liệu Ngọc) đã do phiên khác sửa; phiên này kiểm lại 4 ý Duyên: (1) TOUR=Tourmaline, AQUA=Aquamarine, thưởng SP cộng trực tiếp + loại Lam Thủy/Bích/Cẩm Thạch/Ruby/Saphire; (2) Moon hết đếm đôi; (3) Hải Yến 7 đơn Tỳ hưu (1249,1185,612,442,356,351 + 1264) = 44.000 đúng; (4) thử việc: số đơn/ngày vs doanh số ngày là 2 CT riêng, mỗi CT lấy bậc cao nhất; chính thức: combo SP vs bill vòng mix lấy cao nhất, thưởng ngày riêng — engine đã đúng.
+- [x] Thêm `tools/test-bonus-product-qty.js` (9 ca, PASS). Chạy lại pipeline trên Check_DT_t10_1.xlsx → `Thuong_T10_chuan_v10.xlsx` **4.266.671**, audit 0 lỗi (giao qua chat, KHÔNG commit).
+- ⚠ v10 chưa gồm `kt_include.py` cho thuydinh95 (cần file KT `C DUYÊN-lương sale.xlsx`, phiên này không có) → v9 4.304.671 = v10 + 38.000 (1008T09 TOUR 8k + combo 30k). Gửi file KT nếu muốn áp.
+- [ ] **VIỆC KẾ TIẾP:** Duyên chốt menbui2002, đơn T09 của sale khác, ngày bắt đầu haPTN/thanhNP. Không sửa gas/extension → không cần deploy/reload.
+
 ## 2026-11-05 (phiên 39) — Hải Yến báo thiếu thưởng Tỳ hưu: ĐÃ KIỂM ĐỘC LẬP trên engine mới nhất — đúng, đã được sửa ở code chung
 - **Hải Yến (yenNTH2004) T10:** 6 đơn Duyên nêu (1249, 1185, 612, 442, 356, 351T10) đều ĐÚNG: Pos + Base cùng sale, Base không Hủy/Thất bại. Engine còn thêm **1264T10** (charm Tỳ hưu TOUR, chia 2 sale với biichnguyen1993, +4.000) Duyên chưa liệt kê. Tổng Tỳ hưu Hải Yến = **44.000** (TOUR 8k×SL ÷ số sale, AQUA 8k): 356 Aqua 8.000; 351 8.000; 442 (2 SP) 8.000; 612 4.000; 1185 8.000; 1264 4.000; 1249 4.000. Đơn Lam Thủy/Ngọc Bích (1233, 954, 162T10) đúng quy định bị loại.
 - **NGUYÊN NHÂN thiếu (đã sửa bởi phiên khác, phiên này chỉ kiểm lại, KHÔNG sửa code trùng):** keyword Tourmaline Hồng/Xanh + Aquamarine không khớp tên Pos TOUR/AQUA; `_bonusProductQty_` đếm số lần từ khoá nên Moon đếm đôi; thưởng sản phẩm tranh "best" với combo. Sale khác cùng bị thiếu: trangNH2005 +48k, huyenmaii1990 +39k, thuydinh95 +26k, thuyha88 +24k, anhtrinh1995 +20k, phuongthao2000 +33k...
