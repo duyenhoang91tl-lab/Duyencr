@@ -1207,11 +1207,6 @@ function _srSaleNoFbHtml_(d){
   return h;
 }
 // Ghi chú "đã trừ hoàn/hủy tháng trước" ở đầu Báo cáo B (d.posAdjust do GAS trả khi xem đúng 1 tháng lịch). Không có posAdjust (xem khoảng ngày tuỳ ý) → không hiện gì.
-// Đơn nguồn Bảo hành CÓ gắn thẻ sale: GAS đã trừ cột S "Tiền trả trước" khỏi doanh thu sale (gas_v13.js _bhPrepaidDeduct_) → báo số đơn + tổng đã trừ để KT đối chiếu.
-function _srBhPrepaidBannerHtml_(b){
-  if (!b || !b.count) return '';
-  return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🛠 <b>Đã trừ tiền trả trước của đơn Bảo hành có gắn thẻ sale</b>: '+fmt(b.count)+' đơn, −'+_srMoney(b.total)+' (khách đã chuyển khoản trước nên hoàn lại khỏi doanh thu sale). Đã nằm sẵn trong bảng Theo Sale và thẻ Tổng giá trị.</div>';
-}
 // Duyên 2026-11-05: Báo cáo B LUÔN hiện FULL doanh thu chuẩn của tháng (thẻ Tổng giá trị + bảng Theo Sale KHÔNG bị trừ). Cuối tháng (xem đúng 1 tháng lịch + đã chốt tháng trước)
 // mới có THÊM khối riêng "Chốt tháng — trừ hoàn/hủy tháng trước" ngay dưới bảng Theo Sale (_srPosAdjustBlockHtml_). Vì khối đó tự giải thích nên đã bỏ banner xanh cũ ở đầu trang.
 function _srPosAdjustBannerHtml_(a){
@@ -1228,11 +1223,8 @@ function _srPosAdjustBlockHtml_(a, mergedRows){
     var k = String(r.name || '').toLowerCase(), chuan = (k in gt) ? gt[k] : (Number(r.giaTri) || 0), tru = Number(r.truHoanHuy) || 0;
     return { name: r.name, chuan: chuan, tru: tru, sau: chuan - tru };
   }).sort(function(x, y){ return (y.sau - x.sau) || (x.name < y.name ? -1 : 1); });
-  var h = '<div class="dash-section-title" style="margin-top:18px">🔒 Chốt tháng '+esc(a.month)+': trừ hoàn/hủy tháng '+esc(a.prevMonth)+' <span class="sr-sub">(mốc chốt '+esc(a.closedAt)+' — doanh thu chuẩn ở trên KHÔNG bị trừ)</span></div>';
-  h += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin:6px 0 8px;font-size:12px">'+
-    (a.totalDeduction ? 'Đơn tháng '+esc(a.prevMonth)+' bị hoàn/hủy SAU khi chốt: <b style="color:#dc2626">−'+_srMoney(a.totalDeduction)+'</b>. ' : 'Không có đơn tháng '+esc(a.prevMonth)+' nào phát sinh hoàn/hủy sau khi chốt. ')+
-    'Bảng Theo Team/Nguồn/MKT không có phần trừ.</div>';
-  h += '<table class="dash-table"><thead><tr><th>Sale</th><th class="r">Doanh thu chuẩn tháng '+esc(a.month)+'</th><th class="r">Trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</th><th class="r">Sau trừ</th></tr></thead><tbody>';
+  var h = '';
+  h += '<table class="dash-table" style="margin-top:18px"><thead><tr><th>Sale</th><th class="r">Doanh thu chuẩn tháng '+esc(a.month)+'</th><th class="r">Trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</th><th class="r">Sau trừ</th></tr></thead><tbody>';
   if (!rows.length) h += '<tr><td colspan="4" class="sr-empty">Không có dữ liệu</td></tr>';
   else {
     rows.forEach(function(r){
@@ -1247,7 +1239,7 @@ function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
   var pAdj = d.posAdjust || null;   // Chốt tháng Pos: GAS giữ doanh thu CHUẨN, chỉ trả thêm phần trừ hoàn/hủy tháng trước (gas_v13.js applyPosMonthAdjustToReportB_) → hiện ở khối riêng dưới bảng Theo Sale
-  var html = _srPosAdjustBannerHtml_(pAdj) + _srBhPrepaidBannerHtml_(d.bhPrepaid) + '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
@@ -1264,7 +1256,6 @@ function _srRenderB(d){
   var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span class="sr-sub">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
-  if (bSaleMerged_.storeTotal) saleHtmlB_ += '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:11.5px">🏬 Doanh thu từng sale <b>đã gồm phần Sale 30% đơn quầy</b> (Báo cáo L): <b>'+_srMoney(bSaleMerged_.storeTotal)+'</b> / '+fmt(bSaleMerged_.storeOrders)+' lượt đơn. Thẻ "Số lượng đơn" và "Tổng giá trị" phía trên vẫn chỉ tính đơn Pos.</div>';
   if (_srState.bSaleView === 'table'){
     saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th class="r">Số đơn</th><th class="r">Giá trị sau giảm giá</th><th class="r">TB đơn</th><th class="r">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
