@@ -86,27 +86,39 @@ function _saleStartDate_(name){
   }
   return '';
 }
-// Ước lượng số lượng sản phẩm khớp từ khoá trong ô "Sản phẩm" (văn bản tự do, vd "Tỳ hưu x2, Vòng tay x1")
-// — tìm dạng "x2"/"×2"/"(2)" ngay sau từ khoá, không thấy thì tính là 1. Đây là ƯỚC LƯỢNG, hiển thị
-// kèm nguyên văn ô sản phẩm để kế toán đối chiếu lại, KHÔNG nên dùng để tự động chi tiền hàng loạt
-// mà không kiểm tra khi số tiền lớn.
-function _bonusProductQty_(sanPham, keywordsStr){
-  var text = String(sanPham||'').toLowerCase();
-  var kws = String(keywordsStr||'').split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
-  if (!kws.length || !text) return {matched:false, qty:0};
+// Đếm số lượng sản phẩm khớp từ khoá, THEO TỪNG DÒNG sản phẩm của đơn (Duyên 2026-11-04).
+// NGUYÊN NHÂN GỐC cũ: đếm số LẦN từ khoá xuất hiện trong cả chuỗi → 2 từ khoá chồng nhau ("Tỳ hưu thiên lộc Moon" + "Thiên Lộc Moon") cùng khớp 1 nhẫn nên đếm đôi (trả 20k thay vì 10k);
+// không đọc cột Số lượng; từ khoá "Tourmaline Hồng/Xanh", "Aquamarine" không khớp tên Pos ("...THIÊN LỘC TOUR", "...AQUA") nên thưởng = 0.
+// Nay: tách sanPham theo dấu ',' (ghép vị trí với soLuong nếu cùng số dòng), mỗi dòng khớp tối đa 1 lần, SL = số ở cột Số lượng (không có = 1).
+// Từ khoá dạng "a+b" = dòng phải chứa CẢ a và b (VD "tỳ hưu thiên lộc+tour"). excludeStr = từ khoá chất liệu bị LOẠI (Ngọc Lam/Bích/Cẩm Thạch, Ruby, Saphire).
+// Không có dòng nào để tách (văn bản tự do "Tỳ hưu x2") → vẫn đọc "x2"/"(2)" ngay sau từ khoá như cũ.
+function _bonusProductQty_(sanPham, keywordsStr, soLuong, excludeStr){
+  var low = function(s){ return String(s||'').normalize('NFC').toLowerCase(); };
+  var kws = String(keywordsStr||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  var exs = String(excludeStr||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  var lines = String(sanPham||'').split(',').map(function(s){ return low(s).trim(); }).filter(Boolean);
+  if (!kws.length || !lines.length) return {matched:false, qty:0};
+  var qs = String(soLuong||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  var aligned = qs.length === lines.length;
   var totalQty = 0, matched = false;
-  kws.forEach(function(kw){
-    if (!kw) return;
-    var idx = 0;
-    while (true){
-      var pos = text.indexOf(kw, idx);
-      if (pos === -1) break;
-      matched = true;
-      var tail = text.substr(pos+kw.length, 10);
+  lines.forEach(function(line, i){
+    var hitPos = -1, hitLen = 0;
+    kws.forEach(function(kw){
+      if (hitPos >= 0) return;
+      var parts = kw.split('+').map(function(x){ return x.trim(); }).filter(Boolean);
+      if (!parts.length) return;
+      if (parts.every(function(x){ return line.indexOf(x) !== -1; })){ hitPos = line.indexOf(parts[0]); hitLen = parts[0].length; }
+    });
+    if (hitPos < 0) return;
+    if (exs.some(function(x){ return line.indexOf(x) !== -1; })) return;   // chất liệu bị loại trừ → không tính
+    matched = true;
+    var q = aligned ? (Number(String(qs[i]).replace(',', '.')) || 0) : 0;
+    if (!q){
+      var tail = line.substr(hitPos + hitLen, 10);
       var m = tail.match(/^[\s]*[x×][\s]*([0-9]+)/) || tail.match(/^[\s]*\(([0-9]+)\)/);
-      totalQty += m ? (parseInt(m[1],10)||1) : 1;
-      idx = pos + kw.length;
+      q = m ? (parseInt(m[1],10)||1) : 1;
     }
+    totalQty += q;
   });
   return {matched:matched, qty:totalQty};
 }
@@ -291,10 +303,10 @@ function _computeBonusData_(orders){
           if (tot>0) extra.push({amount:tot, program:p, detail:'Sản phẩm: '+esc(parts.join('; '))});
         }
         if (p.product && p.product.trim()){
-          var pq = _bonusProductQty_(o.sanPham, p.product);
-          if (pq.matched && pq.qty>0){
+          var pq = _bonusProductQty_(o.sanPham, p.product, o.soLuong, p.excludeProduct);
+          if (pq.matched && pq.qty>0){   // thưởng THEO SẢN PHẨM = cộng trực tiếp, không giới hạn, KHÔNG tranh "best" với thưởng combo/giá trị đơn (Duyên 2026-11-04)
             var amt = (Number(p.bonusAmount)||0) * pq.qty;
-            if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'SL ước tính: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'};
+            if (amt>0) extra.push({amount:amt, program:p, detail:'SL: '+pq.qty+' × '+_srMoney(Number(p.bonusAmount)||0)+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'});
           }
         }
         if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order'){
