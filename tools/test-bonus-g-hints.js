@@ -10,7 +10,7 @@ ctx.g = { tv: { rows: [] } };
 let h = vm.runInContext('_srGProbationHints_(g, [{saleBan:"Ngoc"}])', ctx);
 ok(h.length === 2, '2 Sale thử việc không có dòng: ' + h.length);
 ok(/chưa đặt <b>Ngày bắt đầu tính thưởng/.test(h.find(x => x.name === 'Ngoc').reason), 'Ngọc: thiếu ngày bắt đầu (có mốc Thử việc, loại hiện tại offline)');
-ok(/không thấy đơn Pos/.test(h.find(x => x.name === 'Lan').reason), 'Lan: có ngày nhưng không có đơn');
+ok(/không thấy đơn gốc nào \(lên Base trong kỳ và đã có đơn Pos\)/.test(h.find(x => x.name === 'Lan').reason), 'Lan: có ngày nhưng không có đơn gốc (lên Base trong kỳ và đã có đơn Pos)');
 h = vm.runInContext('_srGProbationHints_(g, [{saleBan:"lan, X"},{saleBan:"Lan"}])', ctx);
 ok(/có 2 đơn Pos: 0 đơn đã ghép Base.*0 đơn có ngày lên Base từ ngày bắt đầu/.test(h.find(x => x.name === 'Lan').reason), 'Lan: có đơn nhưng chưa ghép Base');
 h = vm.runInContext('_srGProbationHints_(g, [{saleBan:"Lan",baseNgayTao:"2026-10-06",donGoc:true,ngayTao:"06/10/2026 10:00"},{saleBan:"Lan",baseNgayTao:"2026-10-01",ngayTao:"06/10/2026"}])', ctx);

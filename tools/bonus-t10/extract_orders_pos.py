@@ -56,7 +56,8 @@ for rn, r in d['pos']:
         for k, p in enumerate(OV[o['maDon']]['split']):
             q = dict(o); q['id'] = o['id'] + 's%d' % k; q['saleBanGoc'] = o['saleBan']; q['saleBan'] = p['saleBan']; q['giaTriDon'] = float(p.get('giaTri') or rest); q['ghiChu'] = p['ghiChu']; orders.append(q)
         continue
-    if o['maDon'] in OV: o['saleBanGoc'] = o['saleBan']; o['saleBan'] = OV[o['maDon']]['saleBan']
+    if o['maDon'] in OV and 'saleBan' in OV[o['maDon']]: o['saleBanGoc'] = o['saleBan']; o['saleBan'] = OV[o['maDon']]['saleBan']
+    if o['maDon'] in OV and OV[o['maDon']].get('giaTriTruocGiam'): o['giaTriTruocGiam'] = float(OV[o['maDon']]['giaTriTruocGiam'])   # gia NIEM YET (file Check_DT khong co cot nay) -> CT Tourmaline cao cap T21/T31 xet theo gia nay
     orders.append(o)
 ch = {}
 for rn, r in d.get('1_Theo sale (final)', []):

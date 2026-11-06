@@ -180,9 +180,9 @@ function _reconCollect_(dB, dL, info){
   });
   run('N', 'Báo cáo N', function(){ var n = _reconBuildN_(dB); groups.N = n.items; meta.n = n; });
 
-  // số tổng của B (trước trừ hoàn/hủy — cùng số E/G/N cộng từ chi tiết đơn)
+  // số tổng của B = doanh thu CHUẨN (cùng số E/G/N cộng từ chi tiết đơn); phần trừ hoàn/hủy tháng trước (nếu đã chốt) chỉ là khối riêng, không nằm trong số này
   var adj = (dB.posAdjust && dB.posAdjust.applied) ? dB.posAdjust : null;
-  var bTotal = (adj && dB.totalGiaTriGoc != null) ? dB.totalGiaTriGoc : dB.totalGiaTri;
+  var bTotal = dB.totalGiaTri;
   var all = [].concat(groups.B, groups.E, groups.G, groups.L, groups.N);
   var idx = _reconIndexRows_(info, groups, meta, { bTotal: _reconR2_(bTotal), bOrders: dB.totalOrders, adj: adj, orders: orders.length }, warnings);
   return { items: [{ name: 'Mục lục', rows: idx.rows, mode: 'num' }].concat(all), warnings: warnings, checks: idx.checks, meta: meta };
@@ -206,7 +206,7 @@ function _reconIndexRows_(info, groups, meta, B, warnings){
   var checks = [], rOrd = rows.length + 1;
   rows.push(['Số đơn Pos trong khoảng lọc', 'B', B.bOrders, '', '', 'Số đơn máy chủ trả về cho Báo cáo B.']);
   var rVal = rows.length + 1;
-  rows.push(['Tổng giá trị đơn' + (B.adj ? ' (TRƯỚC trừ hoàn/hủy tháng ' + B.adj.prevMonth + ')' : ''), 'B', B.bTotal, '', '', B.adj ? 'Số web hiển thị đã trừ hoàn/hủy theo mốc chốt; E/G/N cộng từ chi tiết đơn nên so với số TRƯỚC trừ (xem sheet "B Đối chiếu tổng" để nối với số sau trừ).' : 'Tổng giá trị sau giảm giá của các đơn Pos.']);
+  rows.push(['Tổng giá trị đơn', 'B', B.bTotal, '', '', B.adj ? 'Doanh thu chuẩn của tháng (KHÔNG bị trừ hoàn/hủy). Phần trừ hoàn/hủy tháng ' + B.adj.prevMonth + ' là khối "Chốt tháng" riêng (xem sheet "B Đối chiếu tổng" để nối với số sau trừ).' : 'Tổng giá trị sau giảm giá của các đơn Pos.']);
   var diffRow = function(name, code, val, why, strict){
     var r = rows.length + 1, d = _reconR2_(val - B.bTotal), ok = Math.abs(d) < tol;
     rows.push([name, code, _reconR2_(val), { t: 'n', v: d, f: 'ROUND(C' + r + '-C' + rVal + ',2)' }, strict ? (ok ? okTxt : badTxt) : 'ℹ tham khảo', why]);

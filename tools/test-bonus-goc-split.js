@@ -30,4 +30,24 @@ ok(r.total === 0, 'đơn không phải đơn gốc không tính số đơn (A ch
 const old = (id, s) => ({ id, saleBan: s, giaTriDon: 1e6, ngayTao: '20/10/2026 10:00' });
 r = calc([tier], [old(1, 'A'), old(2, 'A')]);
 ok(r.total === 50000, 'backend cũ: vẫn đếm theo thẻ Pos');
+// ===== Gộp đơn NG "ghép/ship cùng đơn" (Duyên 04/11/2026): 1326T10 (5,85tr) + NG139T10 (5,45tr) cùng sale = 1 bill 11,3tr =====
+const big = Object.assign({}, base, { id: 'm', name: 'Đơn từ 10tr', revenue: { enabled: true, scope: 'order', min: 10000000, max: '' }, bonusAmount: 20000 });
+const gh = (id, note, val, sale, goc, extra) => Object.assign({ id, saleBan: sale, giaTriDon: val, ghiChu: note, baseNgayTao: D, ngayTao: '20/10/2026 10:00', donGoc: goc, sanPham: 'x' }, extra || {});
+let O2 = [gh(1, '1326T10/2026', 5850000, 'thuydinh95', true, { saleShares: [{ name: 'thuydinh95', frac: 1 }] }), gh(2, 'NG139T10/2026 GHÉP CÙNG ĐƠN 1326T10/2026', 5450000, 'thuydinh95', false)];
+r = calc([big], O2);
+ok(r.total === 20000 && r.bySale.length === 1, 'đơn NG ghép cùng đơn gốc cùng sale → 1 bill 11,3tr đạt mốc 10tr (' + r.total + ')');
+O2 = [gh(1, '807T10/2026', 5850000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] }), gh(2, '702T10/2026 GHÉP CÙNG ĐƠN 807T10/2026', 5450000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] })];
+ok(calc([big], O2).total === 0, '2 đơn gốc Base riêng (không có NG) KHÔNG gộp → 0');
+O2 = [gh(1, '1326T10/2026', 5850000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] }), gh(2, 'NG139T10/2026 GHÉP CÙNG ĐƠN 1326T10/2026', 5450000, 'b', false, { saleShares: [{ name: 'b', frac: 1 }] })];
+ok(calc([big], O2).total === 0, 'khác bộ sale → không gộp');
+ok(calc([tier], [gh(1, '1326T10/2026', 5e6, 'A', true, { saleShares: [{ name: 'A', frac: 1 }] }), gh(2, 'NG1T10/2026 SHIP CÙNG ĐƠN 1326T10/2026', 5e6, 'A', false)]).total === 0, 'đơn gộp tính là 1 đơn (không đạt bậc 2 đơn/ngày)');
+// ===== Tourmaline cao cấp xét theo GIÁ NIÊM YẾT (cột T "Đơn giá" của dữ liệu đơn) — đơn 1301T10 (Duyên 05/11/2026) =====
+const t21 = Object.assign({}, base, { id: 't21', name: 'Tourmaline cao cấp — đơn từ 21tr500', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 21500000, max: '' }, bonusAmount: 100000 });
+const t31 = Object.assign({}, base, { id: 't31', name: 'Tourmaline cao cấp — đơn từ 31tr500', requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', revenue: { enabled: true, scope: 'order', min: 31500000, max: '' }, bonusAmount: 200000 });
+const tour = (val, niem, sp) => ({ id: 1, saleBan: 'A', giaTriDon: val, giaTriTruocGiam: niem, sanPham: sp || 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP', ghiChu: '1301T10/2026', baseNgayTao: D, ngayTao: '20/10/2026 10:00', donGoc: true, saleShares: [{ name: 'A', frac: 1 }] });
+ok(calc([t21, t31], [tour(29925000, 31500000)]).total === 200000, '1301T10: niêm yết 31,5tr, sau giảm 29,925tr → T31 200.000 (không chỉ T21 100.000)');
+ok(calc([t21, t31], [tour(29925000, undefined)]).total === 100000, 'chưa có giá niêm yết → xét theo giá sau giảm như cũ (T21 100.000)');
+ok(calc([t21, t31], [tour(29925000, 31500000, 'NHẪN VÀNG THƯỜNG')]).total === 0, 'đơn không có nhẫn Tourmaline cao cấp → không dùng giá niêm yết');
+const c10 = Object.assign({}, base, { id: 'c10', name: 'Đơn từ 10tr', revenue: { enabled: true, scope: 'order', min: 10000000, max: '' }, bonusAmount: 20000 });
+ok(calc([c10], [tour(9000000, 11000000)]).total === 0, 'CT khác (10tr…) vẫn xét theo giá sau giảm, không dùng giá niêm yết');
 process.exit(bad ? 1 : 0);

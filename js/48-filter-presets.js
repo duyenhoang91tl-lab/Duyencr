@@ -217,7 +217,7 @@
         '<option value="">⚡ Mẫu lọc nhanh…</option>' +
         list.map(function(p){ var n = nSale(p); return '<option value="' + e(p.id) + '"' + (act && act.id === p.id ? ' selected' : '') + '>' + e(p.name) + (n ? ' (' + n + ' sale)' : '') + '</option>'; }).join('') + '</select>';
     }
-    if (act) h += '<button type="button" class="btn sm fp-off" data-fp="off" onclick="_fpOff()" title="Tắt lọc nhanh: bỏ các bộ lọc đang chọn của báo cáo này và tải lại">✕ Tắt lọc nhanh</button>';
+    if (act) h += '<button type="button" class="btn sm fp-off" data-fp="off" onclick="_fpOff()" title="Tắt lọc nhanh: bỏ các bộ lọc đang chọn của báo cáo này và tải lại">✕ Tắt<span class="fp-off-x"> lọc nhanh</span></button>';
     h += '<div class="gear-menu"><button type="button" class="btn sm" onclick="_srToggleGearMenu(event,\'fp-gear\')">' + (list.length ? '⚙ Mẫu ▾' : '⚡ Mẫu lọc nhanh ▾') + '</button>' +
       '<div class="gear-menu-list fp-gear" id="fp-gear">' +
       '<div data-fp="new" onclick="_fpDo(\'new\')">＋ Tạo mẫu (chọn sẵn các Sale)</div>' +
