@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-05 (phiên 40) — THƯỞNG T10: Duyên CHỐT đơn T09 không tính + Mến chỉ nguồn Fb Phạm Thu Hiền — XONG, đã push
+- **Duyên chốt:** (1) 1008T09 "bản chất là đơn tháng 9" → KHÔNG tính thưởng T10 là đúng, áp cho mọi đơn mã tháng khác (v9 4.304.671 có +8.000 của 1008T09 là SAI; bản chuẩn = **4.266.671**); (2) menbui2002 vẫn được tính nhưng CHỈ nguồn "Fb Phạm Thu Hiền".
+- **Đã kiểm:** engine hiện tại ĐÃ đúng cả hai (lọc tháng theo mã ở `calc_bonus.js`; Mến chỉ pass 2 nguồn Fb Phạm Thu Hiền: 5 đơn = 34.000, không dòng nào từ nguồn khác; 58 đơn khác của Mến là Zalo CSKH/bảo hành → không thưởng; đơn M47093 nguồn "Hiền Tourmaline" 5,25tr không đạt mốc nên cũng không đổi tiền). Không đổi số, không đổi code tính.
+- **NGUYÊN NHÂN GỐC dễ gây nhầm:** `kt_include.py` vẫn đánh dấu 13 đơn T09 là "tính lại" (calc_bonus loại ở bước sau nên tổng không đổi nhưng bảng liệt kê sai). [x] Thêm chốt chặn: bỏ qua đơn có MÃ ĐẦU TIÊN khác tháng tính (tham số 4, mặc định 10) → 0 đơn T09 được tính lại. Test: chạy kt_include + calc_bonus trên T10 thật = 4.266.671, `ktInclude` rỗng.
+- [x] `docs/crm-kb/09-thuong-t10-cach-tinh-chuan.md` cập nhật 2 quy tắc + xoá 2 câu hỏi mở. Không sửa gas_v13.js/extension → không cần deploy GAS/reload extension.
+- [ ] **VIỆC KẾ TIẾP:** còn mở: 826T10 của Thủy (không ảnh hưởng tiền), ngày bắt đầu haPTN/thanhNP; sheet "Đối chiếu sale tự nhập" còn 26 LỆCH MỨC + 7 ENGINE=0 chưa đổi. File giao: `Thuong_T10_chuan_FINAL_v3.xlsx` (4.266.671).
+- **ĐANG LÀM:** không có việc dở.
+
 ## 2026-11-05 (phiên 39) — Hải Yến báo thiếu thưởng Tỳ hưu: ĐÃ KIỂM ĐỘC LẬP trên engine mới nhất — đúng, đã được sửa ở code chung
 - **Hải Yến (yenNTH2004) T10:** 6 đơn Duyên nêu (1249, 1185, 612, 442, 356, 351T10) đều ĐÚNG: Pos + Base cùng sale, Base không Hủy/Thất bại. Engine còn thêm **1264T10** (charm Tỳ hưu TOUR, chia 2 sale với biichnguyen1993, +4.000) Duyên chưa liệt kê. Tổng Tỳ hưu Hải Yến = **44.000** (TOUR 8k×SL ÷ số sale, AQUA 8k): 356 Aqua 8.000; 351 8.000; 442 (2 SP) 8.000; 612 4.000; 1185 8.000; 1264 4.000; 1249 4.000. Đơn Lam Thủy/Ngọc Bích (1233, 954, 162T10) đúng quy định bị loại.
 - **NGUYÊN NHÂN thiếu (đã sửa bởi phiên khác, phiên này chỉ kiểm lại, KHÔNG sửa code trùng):** keyword Tourmaline Hồng/Xanh + Aquamarine không khớp tên Pos TOUR/AQUA; `_bonusProductQty_` đếm số lần từ khoá nên Moon đếm đôi; thưởng sản phẩm tranh "best" với combo. Sale khác cùng bị thiếu: trangNH2005 +48k, huyenmaii1990 +39k, thuydinh95 +26k, thuyha88 +24k, anhtrinh1995 +20k, phuongthao2000 +33k...
