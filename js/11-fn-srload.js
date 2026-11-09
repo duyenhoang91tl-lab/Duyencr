@@ -21,6 +21,15 @@ async function _srLoad(){
       byCreator: _srState.byCreator ? '1' : ''
     });
   } else if (_srState.sub === 'B') {
+    // Duyen 2026-11-09: Bao cao B mo lan DAU ma chua chon ngay (dateFrom/dateTo rong) = tinh TOAN BO don tu truoc toi nay -> vuot 55s cua _srFetch, bao "signal is aborted" va khong ra gi.
+    // Lan dau trong phien tu dat "Thang nay" (nhu cac bao cao khac nguoi dung hay xem); sau do neu Duyen CHU DONG xoa ngay de xem tat ca thi ton trong (khong ep lai).
+    if (!_srState.bAutoMonthDone_) {
+      _srState.bAutoMonthDone_ = true;
+      if (!_srState.dateFrom && !_srState.dateTo) {
+        var rBm = _pkQuickRange('thisMonth');
+        if (rBm) { _srState.dateFrom = rBm.from; _srState.dateTo = rBm.to; _srState.dateQuick = 'thisMonth'; renderSalesReportTab(); }
+      }
+    }
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(','),

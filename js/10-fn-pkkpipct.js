@@ -1274,7 +1274,7 @@ async function _srFetch(action, params){
   } catch(e) {
     if (timer) clearTimeout(timer);
     _srState.lastFetchError = (e && e.name === 'AbortError')
-      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.'
+      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
       : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
     return null;
   }
