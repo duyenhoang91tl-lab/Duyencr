@@ -22,7 +22,7 @@ const ctx = { SpreadsheetApp: svc(), CacheService: { getScriptCache: () => cache
 vm.createContext(ctx); vm.runInContext(R('gas_v13.js'), ctx, { filename: 'gas_v13.js' });
 vm.runInContext(`
   var __settings = {}; getSetting_ = function(k) { return __settings[k] == null ? null : __settings[k]; }; setSetting_ = function(k, v) { __settings[k] = v; };
-  var __today = '2026-11', __last = false; _todayYm_ = function() { return __today; }; _isLastDayOfMonthVn_ = function() { return __last; };
+  var __today = '2026-11', __last = true;   /* ngay cuoi thang 11: moi co tru hoan/huy */ _todayYm_ = function() { return __today; }; _isLastDayOfMonthVn_ = function() { return __last; };
   _vnYmd_ = function() { return '2026-10-31'; };
   _acctExtraRaw_ = function() { return ''; };
   _expandSaleFilterWithPancakeAliases_ = function(a) { return a; };
@@ -60,9 +60,9 @@ ok(builds('2026-10') === b0 + 1 && JSON.parse(vm.runInContext('__settings.posMon
 // ── 4. Doi cong tac chia (ty le Base) -> khoa cache doi, khong dung nham so cu ──
 store.clear(); ctx.__builds = {};
 run('_posRevenueBySaleCached_("2026-10")');
-vm.runInContext('__settings.POS_GHEP_RATIO = "1"; _posGhepRatioMemo_ = null;', ctx);   // memo chi song 1 lan chay GAS that; test dung chung 1 context nen phai xoa tay
+vm.runInContext('__settings.POS_GHEP_RATIO = "0"; _posGhepRatioMemo_ = null;', ctx);   // memo chi song 1 lan chay GAS that; test dung chung 1 context nen phai xoa tay
 run('_posRevenueBySaleCached_("2026-10")');
-ok(builds('2026-10') === 2, 'bat POS_GHEP_RATIO: tinh lai (khoa cache khac), khong dung so cua che do cu');
+ok(builds('2026-10') === 2, 'tat POS_GHEP_RATIO (mac dinh nay LUON BAT): tinh lai (khoa cache khac), khong dung so cua che do cu');
 
 // ── 5. Ket qua lon (> 100KB) van cache duoc nho luu theo cum ──
 const big = JSON.stringify({ orders: Array.from({ length: 3000 }, (_, i) => ({ posRow: i, ghiChu: 'x'.repeat(380), khachHang: 'Khach ' + i })) });

@@ -45,7 +45,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_KPI_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
-- Hàm: `_posGhepMinCodes_`, `_posGhepRatioOn_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_bhPrepaidDeduct_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_acctExtraRaw_`, `_loadAcctExtra_`, `_acctRowCodes_`, `_acctMatchExtra_`, `_saleCanonOrders_`, `_orderSaleOvrMap_`, `_applyOrderSaleOvr_`, `buildSalesReportB_`, `_goldChannelRule_`, `_csChannelCommissionOf_`
+- Hàm: `_posGhepMinCodes_`, `_posGhepRatioOn_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_bhPrepaidDeduct_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_acctParseSheet_`, `_acctShName_`, `_acctIsOnlSheetName_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_acctExtraRaw_`, `_loadAcctExtra_`, `_acctRowCodes_`, `_acctMatchExtra_`, `_saleCanonOrders_`, `_orderSaleOvrMap_`, `_applyOrderSaleOvr_`, `buildSalesReportB_`, `_goldChannelRule_`, `_csChannelCommissionOf_`
 - Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `POS_GHEP_MIN_CODES_`, `_posGhepMinMemo_`, `_posGhepRatioMemo_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `_BASE_DETECT_DBG_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`, `ACCT_SPLIT_SS_ID_`, `ACCT_EXTRA_KEY_`, `_acctExtraMemo_`, `GOLD_RULE_CHANNELS_`, `GOLD_RULE_MATERIALS_`
 
 ## 10_CSStats_KPI_ReportC.gs
@@ -132,7 +132,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_KHD_`, `KHD_HEADERS_`, `KHD_MAX_TEXT_`, `KHD_LIMIT_`, `KHD_TAIL_ROWS_`, `KHD_RATE_MS_`, `KHD_GET_ACTIONS_`, `KHD_POST_ACTIONS_`, `KHD_FORBIDDEN_MSG_`, `CV_SHEET`, `CV_HEADERS`, `CV_DEFAULT_ADMINS`, `RB_NEW_DAYS_DEF_`, `CV_NOTIF_MAX_GROUPS_`
 
 ## 31_SplitOrders.gs
-- Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitSaleSet_`, `_splitCompareSales_`, `_splitDayDiff_`, `_splitPhoneCandidates_`, `_splitFbKey_`, `_splitFbRead_`, `_splitAttachFeedback_`, `saveSplitFeedback_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
+- Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitSaleSet_`, `_splitCompareSales_`, `_splitDayDiff_`, `_splitPhoneCandidates_`, `_splitFbKey_`, `_splitFbRead_`, `_splitAttachFeedback_`, `saveSplitFeedback_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitFixList_`, `splitDoGet_`
 - Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_DETAIL_MAX_`, `SPLIT_GET_ACTIONS_`, `SPLIT_POST_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
 
 ## 32_ChatCoach.gs

@@ -968,6 +968,9 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   filters = filters || {};
   var month = _posFullMonthOfRange_(filters.dateFrom, filters.dateTo);
   if (!res || !month) return res;
+  // Duyen 2026-11-09: "tru hoan/huy thang truoc CHI tinh vao CUOI THANG, dang tinh thang moi thi chua chot so". Thang dang chay (chua toi ngay cuoi) -> KHONG tru, KHONG liet ke don hoan/huy,
+  // KHONG tinh lai thang truoc (tiet kiem 1 lan chay Bao cao B). Cung dieu kien voi chot thang: thang < thang hien tai, hoac thang hien tai vao NGAY CUOI THANG (_posCanCloseMonth_).
+  if (month === _todayYm_() && !_isLastDayOfMonthVn_()) return res;
   var prev = _ymAdd_(month, -1), snap = _readPosSnapshots_()[prev];
   var info = { applied: false, month: month, prevMonth: prev };
   res.posAdjust = info;
