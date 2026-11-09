@@ -146,6 +146,9 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   filters = filters || {};
   var month = _posFullMonthOfRange_(filters.dateFrom, filters.dateTo);
   if (!res || !month) return res;
+  // Duyen 2026-11-09: "tru hoan/huy thang truoc CHI tinh vao CUOI THANG, dang tinh thang moi thi chua chot so". Thang dang chay (chua toi ngay cuoi) -> KHONG tru, KHONG liet ke don hoan/huy,
+  // KHONG tinh lai thang truoc (tiet kiem 1 lan chay Bao cao B). Cung dieu kien voi chot thang: thang < thang hien tai, hoac thang hien tai vao NGAY CUOI THANG (_posCanCloseMonth_).
+  if (month === _todayYm_() && !_isLastDayOfMonthVn_()) return res;
   var prev = _ymAdd_(month, -1), snap = _readPosSnapshots_()[prev];
   var info = { applied: false, month: month, prevMonth: prev };
   res.posAdjust = info;
@@ -958,7 +961,7 @@ function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   return ok;
 }
 // Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
-var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitFixList:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
 function _featureGate_(action, token) {
   var f = ACTION_FEATURE_[action];
   if (!f || !token) return null;
