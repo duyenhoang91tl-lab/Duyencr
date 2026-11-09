@@ -122,6 +122,7 @@
       const fresh = res.pkKnowledge && res.pkKnowledgeTs && (Date.now() - res.pkKnowledgeTs < KNOWLEDGE_TTL_MS);
       if (fresh) return;
       chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, (resp) => {
+        if (chrome.runtime.lastError) return; // background chua san sang / extension vua reload ("Receiving end does not exist"): doc lastError de khong bao "Unchecked runtime.lastError"
         if (!resp?.ok || !resp.data) return; // giu ban mac dinh/cache cu neu GAS loi
         const k = {
           menhTable: resp.data.menhTable || MENH_TABLE_DEFAULT,

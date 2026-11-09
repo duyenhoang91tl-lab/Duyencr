@@ -39,7 +39,7 @@
       const sy = await sget('sync', { csName: '' });
       const by = String(sy.csName || '');
       if (!force && l.vtBy === by && Date.now() - (l.vtAt || 0) < STALE_MS) return;
-      const resp = await new Promise((res) => { try { chrome.runtime.sendMessage({ type: 'GET_VIETTAT' }, (r) => res(r)); } catch (_) { res(null); } });   // lỗi đồng bộ (extension vừa reload) → null; KHÔNG dùng safe(...,res(null)) vì đối số mặc định chạy ngay
+      const resp = await new Promise((res) => { try { chrome.runtime.sendMessage({ type: 'GET_VIETTAT' }, (r) => res(chrome.runtime.lastError ? null : r)); } catch (_) { res(null); } });   /* đọc lastError: background chưa sẵn sàng/vừa reload → "Receiving end does not exist" không còn báo "Unchecked" */   // lỗi đồng bộ (extension vừa reload) → null; KHÔNG dùng safe(...,res(null)) vì đối số mặc định chạy ngay
       if (resp && resp.ok && resp.data && Array.isArray(resp.data.snippets)) {
         safe(() => chrome.storage.local.set({ vtData: resp.data.snippets, vtAt: Date.now(), vtBy: by }));
       }
@@ -278,7 +278,7 @@
   }
   async function getImageFile(im) {
     if (imgCache.has(im.id)) return imgCache.get(im.id);
-    const resp = await new Promise((res) => { try { chrome.runtime.sendMessage({ type: 'GET_VIETTAT_IMAGE', id: im.id }, (r) => res(r)); } catch (_) { res(null); } });
+    const resp = await new Promise((res) => { try { chrome.runtime.sendMessage({ type: 'GET_VIETTAT_IMAGE', id: im.id }, (r) => res(chrome.runtime.lastError ? null : r)); } catch (_) { res(null); } });
     if (!resp || !resp.ok || !resp.data) throw new Error((resp && resp.error) || 'không kết nối được extension');
     const f = b64ToFile(resp.data.base64, resp.data.mimeType, im.name);
     if (imgCache.size >= IMG_CACHE_MAX) imgCache.delete(imgCache.keys().next().value);
