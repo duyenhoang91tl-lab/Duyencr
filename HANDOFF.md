@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-09 (phiên 45) — Báo cáo check ngược Base: hiện KÊNH + SALE + SẢN PHẨM từng đơn gốc Base cạnh đơn Pos — XONG code, ĐÃ COMMIT cục bộ; CHƯA PUSH (chờ token mới của Duyên)
+- **Duyên yêu cầu (ảnh đơn Nguyễn Hải Phương: 1 đơn Pos 8.123.000 tách 2 đơn Base 79T11 + 62T11):** hiện rõ 2 đơn Base để check ngược, xem được order sản phẩm của kênh Base + Sale Base tương ứng.
+- **NGUYÊN NHÂN GỐC thiếu thông tin:** `baseOrders` (gas_v13.js ~5860) chỉ có sản phẩm khi `withProduct` bật (chỉ báo cáo đơn chia M bật), và KHÔNG có cột Kênh bán (cột M DT TỔNG); màn hình chỉ in 1 dòng chữ mã·người tạo·sale·giá.
+- [x] `gas_v13.js`: `_readBaseRowsByCounterCodes_` đọc thêm `kenh` (cột M) cùng cờ `withProduct`; `baseOrders` thêm `kenh`, `sanPham` (cắt 200 ký tự); handler `salesReportB` luôn đặt `withBaseProduct:true` (chỉ GET salesReportB của màn hình; E/G/posRevenueBySale không đổi nên không chậm thêm). `node tools/split-gas.js` + `--check` OK. LƯU Ý: cột O "sản phẩm" trên DT TỔNG là text tự do nhân viên gõ (tên KH + địa chỉ) — cột này hiện nguyên văn.
+- [x] `js/11-fn-srload.js` `_srBaseCheckPanelHtml_`: mỗi đơn gốc Base = 1 khối (mã · ngày · 📣kênh / Sale Base · người tạo · giá · trạng thái / 🛒 sản phẩm); cột Thẻ Pos thêm 🛒 sản phẩm đơn Pos. Test `tools/test-base-check-report.js` (thêm ca 2 đơn Base) ĐẠT; test-ghep-* + test-pos-report-cache đạt.
+- [ ] **VIỆC KẾ TIẾP:** push (cần token mới); workflow deploy-gas phải xanh (đổi gas_v13.js) rồi Ctrl+F5; nếu Duyên muốn: thêm cột Kênh/Sản phẩm vào Excel xuất (sheet "Check ngược từng đơn").
+
 ## 2026-11-09 (phiên 44) — "Báo cáo check ngược Base chỉ hiện đơn lệch Base–Pos" — XONG 1/1 bước, đã push; CHỜ Duyên xem thực tế
 - **Duyên yêu cầu:** bảng "🔁 Báo cáo check ngược Base" (Báo cáo B) chỉ cần hiện đơn có chênh lệch giữa Base và Pos để check tay + chia tiền tay; đơn khớp Base = Pos thì KHÔNG cần hiện (ảnh chụp: phần lớn dòng Chênh 0đ làm rối, đơn lệch như ninhnga99 −60.000đ bị chìm).
 - **NGUYÊN NHÂN GỐC:** `_srBaseCheckPanelHtml_` (`js/11-fn-srload.js`) liệt kê MỌI đơn Pos đã ghép Base (cắt 100 dòng đầu theo thứ tự ngày) — đơn khớp chiếm gần hết, đơn lệch bị chìm và có thể bị cắt khỏi 100 dòng.

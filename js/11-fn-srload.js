@@ -1592,12 +1592,18 @@ function _srBaseCheckPanelHtml_(d){
   if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
   if (!lechOrders.length){ return h + '<div style="font-size:12px;color:var(--muted)">✅ Cả ' + fmt(orders.length) + ' đơn Pos ghép Base đều khớp giá với Base — không có đơn nào cần check tay.</div>'; }
   var LIM = 100;
-  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th>Đơn gốc Base</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
+  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th style="min-width:320px">Đơn gốc Base (mã · kênh · sale · sản phẩm)</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
   lechOrders.slice(0, LIM).forEach(function(o){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
-    var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
+    // Mỗi đơn gốc Base = 1 khối riêng (Duyên 2026-11-09): mã · ngày · KÊNH · SALE BASE · người tạo · giá, dòng dưới = SẢN PHẨM/nội dung đơn Base, để check ngược từng đơn.
+    var src = (o.ghepBase || []).map(function(x){
+      var gv = fmt(Math.round(Number(x.giaTri) || 0));
+      return '<div style="padding:3px 0;border-bottom:1px dashed var(--border)"><b>' + esc(x.ma || '') + '</b>' + (x.ngay ? ' · ' + esc(x.ngay) : '') + (x.kenh ? ' · <span title="Kênh bán trên Base">📣 ' + esc(x.kenh) + '</span>' : '') +
+        '<br>Sale Base: <b>' + esc(x.saleBan || '(chưa gán)') + '</b> · tạo: ' + esc(x.nguoiTao || '?') + ' · <b>' + gv + 'đ</b>' + (x.trangThai ? ' · ' + esc(x.trangThai) : '') + (x.tinh ? '' : ' <span style="color:#c00">(bị loại: ' + esc(x.trangThai || '') + ')</span>') +
+        (x.sanPham ? '<br><span style="color:var(--muted)">🛒 ' + esc(x.sanPham) + '</span>' : '') + '</div>';
+    }).join('');
     var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
-    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + '</td>' +
+    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + (o.sanPham ? '<br><span style="color:var(--muted);font-size:11px">🛒 ' + esc(String(o.sanPham).substring(0, 120)) + '</span>' : '') + '</td>' +
       '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
   });
   h += '</tbody></table></div>';

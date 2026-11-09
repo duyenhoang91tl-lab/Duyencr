@@ -76,6 +76,15 @@ ok(ci('Phần còn lại tính theo Thẻ Pos') >= 0 && ci('Sale nhận phần c
 ok(row[ci('Phần còn lại tính theo Thẻ Pos')] === 2000000 && row[ci('Sale nhận phần còn lại')] === 'S9' && row[ci('Doanh thu tính = Base + phần còn lại')] === 5000000, 'dong dau: phan con lai 2tr cho S9, doanh thu tinh = 3tr Base + 2tr = 5tr');
 ok(r2.tot.du === 2000000, 'tong phan con lai (tot.du) = 2tr');
 ok(r2.chia.length === 3 && Math.round(r2.chia[1][7] + r2.chia[2][7]) === 5000000, 'sheet chia sale: tong tien chia = 5tr (gom ca phan con lai)');
+// ===== Duyên 2026-11-09: 1 đơn Pos tách 2 đơn Base (ca ảnh Nguyễn Hải Phương) — hiện kênh + sale Base + sản phẩm từng đơn gốc =====
+const O4 = [{ posRow: 41, ngayTaoDon: '03/11/2026', khachHang: 'Nguyễn Hải Phương', soDienThoai: '0942926655', theSale: 'ninhnga99', sanPham: 'Vòng tay thạch anh', giaTriPos: 8123000, giaTriSauGiam: 8123000, cod: 0, ghiChu: '79T11/2026 + 62T11/2026', ghepCodes: ['79T11/2026', '62T11/2026'],
+  ghepBase: [Object.assign(B(50, '79T11/2026', 'ninhnga99', 'ninhnga99', 'Hoàn thành', 8123000, true), { kenh: 'Zalo CSKH', sanPham: 'Nhẫn bạc 925 size 12' }), Object.assign(B(51, '62T11/2026', 'ninhnga99', 'ninhnga99', 'Hoàn thành', 5850000, true), { kenh: 'Facebook', sanPham: 'Dây chuyền vàng' })],
+  saleShares: [{ name: 'ninhnga99', frac: 1 }], dieuChinh: 'base' }];
+const h6 = C._srBaseCheckPanelHtml_({ orders: O4, ghep: {}, ghepCheck: {} });
+ok(/79T11\/2026/.test(h6) && /62T11\/2026/.test(h6) && /Zalo CSKH/.test(h6) && /Facebook/.test(h6), 'Cả 2 đơn gốc Base hiện riêng, kèm KÊNH Base');
+ok(/Nhẫn bạc 925 size 12/.test(h6) && /Dây chuyền vàng/.test(h6), 'Hiện SẢN PHẨM từng đơn gốc Base');
+ok(/Sale Base: <b>ninhnga99<\/b>/.test(h6), 'Hiện SALE Base từng đơn');
+ok(/Vòng tay thạch anh/.test(h6) && /5\.850\.000đ/.test(h6), 'Hiện sản phẩm đơn Pos + chênh 5.850.000đ');
 const r1 = C._srBcBuild_(orders);
 ok(r1.detail[1][ci('Phần còn lại tính theo Thẻ Pos')] === '' && r1.tot.du === 0, 'don khong co phan con lai: o de trong, tong = 0 (khong doi hanh vi cu)');
 ok(C._srBaseCheckPanelHtml_({ orders: O2, ghep: {} }).indexOf('Phần còn lại tính theo Thẻ Pos') >= 0, 'man hinh hien tong phan con lai khi co');

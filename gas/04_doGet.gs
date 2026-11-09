@@ -334,7 +334,8 @@ function doGetCore_(e) {
                  sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer),
                  sanPham: pB.sanPham || '',
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
-                 zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
+                 zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '',
+                 withBaseProduct: true };   // Bao cao check nguoc Base can san pham + kenh cua tung don goc Base (Duyen 2026-11-09); co trong filters nen vao khoa cache luon
       var cacheB = CacheService.getScriptCache();
       var snapB_ = _readPosSnapshots_();   // dau moc chot vao khoa cache: bam Chot/Chot lai la bang Theo Sale doi NGAY (khong doi het 120s cache cu)
       var cKeyB = _reportCacheKey_('salesB6_' + Object.keys(snapB_).sort().map(function(k) { return k.slice(2).replace('-', '') + String((snapB_[k] || {}).closedAt || '').replace(/\D/g, ''); }).join('.') + '_', fB);   // salesB4_ -> salesB5_: ket qua gio co the da tru hoan/huy theo moc chot

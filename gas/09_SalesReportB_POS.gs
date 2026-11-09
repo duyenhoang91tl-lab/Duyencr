@@ -113,7 +113,7 @@ function _readBaseRowsByCounterCodes_(wantedCodes, withProduct) {
   if (colIdx < 0) return res;
   var n = last - 1;
   function col_(ci) { return sh.getRange(2, ci + 1, n, 1).getValues(); }
-  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1), cNgay = col_(DT_COL_NGAYTAO), cSP = withProduct ? col_(DT_COL_SANPHAM) : null;   // cSP: chi doc khi bao cao chi tiet don chia (splitOrderDetail) can "san pham" tren Base // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
+  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1), cNgay = col_(DT_COL_NGAYTAO), cSP = withProduct ? col_(DT_COL_SANPHAM) : null, cKenh = withProduct ? col_(DT_COL_KENHBAN) : null;   // cSP: chi doc khi bao cao chi tiet don chia (splitOrderDetail) can "san pham" tren Base // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
   var re = new RegExp(COUNTER_CODE_RE_SRC_, 'g'), quick = /[Tt]\d/;
   function addHit_(bucket, key, rowObj) {
     var arr = bucket[key] || (bucket[key] = []);
@@ -148,7 +148,8 @@ function _readBaseRowsByCounterCodes_(wantedCodes, withProduct) {
           ngayTao: cNgay[i][0], // NGAY TAO DON tren Base (doanh thu NGAY / thuong tinh theo ngay nay, khong theo ngay Pos)
           giaTriDon: _normMoney_(cGT[i][0]),
           code: bc,
-          sanPham: cSP ? String(cSP[i][0] || '') : undefined
+          sanPham: cSP ? String(cSP[i][0] || '') : undefined,
+          kenh: cKenh ? String(cKenh[i][0] || '') : undefined   // cot M "Kenh ban" tren Base — hien o Bao cao check nguoc Base (Duyen 2026-11-09)
         };
       }
       if (isWanted) addHit_(res.exact, bc, rowObj);
@@ -215,7 +216,7 @@ function _resolveGhepDon_(codes, idx, usedBaseRows, posVal, theNames) {
     // baseOrders = TUNG don goc Base da khop (ke ca don bi loai) de ke toan do lai tung don (Bao cao check nguoc Base). CHI THEM FIELD, khong doi cach tinh.
     var exclB = _isExcludedOrderStatus_(br.trangThai), bDt0 = parseVNDate_(br.ngayTao);
     baseOrders.push({ dong: br.rowIndex, ma: br.code || '', ngay: bDt0 ? _vnYmd_(bDt0) : '', nguoiTao: br.creator || '', saleBan: String(br.saleBan || ''),
-      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !exclB, sanPham: br.sanPham });
+      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !exclB, sanPham: br.sanPham === undefined ? undefined : String(br.sanPham).substring(0, 200), kenh: br.kenh });
     if (exclB) continue; // don goc da Huy/Hoan (theo dinh nghia Base) -> khong tinh
     liveRows++;
     var bDt = parseVNDate_(br.ngayTao), bYmd = bDt ? _vnYmd_(bDt) : '';
