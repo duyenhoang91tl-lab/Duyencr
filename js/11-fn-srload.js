@@ -1581,14 +1581,19 @@ function _srBaseCheckPanelHtml_(d){
   if (!d || !d.orders) return '';
   var orders = _srBcOrders_(d), g = d.ghep || {};
   var b = _srBcBuild_(orders), t = b.tot;
-  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — chia sale theo đơn gốc Base)</span></div>';
-  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b>' + (t.du ? ' · Phần còn lại tính theo Thẻ Pos <b>' + _srMoney(t.du) + '</b>' : '') +
+  // Duyên 2026-11-09: màn hình CHỈ hiện đơn Pos lệch Base (|Base − Pos| > 1đ, cùng ngưỡng tô đỏ + t.lech) để check tay/chia tiền tay; đơn khớp thì ẩn. Xếp lệch lớn nhất lên đầu. Excel xuất vẫn đủ mọi đơn ghép.
+  var lechOrders = orders.filter(function(o){ return Math.abs(_srBcBaseSum_(o) - _srBcPosVal_(o)) > 1; })
+    .sort(function(x, y){ return Math.abs(_srBcBaseSum_(y) - _srBcPosVal_(y)) - Math.abs(_srBcBaseSum_(x) - _srBcPosVal_(x)); });
+  var lechTot = lechOrders.reduce(function(sum, o){ return sum + (_srBcBaseSum_(o) - _srBcPosVal_(o)); }, 0);
+  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — CHỈ hiện đơn Pos lệch Base để check tay &amp; chia tiền tay; đơn khớp thì ẩn)</span></div>';
+  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b> · <span style="color:#c00">Đơn lệch cần check tay <b>' + fmt(lechOrders.length) + '</b> (tổng chênh <b>' + _srMoney(lechTot) + '</b>)</span>' + (t.du ? ' · Phần còn lại tính theo Thẻ Pos <b>' + _srMoney(t.du) + '</b>' : '') +
     ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>. ' +
     '<button class="btn sm" onclick="_srBaseCheckExport_()">📥 Xuất Excel check ngược Base</button></div>';
   if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
+  if (!lechOrders.length){ return h + '<div style="font-size:12px;color:var(--muted)">✅ Cả ' + fmt(orders.length) + ' đơn Pos ghép Base đều khớp giá với Base — không có đơn nào cần check tay.</div>'; }
   var LIM = 100;
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th>Đơn gốc Base</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
-  orders.slice(0, LIM).forEach(function(o){
+  lechOrders.slice(0, LIM).forEach(function(o){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
     var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
     var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
@@ -1596,7 +1601,7 @@ function _srBaseCheckPanelHtml_(d){
       '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
   });
   h += '</tbody></table></div>';
-  if (orders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(orders.length) + ' đơn — bấm <b>Xuất Excel</b> để xem đủ.</div>';
+  if (lechOrders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(lechOrders.length) + ' đơn lệch (lệch lớn nhất trước) — bấm <b>Xuất Excel</b> để xem đủ.</div>';
   return h;
 }
 function _srBaseCheckExport_(){

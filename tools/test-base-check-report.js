@@ -42,8 +42,27 @@ const chk = C._srBcCheckRows_({ ghep: { khongKhop: [{ ngay: 'n', sdt: 's', maCoD
 ok(chk.length === 3 && /KHÔNG khớp/.test(chk[1][0]) && /BỊ BỎ/.test(chk[2][0]), 'Sheet cần kiểm tra tay: có nhóm không khớp + đơn Pos bị bỏ vì gốc Thất bại');
 ok(C._srBcCheckRows_({}).length === 2, 'Không có mục nào → 1 dòng thông báo');
 const html = C._srBaseCheckPanelHtml_({ orders: O, ghep: { khongKhopCount: 1, trungDonGocCount: 0, gocBiLoai: 2 }, ghepCheck: { count: 3 } });
-ok(/check ngược Base/.test(html) && /K1/.test(html) && /K2/.test(html) && !/K3/.test(html), 'Panel hiện đơn ghép (K1, K2), không hiện đơn thường (K3)');
-ok(/bị loại: Thất bại/.test(html), 'Panel ghi rõ đơn gốc bị loại');
+ok(/check ngược Base/.test(html) && /K1/.test(html) && !/K3/.test(html), 'Panel hiện đơn ghép LỆCH (K1 lệch -500.000), không hiện đơn thường (K3)');
+ok(!/K2/.test(html), 'Đơn K2 khớp Pos=Base (1.000.000, đơn gốc Thất bại không tính) → ẨN khỏi màn hình');
+ok(/Đơn lệch cần check tay <b>1<\/b>/.test(html), 'Tóm tắt: 1 đơn lệch cần check tay');
+// ===== Duyên 2026-11-09: CHỈ hiện đơn lệch Base–Pos (ca theo ảnh thật) =====
+const mk = (row, khach, sdt, the, pos, base, ma) => ({ posRow: row, ngayTaoDon: '04/11/2026', khachHang: khach, soDienThoai: sdt, theSale: the, giaTriPos: pos, giaTriSauGiam: pos, cod: 0, ghiChu: ma, ghepCodes: [ma],
+  ghepBase: [B(row, ma, 'x', the, 'Hoàn thành', base, true)], saleShares: [{ name: the, frac: 1 }], dieuChinh: 'base' });
+const O3 = [ mk(31, 'Luong Ha', '0362888575', 'thuydinh95', 4228000, 4228000, '147T11/2026'),
+             mk(32, 'Tran Thi Ngan', '0832960589', 'ninhnga99', 6093000, 6033000, '145T11/2026'),
+             mk(33, 'Ngo thanh', '0934320468', 'huyenmaii1990', 6150000, 6150000, '141T11/2026'),
+             mk(34, 'Kim Kim', '0368955601', 'huyenmaii1990', 8800000, 8800000, '133T11/2026'),
+             mk(35, 'Khach Lech Lon', '0900000035', 'A', 10000000, 7000000, '150T11/2026') ];
+const h3 = C._srBaseCheckPanelHtml_({ orders: O3, ghep: {}, ghepCheck: {} });
+ok(/Tran Thi Ngan/.test(h3) && /Khach Lech Lon/.test(h3), 'Ca ảnh: đơn ninhnga99 (−60.000) và đơn lệch lớn đều HIỆN');
+ok(!/Luong Ha/.test(h3) && !/Ngo thanh/.test(h3) && !/Kim Kim/.test(h3), 'Ca ảnh: các đơn Chênh 0đ (Luong Ha, Ngo thanh, Kim Kim) bị ẨN');
+ok(h3.indexOf('Khach Lech Lon') < h3.indexOf('Tran Thi Ngan'), 'Xếp lệch lớn nhất (−3.000.000) trước lệch nhỏ (−60.000)');
+ok(/Đơn Pos đã ghép: <b>5<\/b>/.test(h3) && /Đơn lệch cần check tay <b>2<\/b>/.test(h3), 'Vẫn đếm đủ 5 đơn ghép, nhưng chỉ 2 đơn lệch');
+const h4 = C._srBaseCheckPanelHtml_({ orders: [O3[0], O3[2]], ghep: {}, ghepCheck: {} });
+ok(/đều khớp giá với Base/.test(h4) && !/<table/.test(h4), 'Tất cả khớp → báo ✅ không có đơn cần check tay, không vẽ bảng');
+const Obig = []; for (let i = 0; i < 130; i++) Obig.push(mk(100 + i, 'KH' + i, '09' + i, 'S', 1000000 + 5000, 1000000, i + 'T11/2026'));
+const h5 = C._srBaseCheckPanelHtml_({ orders: Obig, ghep: {}, ghepCheck: {} });
+ok(/Đang hiện 100\/130 đơn lệch/.test(h5), 'Quá 100 đơn lệch → ghi rõ 100/130, Excel xem đủ');
 ok(C._srBaseCheckPanelHtml_({ orders: [{ posRow: 1, giaTriSauGiam: 1 }], ghep: {}, ghepCheck: {} }).indexOf('không có đơn Pos nào ghép') > 0, 'Không có đơn ghép → báo rõ, không lỗi');
 ok(C._srBaseCheckPanelHtml_(null) === '' && C._srBaseCheckPanelHtml_({}) === '', 'Chưa có dữ liệu → trả rỗng, không lỗi');
 // ===== QUY TAC 21/10/2026: phan CON LAI cua don ghep (gia Pos - tong goc) tinh cho sale tren the Pos -> co cot rieng trong Excel =====
