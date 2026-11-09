@@ -227,6 +227,117 @@ async function _srMToggleRatio_(){
     if (typeof toast==='function') toast('❌ Chưa đổi được công tắc: '+(err && err.message || err));
   }
 }
+// ═══ ĐƠN LỆCH POS–BASE: Admin chỉnh chia tay từng đơn (Duyên 2026-11-06) ═══
+// Danh sách từ GET splitFixList (thẻ Pos + từng đơn gốc Base + chia hiện tại). Lưu = Settings acctSplitExtra (mảng [{code,sales:[..],tong}], nhiều dòng cùng code = chia tay; ưu tiên hơn ghép Base).
+// Mỗi dòng nhập: "sale1, sale2 = số tiền"  (sale trong 1 dòng chia đều số tiền đó). Tổng các dòng = doanh thu đơn.
+function splitFixCodeNy_(c){ return String(c||'').replace(/\s+/g,'').toUpperCase().replace(/\/\d{2,4}$/,''); }
+function splitFixParseLines_(text){
+  var rows = [], errs = [];
+  String(text||'').split(/\r?\n/).forEach(function(line, i){
+    line = line.trim(); if (!line) return;
+    var k = line.lastIndexOf('='); if (k < 0) k = line.lastIndexOf(':');
+    if (k < 0) { errs.push('Dòng ' + (i+1) + ': thiếu dấu "=" (dạng: sale1, sale2 = 5000000)'); return; }
+    var sales = line.slice(0,k).split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+    var digits = line.slice(k+1).replace(/[^0-9]/g,''), tong = digits ? parseInt(digits,10) : NaN;
+    if (!sales.length) { errs.push('Dòng ' + (i+1) + ': thiếu tên sale'); return; }
+    if (!(tong >= 0)) { errs.push('Dòng ' + (i+1) + ': số tiền không hợp lệ'); return; }
+    rows.push({ sales: sales, tong: tong });
+  });
+  return { rows: rows, errors: errs, total: rows.reduce(function(s,r){ return s + r.tong; }, 0) };
+}
+function splitFixRemoveCode_(arr, code){ var ny = splitFixCodeNy_(code); return (arr||[]).filter(function(x){ return splitFixCodeNy_(x && x.code) !== ny; }); }
+function splitFixMergeExtra_(arr, code, rows){
+  var out = splitFixRemoveCode_(arr, code);
+  rows.forEach(function(r){ out.push({ code: String(code), sales: r.sales.slice(), tong: r.tong }); });
+  return out;
+}
+function splitFixDefaultText_(o){ return (o.current||[]).map(function(c){ return c.name + ' = ' + Math.round(c.tien||0); }).join('\n'); }
+async function _splitFixGetExtra_(){
+  var r = await _srFetch('getSetting', { key:'acctSplitExtra' }), v = String((r && r.value) || '').trim();
+  if (!v) return [];
+  var a = JSON.parse(v); if (!Array.isArray(a) && a && Array.isArray(a.rows)) a = a.rows;
+  return Array.isArray(a) ? a : [];
+}
+async function _splitFixPutExtra_(arr){
+  var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'acctSplitExtra', value: JSON.stringify(arr) }) });
+  var j = await r.json(); if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+}
+async function splitFixLoad_(){
+  var f = _srState.fix = _srState.fix || { edits:{} };
+  f.loading = true; f.err = ''; _splitFixRerender_();
+  try{
+    var rs = await Promise.all([ _srFetch('splitFixList', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo, q:f.q||'' }), _splitFixGetExtra_().catch(function(){ return null; }) ]);
+    var d = rs[0]; if (!d || d.ok===false) throw new Error((d && d.error) || (_srState.lastFetchError) || 'Không tải được danh sách.');
+    f.data = d; f.extra = rs[1] || []; f.extraErr = rs[1] === null;
+  }catch(e){ f.err = String(e && e.message || e); }
+  f.loading = false; _splitFixRerender_();
+}
+function splitFixToggle_(){
+  _srState.fixOpen = !_srState.fixOpen;
+  if (_srState.fixOpen && !(_srState.fix && _srState.fix.data)) splitFixLoad_(); else _splitFixRerender_();
+  var btn = document.getElementById('sr-fix-btn'); if (btn) btn.className = 'btn sm' + (_srState.fixOpen ? ' primary' : '');
+}
+function splitFixEdit_(i, v){ var f = _srState.fix; f.edits[i] = v; var el = document.getElementById('sr-fix-sum-'+i); if (el) el.innerHTML = splitFixSumHtml_(i); }
+function splitFixSumHtml_(i){
+  var f = _srState.fix, o = f.data.rows[i], t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o), p = splitFixParseLines_(t);
+  if (p.errors.length) return '<span style="color:#c0392b">' + splitEsc_(p.errors[0]) + '</span>';
+  var d = p.total - o.posVal;
+  return 'Tổng chia tay: <b>' + splitMoney_(p.total) + '</b> · giá Pos ' + splitMoney_(o.posVal) + (d ? ' · <span style="color:#b9770e">chênh ' + (d>0?'+':'') + splitMoney_(d) + ' (đơn sẽ tính theo tổng chia tay)</span>' : ' · khớp');
+}
+async function splitFixSave_(i){
+  var f = _srState.fix, o = f.data.rows[i], t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o), p = splitFixParseLines_(t);
+  if (p.errors.length) { toast('❌ ' + p.errors[0]); return; }
+  if (!p.rows.length) { toast('❌ Chưa có dòng chia nào'); return; }
+  if (typeof confirm==='function' && !confirm('Lưu chia tay đơn ' + o.code + '?\n\nTổng ' + splitMoney_(p.total) + ' (giá Pos ' + splitMoney_(o.posVal) + ').\nTừ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).')) return;
+  try{
+    var cur = await _splitFixGetExtra_();
+    await _splitFixPutExtra_(splitFixMergeExtra_(cur, o.code, p.rows));
+    delete f.edits[i]; toast('✅ Đã lưu chia tay ' + o.code + ' — đang tính lại báo cáo');
+    if (typeof _srLoad==='function') _srLoad();
+    splitFixLoad_();
+  }catch(e){ toast('❌ Chưa lưu được: ' + (e && e.message || e)); }
+}
+async function splitFixDelete_(code){
+  if (typeof confirm==='function' && !confirm('Xoá chia tay đơn ' + code + ' khỏi bảng CRM? (đơn quay về tự động theo Base; dòng ở tab onl của kế toán không bị xoá)')) return;
+  try{
+    var cur = await _splitFixGetExtra_();
+    await _splitFixPutExtra_(splitFixRemoveCode_(cur, code));
+    toast('✅ Đã xoá chia tay ' + code); if (typeof _srLoad==='function') _srLoad(); splitFixLoad_();
+  }catch(e){ toast('❌ Chưa xoá được: ' + (e && e.message || e)); }
+}
+function splitFixPanelHtml_(){
+  if (!_srIsAdmin_() || !_srState.fixOpen) return '';
+  var f = _srState.fix || {}, h = '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin:0 0 14px;background:var(--card,#fff)">'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><b>🛠 Đơn lệch Pos–Base — chia tay doanh thu</b>'
+    + '<input type="text" value="' + splitEsc_(f.q||'') + '" placeholder="Tìm mã / khách / sale" onchange="_srState.fix.q=this.value;splitFixLoad_()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;min-width:200px">'
+    + '<button type="button" class="btn sm" onclick="splitFixLoad_()">↻ Tải lại</button></div>'
+    + '<div style="color:var(--muted);font-size:12px;margin-bottom:8px">Mỗi dòng: <code>sale1, sale2 = số tiền</code> (sale cùng dòng chia đều). Đơn đã có dòng chia tay (tab onl của kế toán hoặc bảng CRM) không hiện ở đây.</div>';
+  if (f.loading) return h + '<div style="padding:16px;color:var(--muted)">Đang tải…</div></div>';
+  if (f.err) return h + '<div style="padding:10px;color:#c0392b">' + splitEsc_(f.err) + '</div></div>';
+  var d = f.data; if (!d) return h + '</div>';
+  h += '<div style="margin-bottom:8px">Có <b>' + d.total + '</b> đơn ghép lệch Pos–Base' + (d.truncated ? ' (chỉ hiện ' + d.rows.length + ' đơn lệch nhiều nhất — lọc thêm bằng ô tìm)' : '') + '.</div>';
+  d.rows.forEach(function(o, i){
+    var t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o);
+    h += '<div style="border-top:1px solid var(--border);padding:10px 0">'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b>' + splitEsc_(o.code || '(không mã)') + '</b><span style="color:var(--muted)">' + splitEsc_(o.ngay) + ' · ' + splitEsc_(o.khach) + ' · ' + splitEsc_(o.sdt) + '</span></div>'
+      + '<div style="margin:4px 0">Pos: <b>' + splitMoney_(o.posVal) + '</b> · thẻ Pos: <b>' + splitEsc_(o.the.join(', ') || '—') + '</b> · Base: <b>' + splitMoney_(o.baseSum) + '</b> · <span style="color:' + (o.lechTien ? '#c0392b' : '#b9770e') + '">' + (o.lechTien ? 'lệch ' + (o.lechTien>0?'+':'') + splitMoney_(o.lechTien) : 'lệch người bán') + '</span></div>'
+      + '<table style="font-size:12px;border-collapse:collapse;margin:4px 0"><tr style="color:var(--muted)"><td style="padding:1px 10px 1px 0">Đơn gốc Base</td><td style="padding:1px 10px">Sale bán</td><td style="padding:1px 10px;text-align:right">Giá trị</td><td style="padding:1px 10px">Trạng thái</td></tr>'
+      + o.base.map(function(x){ return '<tr style="' + (x.tinh ? '' : 'opacity:.55;text-decoration:line-through') + '"><td style="padding:1px 10px 1px 0">' + splitEsc_(x.ma) + ' <span style="color:var(--muted)">' + splitEsc_(x.ngay) + '</span></td><td style="padding:1px 10px">' + splitEsc_(x.saleBan || '—') + '</td><td style="padding:1px 10px;text-align:right">' + splitMoney_(x.giaTri) + '</td><td style="padding:1px 10px">' + splitEsc_(x.trangThai) + '</td></tr>'; }).join('') + '</table>'
+      + '<textarea rows="' + Math.max(2, Math.min(6, t.split('\n').length)) + '" oninput="splitFixEdit_(' + i + ',this.value)" style="width:100%;max-width:560px;font-family:monospace;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px">' + splitEsc_(t) + '</textarea>'
+      + '<div style="font-size:12px;margin:4px 0" id="sr-fix-sum-' + i + '">' + splitFixSumHtml_(i) + '</div>'
+      + '<button type="button" class="btn sm primary" onclick="splitFixSave_(' + i + ')">💾 Lưu chia tay</button></div>';
+  });
+  var ex = {}; (f.extra||[]).forEach(function(x){ if (!x || !x.code) return; var k = splitFixCodeNy_(x.code); (ex[k] = ex[k] || { code: x.code, rows: [] }).rows.push(x); });
+  var keys = Object.keys(ex);
+  h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>Chia tay đang lưu trong CRM</b> (' + keys.length + ' đơn)' + (f.extraErr ? ' <span style="color:#c0392b">— không đọc được bảng</span>' : '') + '</div>';
+  keys.forEach(function(k){
+    var g = ex[k];
+    h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;font-size:12px"><b>' + splitEsc_(g.code) + '</b><span>' + g.rows.map(function(r){ return splitEsc_((r.sales||[]).join(', ')) + ' = ' + splitMoney_(r.tong); }).join(' · ') + '</span>'
+      + '<button type="button" class="btn sm" data-code="' + splitEsc_(g.code) + '" onclick="splitFixDelete_(this.getAttribute(\'data-code\'))">Xoá</button></div>';
+  });
+  return h + '</div>';
+}
+function _splitFixRerender_(){ var el = document.getElementById('sr-m-fix'); if (el) el.innerHTML = splitFixPanelHtml_(); }
 function _srIsAdmin_(){ return typeof currentUser!=='undefined' && !!currentUser && currentUser.role==='admin'; }
 async function _srMToggleGhep_(){
   var turnOn = !_srState.ghepMin1;
@@ -266,8 +377,9 @@ function renderSalesReportTabM_(wrap, subTabs){
     +'<input type="text" id="sr-m-search" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm sale / khách / SĐT / sản phẩm…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;min-width:260px">'
     +splitGhepBtnHtml_(_srIsAdmin_(), !!_srState.ghepMin1)
     +splitRatioBtnHtml_(_srIsAdmin_(), !!_srState.ghepRatio)
+    +(_srIsAdmin_() ? '<button type="button" id="sr-fix-btn" class="btn sm'+(_srState.fixOpen?' primary':'')+'" onclick="splitFixToggle_()" title="Xem thẻ Pos + đơn gốc Base của các đơn ghép lệch nhau và chỉnh chia tay doanh thu từng đơn">🛠 Đơn lệch Pos–Base</button>' : '')
     +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">⬇ Excel đối soát TẤT CẢ sale</button></div>';
-  wrap.innerHTML = bar + tools + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
+  wrap.innerHTML = bar + tools + '<div id="sr-m-fix">' + splitFixPanelHtml_() + '</div><div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
 function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel); }
