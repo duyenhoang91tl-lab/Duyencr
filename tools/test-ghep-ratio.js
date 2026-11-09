@@ -24,12 +24,12 @@ ok(money(r, 'An') === 8e6 && money(r, 'Binh') === 4e6 && fr(r, 'Cuong') === unde
 idx = { exact: { 'B1T10/2026': [mk(1, 'B1T10/2026', 'An', 6e6)], 'B2T10/2026': [mk(2, 'B2T10/2026', 'Binh', 3e6)] } };
 r = build('1')(['B1T10/2026', 'B2T10/2026'], idx, {}, 12e6, ['Cuong']);
 ok(r.total === 12e6 && money(r, 'An') === 8e6 && money(r, 'Binh') === 4e6 && !r.remainder, 'Base 9tr < Pos 12tr => chia theo ty le Base (8tr/4tr), khong co phan du cho the Pos');
-// C: cung du lieu B nhung cong tac TAT => quy tac cu (phan du 3tr chia cho Cuong): tong van 12tr, Cuong 3tr
-r = build('')(['B1T10/2026', 'B2T10/2026'], idx, {}, 12e6, ['Cuong']);
+// C: cung du lieu B nhung cong tac TAT (Settings POS_GHEP_RATIO='0') => quy tac cu (phan du 3tr chia cho Cuong): tong van 12tr, Cuong 3tr
+r = build('0')(['B1T10/2026', 'B2T10/2026'], idx, {}, 12e6, ['Cuong']);
 ok(r.total === 12e6 && money(r, 'Cuong') === 3e6 && money(r, 'An') === 6e6 && !r.scale, 'cong tac TAT => hanh vi cu giu nguyen (Cuong nhan phan du 3tr)');
 // D: Base > Pos, cong tac TAT => cu: total = tong Base (15tr)
 idx = { exact: { 'A1T10/2026': [mk(1, 'A1T10/2026', 'An', 10e6)], 'A2T10/2026': [mk(2, 'A2T10/2026', 'Binh', 5e6)] } };
-r = build('')(['A1T10/2026', 'A2T10/2026'], idx, {}, 12e6, ['Cuong']);
+r = build('0')(['A1T10/2026', 'A2T10/2026'], idx, {}, 12e6, ['Cuong']);
 ok(r.total === 15e6, 'cong tac TAT, Base > Pos => van total = tong Base 15tr (hanh vi cu)');
 // E: khong co Base (khong khop) => khongKhop, fallback Pos (khong ghep)
 r = build('1')(['Z9T10/2026'], { exact: {} }, {}, 5e6, ['Cuong']);
@@ -42,4 +42,7 @@ ok(r.total === 5e6 && money(r, 'An') === 2.5e6 && money(r, 'Binh') === 2.5e6 && 
 idx = { exact: { 'G1T10/2026': [mk(1, 'G1T10/2026', 'An', 3333333)], 'G2T10/2026': [mk(2, 'G2T10/2026', 'Binh', 1111111)] } };
 r = build('1')(['G1T10/2026', 'G2T10/2026'], idx, {}, 7777777, []);
 ok(Math.abs(r.shares.reduce((s, x) => s + x.frac * r.total, 0) - 7777777) < 1e-6, 'tong cac phan chia = Pos (7.777.777)');
+// H: MAC DINH (Settings trong / khong dat) = BAT (Duyen 2026-11-06 'luon bat')
+r = build('')(['B1T10/2026', 'B2T10/2026'], { exact: { 'B1T10/2026': [mk(1, 'B1T10/2026', 'An', 6e6)], 'B2T10/2026': [mk(2, 'B2T10/2026', 'Binh', 3e6)] } }, {}, 12e6, ['Cuong']);
+ok(r.scale === 12e6 / 9e6 && money(r, 'An') === 8e6 && !r.remainder, 'Settings trong => MAC DINH BAT che do ty le');
 console.log(fail ? 'FAIL ' + fail : 'ALL OK'); process.exit(fail ? 1 : 0);

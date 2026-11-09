@@ -251,8 +251,8 @@ async function splitReportLoad_(){
   var gp = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_MIN_CODES' }).catch(function(){ return null; }) : Promise.resolve(null);
   var gr = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_RATIO' }).catch(function(){ return null; }) : Promise.resolve(null);
   _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo, sale:(_srState.mSale||[]).join(','), nguon:(_srState.mNguon||[]).join(',') });
-  var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()==='1';
-  var g2 = await gr; if (_srIsAdmin_()) _srState.ghepRatio = String((g2 && g2.value) || '').trim()==='1';
+  var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()!=='2';   // MAC DINH BAT (Duyen 2026-11-06): chi Settings '2' moi tat
+  var g2 = await gr; if (_srIsAdmin_()) _srState.ghepRatio = String((g2 && g2.value) || '').trim()!=='0';   // MAC DINH BAT (Duyen 2026-11-06): chi Settings '0' moi tat
 }
 // Thân báo cáo: KPI + bảng theo sale (bấm dòng → panel đối soát Base/Pos) + panel + danh sách chi tiết TẤT CẢ đơn chia (có ô tìm)
 function splitMBodyHtml_(d, search, sel){
