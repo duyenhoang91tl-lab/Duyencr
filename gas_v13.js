@@ -1780,7 +1780,7 @@ function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   return ok;
 }
 // Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
-var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitFixList:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
 function _featureGate_(action, token) {
   var f = ACTION_FEATURE_[action];
   if (!f || !token) return null;
@@ -20366,7 +20366,7 @@ function cvList_(p) {
 // ═══════════════════════════════════════════════════════
 var SPLIT_ORDER_MAX_ROWS_ = 3000;
 var SPLIT_DETAIL_MAX_ = 1500;
-var SPLIT_GET_ACTIONS_ = { splitOrderReport: 1, splitOrderMine: 1, splitOrderDetail: 1 };
+var SPLIT_GET_ACTIONS_ = { splitOrderReport: 1, splitOrderMine: 1, splitOrderDetail: 1, splitFixList: 1 };
 var SPLIT_POST_ACTIONS_ = { exportSplitOrderSheet: 1 };
 var SPLIT_UNASSIGNED_ = '(chưa gán sale)';
 
@@ -20674,11 +20674,43 @@ function splitOrderDetail_(p, user) {
   try { var js = JSON.stringify(out); cache.put(ck, js.length < 90000 ? js : '', 120); } catch (e1) {}
   return _splitAttachFeedback_(out);
 }
+// ---- DON GHEP LECH POS-BASE (Duyen 2026-11-06): admin xem THE SALE tren Pos + tung DON GOC Base cua moi don ghep co Base lech Pos (lech tien HOAC lech nguoi ban) de CHIA TAY tung don.
+// CHI ADMIN. Doc tu Bao cao B (cung bo loc ngay) nen khop so lieu bao cao; KHONG ghi gi. Don da co dong chia tay (tab onl / bang CRM) di nhanh khac (khong ghep Base) nen khong nam trong danh sach nay -
+// giao dien lay danh sach chia tay hien co tu Settings acctSplitExtra. Tien chia hien tai = ty le * tong don (da theo che do ty le Base).
+function splitFixList_(p, user) {
+  if (!user || user.role !== 'admin') return { ok: false, code: 'AUTH', error: 'Chi Admin duoc chinh chia tay don ghep Base.' };
+  var r = _splitRange_(p), search = _normTxt_(String(p.q || '')), minDiff = Number(p.minDiff) >= 0 ? Number(p.minDiff) : 1000;
+  var rb = buildSalesReportB_(_splitFilters_(r.from, r.to, [], []));
+  var rows = [], total = 0;
+  (rb.orders || []).forEach(function (o) {
+    var gb = o.ghepBase || [];
+    if (!gb.length) return;
+    var posVal = Number(o.giaTriPos) || Number(o.giaTriSauGiam) || 0, baseSum = 0, baseNames = {}, base = [];
+    gb.forEach(function (b) {
+      var gt = Number(b.giaTri) || 0, names = _saleNamesClean_(b.saleBan).filter(function (x) { return !_isNumericTag_(x); });
+      if (b.tinh) { baseSum += gt; names.forEach(function (n) { baseNames[_normTxt_(n)] = n; }); }
+      base.push({ ma: String(b.ma || ''), ngay: String(b.ngay || ''), saleBan: names.join(', '), nguoiTao: String(b.nguoiTao || ''), giaTri: Math.round(gt), trangThai: String(b.trangThai || ''), tinh: !!b.tinh });
+    });
+    var theNames = _donSaleNamesFromThe_(o.theSale).filter(function (x) { return x && !_isNumericTag_(x); }), theSet = {};
+    theNames.forEach(function (n) { theSet[_normTxt_(n)] = 1; });
+    var lechTien = Math.round(baseSum - posVal), lechSale = Object.keys(baseNames).some(function (k) { return !theSet[k]; }) || theNames.some(function (n) { return !baseNames[_normTxt_(n)]; });
+    if (Math.abs(lechTien) <= minDiff && !lechSale) return;
+    var tot = Number(o.giaTriSauGiam) || 0, cur = (o.saleShares || []).map(function (s) { return { name: s.name, tien: Math.round((Number(s.frac) || 0) * tot) }; });
+    var codes = _extractCounterCodes_(o.ghiChu), key = codes[0] || '';
+    var hay = _normTxt_([key, o.khachHang, o.soDienThoai, o.theSale, base.map(function (x) { return x.ma + ' ' + x.saleBan; }).join(' ')].join(' '));
+    if (search && hay.indexOf(search) === -1) return;
+    total++;
+    if (rows.length < 400) rows.push({ code: key, codes: codes, ngay: String(o.ngayTaoDon || ''), khach: String(o.khachHang || ''), sdt: String(o.soDienThoai || ''), ghiChu: String(o.ghiChu || '').substring(0, 160),
+      posVal: Math.round(posVal), the: theNames, base: base, baseSum: Math.round(baseSum), lechTien: lechTien, lechSale: lechSale, current: cur, tong: Math.round(tot) });
+  });
+  rows.sort(function (a, b) { return Math.abs(b.lechTien) - Math.abs(a.lechTien); });
+  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows };
+}
 function splitDoGet_(action, p) {
   try {
     var u = p && p.token ? _sessUser_(p.token) : null;
     if (!u) return jsonOut_({ ok: false, code: 'AUTH', error: 'Can dang nhap (tai khoan that) de xem don chia.' });
-    return jsonOut_(action === 'splitOrderReport' ? splitOrderReport_(p, u) : action === 'splitOrderDetail' ? splitOrderDetail_(p, u) : splitOrderMine_(p, u));
+    return jsonOut_(action === 'splitFixList' ? splitFixList_(p, u) : action === 'splitOrderReport' ? splitOrderReport_(p, u) : action === 'splitOrderDetail' ? splitOrderDetail_(p, u) : splitOrderMine_(p, u));
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi don chia: ' + (err && err.message || err) }); }
 }
 
