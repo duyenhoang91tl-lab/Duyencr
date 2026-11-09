@@ -186,6 +186,11 @@ if (BASE_MODE) {
   orders.forEach(o => { const gt = Number(o.giaTriDon) || 0, ls = o.saleShares && o.saleShares.length ? o.saleShares.map(x => [x.name, gt * x.frac]) : (() => { const l = String(o.saleBan || '').split(',').map(x => x.trim()).filter(Boolean); return l.map(n => [n, gt / l.length]); })();
     ls.forEach(([n, v]) => { const k = lcCh[String(n).toLowerCase()]; if (k) res.revBySale[k] = (res.revBySale[k] || 0) + v; }); }); }
 res.tachGroups = mergedInfo; res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
+// Duyen chot 2026-11-05: haPTN (Ha) + thanhNP (Thanh) NGHI VIEC -> BO QUA khong tra thuong. Van tinh trong cac don chia deu (so sale tren the giu nguyen, khong chia lai cho nguoi khac).
+const NGHI_VIEC = ['haPTN', 'thanhNP'];
+res.nghiViecBoQua = res.bySale.filter(x => NGHI_VIEC.includes(x.name)).map(x => ({ name: x.name, total: x.total }));
+res.nghiViecBoQua.forEach(x => { res.total -= x.total; }); res.bySale = res.bySale.filter(x => !NGHI_VIEC.includes(x.name));
+console.log('bo qua (nghi viec):', JSON.stringify(res.nghiViecBoQua));
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
 res.bySale.slice(0, 40).forEach(s => console.log(s.name.padEnd(22), String(s.total).padStart(9), (chRaw[s.name] || '(chua phan loai)')));

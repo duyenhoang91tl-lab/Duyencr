@@ -87,7 +87,7 @@ CT = [('10tr', 'Bill combo 2 sản phẩm', 'Đơn trên 10tr', 'Nguồn All', 2
       ('100tr', 'Thưởng doanh số ngày', 'Đạt từ 100tr/1 ngày', 'Nguồn All', 100000), ('THMoon', 'Tỳ hưu thiên lộc Moon', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 10000),
       ('THT', 'Tỳ hưu thiên lộc Tourmaline Hồng', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000), ('THT', 'Tỳ hưu thiên lộc Tourmaline Xanh', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000),
       ('THA', 'Tỳ hưu thiên lộc Aquamarine', 'Cộng thưởng theo số lượng sản phẩm bán ra', 'Nguồn All', 8000), ('T21', 'Tourmaline cao cấp', 'Đơn từ 21tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 100000), ('T31', 'Tourmaline cao cấp', 'Đơn từ 31tr500 (đơn không phát sinh huỷ)', 'Từ 21/9', 200000)]
-tv_sales = ', '.join(k for k, v in ch.items() if v == 'probation'); cc_sales = ', '.join(x['name'] for x in r['bySale'] if ch.get(x['name']) != 'probation')
+tv_sales = ', '.join(x['name'] for x in r['bySale'] if ch.get(x['name']) == 'probation'); cc_sales = ', '.join(x['name'] for x in r['bySale'] if ch.get(x['name']) != 'probation')
 k = 2
 for title, tbl, who in (('Sale thử việc', TV, tv_sales), ('Sale online / chính thức (gồm cả sale offline đã chính thức)', CT, cc_sales)):
     for n, x in enumerate(tbl, 1):
