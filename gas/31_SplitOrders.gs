@@ -294,7 +294,7 @@ function splitOrderDetail_(p, user) {
       var cnt = 0; names.forEach(function (n) { if (_normTxt_(id.primary(n)) === me) cnt++; });
       if (!cnt) return;
       any = true;
-      var bv = Number(b.giaTri) || 0, bsh = bv * cnt / names.length * ratio, bd = _splitDmy_(b.ngay);
+      var bv = Number(b.giaTri) || 0, bsh = bv * cnt / names.length * ratio * (Number(o.ghepScale) || 1), bd = _splitDmy_(b.ngay);
       base.push({ date: bd.dmy, month: bd.month, ymd: bd.ymd, name: String(o.khachHang || ''), phone: ph, code: String(b.ma || ''), sales: String(b.saleBan || ''),
         product: String(b.sanPham || '').substring(0, 300), total: _splitRound_(bv), share: _splitRound_(bsh) });
       sm.bt += bv; sm.bs += bsh;

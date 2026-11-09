@@ -892,6 +892,29 @@ function _posRevenueBySale_(ym) {
   (a.bySale || []).forEach(function(s) { out[s.name] = Number(s.giaTri) || 0; });
   return { bySale: out, total: Number(a.totalGiaTri) || 0 };
 }
+// BAN CO CACHE cua _posRevenueBySale_ — CHI dung cho lop tra ve action salesReportB (applyPosMonthAdjustToReportB_).
+// NGUYEN NHAN GOC Bao cao B tai rat lau / khong tai duoc (Duyen 2026-11-09): xem DUNG 1 thang lich ma thang truoc da chot thi MOI lan cache 120s het han, applyPosMonthAdjustToReportB_
+// goi _posRevenueBySale_(thang truoc) = chay LAI NGUYEN buildSalesReportB_ cho thang truoc (doc lai "du lieu don" + 6-7 cot DT TONG de ghep Base) => 1 lan bam Xem ton GAP DOI thoi gian,
+// co thang vuot 55s cua giao dien (AbortController) hoac 6 phut cua GAS. So thang truoc khong phu thuoc bo loc cua nguoi xem (luon ca thang, khong loc) nen cache chung cho moi nguoi.
+// KHONG dung cho closePosMonth_ / posMonthAdjust_: chot thang & nut "Xem sau khi tru" PHAI doc so moi nhat (khong duoc dung so cache cu).
+function _posRevCacheGet_(key) {
+  try { var raw = CacheService.getScriptCache().get(key); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object' && o.bySale && typeof o.bySale === 'object') return o; } } catch (e) {}
+  return null;
+}
+function _posRevCachePut_(key, obj, ttl) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(obj), ttl); } catch (e) {}
+}
+function _posRevenueBySaleCached_(ym) {
+  var key = '';
+  try { key = _reportCacheKey_('posRevBySale1_', { ym: ym }); } catch (eK) { key = ''; }   // khoa da gom cac cong tac chia (ty le Base / don 1 ma / bang chia bo sung) nen doi cong tac la co hieu luc ngay
+  var hit = key ? _posRevCacheGet_(key) : null;
+  if (hit) return hit;
+  var t0 = Date.now();
+  var out = _posRevenueBySale_(ym);
+  try { Logger.log('PERF posRevenueBySale ym=' + ym + ' ms=' + (Date.now() - t0) + ' sales=' + Object.keys(out.bySale).length); } catch (eL) {}
+  if (key) _posRevCachePut_(key, out, 180);
+  return out;
+}
 function _readPosSnapshots_() {
   try { var raw = getSetting_('posMonthSnapshots'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') return o; } } catch (e) {}
   return {};
@@ -951,7 +974,7 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   if (!snap) { info.reason = 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy.'; return res; }
   var other = ['nguon', 'marketer', 'careStatus', 'khStatus', 'zaloStatus'].some(function(k) { return filters[k] && filters[k].length; }) || filters.sanPham || filters.nickZalo;
   if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không trừ hoàn/hủy (số trừ tính cho cả tháng). Bỏ các bộ lọc này để xem số sau trừ.'; return res; }
-  var now = _posRevenueBySale_(prev), want = null;
+  var now = _posRevenueBySaleCached_(prev), want = null;   // cache 180s: truoc day moi lan cache bao cao het han lai chay LAI ca Bao cao B cua thang truoc (gap doi thoi gian)
   if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
   var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
   var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
@@ -2718,11 +2741,18 @@ function doGetCore_(e) {
       var cacheB = CacheService.getScriptCache();
       var snapB_ = _readPosSnapshots_();   // dau moc chot vao khoa cache: bam Chot/Chot lai la bang Theo Sale doi NGAY (khong doi het 120s cache cu)
       var cKeyB = _reportCacheKey_('salesB6_' + Object.keys(snapB_).sort().map(function(k) { return k.slice(2).replace('-', '') + String((snapB_[k] || {}).closedAt || '').replace(/\D/g, ''); }).join('.') + '_', fB);   // salesB4_ -> salesB5_: ket qua gio co the da tru hoan/huy theo moc chot
-      var cachedB = cacheB.get(cKeyB);
+      // NGUYEN NHAN GOC Bao cao B "dao nay tai rat lau / khong tai duoc" (Duyen 2026-11-09): CacheService.put CHI nhan gia tri <= 100KB, vuot thi NEM LOI (truoc day bi nuot im lang trong try/catch
+      // => KHONG BAO GIO cache duoc). Ket qua B ngay cang phinh (them bao cao don hoan/huy thang truoc toi 3000 don, danh sach don chia...) nen moi lan bam Xem deu tinh lai tu dau.
+      // Nay luu/doc theo CUM 30KB (_cachePutBig_/_cacheGetBig_, cung co che donChiTiet_v4) => bam Xem lai trong 120s la tra ngay.
+      var cachedB = _cacheGetBig_(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
+      var tB0_ = Date.now();
       var resB = buildSalesReportB_(fB);
+      var tB1_ = Date.now();
       try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
-      try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
+      var tB2_ = Date.now(), jsB_ = '';
+      try { jsB_ = JSON.stringify(resB); _cachePutBig_(cKeyB, jsB_, 120); } catch(ec) {}
+      try { Logger.log('PERF salesReportB from=' + fB.dateFrom + ' to=' + fB.dateTo + ' buildMs=' + (tB1_ - tB0_) + ' adjustMs=' + (tB2_ - tB1_) + ' totalMs=' + (Date.now() - tB0_) + ' bytes=' + jsB_.length + ' orders=' + (resB.totalOrders || 0)); } catch (eL) {}   // xem: Apps Script -> Executions
       return jsonOut_(resB);
     }
     // So lieu ca nhan cua 1 CS cho extension Pancake AI (chi doc) — xem buildCsStats_.

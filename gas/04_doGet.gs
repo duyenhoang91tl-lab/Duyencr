@@ -338,11 +338,18 @@ function doGetCore_(e) {
       var cacheB = CacheService.getScriptCache();
       var snapB_ = _readPosSnapshots_();   // dau moc chot vao khoa cache: bam Chot/Chot lai la bang Theo Sale doi NGAY (khong doi het 120s cache cu)
       var cKeyB = _reportCacheKey_('salesB6_' + Object.keys(snapB_).sort().map(function(k) { return k.slice(2).replace('-', '') + String((snapB_[k] || {}).closedAt || '').replace(/\D/g, ''); }).join('.') + '_', fB);   // salesB4_ -> salesB5_: ket qua gio co the da tru hoan/huy theo moc chot
-      var cachedB = cacheB.get(cKeyB);
+      // NGUYEN NHAN GOC Bao cao B "dao nay tai rat lau / khong tai duoc" (Duyen 2026-11-09): CacheService.put CHI nhan gia tri <= 100KB, vuot thi NEM LOI (truoc day bi nuot im lang trong try/catch
+      // => KHONG BAO GIO cache duoc). Ket qua B ngay cang phinh (them bao cao don hoan/huy thang truoc toi 3000 don, danh sach don chia...) nen moi lan bam Xem deu tinh lai tu dau.
+      // Nay luu/doc theo CUM 30KB (_cachePutBig_/_cacheGetBig_, cung co che donChiTiet_v4) => bam Xem lai trong 120s la tra ngay.
+      var cachedB = _cacheGetBig_(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
+      var tB0_ = Date.now();
       var resB = buildSalesReportB_(fB);
+      var tB1_ = Date.now();
       try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
-      try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
+      var tB2_ = Date.now(), jsB_ = '';
+      try { jsB_ = JSON.stringify(resB); _cachePutBig_(cKeyB, jsB_, 120); } catch(ec) {}
+      try { Logger.log('PERF salesReportB from=' + fB.dateFrom + ' to=' + fB.dateTo + ' buildMs=' + (tB1_ - tB0_) + ' adjustMs=' + (tB2_ - tB1_) + ' totalMs=' + (Date.now() - tB0_) + ' bytes=' + jsB_.length + ' orders=' + (resB.totalOrders || 0)); } catch (eL) {}   // xem: Apps Script -> Executions
       return jsonOut_(resB);
     }
     // So lieu ca nhan cua 1 CS cho extension Pancake AI (chi doc) — xem buildCsStats_.
