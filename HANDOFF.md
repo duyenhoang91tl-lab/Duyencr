@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-09 (phiên 46) — Báo cáo check ngược Base: Admin SỬA TAY tiền từng sale ngay cạnh đơn lệch (≥2 sale), sale còn lại tự bù — XONG 1/1 bước, đã push; CHỜ Duyên thử
+- **Duyên yêu cầu:** đơn Pos ghép Base mà có từ 2 sale và doanh thu lệch Pos–Base, nếu hệ thống tự chia chưa chuẩn thì Admin được sửa số tiền các sale ngay cạnh đơn (vd đơn 5tr: nhập sale A 3tr → sale B tự còn 2tr).
+- **NGUYÊN NHÂN GỐC:** bảng "Báo cáo check ngược Base" (`_srBaseCheckPanelHtml_`, `js/11-fn-srload.js`) chỉ HIỂN THỊ cột "Chia sale (theo Base)" (tỷ lệ tự động); muốn chia tay phải mở riêng panel "🛠 Đơn lệch Pos–Base" (js/50) và gõ text `sale = số tiền` từng dòng, không có tự bù.
+- [x] `js/11-fn-srload.js`: cột chia sale của đơn lệch có ≥2 sale → mỗi sale 1 ô số tiền (chỉ Admin). Nhập 1 ô → `_srBcRebalance_` tự bù các sale còn lại (2 sale: đúng phần còn lại; ≥3 sale: chia theo tỷ lệ số hiện có, sale cuối nhận số dư làm tròn; luôn tổng = tổng đơn, kẹp 0..tổng). Nút 💾 Lưu chia tay (`_srBcSave_`) dùng lại `_splitFixGetExtra_/_splitFixMergeExtra_/_splitFixPutExtra_` → Settings `acctSplitExtra` (mỗi sale 1 dòng `{code, sales:[tên], tong}`, code = mã bộ đếm đầu tiên `ghepCodes[0]`, thay SẠCH mọi dòng cùng mã), rồi `_srLoad()` tính lại. Nút ↺ Hoàn tác. Sale về 0đ thì bỏ dòng.
+- **KHÔNG hiện ô sửa:** user không phải Admin; đơn chỉ 1 sale; đơn quầy 30/70 (saleRatio≠1 — tổng đã nhân tỷ lệ quầy, dùng nút "🛠 Đơn lệch Pos–Base"). Backend `gas_v13.js` KHÔNG đổi (đã có sẵn acctSplitExtra ưu tiên hơn ghép Base) → không cần chờ deploy GAS. Không đụng extension.
+- Lưu ý hành vi: đơn đã lưu chia tay đi nhánh `acctSplitExtra` nên KHÔNG còn là "đơn ghép Base" → biến khỏi bảng check ngược sau khi tính lại; xem/xoá ở panel "Chia tay đang lưu trong CRM" (nút 🛠). Test: `node tools/test-bc-inline-edit.js` (15 ca, gồm ví dụ 5tr→3tr+2tr) ĐẠT; `test-base-check-report` (thêm stub), `test-split-fix-ui`, `test-acct-extra` vẫn đạt; `node -c js/*.js` OK. Bump `js/11-fn-srload.js?v=20261109b`.
+- [ ] **VIỆC KẾ TIẾP (nếu Duyên muốn):** (a) cho sửa cả đơn quầy 30/70 ngay trong bảng; (b) đưa tiền đã sửa vào cột Excel xuất check ngược; (c) thử với đơn thật ≥3 sale. **Duyên:** Ctrl+F5 CRM, mở Báo cáo B → bảng check ngược, thử 1 đơn lệch có 2 sale.
+
 ## 2026-11-09 (phiên 45) — Báo cáo check ngược Base: hiện KÊNH + SALE + SẢN PHẨM từng đơn gốc Base cạnh đơn Pos — XONG code, ĐÃ COMMIT cục bộ; CHƯA PUSH (chờ token mới của Duyên)
 - **Duyên yêu cầu (ảnh đơn Nguyễn Hải Phương: 1 đơn Pos 8.123.000 tách 2 đơn Base 79T11 + 62T11):** hiện rõ 2 đơn Base để check ngược, xem được order sản phẩm của kênh Base + Sale Base tương ứng.
 - **NGUYÊN NHÂN GỐC thiếu thông tin:** `baseOrders` (gas_v13.js ~5860) chỉ có sản phẩm khi `withProduct` bật (chỉ báo cáo đơn chia M bật), và KHÔNG có cột Kênh bán (cột M DT TỔNG); màn hình chỉ in 1 dòng chữ mã·người tạo·sale·giá.
