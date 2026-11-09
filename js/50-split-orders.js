@@ -205,6 +205,28 @@ function splitGhepBtnHtml_(isAdmin, on){
   if (!isAdmin) return '';
   return '<button type="button" class="btn sm'+(on?' primary':'')+'" onclick="_srMToggleGhep_()" title="BẬT: đơn Pos từ 1 mã bộ đếm cũng chia tiền theo sale + giá đơn gốc Base (tháng 9 từng làm lệch tổng so với file kế toán — bật xong phải đối chiếu lại). TẮT: chỉ đơn ≥2 mã ghép Base (quy tắc hiện hành)">⚙ Đơn 1 mã chia theo Base: '+(on?'BẬT':'TẮT')+'</button>';
 }
+// Cong tac "Chia theo ty le Base" (Settings POS_GHEP_RATIO, chi Admin bat/tat; mac dinh TAT). Quy tac Duyen chot 2026-11-06: don Pos check nguoc Base, CO Base -> chia theo ty le Base (tong = gia Pos), KHONG co Base -> theo Pos.
+function splitRatioBtnHtml_(isAdmin, on){
+  if (!isAdmin) return '';
+  return '<button type="button" class="btn sm'+(on?' primary':'')+'" onclick="_srMToggleRatio_()" title="BẬT: đơn Pos check ngược Base — có Base thì chia theo TỶ LỆ Base (tổng = giá Pos), không có Base thì tính theo Pos. TẮT: quy tắc cũ (đơn gốc Base + phần còn lại theo thẻ Pos). Nên bật cùng nút Đơn 1 mã chia theo Base.">Chia theo tỷ lệ Base: '+(on?'BẬT':'TẮT')+'</button>';
+}
+async function _srMToggleRatio_(){
+  var turnOn = !_srState.ghepRatio;
+  var msg = turnOn
+    ? 'BẬT: đơn Pos check ngược về Base. Có Base → chia theo TỶ LỆ Base, tổng luôn = giá Pos (Base lớn hơn/nhỏ hơn Pos đều co/giãn theo tỷ lệ). Không có Base → tính theo Pos.\n\nSau khi bật hãy đối chiếu lại tổng với file kế toán.\n\nBật?'
+    : 'TẮT: quay về quy tắc cũ (đơn gốc Base + phần còn lại theo thẻ Pos).\n\nTắt?';
+  if (typeof confirm==='function' && !confirm(msg)) return;
+  try{
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'POS_GHEP_RATIO', value: turnOn ? '1' : '0' }) });
+    var j = await r.json();
+    if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+    _srState.ghepRatio = turnOn;
+    if (typeof toast==='function') toast(turnOn ? '✅ BẬT: chia theo tỷ lệ Base — đang tính lại báo cáo' : '✅ TẮT: về quy tắc cũ — đang tính lại báo cáo');
+    if (typeof _srLoad==='function') _srLoad(); else if (typeof renderSalesReportTabM_==='function') _srMRerender_();
+  }catch(err){
+    if (typeof toast==='function') toast('❌ Chưa đổi được công tắc: '+(err && err.message || err));
+  }
+}
 function _srIsAdmin_(){ return typeof currentUser!=='undefined' && !!currentUser && currentUser.role==='admin'; }
 async function _srMToggleGhep_(){
   var turnOn = !_srState.ghepMin1;
@@ -227,8 +249,10 @@ async function splitReportLoad_(){
   if (_srState.mDateQuick && _srState.mDateQuick!=='custom' && typeof _pkQuickRange==='function'){ var r = _pkQuickRange(_srState.mDateQuick); if (r){ _srState.mDateFrom = r.from; _srState.mDateTo = r.to; } }
   _srState.mSel = null;   // đổi kỳ/lọc lại -> chi tiết cũ không còn đúng kỳ, đóng lại
   var gp = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_MIN_CODES' }).catch(function(){ return null; }) : Promise.resolve(null);
+  var gr = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_RATIO' }).catch(function(){ return null; }) : Promise.resolve(null);
   _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo, sale:(_srState.mSale||[]).join(','), nguon:(_srState.mNguon||[]).join(',') });
   var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()==='1';
+  var g2 = await gr; if (_srIsAdmin_()) _srState.ghepRatio = String((g2 && g2.value) || '').trim()==='1';
 }
 // Thân báo cáo: KPI + bảng theo sale (bấm dòng → panel đối soát Base/Pos) + panel + danh sách chi tiết TẤT CẢ đơn chia (có ô tìm)
 function splitMBodyHtml_(d, search, sel){
@@ -241,6 +265,7 @@ function renderSalesReportTabM_(wrap, subTabs){
   var tools = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px">'
     +'<input type="text" id="sr-m-search" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm sale / khách / SĐT / sản phẩm…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;min-width:260px">'
     +splitGhepBtnHtml_(_srIsAdmin_(), !!_srState.ghepMin1)
+    +splitRatioBtnHtml_(_srIsAdmin_(), !!_srState.ghepRatio)
     +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">⬇ Excel đối soát TẤT CẢ sale</button></div>';
   wrap.innerHTML = bar + tools + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
