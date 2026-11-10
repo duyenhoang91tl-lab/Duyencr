@@ -3828,6 +3828,7 @@
       price: item.price || 0,
       chatLieu: clOptions ? '' : (item.chatLieu || ''),
       chatLieuOptions: clOptions || null,
+      vangTuoi: '', // tuoi vang 10K/14K/18K (chi dung khi SP co boc/ma vang)
       mauSac: item.mauSac || '',
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
@@ -3839,6 +3840,16 @@
     });
     saveCart_();
     renderCart_();
+  }
+
+  // Tuoi vang (10K/14K/18K) cho san pham co BOC/MA vang — Duyen yeu cau 2026-11-10. Khi chat lieu / ten SP
+  // co chu "boc vang", "ma vang", "co vang"... (hoac "vang 10k/14k/18k") thi dong gio hien 3 o tich chon
+  // 1 tuoi vang; ket qua nam o it.vangTuoi va tu them vao don gui khach ("... chat lieu x vang 14k").
+  // Muon them 24K: them '24K' vao mang duoi day, khong can sua cho khac.
+  const PK_GOLD_KARATS = ['10K', '14K', '18K'];
+  function _hasGoldPlating_(it) {
+    const txt = _stripVNlocal_([it.name, it.chatLieu, (it.chatLieuOptions || []).join(' ')].join(' ')).toLowerCase();
+    return /(boc|ma|gan|dat|co|kem|vien|phu)\s*vang/.test(txt) || /vang\s*(10|14|18|24)\s*k/.test(txt);
   }
 
   function renderCart_() {
@@ -3874,6 +3885,14 @@
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
         <div class="pk-cart-detail-row">
           ${chatLieuHtml}
+          <div class="pk-cart-vang-row" style="${_hasGoldPlating_(it) ? '' : 'display:none'}">
+            <span class="pk-cl-multi-label">Vàng:</span>
+            ${PK_GOLD_KARATS.map((kt) => `
+              <label class="pk-cl-opt">
+                <input type="checkbox" class="pk-vang-chk" data-kt="${kt}" ${it.vangTuoi === kt ? 'checked' : ''} />
+                <span>${kt}</span>
+              </label>`).join('')}
+          </div>
           <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
           <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
         </div>
@@ -3908,8 +3927,28 @@
       });
     });
 
+    // Tich tuoi vang: chi chon 1 (tich o khac thi bo o cu; tich lai o dang chon thi bo chon)
+    list.querySelectorAll('.pk-vang-chk').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const rowEl = e.target.closest('.pk-cart-row');
+        const val = e.target.checked ? e.target.dataset.kt : '';
+        rowEl.querySelectorAll('.pk-vang-chk').forEach((c) => { c.checked = (c.dataset.kt === val); });
+        _updateCartItem_(rowEl.dataset.id, 'vangTuoi', val);
+      });
+    });
+    // Hien/an hang tich vang theo chat lieu / ten dang go (khong render lai de khong mat con tro)
+    const _refreshGoldRow_ = (rowEl) => {
+      const it2 = _cartItems.find((x) => x.id === rowEl.dataset.id);
+      const g = rowEl.querySelector('.pk-cart-vang-row');
+      if (it2 && g) g.style.display = _hasGoldPlating_(it2) ? '' : 'none';
+    };
+    list.querySelectorAll('.pk-cl-opt-chk').forEach((chk) => chk.addEventListener('change', (e) => _refreshGoldRow_(e.target.closest('.pk-cart-row'))));
+
     list.querySelectorAll('.pk-cart-row').forEach((row) => {
       const id = row.dataset.id;
+      row.querySelector('.pk-cart-name').addEventListener('input', () => _refreshGoldRow_(row));
+      const clTxt = row.querySelector('.pk-cart-chatlieu');
+      if (clTxt) clTxt.addEventListener('input', () => _refreshGoldRow_(row));
       row.querySelector('.pk-cart-chk').addEventListener('change', (e) => { _updateCartItem_(id, 'checked', e.target.checked); saveCart_(); });
       const nameEl = row.querySelector('.pk-cart-name');
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
@@ -4110,8 +4149,9 @@
       const name = _sentenceCase_(String(i.name || '').replace(/^trang sức\s+/i, ''));
       const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
       const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
+      const vang = (i.vangTuoi && _hasGoldPlating_(i)) ? ' vàng ' + String(i.vangTuoi).toLowerCase() : '';
       const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
-      const desc = `${name}${size}${cl}${mau}`;
+      const desc = `${name}${size}${cl}${vang}${mau}`;
       const qty = Math.max(1, Number(i.qty) || 1);
       const unit = Number(i.price) || 0;
       const total = _lineTotal_(i);

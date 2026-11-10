@@ -1393,7 +1393,7 @@ function _srRenderB(d){
   }
   if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
-  html += _srPosMonthPanelHtml_();
+  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang màn K (js/28 renderSalesReportTabK_ → _srPosMonthPanelHtml_).
   return html;
 }
 
@@ -1553,6 +1553,15 @@ function _srBcBaseSum_(o){ return (o.ghepBase || []).reduce(function(s, b){ retu
 function _srBcPosVal_(o){ return (o.giaTriPos !== undefined && o.giaTriPos !== null) ? (Number(o.giaTriPos) || 0) : (Number(o.giaTriSauGiam) || 0); }
 function _srBcQuayTxt_(o){ return (o.saleRatio && Number(o.saleRatio) !== 1) ? ('Quầy ' + Math.round(Number(o.saleRatio) * 100) + '%') : ''; }
 // Dựng 3 bảng dữ liệu (mảng-của-mảng, dòng đầu là tiêu đề) + tổng. Tiền của đơn (Giá Pos / Tổng Base / Chênh) CHỈ ghi ở dòng đầu mỗi đơn để SUM cột không bị cộng lặp.
+// Duyên 2026-11-09: Base > Pos đúng 40.000đ = tiền SHIP khách trả (Base cộng ship, Pos không) → coi là KHỚP, không báo lệch. Chỉ chiều Base cao hơn; muốn thêm mức ship khác thì thêm vào mảng này.
+var _SRBC_SHIP_FEES_ = [40000];
+// Phí bảo hiểm 1% đơn trên 6 triệu: Pos = Base + ~1% Base (làm tròn chục nghìn, vd Base 6.033.000 → Pos 6.093.000, chênh −60.000) → cũng KHỚP (Duyên xác nhận 2026-11-09). Chỉ chiều Pos CAO hơn Base, Base ≥ 6.000.000, sai số ≤ 5.000đ.
+function _srBcIsLech_(diff, baseV){   // diff = Base − Pos
+  if (Math.abs(diff) <= 1) return false;
+  if (baseV >= 6000000 && diff < 0 && Math.abs(-diff - baseV * 0.01) <= 5000) return false;
+  for (var k = 0; k < _SRBC_SHIP_FEES_.length; k++) if (Math.abs(diff - _SRBC_SHIP_FEES_[k]) <= 1) return false;
+  return true;
+}
 function _srBcBuild_(orders){
   var detail = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Nguồn đơn', 'Thẻ Pos (nguyên văn)', 'Giá Pos gốc (1 lần/đơn)', 'Ghi chú Pos', 'Mã bộ đếm đã khớp',
     'Dòng trong DT TỔNG (Base)', 'Mã Base', 'Ngày tạo Base', 'Người tạo Base', 'Sale bán (Base)', 'Trạng thái Base', 'Giá trị đơn gốc Base', 'Có tính doanh thu?', 'Tổng Base được tính (1 lần/đơn)', 'Chênh Base − Pos (1 lần/đơn)', 'Phần còn lại tính theo Thẻ Pos (1 lần/đơn)', 'Sale nhận phần còn lại (Thẻ Pos)', 'Doanh thu tính = Base + phần còn lại (1 lần/đơn)']];
@@ -1561,7 +1570,7 @@ function _srBcBuild_(orders){
   (orders || []).forEach(function(o, i){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o);
     tot.don++; tot.pos += posV; tot.base += baseV; tot.du += Number(o.ghepDu) || 0;
-    if (Math.abs(baseV - posV) > 1) tot.lech++;
+    if (_srBcIsLech_(baseV - posV, baseV)) tot.lech++;
     (o.ghepBase || []).forEach(function(b, k){
       var first = k === 0;
       detail.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', first ? Math.round(posV) : '', o.ghiChu || '', (o.ghepCodes || []).join(', '),
@@ -1670,7 +1679,7 @@ function _srBaseCheckPanelHtml_(d){
   var orders = _srBcOrders_(d), g = d.ghep || {};
   var b = _srBcBuild_(orders), t = b.tot;
   // Duyên 2026-11-09: màn hình CHỈ hiện đơn Pos lệch Base (|Base − Pos| > 1đ, cùng ngưỡng tô đỏ + t.lech) để check tay/chia tiền tay; đơn khớp thì ẩn. Xếp lệch lớn nhất lên đầu. Excel xuất vẫn đủ mọi đơn ghép.
-  var lechOrders = orders.filter(function(o){ return Math.abs(_srBcBaseSum_(o) - _srBcPosVal_(o)) > 1; })
+  var lechOrders = orders.filter(function(o){ return _srBcIsLech_(_srBcBaseSum_(o) - _srBcPosVal_(o), _srBcBaseSum_(o)); })
     .sort(function(x, y){ return Math.abs(_srBcBaseSum_(y) - _srBcPosVal_(y)) - Math.abs(_srBcBaseSum_(x) - _srBcPosVal_(x)); });
   var lechTot = lechOrders.reduce(function(sum, o){ return sum + (_srBcBaseSum_(o) - _srBcPosVal_(o)); }, 0);
   var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — CHỈ hiện đơn Pos lệch Base để check tay &amp; chia tiền tay; đơn khớp thì ẩn)</span></div>';
@@ -1759,7 +1768,7 @@ function _srPosMonthPanelHtml_(){
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   return '<div class="dash-section-title" style="margin-top:22px">🔒 Chốt tháng Pos &amp; trừ hoàn/hủy tháng trước</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Doanh thu Pos tháng M = doanh thu trong tháng − phần hoàn/hủy phát sinh của tháng M-1 <b>sau khi đã chốt</b>. '+
-    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bảng <b>Theo Sale</b> của Báo cáo B khi xem đúng tháng đó sẽ tự hiện số sau trừ. Chưa chốt thì chưa trừ gì.</div>'+
+    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bấm <b>Xem sau khi trừ hoàn/hủy</b> bên dưới để xem số sau trừ (Báo cáo B vẫn giữ doanh thu chuẩn, không bị trừ). Chưa chốt thì chưa trừ gì.</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
       '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+closeDef+'" style="'+st+'">'+
       '<button class="btn sm" onclick="_srPosMonthClose_()">🔒 Chốt tháng này làm mốc</button>'+
@@ -1778,7 +1787,7 @@ async function _srPosMonthClose_(force){
     if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
     if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
     toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
-    try { _srLoad(); } catch(e2){}   // tải lại Báo cáo B để bảng Theo Sale nhảy theo mốc vừa chốt
+    try { _srLoad(); } catch(e2){}   // tải lại màn đang xem (K); Báo cáo B không còn bị trừ nên không cần nhảy theo mốc
   } catch(e){ toast('❌ Lỗi: '+e.message); }
 }
 async function _srPosMonthLoad_(){
