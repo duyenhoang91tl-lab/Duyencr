@@ -19,9 +19,12 @@ const ctx = { loadLS: () => null, SALE_CHANNELS: chRaw, teams: [], INDIVIDUAL_RA
 vm.createContext(ctx);
 vm.runInContext([line(/var GOLD_RULE_CHANNELS = [^\n]*/), line(/var GOLD_RULE_MATERIALS = [^\n]*/), 'var _SALE_ALIAS_MAP = {};',
   line(/function isNumTagSale_\(x\)\{[^\n]*\}/)].concat(['splitMulti_', '_cfgAliasesOf', '_cfgByAlias', '_saleChannelOf_', '_teamRateForName_', '_resolveCommissionRate_', '_goldFold_', '_goldChannelRule_', '_channelCommissionRate_', '_computeCommissionData_'].map(n => fn(j01, n))).join('\n'), ctx);
-let ordersUse = orders;   // CHE DO DON GOC BASE: giaTriDon = Base + phan con lai theo The Pos, saleShares (don tach chua gop o buoc nay -> giu chia theo The Pos)
+// GOP DON TACH (Duyen 2026-11-06 dong y): don cung khach tach 2 don, tong >= 15tr => muc 1,5% (khop web CRM _mergeTachDon_). Can `trangThai` trong orders.json (extract_orders.py).
+const mergeTach = require('./merge_tach.js'), ordersMerged = mergeTach(orders);
+console.log('HOA HONG gop don tach:', (mergeTach.info || []).length, 'nhom', (mergeTach.info || []).map(x => x.key + '=' + x.tong).join(', '));
+let ordersUse = ordersMerged;   // CHE DO DON GOC BASE: giaTriDon = Base + phan con lai theo The Pos, saleShares (don tach chua gop o buoc nay -> giu chia theo The Pos)
 if (fs.existsSync(W + '/base_split.json') && process.argv[3] !== 'the-pos') {
-  const er = require('./base_enrich.js')(orders, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
+  const er = require('./base_enrich.js')(ordersMerged, W, JSON.parse(fs.readFileSync(path.join(__dirname, 'order_overrides.json'), 'utf8')));
   ordersUse = er.orders; console.log('HOA HONG theo don goc Base: ghep', er.matched, 'don; khong khop', er.unmatched.length);
 }
 ctx.O = ordersUse.filter(o => !/hủy|huỷ/i.test(o.ghiChu || '') || true);
