@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 50) — Pancake AI: ô tích Vàng 10K/14K/18K cho SP bọc/mạ vàng — XONG 1/1, đã push; CHỜ Duyên thử
+- **Duyên yêu cầu:** chất liệu có bọc vàng / mạ vàng / có vàng thì hiện rõ vàng 10K, 14K hay 18K (tốt nhất là ô tích bên cạnh).
+- **NGUYÊN NHÂN GỐC:** giỏ hàng "Soạn đơn" chỉ có ô Chất liệu dạng chữ/tick theo bảng giá, KHÔNG có trường tuổi vàng riêng → Sale phải tự gõ "vàng 14k" vào chất liệu, dễ quên/sai, đơn gửi khách thiếu tuổi vàng.
+- [x] `extension-pancake/pancake-content.js`: thêm `PK_GOLD_KARATS` + `_hasGoldPlating_(it)` (nhận diện "bọc/mạ/gắn/đính/có/kèm/viền/phủ vàng" hoặc "vàng 10/14/18/24k" trong tên SP + chất liệu; KHÔNG bắt nhầm màu/đá như "vàng mỡ gà", "mắt hổ vàng", màu sắc Vàng). Dòng giỏ có hàng "Vàng: ☐10K ☐14K ☐18K" (chỉ chọn 1, tự ẩn/hiện khi gõ chất liệu/tên, lưu `it.vangTuoi`). Đơn copy gửi khách thêm " vàng 14k" ngay sau chất liệu (chỉ khi SP còn là loại bọc/mạ vàng). CSS `.pk-cart-vang-row` trong `pancake-content.css`.
+- Chỉ đụng extension Pancake AI; KHÔNG đổi `gas_v13.js` → không cần deploy GAS; không đụng thư mục `extension/` cũ. Test Node 8 ca nhận diện ĐẠT; `node -c` OK.
+- [ ] **VIỆC KẾ TIẾP:** (a) Duyên reload extension ở chrome://extensions, mở Soạn đơn → thêm SP chất liệu "bạc mạ vàng" thử tick 14K, bấm sao chép đơn xem dòng; (b) nếu cần thêm 24K: thêm `'24K'` vào `PK_GOLD_KARATS`; (c) nếu muốn hiện ô vàng cho MỌI SP (kể cả không ghi bọc vàng): bỏ điều kiện `_hasGoldPlating_` ở hàng `.pk-cart-vang-row`.
+
 ## 2026-11-10 (phiên 49) — Đối chiếu Báo cáo B (Pos) T11 với export Pos orders_6.xlsx — XONG 1/1: CHƯA KẾT LUẬN ĐƯỢC "CHUẨN", phát hiện tên sale tách đôi
 - **Dữ liệu:** `orders_6.xlsx` = 652 dòng Pos 01–10/11 (export lúc ~10:58, màn hình chụp 09:41 → file có thêm đơn 10/11). 270 đơn không có sale trong cột Thẻ = Quầy Hào Nam (157) + Bảo hành (106) + vài đơn Fb → KHÔNG thuộc báo cáo sale (đúng). `orders_4/5` chỉ 30 dòng (Pos giới hạn khi xuất) — không dùng được.
 - **Khớp nội bộ:** 1.730.149.333 ÷ 319 = 5.423.666; tổng các sale = tổng thẻ (lệch 1đ làm tròn). ngocnb2003saleoff, mainguyen97, trangnh2005, dungnguyen1995 khớp Pos thuần.
