@@ -148,3 +148,11 @@ tr[data-drill]:hover td{background:var(--surface2,#f3f4f6)}
 .nt-rs-tbl th{color:var(--muted);font-weight:600;white-space:nowrap;}
 .nt-rs-tbl tr.nt-rs-new{background:rgba(245,158,11,.14);}
 .nt-rs-tag{display:inline-block;background:#f59e0b;color:#fff;border-radius:4px;padding:0 5px;font-size:10px;font-weight:700;}
+/* 2026-11-09 Duyen: thanh Báo cáo trên điện thoại bị tràn ngang -> ô "🔍 Tra khách" bị cắt ("Tra khá"). NGUYÊN NHÂN GỐC: #rpt-bar là flex 1 hàng không xuống dòng (css/02-style.css) gồm select + nút "Về màn hình chính" + ô tra khách (min-width 120px, margin-left:auto) nên tổng bề rộng > màn hình hẹp.
+   Sửa: màn hình hẹp cho thanh XUỐNG DÒNG; ô tra khách chiếm trọn 1 hàng riêng, chữ gợi ý không bị cắt (ellipsis). */
+@media (max-width: 700px){
+  body.rpt-mode #rpt-bar{flex-wrap:wrap;gap:6px 8px;padding:8px 12px}
+  #rpt-mode-sel{flex:1 1 140px;min-width:0;max-width:100%}
+  body.rpt-mode #rpt-bar .btn{flex:0 0 auto;white-space:nowrap}
+  #rpt-qs-input{flex:1 1 100%;order:3;margin-left:0;max-width:none;min-width:0;width:100%;text-overflow:ellipsis}
+}
