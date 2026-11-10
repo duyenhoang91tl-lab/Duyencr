@@ -2,7 +2,7 @@
 // Chạy: node tools/test-base-check-report.js
 const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../js/11-fn-srload.js', 'utf8');
-const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srBcOrders_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcBuild_', '_srBcCheckRows_', '_srBaseCheckPanelHtml_'];
+const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srBcOrders_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcIsLech_', '_srBcBuild_', '_srBcCheckRows_', '_srBaseCheckPanelHtml_'];
 let code = "var _SR_BC_LIM_=100; var _srState={}; function _srBcEditCellHtml_(){ return ''; } function _custLinkHtml_(p, h){ return h; } var _SR_UNASSIGNED_='(chưa gán sale)'; function fmt(n){return (n||0).toLocaleString('vi-VN');} function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');} function _srMoney(n){return fmt(Math.round(n||0))+'đ';}\n";
 for (const n of names) {
   const i = src.indexOf('function ' + n + '(');
@@ -10,6 +10,7 @@ for (const n of names) {
   let depth = 0, j = src.indexOf('{', i);
   for (let k = j; k < src.length; k++) { if (src[k] === '{') depth++; else if (src[k] === '}') { depth--; if (!depth) { code += src.slice(i, k + 1) + '\n'; break; } } }
 }
+code += src.match(/var _SRBC_SHIP_FEES_[^\n]*\n/)[0];
 const C = new Function(code + 'return {_srBcBuild_,_srBcOrders_,_srBcCheckRows_,_srBaseCheckPanelHtml_,_srPureCalc_};')();
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
 const B = (dong, ma, nt, sale, tt, gt, tinh) => ({ dong, ma, ngay: '2026-10-05', nguoiTao: nt, saleBan: sale, trangThai: tt, giaTri: gt, tinh });
@@ -85,6 +86,15 @@ ok(/79T11\/2026/.test(h6) && /62T11\/2026/.test(h6) && /Zalo CSKH/.test(h6) && /
 ok(/Nhẫn bạc 925 size 12/.test(h6) && /Dây chuyền vàng/.test(h6), 'Hiện SẢN PHẨM từng đơn gốc Base');
 ok(/Sale Base: <b>ninhnga99<\/b>/.test(h6), 'Hiện SALE Base từng đơn');
 ok(/Vòng tay thạch anh/.test(h6) && /5\.850\.000đ/.test(h6), 'Hiện sản phẩm đơn Pos + chênh 5.850.000đ');
+// ===== Duyên 2026-11-09: Base cao hơn Pos đúng 40.000đ = ship khách → KHỚP, ẩn =====
+const mk2 = (row, khach, pos, base) => ({ posRow: row, ngayTaoDon: '05/11/2026', khachHang: khach, soDienThoai: '09' + row, theSale: 'phuongthao2000', giaTriPos: pos, giaTriSauGiam: pos, cod: 0, ghiChu: row + 'T11/2026', ghepCodes: [row + 'T11/2026'],
+  ghepBase: [B(row, row + 'T11/2026', 'x', 'phuongthao2000', 'Hoàn thành', base, true)], saleShares: [{ name: 'phuongthao2000', frac: 1 }], dieuChinh: 'base' });
+const O5 = [ mk2(61, 'Ship40 A', 3100000, 3140000), mk2(62, 'Ship40 B', 1250000, 1290000), mk2(63, 'Lech45', 7230000, 7275000), mk2(64, 'Lech-10', 2232000, 2222000), mk2(65, 'Lech-60', 6093000, 6033000), mk2(66, 'Base thap hon 40', 5040000, 5000000) ];
+const h7 = C._srBaseCheckPanelHtml_({ orders: O5, ghep: {}, ghepCheck: {} });
+ok(!/Ship40 A/.test(h7) && !/Ship40 B/.test(h7), 'Base cao hơn Pos đúng 40.000đ (ship) → ẨN');
+ok(/Lech45/.test(h7) && /Lech-10/.test(h7) && /Lech-60/.test(h7), 'Lệch 45k / −10k / −60k vẫn HIỆN');
+ok(/Base thap hon 40/.test(h7), 'Base THẤP hơn Pos 40k (ngược chiều ship) vẫn HIỆN');
+ok(/Đơn lệch cần check tay <b>4<\/b>/.test(h7), 'Tóm tắt đếm 4 đơn lệch (loại 2 đơn ship)');
 const r1 = C._srBcBuild_(orders);
 ok(r1.detail[1][ci('Phần còn lại tính theo Thẻ Pos')] === '' && r1.tot.du === 0, 'don khong co phan con lai: o de trong, tong = 0 (khong doi hanh vi cu)');
 ok(C._srBaseCheckPanelHtml_({ orders: O2, ghep: {} }).indexOf('Phần còn lại tính theo Thẻ Pos') >= 0, 'man hinh hien tong phan con lai khi co');

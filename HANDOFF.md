@@ -19,6 +19,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - Lưu ý hành vi: đơn đã lưu chia tay đi nhánh `acctSplitExtra` nên KHÔNG còn là "đơn ghép Base" → biến khỏi bảng check ngược sau khi tính lại; xem/xoá ở panel "Chia tay đang lưu trong CRM" (nút 🛠). Test: `node tools/test-bc-inline-edit.js` (15 ca, gồm ví dụ 5tr→3tr+2tr) ĐẠT; `test-base-check-report` (thêm stub), `test-split-fix-ui`, `test-acct-extra` vẫn đạt; `node -c js/*.js` OK. Bump `js/11-fn-srload.js?v=20261109b`.
 - [ ] **VIỆC KẾ TIẾP (nếu Duyên muốn):** (a) cho sửa cả đơn quầy 30/70 ngay trong bảng; (b) đưa tiền đã sửa vào cột Excel xuất check ngược; (c) thử với đơn thật ≥3 sale. **Duyên:** Ctrl+F5 CRM, mở Báo cáo B → bảng check ngược, thử 1 đơn lệch có 2 sale.
 
+## 2026-11-09 (phiên 46) — Báo cáo check ngược Base: Base cao hơn Pos đúng 40.000đ (ship khách) = KHỚP, ẩn — XONG 1/1, đã push
+- **Duyên xác nhận:** chênh +40.000đ ở Báo cáo B là tiền ship khách trả (Base cộng ship, Pos không) nên coi như khớp.
+- [x] `js/11-fn-srload.js`: thêm `_SRBC_SHIP_FEES_ = [40000]` + `_srBcIsLech_(diff)` (diff = Base − Pos; |diff| ≤ 1 hoặc ≈ đúng mức ship → KHÔNG lệch). Dùng ở 2 chỗ: đếm `tot.lech` (`_srBcBuild_`, dòng "Số đơn Pos có giá lệch Base" của Excel) và bộ lọc `lechOrders` của màn hình. Chỉ chiều Base CAO hơn Pos; Base thấp hơn 40k vẫn báo lệch. Thêm mức ship khác = thêm số vào mảng. Test `tools/test-base-check-report.js` thêm 4 ca (ship 40k ẩn; 45k/−10k/−60k hiện; ngược chiều 40k hiện) TẤT CẢ ĐẠT.
+- **Chưa đổi:** các lệch còn lại trong ảnh (−60.000 phí bảo hiểm 1%, +45.000, −10.000) vẫn hiện để Duyên check tay; Excel vẫn đủ mọi đơn ghép; không đụng backend.
+- [ ] **VIỆC KẾ TIẾP (nếu Duyên muốn):** hỏi xem +45.000 (thuyha88) có phải ship vùng khác không → thêm vào `_SRBC_SHIP_FEES_`; phí bảo hiểm 1% (−60.000 ở đơn trên 6 triệu) có tự nhận diện được không; thêm cột Kênh/Sản phẩm vào Excel.
+
 ## 2026-11-09 (phiên 45) — Báo cáo check ngược Base: hiện KÊNH + SALE + SẢN PHẨM từng đơn gốc Base cạnh đơn Pos — XONG code, ĐÃ COMMIT cục bộ; CHƯA PUSH (chờ token mới của Duyên)
 - **Duyên yêu cầu (ảnh đơn Nguyễn Hải Phương: 1 đơn Pos 8.123.000 tách 2 đơn Base 79T11 + 62T11):** hiện rõ 2 đơn Base để check ngược, xem được order sản phẩm của kênh Base + Sale Base tương ứng.
 - **NGUYÊN NHÂN GỐC thiếu thông tin:** `baseOrders` (gas_v13.js ~5860) chỉ có sản phẩm khi `withProduct` bật (chỉ báo cáo đơn chia M bật), và KHÔNG có cột Kênh bán (cột M DT TỔNG); màn hình chỉ in 1 dòng chữ mã·người tạo·sale·giá.
