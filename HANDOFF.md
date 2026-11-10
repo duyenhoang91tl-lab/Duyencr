@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 48) — Kiểm tra Báo cáo A (Base) T11 so với export Base — XONG 1/1: CÔNG THỨC ĐÚNG, SỐ LIỆU NGUỒN THIẾU 31 ĐƠN
+- **Duyên hỏi:** Báo cáo A (01/11–30/11, Phòng KD 23 sale: 217 đơn, 1.405.628.000đ) tính chuẩn chưa. Đối chiếu với export Base "don-cac-kenh" (14 sale có đơn: 246 đơn, 1.575.438.000đ).
+- **KẾT LUẬN:** công thức `buildSalesReportA_` ĐÚNG (loại Thất bại, chia đều theo số sale, đếm nguyên đơn, TB/đơn = DT ÷ đơn). 6/14 sale khớp từng đồng. **NGUYÊN NHÂN GỐC lệch:** nguồn dữ liệu CRM (sheet "DT TỔNG " hoặc bản sao Supabase `dt_tong`) THIẾU 30 đơn tạo 01/11 từ 12:03→23:03 (mã 9T11→39T11, liên tục, ≈185,1tr) + 348T11 (10/11 08:57, 5,46tr, có thể chỉ chậm đồng bộ). Bỏ các đơn đó khỏi export thì 8 sale lệch còn lại khớp tuyệt đối. Ngoài ra CRM DƯ 2 đơn so với export: huyenmaii1990 +4,65tr (nghi 110T11 đã Thất bại trong Base nhưng CRM chưa cập nhật trạng thái), thuydinh1995 +16,136tr (không thấy trong export; export cũng thiếu mã 200/202/291T11).
+- [x] Công cụ tái dùng: `tools/recon-base-a/recon_base_a.py` (đối chiếu export vs số màn hình, `crm_screen_2026-11-10.json`) → file `Doi_soat_Bao_cao_A_Base_T11.xlsx` (Tổng hợp / Theo sale / Đơn CRM đang thiếu). Không commit file có tiền từng người.
+- [ ] **VIỆC KẾ TIẾP:** (1) Mở sheet "DT TỔNG ": có dòng 9T11–39T11 (01/11 12h–23h) không? Thiếu → nạp lại/đồng bộ từ export Base. Có mà báo cáo không thấy → bản sao Supabase `dt_tong` thiếu: làm mới đồng bộ hoặc tắt `SB_ORD_READ` rồi Ctrl+F5 và chạy lại Báo cáo A. (2) Kiểm tra 110T11 (huyenmaii1990) trạng thái trên Base và 2 dòng dư của thuydinh1995. (3) Chạy lại Báo cáo A, đối chiếu lại bằng tool. (4) Việc cũ còn treo: 4 sale đổi sang Offline trong Quản lý Sale; commit 4352a2f (phiên 23).
+
 ## 2026-11-09 (phiên 47) — Báo cáo check ngược Base: phí bảo hiểm 1% đơn ≥ 6 triệu = KHỚP, ẩn — XONG 1/1, đã push
 - **Duyên xác nhận:** phí bảo hiểm 1% (ghi chú Base kiểu "6.033k + phí 1% bảo hiểm tầm 60k = 6.093k") cũng coi là khớp.
 - [x] `js/11-fn-srload.js` `_srBcIsLech_(diff, baseV)`: thêm quy tắc KHỚP khi Base ≥ 6.000.000, Pos CAO hơn Base (diff < 0) và |Pos − Base − 1%·Base| ≤ 5.000đ (làm tròn chục nghìn). Cả 2 chỗ gọi (`tot.lech`, `lechOrders`) đã truyền thêm baseV. Test `tools/test-base-check-report.js` thêm ca: 6.093k/6.033k ẩn; Pos>Base nhưng không ≈1% (6.200k vs 6.033k) hiện; đơn dưới 6 triệu hiện; TẤT CẢ ĐẠT.
