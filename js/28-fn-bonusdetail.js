@@ -164,7 +164,9 @@ function _bdRenderBody_(d){
 function renderSalesReportTabK_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
   wrap.innerHTML = _srGFiltersHtml_() +
-    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body +
+    // Duyên 2026-11-10: Chốt tháng Pos + trừ hoàn/hủy tháng trước chuyển từ Báo cáo B sang màn K (chỉ Admin; _srPosMonthPanelHtml_ ở js/11 tự trả '' nếu không phải admin).
+    (typeof _srPosMonthPanelHtml_ === 'function' ? _srPosMonthPanelHtml_() : '');
 }
 
 // ── Từ Báo cáo G: bấm "Chi tiết" của 1 sale → màn hình chi tiết đơn thưởng (K) lọc theo sale đó ──

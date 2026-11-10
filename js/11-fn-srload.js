@@ -1393,7 +1393,7 @@ function _srRenderB(d){
   }
   if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
-  html += _srPosMonthPanelHtml_();
+  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang màn K (js/28 renderSalesReportTabK_ → _srPosMonthPanelHtml_).
   return html;
 }
 
@@ -1759,7 +1759,7 @@ function _srPosMonthPanelHtml_(){
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   return '<div class="dash-section-title" style="margin-top:22px">🔒 Chốt tháng Pos &amp; trừ hoàn/hủy tháng trước</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Doanh thu Pos tháng M = doanh thu trong tháng − phần hoàn/hủy phát sinh của tháng M-1 <b>sau khi đã chốt</b>. '+
-    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bảng <b>Theo Sale</b> của Báo cáo B khi xem đúng tháng đó sẽ tự hiện số sau trừ. Chưa chốt thì chưa trừ gì.</div>'+
+    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bấm <b>Xem sau khi trừ hoàn/hủy</b> bên dưới để xem số sau trừ (Báo cáo B vẫn giữ doanh thu chuẩn, không bị trừ). Chưa chốt thì chưa trừ gì.</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
       '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+closeDef+'" style="'+st+'">'+
       '<button class="btn sm" onclick="_srPosMonthClose_()">🔒 Chốt tháng này làm mốc</button>'+
@@ -1778,7 +1778,7 @@ async function _srPosMonthClose_(force){
     if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
     if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
     toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
-    try { _srLoad(); } catch(e2){}   // tải lại Báo cáo B để bảng Theo Sale nhảy theo mốc vừa chốt
+    try { _srLoad(); } catch(e2){}   // tải lại màn đang xem (K); Báo cáo B không còn bị trừ nên không cần nhảy theo mốc
   } catch(e){ toast('❌ Lỗi: '+e.message); }
 }
 async function _srPosMonthLoad_(){
