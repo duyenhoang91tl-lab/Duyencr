@@ -248,3 +248,8 @@ html.ui-pro #pro-ai .pro-pc.alt{border-color:var(--pro-line);color:var(--pro-ink
 html.ui-pro #pro-dock{touch-action:none;user-select:none;-webkit-user-select:none;}
 html.ui-pro #pro-dock button{touch-action:none;cursor:grab;}
 html.ui-pro #pro-dock.dragging button{cursor:grabbing;box-shadow:0 6px 20px rgba(0,0,0,.35);}
+
+/* Trợ lý AI — thanh lọc ngày chế độ Doanh số (Báo cáo B): viên thuốc nhanh + 2 ô ngày, xuống dòng trên màn hẹp */
+html.ui-pro #pro-ai .pro-ai-range{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 14px 0;}
+html.ui-pro #pro-ai .pro-ai-dates{display:flex;align-items:center;gap:4px;flex:1 1 100%;font-size:12px;color:var(--muted);}
+html.ui-pro #pro-ai .pro-ai-dates input{flex:1;min-width:0;border:1px solid var(--pro-line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12px;background:var(--surface);}

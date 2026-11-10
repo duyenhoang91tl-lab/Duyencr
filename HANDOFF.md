@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 47) — Trợ lý AI chế độ 📊 Doanh số: tính theo BÁO CÁO B + lọc nhanh ngày/tháng — XONG 1/1 bước, đã push; CHỜ Duyên thử
+- **Duyên yêu cầu:** Trợ lý AI cũng được lọc theo tháng/ngày/khoảng thời gian nhanh như các báo cáo; doanh thu tính theo Báo cáo B; hỏi AI hiện không ra kết quả (ảnh: kỳ 2026-11-01→09 ra "Doanh thu 0đ · 0 đơn").
+- **NGUYÊN NHÂN GỐC:** chế độ Doanh số của dock (`js/38-pro-dock.js` `proAiContext_`) đọc số màn 🏠 Tổng quan (`_ov`/orgOverview, kỳ cố định theo Tổng quan, không phải Báo cáo B) và panel không có ô chọn kỳ.
+- [x] `js/38-pro-dock.js`: chế độ Doanh số gọi thẳng `salesReportB` (+ `storeCaseReport` best-effort, gộp qua `_srMergeStoreIntoBySale_` như bảng "Theo Sale" của B) theo khoảng ngày; thanh lọc `qrPillsHtml_` (Hôm nay/Tuần này/Tháng này/Khác…) + 2 ô ngày; mặc định Tháng này (để trống cả 2 ngày sẽ tự đặt Tháng này, tránh timeout 55s); chọn kỳ là tự tóm tắt; cache 2 phút/kỳ; lỗi GAS báo lỗi thật. Trả lời quy tắc mới `proRuleSalesB_` (tóm tắt / top / doanh thu thấp nhất / điểm đáng chú ý; KHÔNG có %KPI/xếp loại vì B không có). `proRuleSales_`/`proSalesContext_` (nguồn Tổng quan) giữ nguyên, không còn được chế độ Doanh số gọi. `css/06-pro.css` thêm thanh lọc. Bump `?v=20261110a`.
+- Test: `node tools/test-pro-dock-salesb.js` (13 ca) ĐẠT; test-ui-pro-dock, test-pro-dock-drag, test-price-ai-ui, test-qr-pills đạt; `node -c js/*.js` OK. Backend không đổi.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5, mở 🤖 → Doanh số, thử Hôm nay / Tháng trước / chọn ngày. Nếu cần: thêm %KPI/xếp loại vào chế độ này (cần nguồn KPI), cho lọc theo sale.
+
 ## 2026-11-09 (phiên 46) — Báo cáo check ngược Base: Admin SỬA TAY tiền từng sale ngay cạnh đơn lệch (≥2 sale), sale còn lại tự bù — XONG 1/1 bước, đã push; CHỜ Duyên thử
 - **Duyên yêu cầu:** đơn Pos ghép Base mà có từ 2 sale và doanh thu lệch Pos–Base, nếu hệ thống tự chia chưa chuẩn thì Admin được sửa số tiền các sale ngay cạnh đơn (vd đơn 5tr: nhập sale A 3tr → sale B tự còn 2tr).
 - **NGUYÊN NHÂN GỐC:** bảng "Báo cáo check ngược Base" (`_srBaseCheckPanelHtml_`, `js/11-fn-srload.js`) chỉ HIỂN THỊ cột "Chia sale (theo Base)" (tỷ lệ tự động); muốn chia tay phải mở riêng panel "🛠 Đơn lệch Pos–Base" (js/50) và gõ text `sale = số tiền` từng dòng, không có tự bù.
