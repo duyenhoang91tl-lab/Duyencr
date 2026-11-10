@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 56) — Vì sao Báo cáo B tổng ≠ khi lọc riêng Sale ngocNB2003saleoff (113.812.000 vs 120.527.000) — XONG phân tích (chưa đổi code); CHỜ Duyên chọn cách hiển thị
+- **Hiện tượng:** bảng "Theo Sale" (cả 2 màn hình) = 7 đơn / 113.812.000 / COD 84.859.000; nhưng thẻ KPI khi lọc riêng Ngọc = 7 đơn / 120.527.000 / COD 89.899.000. Lệch 6.715.000 (giá trị) và 5.040.000 (COD); số đơn khớp (7).
+- **NGUYÊN NHÂN GỐC (không phải lỗi dữ liệu):** `buildSalesReportB_` (gas_v13.js ~6471) khi lọc Sale giữ NGUYÊN đơn nếu Ngọc có trên cột "Thẻ"; thẻ KPI `totalGiaTri/totalCod` cộng GIÁ TRỊ CẢ ĐƠN. Còn `bySale` (~6540-6570) chia tiền theo `frac` (chia đều số sale/đơn, hoặc theo tỷ lệ đơn gốc Base khi đơn ghép) × `saleRatio`. Vậy Ngọc có đơn bán chung với sale khác: bảng chỉ tính phần của Ngọc, thẻ KPI tính cả đơn → 120.527.000 − 113.812.000 = phần của sale cùng đơn.
+- **Tổng toàn team không lệch** vì mỗi đơn chia tổng = 1 (trừ +3.886.333 do cộng 30% đơn quầy, xem phiên 54).
+- [ ] **VIỆC KẾ TIẾP (chờ Duyên chọn):** (a) khi có lọc Sale, thẻ KPI đổi sang tổng phần của sale (khớp bảng) — sửa `_srRenderB`/backend, grep mọi nơi dùng `totalGiaTri`; hoặc (b) giữ nguyên, thêm chú thích "thẻ = cả đơn, bảng = phần chia". Sau khi sửa gas_v13.js nhớ chạy `sync_gas_to_index.py` + deploy lại.
+
 ## 2026-11-10 (phiên 55) — Duyên chốt 3 quy tắc; làm xong quy tắc 3 (đơn Pos 1 mã mà đơn gốc Base Thất bại → loại khỏi Báo cáo B) — XONG 1/1, đã push; CHỜ Duyên xem thực tế
 - **Duyên chốt:** (1) đơn "lên lại đơn hoàn/đổi/BH" mã T10 VẪN tính; (2) đơn NG VẪN tính; (3) đơn Pos mà đơn Base Thất bại → LOẠI. Quy tắc 1, 2 = hành vi hiện tại, KHÔNG đổi code.
 - **NGUYÊN NHÂN GỐC quy tắc 3:** `buildSalesReportB_` chỉ tra Base khi đơn Pos có ≥ `POS_GHEP_MIN_CODES` mã (mặc định 2) → đơn 1 mã (vd 110T11, Pos 4,65tr, Base Thất bại) không bao giờ bị tra nên vẫn tính theo giá Pos.
