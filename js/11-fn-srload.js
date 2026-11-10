@@ -46,6 +46,18 @@ async function _srLoad(){
       } catch (eStoreB) { /* bo qua: B van hien thi doanh thu Pos nhu cu */ }
     }
   } else if (_srState.sub === 'C') {
+    // C tính theo Pos = tính 2 kỳ (mỗi kỳ chạy Báo cáo B, chậm): bắn 2 request SONG SONG để backend tính + cache từng kỳ, rồi mới lấy kết quả (1 request nối tiếp 2 kỳ vượt 55s → treo "Đang tải").
+    // Bỏ qua lỗi ở bước này; request chính bên dưới tự tính lại nếu cache không có.
+    if (!_srState.byCreator && _srState.cDateField !== 'thoiGianHT') {
+      var _cBase = {
+        dateField: _srState.cDateField, periodType: _srState.cPeriodType,
+        weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
+        customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
+        customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
+        sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','), sanPham: _srState.cSanPham || '', byCreator: ''
+      };
+      try { await Promise.all(['cur', 'prev'].map(function(pt){ return _srFetch('salesReportC', Object.assign({}, _cBase, { part: pt })); })); } catch (eWarmC) { /* bỏ qua */ }
+    }
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,

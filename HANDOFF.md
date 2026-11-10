@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 58) — Báo cáo C (Pos) không tải được, treo "Đang tải..." — XONG 1/1 (đã push); CHỜ deploy GAS + Duyên thử
+- **Hiện tượng (ảnh Duyên):** C, kỳ tùy chỉnh 01–09/10 so 01–09/11, mẫu lọc nhanh "Phòng kinh doanh" 23 sale → "Đang tải..." mãi. (Dòng "Unchecked runtime.lastError… Receiving end does not exist" là log của extension Chrome, KHÔNG liên quan.)
+- **NGUYÊN NHÂN GỐC (suy ra từ code, chưa đo được thời gian GAS thật):** phiên 57 làm C gọi `buildSalesReportB_` 2 lần NỐI TIẾP trong 1 request; B vốn đã chậm (đọc Pos + đối chiếu Base) nên cộng 2 kỳ vượt 55s của `_srFetch` (client huỷ) / GAS chậm → treo.
+- [x] `gas_v13.js`: tách `posOrdersForPeriod_` (đơn Pos 1 kỳ, đã gắn kênh chuẩn + phần chia sale) có CACHE riêng từng kỳ (`_cachePutBig_`, 600s, khoá = kỳ + Sale + Sản phẩm; KHÔNG gồm Kênh nên đổi lọc Kênh dùng lại cache); filter `part='cur'|'prev'` chỉ tính+cache 1 kỳ rồi trả `{warm}`; action `salesReportC` nhận `part`. `js/11-fn-srload.js`: trước request chính, C bắn 2 request SONG SONG (cur/prev) rồi mới lấy kết quả (đọc cache, trả ngay) → thời gian ≈ 1 lần B thay vì 2 lần. Test `tools/test-report-c-pos.js` thêm 3 ca (part, đọc cache không gọi B lại, đổi Kênh không tính lại) ĐẠT; `node -c js/*.js` OK; split-gas --check OK.
+- [ ] **VIỆC KẾ TIẾP:** (a) **DEPLOY GAS** + Ctrl+F5, thử lại C; (b) nếu VẪN treo: 1 kỳ B riêng đã >55s → cần xem log thực thi Apps Script để biết kỳ nào chậm (khả năng B với 23 sale + khoảng dài), hướng tiếp: nâng timeout `_srFetch` riêng cho C, hoặc C chỉ dùng dữ liệu rút gọn không ghép Base; (c) so số C với B cùng sale/kỳ.
+
 ## 2026-11-10 (phiên 57) — Báo cáo C "So sánh kỳ": kỳ tùy chỉnh không ra kết quả + chuyển sang Pos + áp mẫu lọc nhanh — BƯỚC 1/3 XONG (đã push)
 - **Hiện tượng (ảnh Duyên):** chọn "Tùy chỉnh (2 khoảng ngày)" kỳ này 01–09/11, kỳ trước 01–09/10 nhưng màn hình hiện "Kỳ này: 10/11 - 10/11", "Kỳ trước: 10/11 - 10/11", 5.963.000đ cả hai, +0%.
 - **NGUYÊN NHÂN GỐC:** client (`js/11-fn-srload.js` ~1857) gửi `customCurFrom/To/PrevFrom/To` dạng `yyyy-MM-dd` (ô `<input type=date>`), còn `_resolvePeriods_` (gas_v13.js) chỉ đọc bằng `parseVNDate_` (chỉ `dd/MM/yyyy`) → null → rơi về HÔM NAY cho cả 4 đầu mút → 2 kỳ giống hệt nhau.
