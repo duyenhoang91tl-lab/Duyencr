@@ -7368,6 +7368,13 @@ function _labelVN_(d) {
 }
 
 // Tinh khoang ngay + PeriodKey cua ky nay & ky truoc, tuy periodType.
+// 'yyyy-MM-dd' (o <input type=date>) HOAC 'dd/MM/yyyy' -> Date 0h gio VN; khong doc duoc -> null. Dung cho ky tuy chinh Bao cao C.
+function _customDateToDate_(v) {
+  var ymd = _dateStrToVnYmd_(v);
+  if (!ymd) return null;
+  var m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? _vnMidnight_(Number(m[1]), Number(m[2]), Number(m[3])) : null;
+}
 function _resolvePeriods_(filters) {
   var today = new Date();
   var periodType = filters.periodType || 'week';
@@ -7394,8 +7401,10 @@ function _resolvePeriods_(filters) {
     prev = _yearRange_(today, yOff - 1);
     curKey = _yearKey_(cur.from); prevKey = _yearKey_(prev.from);
   } else { // custom — 2 khoang ngay hoan toan tu chon, khong lien quan nhau, KHONG co PeriodKey KPI
-    cur = { from: parseVNDate_(filters.customCurFrom) || today, to: parseVNDate_(filters.customCurTo) || today };
-    prev = { from: parseVNDate_(filters.customPrevFrom) || today, to: parseVNDate_(filters.customPrevTo) || today };
+    // NGUYEN NHAN GOC "ky tuy chinh khong ra ket qua, ca 2 ky hien 10/11 - 10/11" (Duyen 2026-11-10): o <input type=date> gui 'yyyy-MM-dd' con parseVNDate_ CHI doc 'dd/MM/yyyy'
+    // -> null -> roi ve HOM NAY cho ca 4 dau mut => 2 ky giong het nhau (+0%). Nay doc ca 2 dinh dang qua _customDateToDate_.
+    cur = { from: _customDateToDate_(filters.customCurFrom) || today, to: _customDateToDate_(filters.customCurTo) || today };
+    prev = { from: _customDateToDate_(filters.customPrevFrom) || today, to: _customDateToDate_(filters.customPrevTo) || today };
     curKey = ''; prevKey = '';
   }
   return {

@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 57) — Báo cáo C "So sánh kỳ": kỳ tùy chỉnh không ra kết quả + chuyển sang Pos + áp mẫu lọc nhanh — BƯỚC 1/3 XONG (đã push)
+- **Hiện tượng (ảnh Duyên):** chọn "Tùy chỉnh (2 khoảng ngày)" kỳ này 01–09/11, kỳ trước 01–09/10 nhưng màn hình hiện "Kỳ này: 10/11 - 10/11", "Kỳ trước: 10/11 - 10/11", 5.963.000đ cả hai, +0%.
+- **NGUYÊN NHÂN GỐC:** client (`js/11-fn-srload.js` ~1857) gửi `customCurFrom/To/PrevFrom/To` dạng `yyyy-MM-dd` (ô `<input type=date>`), còn `_resolvePeriods_` (gas_v13.js) chỉ đọc bằng `parseVNDate_` (chỉ `dd/MM/yyyy`) → null → rơi về HÔM NAY cho cả 4 đầu mút → 2 kỳ giống hệt nhau.
+- [x] **Bước 1 (XONG):** `gas_v13.js` thêm `_customDateToDate_` (đọc cả `yyyy-MM-dd` lẫn `dd/MM/yyyy`) dùng trong nhánh custom của `_resolvePeriods_`; test mới `tools/test-report-c-custom-period.js` ĐẠT; `node -c` OK; `node tools/split-gas.js` + `--check` OK. **Lưu ý: khối `gas-code-v9` trong index.html KHÔNG còn tồn tại (đã bỏ) nên quy tắc 13 hết áp dụng; deploy GAS chạy qua workflow deploy-gas.yml.**
+- [ ] **Bước 2 (kế tiếp):** Báo cáo C tính theo **Pos** (gọi `buildSalesReportB_` cho từng kỳ: bySale = giaTri đã chia theo phần sale, kênh = byNguon) thay vì DT Tổng/Base; giữ KPI/%tăng trưởng như cũ.
+- [ ] **Bước 3:** áp bộ lọc (Sale/Kênh/Sản phẩm của mẫu lọc nhanh `cSale/cKenh/cSanPham`) vào cả 2 kỳ Pos; kiểm tra drill `ordersCur/ordersPrev` (js/13 ~756) vẫn đúng với dữ liệu Pos.
+
 ## 2026-11-10 (phiên 56) — Vì sao Báo cáo B tổng ≠ khi lọc riêng Sale ngocNB2003saleoff (113.812.000 vs 120.527.000) — XONG phân tích (chưa đổi code); CHỜ Duyên chọn cách hiển thị
 - **Hiện tượng:** bảng "Theo Sale" (cả 2 màn hình) = 7 đơn / 113.812.000 / COD 84.859.000; nhưng thẻ KPI khi lọc riêng Ngọc = 7 đơn / 120.527.000 / COD 89.899.000. Lệch 6.715.000 (giá trị) và 5.040.000 (COD); số đơn khớp (7).
 - **NGUYÊN NHÂN GỐC (không phải lỗi dữ liệu):** `buildSalesReportB_` (gas_v13.js ~6471) khi lọc Sale giữ NGUYÊN đơn nếu Ngọc có trên cột "Thẻ"; thẻ KPI `totalGiaTri/totalCod` cộng GIÁ TRỊ CẢ ĐƠN. Còn `bySale` (~6540-6570) chia tiền theo `frac` (chia đều số sale/đơn, hoặc theo tỷ lệ đơn gốc Base khi đơn ghép) × `saleRatio`. Vậy Ngọc có đơn bán chung với sale khác: bảng chỉ tính phần của Ngọc, thẻ KPI tính cả đơn → 120.527.000 − 113.812.000 = phần của sale cùng đơn.
