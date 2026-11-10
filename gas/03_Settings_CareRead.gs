@@ -70,6 +70,29 @@ function _posRevenueBySale_(ym) {
   (a.bySale || []).forEach(function(s) { out[s.name] = Number(s.giaTri) || 0; });
   return { bySale: out, total: Number(a.totalGiaTri) || 0 };
 }
+// BAN CO CACHE cua _posRevenueBySale_ — CHI dung cho lop tra ve action salesReportB (applyPosMonthAdjustToReportB_).
+// NGUYEN NHAN GOC Bao cao B tai rat lau / khong tai duoc (Duyen 2026-11-09): xem DUNG 1 thang lich ma thang truoc da chot thi MOI lan cache 120s het han, applyPosMonthAdjustToReportB_
+// goi _posRevenueBySale_(thang truoc) = chay LAI NGUYEN buildSalesReportB_ cho thang truoc (doc lai "du lieu don" + 6-7 cot DT TONG de ghep Base) => 1 lan bam Xem ton GAP DOI thoi gian,
+// co thang vuot 55s cua giao dien (AbortController) hoac 6 phut cua GAS. So thang truoc khong phu thuoc bo loc cua nguoi xem (luon ca thang, khong loc) nen cache chung cho moi nguoi.
+// KHONG dung cho closePosMonth_ / posMonthAdjust_: chot thang & nut "Xem sau khi tru" PHAI doc so moi nhat (khong duoc dung so cache cu).
+function _posRevCacheGet_(key) {
+  try { var raw = CacheService.getScriptCache().get(key); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object' && o.bySale && typeof o.bySale === 'object') return o; } } catch (e) {}
+  return null;
+}
+function _posRevCachePut_(key, obj, ttl) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(obj), ttl); } catch (e) {}
+}
+function _posRevenueBySaleCached_(ym) {
+  var key = '';
+  try { key = _reportCacheKey_('posRevBySale1_', { ym: ym }); } catch (eK) { key = ''; }   // khoa da gom cac cong tac chia (ty le Base / don 1 ma / bang chia bo sung) nen doi cong tac la co hieu luc ngay
+  var hit = key ? _posRevCacheGet_(key) : null;
+  if (hit) return hit;
+  var t0 = Date.now();
+  var out = _posRevenueBySale_(ym);
+  try { Logger.log('PERF posRevenueBySale ym=' + ym + ' ms=' + (Date.now() - t0) + ' sales=' + Object.keys(out.bySale).length); } catch (eL) {}
+  if (key) _posRevCachePut_(key, out, 180);
+  return out;
+}
 function _readPosSnapshots_() {
   try { var raw = getSetting_('posMonthSnapshots'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') return o; } } catch (e) {}
   return {};
@@ -123,13 +146,16 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   filters = filters || {};
   var month = _posFullMonthOfRange_(filters.dateFrom, filters.dateTo);
   if (!res || !month) return res;
+  // Duyen 2026-11-09: "tru hoan/huy thang truoc CHI tinh vao CUOI THANG, dang tinh thang moi thi chua chot so". Thang dang chay (chua toi ngay cuoi) -> KHONG tru, KHONG liet ke don hoan/huy,
+  // KHONG tinh lai thang truoc (tiet kiem 1 lan chay Bao cao B). Cung dieu kien voi chot thang: thang < thang hien tai, hoac thang hien tai vao NGAY CUOI THANG (_posCanCloseMonth_).
+  if (month === _todayYm_() && !_isLastDayOfMonthVn_()) return res;
   var prev = _ymAdd_(month, -1), snap = _readPosSnapshots_()[prev];
   var info = { applied: false, month: month, prevMonth: prev };
   res.posAdjust = info;
   if (!snap) { info.reason = 'Chưa chốt tháng ' + prev + ' nên chưa có báo cáo đơn hoàn/hủy tháng ' + prev + '.'; return res; }
   var other = ['nguon', 'marketer', 'careStatus', 'khStatus', 'zaloStatus'].some(function(k) { return filters[k] && filters[k].length; }) || filters.sanPham || filters.nickZalo;
   if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không hiện báo cáo đơn hoàn/hủy tháng trước (báo cáo tính cho cả tháng). Bỏ các bộ lọc này để xem.'; return res; }
-  var now = _posRevenueBySale_(prev), want = null;
+  var now = _posRevenueBySaleCached_(prev), want = null;   // cache 180s: truoc day moi lan cache bao cao het han lai chay LAI ca Bao cao B cua thang truoc (gap doi thoi gian)
   if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
   var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
   var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
@@ -935,7 +961,7 @@ function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   return ok;
 }
 // Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
-var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitFixList:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
 function _featureGate_(action, token) {
   var f = ACTION_FEATURE_[action];
   if (!f || !token) return null;
@@ -1294,6 +1320,7 @@ function _scopeGate_(action, token, phone, via) {
 function _reportCacheKey_(prefix, filters) {
   // Cong tac "don 1 ma chia theo Base" (Settings POS_GHEP_MIN_CODES=1) doi so lieu bao cao => dua vao khoa cache de bat/tat co hieu luc NGAY (khong doi het cache cu).
   try { if (_posGhepMinCodes_() === 1) prefix = prefix + 'g1_'; } catch (eG) {}
+  try { if (_posGhepRatioOn_()) prefix = prefix + 'gr_'; } catch (eR) {}   // cong tac chia theo ty le Base doi so lieu => vao khoa cache
   // Bang chia bo sung (acctSplitExtra) doi so lieu B => dua dau van tay vao khoa cache de co hieu luc NGAY khi admin sua.
   try { var _exRaw = _acctExtraRaw_(); if (_exRaw) { var _h = 5381; for (var _hi = 0; _hi < _exRaw.length; _hi++) _h = ((_h << 5) + _h + _exRaw.charCodeAt(_hi)) | 0; prefix = prefix + 'x' + (_h >>> 0).toString(36) + '_'; } } catch (eX) {}
   var js = JSON.stringify(filters);

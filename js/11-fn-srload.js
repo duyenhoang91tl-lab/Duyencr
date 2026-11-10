@@ -21,6 +21,15 @@ async function _srLoad(){
       byCreator: _srState.byCreator ? '1' : ''
     });
   } else if (_srState.sub === 'B') {
+    // Duyen 2026-11-09: Bao cao B mo lan DAU ma chua chon ngay (dateFrom/dateTo rong) = tinh TOAN BO don tu truoc toi nay -> vuot 55s cua _srFetch, bao "signal is aborted" va khong ra gi.
+    // Lan dau trong phien tu dat "Thang nay" (nhu cac bao cao khac nguoi dung hay xem); sau do neu Duyen CHU DONG xoa ngay de xem tat ca thi ton trong (khong ep lai).
+    if (!_srState.bAutoMonthDone_) {
+      _srState.bAutoMonthDone_ = true;
+      if (!_srState.dateFrom && !_srState.dateTo) {
+        var rBm = _pkQuickRange('thisMonth');
+        if (rBm) { _srState.dateFrom = rBm.from; _srState.dateTo = rBm.to; _srState.dateQuick = 'thisMonth'; renderSalesReportTab(); }
+      }
+    }
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(','),
@@ -1585,26 +1594,119 @@ function _srBcCheckRows_(d){
   if (chk.length === 1) chk.push(['(không có mục nào cần kiểm tra tay)', '', '', '', '', '', '']);
   return chk;
 }
+// ═══ SỬA TAY TIỀN TỪNG SALE NGAY TRONG BẢNG CHECK NGƯỢC BASE (Duyên 2026-11-09) ═══
+// Đơn Pos ghép Base LỆCH giá mà có ≥2 sale: hệ thống chia theo tỷ lệ chưa chuẩn thì Admin nhập tay tiền 1 sale, các sale còn lại TỰ BÙ cho đủ tổng
+// (vd đơn 5tr: nhập sale A 3tr → sale B tự = 2tr). Lưu = cùng cơ chế nút "🛠 Đơn lệch Pos–Base": Settings acctSplitExtra, mỗi sale 1 dòng {code, sales:[tên], tong}.
+// Đơn quầy (saleRatio ≠ 1) KHÔNG sửa ở đây (tổng đã nhân tỷ lệ quầy) — dùng nút "🛠 Đơn lệch Pos–Base".
+var _SR_BC_LIM_ = 100;
+function _srBcEditable_(o){
+  if (typeof _srIsAdmin_ !== 'function' || !_srIsAdmin_()) return null;
+  if (o.saleRatio && Number(o.saleRatio) !== 1) return null;
+  var sh = _srOrderShares_(o, 'adj').filter(function(x){ return x.name !== _SR_UNASSIGNED_; });
+  var code = (o.ghepCodes && o.ghepCodes[0]) || '';
+  if (sh.length < 2 || !code) return null;
+  var amts = sh.map(function(x){ return Math.round(x.giaTri); });
+  return { code: code, names: sh.map(function(x){ return x.name; }), amts: amts, total: amts.reduce(function(a, b){ return a + b; }, 0) };
+}
+// Đặt tiền sale thứ k = val (0..total); phần còn lại chia cho các sale KHÁC theo tỷ lệ số hiện có (đều nhau nếu đang 0), sale cuối nhận số dư làm tròn → tổng luôn = total.
+function _srBcRebalance_(amts, total, k, val){
+  var n = amts.length, v = Math.max(0, Math.min(total, Math.round(Number(val) || 0))), out = amts.slice(), others = [], i;
+  for (i = 0; i < n; i++) if (i !== k) others.push(i);
+  out[k] = v;
+  var rest = total - v, base = others.reduce(function(s, j){ return s + amts[j]; }, 0), used = 0;
+  others.forEach(function(j, idx){
+    if (idx === others.length - 1){ out[j] = rest - used; return; }
+    var part = base > 0 ? Math.round(rest * amts[j] / base) : Math.round(rest / others.length);
+    out[j] = part; used += part;
+  });
+  return out;
+}
+function _srBcEditState_(i){
+  var st = _srState.bcEdit = _srState.bcEdit || {}, o = (_srState.bcView || [])[i];
+  if (!o) return null;
+  var ed = _srBcEditable_(o); if (!ed) return null;
+  var cur = st[ed.code];
+  if (!cur || cur.names.join('|') !== ed.names.join('|') || cur.total !== ed.total) cur = st[ed.code] = { names: ed.names, total: ed.total, amts: ed.amts.slice(), orig: ed.amts.slice(), dirty: false };
+  cur.code = ed.code;
+  return cur;
+}
+function _srBcSumHtml_(cur){
+  var sum = cur.amts.reduce(function(a, b){ return a + b; }, 0);
+  return cur.dirty ? 'Tổng <b>' + _srMoney(sum) + '</b> = tổng đơn ' + _srMoney(cur.total) + (sum === cur.total ? ' ✓' : ' <span style="color:#c00">(lệch ' + _srMoney(sum - cur.total) + ')</span>') : 'Tổng đơn <b>' + _srMoney(cur.total) + '</b> — nhập tiền 1 sale, sale còn lại tự bù';
+}
+function _srBcEdit_(i, k, v){
+  var cur = _srBcEditState_(i); if (!cur) return;
+  cur.amts = _srBcRebalance_(cur.amts, cur.total, k, String(v || '').replace(/[^0-9]/g, ''));
+  cur.dirty = true;
+  cur.amts.forEach(function(a, j){ if (j === k) return; var el = document.getElementById('sr-bc-in-' + i + '-' + j); if (el) el.value = fmt(a); });
+  var s = document.getElementById('sr-bc-sum-' + i); if (s) s.innerHTML = _srBcSumHtml_(cur);
+}
+function _srBcReset_(i){
+  var cur = _srBcEditState_(i); if (!cur) return;
+  cur.amts = cur.orig.slice(); cur.dirty = false;
+  cur.amts.forEach(function(a, j){ var el = document.getElementById('sr-bc-in-' + i + '-' + j); if (el) el.value = fmt(a); });
+  var s = document.getElementById('sr-bc-sum-' + i); if (s) s.innerHTML = _srBcSumHtml_(cur);
+}
+function _srBcEditCellHtml_(i, o){
+  var cur = _srBcEditState_(i); if (!cur) return '';
+  var h = cur.names.map(function(nm, k){
+    return '<div style="display:flex;gap:6px;align-items:center;margin:2px 0"><span style="min-width:92px">' + esc(nm) + '</span>' +
+      '<input type="text" inputmode="numeric" id="sr-bc-in-' + i + '-' + k + '" value="' + fmt(cur.amts[k]) + '" oninput="_srBcEdit_(' + i + ',' + k + ',this.value)" onchange="this.value=fmt(parseInt(String(this.value).replace(/[^0-9]/g,\'\'),10)||0)" style="width:110px;text-align:right;padding:3px 6px;border:1px solid var(--border);border-radius:6px"> đ</div>';
+  }).join('');
+  return h + '<div id="sr-bc-sum-' + i + '" style="margin:3px 0;color:var(--muted)">' + _srBcSumHtml_(cur) + '</div>' +
+    '<button type="button" class="btn sm primary" onclick="_srBcSave_(' + i + ')">💾 Lưu chia tay</button> <button type="button" class="btn sm" onclick="_srBcReset_(' + i + ')">↺ Hoàn tác</button>';
+}
+async function _srBcSave_(i){
+  var cur = _srBcEditState_(i); if (!cur) return;
+  var sum = cur.amts.reduce(function(a, b){ return a + b; }, 0);
+  if (sum !== cur.total){ toast('❌ Tổng các sale (' + fmt(sum) + ') chưa bằng tổng đơn (' + fmt(cur.total) + ')'); return; }
+  var rows = [];
+  cur.names.forEach(function(nm, k){ if (cur.amts[k] > 0) rows.push({ sales: [nm], tong: cur.amts[k] }); });
+  if (!rows.length){ toast('❌ Chưa có sale nào có tiền'); return; }
+  var txt = cur.names.map(function(nm, k){ return nm + ': ' + fmt(cur.amts[k]) + 'đ'; }).join('\n');
+  if (typeof confirm === 'function' && !confirm('Lưu chia tay đơn ' + cur.code + '?\n\n' + txt + '\n\nTổng ' + fmt(cur.total) + 'đ. Từ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).')) return;
+  try{
+    var old = await _splitFixGetExtra_();
+    await _splitFixPutExtra_(splitFixMergeExtra_(old, cur.code, rows));
+    delete _srState.bcEdit[cur.code];
+    toast('✅ Đã lưu chia tay ' + cur.code + ' — đang tính lại báo cáo');
+    if (typeof _srLoad === 'function') _srLoad();
+  }catch(e){ toast('❌ Chưa lưu được: ' + (e && e.message || e)); }
+}
 function _srBaseCheckPanelHtml_(d){
   if (!d || !d.orders) return '';
   var orders = _srBcOrders_(d), g = d.ghep || {};
   var b = _srBcBuild_(orders), t = b.tot;
-  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — chia sale theo đơn gốc Base)</span></div>';
-  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b>' + (t.du ? ' · Phần còn lại tính theo Thẻ Pos <b>' + _srMoney(t.du) + '</b>' : '') +
+  // Duyên 2026-11-09: màn hình CHỈ hiện đơn Pos lệch Base (|Base − Pos| > 1đ, cùng ngưỡng tô đỏ + t.lech) để check tay/chia tiền tay; đơn khớp thì ẩn. Xếp lệch lớn nhất lên đầu. Excel xuất vẫn đủ mọi đơn ghép.
+  var lechOrders = orders.filter(function(o){ return Math.abs(_srBcBaseSum_(o) - _srBcPosVal_(o)) > 1; })
+    .sort(function(x, y){ return Math.abs(_srBcBaseSum_(y) - _srBcPosVal_(y)) - Math.abs(_srBcBaseSum_(x) - _srBcPosVal_(x)); });
+  var lechTot = lechOrders.reduce(function(sum, o){ return sum + (_srBcBaseSum_(o) - _srBcPosVal_(o)); }, 0);
+  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — CHỈ hiện đơn Pos lệch Base để check tay &amp; chia tiền tay; đơn khớp thì ẩn)</span></div>';
+  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b> · <span style="color:#c00">Đơn lệch cần check tay <b>' + fmt(lechOrders.length) + '</b> (tổng chênh <b>' + _srMoney(lechTot) + '</b>)</span>' + (t.du ? ' · Phần còn lại tính theo Thẻ Pos <b>' + _srMoney(t.du) + '</b>' : '') +
     ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>. ' +
     '<button class="btn sm" onclick="_srBaseCheckExport_()">📥 Xuất Excel check ngược Base</button></div>';
   if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
-  var LIM = 100;
-  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th>Đơn gốc Base</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
-  orders.slice(0, LIM).forEach(function(o){
+  if (!lechOrders.length){ return h + '<div style="font-size:12px;color:var(--muted)">✅ Cả ' + fmt(orders.length) + ' đơn Pos ghép Base đều khớp giá với Base — không có đơn nào cần check tay.</div>'; }
+  var LIM = _SR_BC_LIM_;
+  _srState.bcView = lechOrders.slice(0, LIM);
+  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th style="min-width:320px">Đơn gốc Base (mã · kênh · sale · sản phẩm)</th><th style="min-width:230px">Chia sale (theo Base) — Admin sửa tay</th></tr></thead><tbody>';
+  _srState.bcView.forEach(function(o, oi){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
-    var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
+    // Mỗi đơn gốc Base = 1 khối riêng (Duyên 2026-11-09): mã · ngày · KÊNH · SALE BASE · người tạo · giá, dòng dưới = SẢN PHẨM/nội dung đơn Base, để check ngược từng đơn.
+    var src = (o.ghepBase || []).map(function(x){
+      var gv = fmt(Math.round(Number(x.giaTri) || 0));
+      return '<div style="padding:3px 0;border-bottom:1px dashed var(--border)"><b>' + esc(x.ma || '') + '</b>' + (x.ngay ? ' · ' + esc(x.ngay) : '') + (x.kenh ? ' · <span title="Kênh bán trên Base">📣 ' + esc(x.kenh) + '</span>' : '') +
+        '<br>Sale Base: <b>' + esc(x.saleBan || '(chưa gán)') + '</b> · tạo: ' + esc(x.nguoiTao || '?') + ' · <b>' + gv + 'đ</b>' + (x.trangThai ? ' · ' + esc(x.trangThai) : '') + (x.tinh ? '' : ' <span style="color:#c00">(bị loại: ' + esc(x.trangThai || '') + ')</span>') +
+        (x.sanPham ? '<br><span style="color:var(--muted)">🛒 ' + esc(x.sanPham) + '</span>' : '') + '</div>';
+    }).join('');
     var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
-    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + '</td>' +
+    var edCell = _srBcEditCellHtml_(oi, o);
+    if (edCell) sh = '<div style="color:var(--muted);margin-bottom:3px">✏️ Admin sửa tay:</div>' + edCell;
+    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + (o.sanPham ? '<br><span style="color:var(--muted);font-size:11px">🛒 ' + esc(String(o.sanPham).substring(0, 120)) + '</span>' : '') + '</td>' +
       '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
   });
   h += '</tbody></table></div>';
-  if (orders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(orders.length) + ' đơn — bấm <b>Xuất Excel</b> để xem đủ.</div>';
+  if (lechOrders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(lechOrders.length) + ' đơn lệch (lệch lớn nhất trước) — bấm <b>Xuất Excel</b> để xem đủ.</div>';
   return h;
 }
 function _srBaseCheckExport_(){

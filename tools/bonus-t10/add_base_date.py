@@ -42,7 +42,10 @@ for o in orders:
     # Don them NG... / BH... la don di kem (khong co dong rieng tren Base) -> van tinh nhu cu nhung van liet ke de check tay.
     ck = key or first; st = status.get(key) or status.get(first)
     lyDo = ''
-    if st == 'Thất bại': lyDo = 'Base Thất bại/Hủy'; o['loaiThuong'] = 'base-that-bai'
+    # QUY TAC DUYEN 2026-11-05: ma T09 la don cua THANG 9 -> KHONG tinh thuong/doanh thu T10 (du Pos T10 co, du Base co). BH... la bao hanh di kem nen bo qua khi xet thang.
+    mths = [mm for pre, num, mm in re.findall(r'(?<![A-Za-z0-9])(BH|NG)?(\d+)T(\d{2})(?![0-9])', first, re.I) if (pre or '').upper() != 'BH']
+    if mths and all(mm == '09' for mm in mths): lyDo = 'Mã tháng 9 (T09) — không tính thưởng T10'; o['loaiThuong'] = 'thang-9'
+    elif st == 'Thất bại': lyDo = 'Base Thất bại/Hủy'; o['loaiThuong'] = 'base-that-bai'
     elif m and not m.group(1) and not d: lyDo = 'Có trên Pos, KHÔNG có trên Base'; o['loaiThuong'] = 'khong-co-base'
     elif m and m.group(1) and not d: lyDo = 'Đơn thêm %s không có dòng riêng trên Base (vẫn tính như cũ)' % m.group(1).upper()
     elif not m and first: lyDo = 'Ghi chú không có mã bộ đếm đọc được'
