@@ -2800,7 +2800,7 @@ function doGetCore_(e) {
                  sanPham: pC.sanPham || '',
                  byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
       var cacheC = CacheService.getScriptCache();
-      var cKeyC = _reportCacheKey_('salesC_', fC);
+      var cKeyC = _reportCacheKey_('salesC2_', fC);
       var cachedC = cacheC.get(cKeyC);
       if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
       var resC = buildSalesReportC_(fC);
@@ -7429,10 +7429,11 @@ function buildSalesReportC_(filters) {
   // tat ca sale dung ten tren don (mac dinh, giu nguyen hanh vi cu).
   var byCreator = !!filters.byCreator;
 
-  var rows = readDTTong_();
+  var rows = null;   // doc DT Tong LAZY: che do Pos (mac dinh) khong can doc -> bao cao C nhanh hon
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
   // nhu buildSalesReportA_ (so don khong chia — o day khong can so don nen bo qua, chi lay tien).
   function aggregate(fromStr, toStr) {
+    if (rows === null) rows = readDTTong_();
     var bySale = {}, byKenh = {};
     var matchedOrders = [];
     for (var i = 0; i < rows.length; i++) {
@@ -7463,8 +7464,35 @@ function buildSalesReportC_(filters) {
     return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
   }
 
-  var curAgg = aggregate(per.curFrom, per.curTo);
-  var prevAgg = aggregate(per.prevFrom, per.prevTo);
+  // NGUON SO LIEU (Duyen 2026-11-10: "bao cao C tinh theo POS"): mac dinh lay tu Bao cao B (don Pos, da ghep Base/chia theo phan tung sale) cho CA 2 KY,
+  // loc Sale/Kenh/San pham cua mau loc nhanh ap NHU NHAU cho 2 ky. Giu DT Tong (Base) khi: filters.source==='base', hoac 'tinh theo nguoi tao don' (Pos khong co cot nay),
+  // hoac moc ngay 'thoiGianHT' (Pos khong co ngay hoan thanh).
+  var usePos = filters.source !== 'base' && !byCreator && dateField === 'ngayTao';
+  var _kenhPageById = null, _kenhPageByName = null;
+  function kenhOfPosOrder_(o) {
+    if (!_kenhPageById) { _kenhPageById = readPancakePageMap_(); _kenhPageByName = readPancakePageMapByName_(); }
+    return _donKenhFromNguon_(o.nguonDon, _kenhPageById, _kenhPageByName) || o.nguonDon || '(chưa có kênh)';   // kenh chuan qua PancakePageMap (cung bo chon Kenh ban voi Bao cao A); khong khop -> giu Nguon don
+  }
+  function aggregatePos(fromStr, toStr) {
+    var rb = buildSalesReportB_({ dateFrom: fromStr, dateTo: toStr, sale: saleFilterArr, sanPham: filters.sanPham || '' });
+    var bySale = {}, byKenh = {}, matchedOrders = [];
+    (rb.orders || []).forEach(function(o) {
+      var kenh = kenhOfPosOrder_(o);
+      if (kenhFilterArr.length && kenhFilterArr.indexOf(kenh) === -1) return;
+      var shares = (o.bsx && o.bsx.length) ? o.bsx : [], total = 0;
+      shares.forEach(function(x) {
+        if (x[0] === UNASSIGNED) return;   // B bo dong "(chua gan sale)" khoi Theo Sale -> C cung bo, de 2 bao cao khop nhau
+        bySale[x[0]] = (bySale[x[0]] || 0) + x[1]; total += x[1];
+      });
+      byKenh[kenh] = (byKenh[kenh] || 0) + total;
+      matchedOrders.push({ ngayTao: o.ngayTaoDon, thoiGianHT: '', kenhBan: kenh, saleBan: shares.map(function(x) { return x[0]; }).join(', '),
+                           sanPham: o.sanPham, giaTriCoc: 0, giaTriDon: o.giaTriSauGiam, giaiDoan: '', trangThai: o.trangThai, id: o.posRow || '' });
+    });
+    return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
+  }
+
+  var curAgg = usePos ? aggregatePos(per.curFrom, per.curTo) : aggregate(per.curFrom, per.curTo);
+  var prevAgg = usePos ? aggregatePos(per.prevFrom, per.prevTo) : aggregate(per.prevFrom, per.prevTo);
 
   function buildTable(curMap, prevMap, entType) {
     var names = Object.keys(Object.assign({}, curMap, prevMap));
@@ -7492,6 +7520,7 @@ function buildSalesReportC_(filters) {
   };
 
   return {
+    source: usePos ? 'pos' : 'base',
     period: per,
     byEmployee: buildTable(curAgg.bySale, prevAgg.bySale, 'sale'),
     byKenh: buildTable(curAgg.byKenh, prevAgg.byKenh, 'kenh'),
