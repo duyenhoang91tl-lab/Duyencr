@@ -11,6 +11,19 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 53) — Vì sao Báo cáo B (Pos) cao hơn Báo cáo A (Base) ~150,8tr — XONG phân tích (chưa đổi code), đã push; CHỜ Duyên quyết 3 quy tắc bên dưới
+- **Số liệu:** A (Base) 246 đơn 1.575.438.000đ; B (Pos) thẻ đầu 270 đơn 1.726.263.000đ → B − A = **+150.825.000đ**. File `BaoCao_Pos_CheckNguocBase_2026-11-10.xlsx` (11:30): 238 đơn Pos đã ghép Base, giá Pos 1.496.553.000 < Base 1.520.706.000 (Base cao hơn 24,15tr, 13 đơn lệch) → **phần đã ghép KHÔNG phải nguyên nhân Pos cao hơn.**
+- **Phân rã (từ CRM + 2 export):** B − A = (+66,6tr) Base-ghép của B (1.520,7tr) lớn hơn phần Base T11 mà A có (1.454,1tr): đơn gốc Base nằm NGOÀI tập A (đơn tháng trước T10 đổi/lên lại/BH do Pos tạo tháng 11, hoặc ngoài 14 sale) + (+84,2tr) đơn Pos tính theo giá Pos mà A không có tương ứng (205,6tr đơn Pos không ghép Base − 121,3tr đơn Base 1 mã không ghép).
+- **Đơn Pos KHÔNG có mã nào trong Base T11 (26 đơn / 230,5tr, tính theo Pos), trừ 6 đơn chỉ có ở Base (24,8tr) = +205,7tr:**
+  1. 14 đơn mã T10/BH, ghi chú "LÊN LẠI ĐƠN HOÀN", "ĐỔI", "BH…": **89,5tr** — Base tính theo tháng tạo đơn gốc (T10) nên không vào A; Pos vẫn là doanh thu tháng 11.
+  2. 9 đơn mã **NG…** (NG2T11, NG38T11, NG49T11…): **61,9tr** — mã NG không có trong export Base "đơn các kênh".
+  3. 3 đơn mã T11 chưa có trong Base: **351T11 50,8tr** (10/11, Zalo, huyenmaii1990) + **354T11 23,7tr** (10/11, thuydinh95) — tạo sáng 10/11 sau lúc export Base 09:22; **110T11 4,65tr** Base đã Thất bại nhưng Pos vẫn tính (đơn 1 mã nên không bị loại).
+  - Đơn chỉ có ở Base (24,8tr): 25T11 10,33tr (ninhLTK1984), 299T11 6,2tr (Dungnguyen1995), 128T11 4,85tr, 333T11 2,45tr, 72T11 0,95tr (+159T11 0đ) — Pos không ghi mã.
+- **Nghi trùng/lệch cần Duyên xem:** 6T11 (Base 20,425tr) có 2 đơn Pos: 20,425tr + NG2T11 12,55tr (cùng khách, ghi chú lòng nhẫn) → 12,55tr có thể là đơn bổ sung thật hoặc trùng; 303T11 (Base 5,85tr) có 2 đơn Pos 5,85tr + 4,65tr (4,65tr = đơn 110T11 Thất bại bên Base); 296T11 Base ghi sale anhNP1999 nhưng thẻ Pos là anhtrinh1995 (Base ≠ Pos về người); 14 đơn "nghi ghép nhưng chưa ghép" tổng 127,7tr đang tính theo Pos.
+- **Chưa giải thích:** thẻ đầu B 1.726.263.000 vs tổng bảng Theo Sale 1.730.149.333 (lệch +3.886.333) vẫn chưa dò.
+- Script phân tích dùng 3 file: Base export (xls lỗi cấu trúc → đọc bằng `xlrd.open_workbook(..., ignore_workbook_corruption=True)`), `orders_6.xlsx`, file check ngược; KHÔNG commit (có tiền từng người).
+- [ ] **VIỆC KẾ TIẾP (cần Duyên quyết):** (a) đơn "lên lại đơn hoàn/đổi/BH" mã T10 có tính vào doanh thu B tháng 11 không (hiện CÓ); (b) mã **NG…** là gì và có phải đơn thật cần có trong Base không; (c) đơn Pos 1 mã mà Base đã "Thất bại" (110T11) có loại khỏi B không (hiện KHÔNG, chỉ loại khi ≥2 mã và mọi đơn gốc Thất bại). Sau khi chốt: sửa `buildSalesReportB_` (tìm `ghepCheck`/`acctStats`) + thêm test. Cũng nên lấy lại export Base SAU 11:00 để loại yếu tố 351T11/354T11.
+
 ## 2026-11-10 (phiên 52) — Đối soát A/B với export mới + sửa tên hiển thị Báo cáo B (tên đầy đủ → username Base) — XONG code, ĐÃ COMMIT CỤC BỘ; CHƯA PUSH (chờ token mới của Duyên)
 - **Báo cáo A (Base) — KHỚP 100%:** export Base `don-cac-kenh` 09:22 10/11 (346 dòng, 246 đơn hợp lệ) = màn hình CRM 246 đơn / 1.575.438.000đ, cả 14 sale khớp từng đồng (tổng cọc 756.563.000). Vấn đề phiên 48 (thiếu 31 đơn 01/11 + 348T11) ĐÃ HẾT → nguồn đã đồng bộ lại.
 - **Báo cáo B (Pos):** `orders_6.xlsx` vẫn là file cũ (652 dòng, ngày tới 10/11) và số CRM B không đổi so với phiên 49 (319 lượt, 1.730.149.333đ). **Gộp tên phiên 51 hoạt động:** Thuydinh1995 còn 1 dòng 202.060.000đ. Chênh CRM − Pos thuần của từng sale GIỐNG HỆT phiên 49 (huyenmaii1990 −48,6tr, thuydinh1995 −40,2tr, anhtrinh1995 −12,7tr, ninhnga99 +18,0tr, ninhltk1984 +10,3tr…) = do ghép Base/bảng chia kế toán/gộp tách đơn, tool KHÔNG mô phỏng; chưa xác nhận từng đơn. ngocnb2003saleoff, dungnguyen1995, mainguyen97 khớp Pos thuần.
