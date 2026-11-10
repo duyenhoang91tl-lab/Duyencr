@@ -886,6 +886,19 @@ function _ymAdd_(ym, delta) {
   y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
   return y + '-' + ('0' + (m + 1)).slice(-2);
 }
+// Gop tien theo NGUOI khi so sanh anh chup chot thang (ten luc chot co the la ten goc cu: thuydinh95) voi so tinh lai (nay ra ten chinh Thuydinh1995).
+// map: {ten: tien}; refs: cac {ten: ...} dang dung de hien thi — ten trong refs duoc uu tien lam ten dai dien, neu khong co thi dung TEN CHINH.
+function _foldRevMapByPerson_(map, refs) {
+  map = map || {};
+  var names = Object.keys(map), refNames = [];
+  (refs || []).forEach(function(r) { Object.keys(r || {}).forEach(function(n) { refNames.push(n); }); });
+  if (!names.length) return {};
+  var id; try { id = _salePersonIdentity_(names.concat(refNames)); } catch (e) { return map; }
+  var refByKey = {}; refNames.forEach(function(n) { refByKey[id.key(n)] = n; });
+  var out = {};
+  names.forEach(function(n) { var t = refByKey[id.key(n)] || id.primary(n) || n; out[t] = Math.round(((out[t] || 0) + (Number(map[n]) || 0)) * 100) / 100; });
+  return out;
+}
 function _posRevenueBySale_(ym) {
   var a = buildSalesReportB_({ dateFrom: _ymFirstDay_(ym), dateTo: _ymLastDay_(ym) });
   var out = {};
@@ -979,8 +992,10 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không trừ hoàn/hủy (số trừ tính cho cả tháng). Bỏ các bộ lọc này để xem số sau trừ.'; return res; }
   var now = _posRevenueBySaleCached_(prev), want = null;   // cache 180s: truoc day moi lan cache bao cao het han lai chay LAI ca Bao cao B cua thang truoc (gap doi thoi gian)
   if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
-  var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
-  var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
+  var _rowNamesA = {}; (res.bySale || []).forEach(function(r) { _rowNamesA[r.name] = 1; });
+  var snapBy = _foldRevMapByPerson_(snap.bySale, [_rowNamesA, now.bySale]), nowBy = _foldRevMapByPerson_(now.bySale, [_rowNamesA]);   // gop theo nguoi: ten luc chot != ten chinh hien tai khong con tao khoan tru gia
+  var names = {}; Object.keys(snapBy).forEach(function(n) { names[n] = 1; }); Object.keys(nowBy).forEach(function(n) { names[n] = 1; });
+  var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snapBy[n]) || 0) - (Number(nowBy[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
   // DOANH THU CHUAN cua thang (bang Theo Sale + tong) GIU NGUYEN — KHONG tru truc tiep (Duyen chot 2026-11-03: "cho doanh thu chuan cua thang truoc, ngay ben duoi la bao cao
   // phan tru hoan/huy cua thang truoc"). Phan tru tra RIENG: moi dong co truHoanHuy + giaTriSauTru, va posAdjust.rows (ca sale chi co hoan/huy thang truoc, khong co don thang nay)
   // de giao dien hien bang "Tru hoan/huy thang truoc" ngay duoi bang chinh.
@@ -1022,9 +1037,10 @@ function posMonthAdjust_(month) {
       rows: Object.keys(cur.bySale).map(function(n) { return { name: n, revenue: cur.bySale[n], deduction: 0, net: cur.bySale[n] }; }).sort(function(a, b) { return b.net - a.net; }) };
   }
   var now = _posRevenueBySale_(prev); // doanh thu thang truoc tinh lai theo du lieu HIEN TAI (da loai don hoan/huy phat sinh sau luc chot)
-  var names = {}; Object.keys(cur.bySale).forEach(function(n) { names[n] = 1; }); Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; });
+  var snapBy2 = _foldRevMapByPerson_(snap.bySale, [cur.bySale, now.bySale]), nowBy2 = _foldRevMapByPerson_(now.bySale, [cur.bySale]);   // gop theo nguoi (xem _foldRevMapByPerson_)
+  var names = {}; Object.keys(cur.bySale).forEach(function(n) { names[n] = 1; }); Object.keys(snapBy2).forEach(function(n) { names[n] = 1; });
   var rows = Object.keys(names).map(function(n) {
-    var deduction = (Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0);
+    var deduction = (Number(snapBy2[n]) || 0) - (Number(nowBy2[n]) || 0);
     var revenue = Number(cur.bySale[n]) || 0;
     return { name: n, revenue: revenue, deduction: deduction, net: revenue - deduction };
   }).filter(function(r) { return r.revenue || r.deduction; }).sort(function(a, b) { return b.net - a.net; });
@@ -6213,12 +6229,12 @@ function _acctMatchExtra_(acct, codes) {
 }
 // Chuan hoa ten Sale tren cac don cua Bao cao B ve TEN CHINH (xem _salePersonIdentity_). list(): doi + bo trung (giu thu tu); shares(): gop ty le cua cac ten cung
 // nguoi (tong khong doi); aliasMap: ten chinh -> moi ten cung nguoi (chi nguoi co >= 2 ten).
-function _saleCanonOrders_(orders) {
+function _saleCanonOrders_(orders, idOpt) {
   var observed = [];
   (orders || []).forEach(function(m) {
     (m.ghepShares ? m.ghepShares.map(function(x) { return x.name; }) : _donSaleNamesFromThe_(m.theSale)).forEach(function(n) { if (n) observed.push(n); });
   });
-  var id = _salePersonIdentity_(observed), aliasMap = {}, seenPrim = {};
+  var id = idOpt || _salePersonIdentity_(observed), aliasMap = {}, seenPrim = {};
   observed.forEach(function(n) {
     var c = id.primary(n), ck = _normTxt_(c); if (!c || seenPrim[ck]) return; seenPrim[ck] = 1;
     var mem = id.members(c); if (mem.length > 1) aliasMap[c] = mem.slice(0, 20);
@@ -6459,6 +6475,16 @@ function buildSalesReportB_(filters) {
   var products = {}; // maSanPham -> { name, soLuong }
   var bySale = {};   // ten sale -> { orders, giaTri, cod } — tien CHIA DEU cho so sale/don, so don GIU NGUYEN
 
+  // GOM TEN THEO NGUOI (Duyen 2026-11-10: bang Theo Sale hien ca "Thuydinh1995" lan "thuydinh95", "Biichnguyen1993"/"biichnguyen1993"...).
+  // NGUYEN NHAN GOC: bySale/byTeamSale/bySaleDay keyed theo CHUOI ten goc (don ghep Base mang ten Base chuan, don thuong mang tag Pos khac hoa/thuong
+  // hoac khac ten) nen 1 nguoi bi tach 2 dong, trong khi don tra ve (_saleCanonOrders_) da dung TEN CHINH. Nay moi ten -> TEN CHINH cua nguoi (cung
+  // _salePersonIdentity_), cac ten cung nguoi tren 1 don cong don ty le (don chi dem 1 lan cho nguoi do). Tong tien khong doi.
+  var _idB = null;
+  try {
+    var _obsB = [];
+    matched.forEach(function(mm) { (mm.ghepShares ? mm.ghepShares.map(function(x) { return x.name; }) : _donSaleNamesFromThe_(mm.theSale)).forEach(function(n) { if (n) _obsB.push(n); }); });
+    _idB = _salePersonIdentity_(_obsB);
+  } catch (eIdB) { _idB = null; }
   for (var j = 0; j < matched.length; j++) {
     var m = matched[j];
     totalGiaTri += m.giaTriSauGiam;
@@ -6483,10 +6509,18 @@ function buildSalesReportB_(filters) {
       fracOf = function() { return evenFrac; };
     }
     var teamsOnOrderB = {};
-    for (var si2 = 0; si2 < salesOnOrder.length; si2++) {
-      var sName = salesOnOrder[si2];
-      if (!wantSaleB_(sName)) continue;   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc (frac van theo ca don nen tien cua tung nguoi khong doi)
-      var fr = fracOf(sName) * (m.saleRatio || 1); // saleRatio 0.3 = don Quay 30/70 (phan con lai 70% la cua quay)
+    var mergedB = [], mIdxB = {};   // gop cac ten cua CUNG 1 nguoi tren don thanh 1 dong (ten chinh), ty le cong don
+    salesOnOrder.forEach(function(n) {
+      var c = n;
+      if (_idB && n !== UNASSIGNED) { try { c = _idB.primary(n) || n; } catch (eP) { c = n; } }
+      var kk = _normTxt_(c), f0 = Number(fracOf(n)) || 0;
+      if (mIdxB[kk] === undefined) { mIdxB[kk] = mergedB.length; mergedB.push({ name: c, frac: f0, raws: [n] }); }
+      else { mergedB[mIdxB[kk]].frac += f0; mergedB[mIdxB[kk]].raws.push(n); }
+    });
+    for (var si2 = 0; si2 < mergedB.length; si2++) {
+      var sName = mergedB[si2].name;
+      if (!wantSaleB_(sName) && !mergedB[si2].raws.some(function(rn) { return wantSaleB_(rn); })) continue;   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc (frac van theo ca don nen tien cua tung nguoi khong doi)
+      var fr = mergedB[si2].frac * (m.saleRatio || 1); // saleRatio 0.3 = don Quay 30/70 (phan con lai 70% la cua quay)
       if (!bySale[sName]) bySale[sName] = { orders: 0, giaTri: 0, cod: 0 };
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam * fr;
@@ -6601,7 +6635,7 @@ function buildSalesReportB_(filters) {
   // CHUAN HOA DANH TINH (Duyen 2026-10-15): moi ten cua CUNG 1 nguoi (2 the Pos, ten Base khac ten Pos...) -> 1 TEN CHINH ngay trong don tra ve cho
   // Bao cao E/G (hoa hong + thuong) va csStats: 1 nguoi = 1 dong, bac thuong theo ngay tinh tren TONG, don co 2 ten cua cung 1 nguoi khong bi chia doi.
   // % hoa hong/kenh/ngay bat dau/team dat theo TEN nao cung duoc tra theo moi ten cung nguoi (client: saleIdentity -> _cfgAliasesOf).
-  var _cn = _saleCanonOrders_(matched);
+  var _cn = _saleCanonOrders_(matched, _idB);
 
   return {
     saleIdentity: _cn.aliasMap,   // ten chinh -> moi ten cung nguoi (client tra cau hinh % hoa hong/kenh/ngay bat dau theo ten bat ky)
