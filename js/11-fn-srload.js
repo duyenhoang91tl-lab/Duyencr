@@ -1555,8 +1555,10 @@ function _srBcQuayTxt_(o){ return (o.saleRatio && Number(o.saleRatio) !== 1) ? (
 // Dựng 3 bảng dữ liệu (mảng-của-mảng, dòng đầu là tiêu đề) + tổng. Tiền của đơn (Giá Pos / Tổng Base / Chênh) CHỈ ghi ở dòng đầu mỗi đơn để SUM cột không bị cộng lặp.
 // Duyên 2026-11-09: Base > Pos đúng 40.000đ = tiền SHIP khách trả (Base cộng ship, Pos không) → coi là KHỚP, không báo lệch. Chỉ chiều Base cao hơn; muốn thêm mức ship khác thì thêm vào mảng này.
 var _SRBC_SHIP_FEES_ = [40000];
-function _srBcIsLech_(diff){   // diff = Base − Pos
+// Phí bảo hiểm 1% đơn trên 6 triệu: Pos = Base + ~1% Base (làm tròn chục nghìn, vd Base 6.033.000 → Pos 6.093.000, chênh −60.000) → cũng KHỚP (Duyên xác nhận 2026-11-09). Chỉ chiều Pos CAO hơn Base, Base ≥ 6.000.000, sai số ≤ 5.000đ.
+function _srBcIsLech_(diff, baseV){   // diff = Base − Pos
   if (Math.abs(diff) <= 1) return false;
+  if (baseV >= 6000000 && diff < 0 && Math.abs(-diff - baseV * 0.01) <= 5000) return false;
   for (var k = 0; k < _SRBC_SHIP_FEES_.length; k++) if (Math.abs(diff - _SRBC_SHIP_FEES_[k]) <= 1) return false;
   return true;
 }
@@ -1568,7 +1570,7 @@ function _srBcBuild_(orders){
   (orders || []).forEach(function(o, i){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o);
     tot.don++; tot.pos += posV; tot.base += baseV; tot.du += Number(o.ghepDu) || 0;
-    if (_srBcIsLech_(baseV - posV)) tot.lech++;
+    if (_srBcIsLech_(baseV - posV, baseV)) tot.lech++;
     (o.ghepBase || []).forEach(function(b, k){
       var first = k === 0;
       detail.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', first ? Math.round(posV) : '', o.ghiChu || '', (o.ghepCodes || []).join(', '),
@@ -1677,7 +1679,7 @@ function _srBaseCheckPanelHtml_(d){
   var orders = _srBcOrders_(d), g = d.ghep || {};
   var b = _srBcBuild_(orders), t = b.tot;
   // Duyên 2026-11-09: màn hình CHỈ hiện đơn Pos lệch Base (|Base − Pos| > 1đ, cùng ngưỡng tô đỏ + t.lech) để check tay/chia tiền tay; đơn khớp thì ẩn. Xếp lệch lớn nhất lên đầu. Excel xuất vẫn đủ mọi đơn ghép.
-  var lechOrders = orders.filter(function(o){ return _srBcIsLech_(_srBcBaseSum_(o) - _srBcPosVal_(o)); })
+  var lechOrders = orders.filter(function(o){ return _srBcIsLech_(_srBcBaseSum_(o) - _srBcPosVal_(o), _srBcBaseSum_(o)); })
     .sort(function(x, y){ return Math.abs(_srBcBaseSum_(y) - _srBcPosVal_(y)) - Math.abs(_srBcBaseSum_(x) - _srBcPosVal_(x)); });
   var lechTot = lechOrders.reduce(function(sum, o){ return sum + (_srBcBaseSum_(o) - _srBcPosVal_(o)); }, 0);
   var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — CHỈ hiện đơn Pos lệch Base để check tay &amp; chia tiền tay; đơn khớp thì ẩn)</span></div>';

@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-09 (phiên 47) — Báo cáo check ngược Base: phí bảo hiểm 1% đơn ≥ 6 triệu = KHỚP, ẩn — XONG 1/1, đã push
+- **Duyên xác nhận:** phí bảo hiểm 1% (ghi chú Base kiểu "6.033k + phí 1% bảo hiểm tầm 60k = 6.093k") cũng coi là khớp.
+- [x] `js/11-fn-srload.js` `_srBcIsLech_(diff, baseV)`: thêm quy tắc KHỚP khi Base ≥ 6.000.000, Pos CAO hơn Base (diff < 0) và |Pos − Base − 1%·Base| ≤ 5.000đ (làm tròn chục nghìn). Cả 2 chỗ gọi (`tot.lech`, `lechOrders`) đã truyền thêm baseV. Test `tools/test-base-check-report.js` thêm ca: 6.093k/6.033k ẩn; Pos>Base nhưng không ≈1% (6.200k vs 6.033k) hiện; đơn dưới 6 triệu hiện; TẤT CẢ ĐẠT.
+- **Còn hiện để check tay:** lệch khác ship 40k và bảo hiểm 1% (vd +45.000 thuyha88, −10.000 Oanh Hoàng). Không đụng backend/Excel.
+- [ ] **VIỆC KẾ TIẾP (nếu Duyên muốn):** xác nhận +45.000 có phải ship vùng khác không → thêm vào `_SRBC_SHIP_FEES_`; thêm cột Kênh/Sản phẩm vào Excel xuất.
+
 ## 2026-11-09 (phiên 46) — Báo cáo check ngược Base: Admin SỬA TAY tiền từng sale ngay cạnh đơn lệch (≥2 sale), sale còn lại tự bù — XONG 1/1 bước, đã push; CHỜ Duyên thử
 - **Duyên yêu cầu:** đơn Pos ghép Base mà có từ 2 sale và doanh thu lệch Pos–Base, nếu hệ thống tự chia chưa chuẩn thì Admin được sửa số tiền các sale ngay cạnh đơn (vd đơn 5tr: nhập sale A 3tr → sale B tự còn 2tr).
 - **NGUYÊN NHÂN GỐC:** bảng "Báo cáo check ngược Base" (`_srBaseCheckPanelHtml_`, `js/11-fn-srload.js`) chỉ HIỂN THỊ cột "Chia sale (theo Base)" (tỷ lệ tự động); muốn chia tay phải mở riêng panel "🛠 Đơn lệch Pos–Base" (js/50) và gõ text `sale = số tiền` từng dòng, không có tự bù.
