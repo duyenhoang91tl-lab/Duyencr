@@ -26,7 +26,7 @@
   "content_scripts": [
     {
       "matches": ["https://chat.zalo.me/*"],
-      "js": ["zalo-content.js", "zalo-viettat.js"],
+      "js": ["zalo-promo.js", "zalo-content.js", "zalo-viettat.js"],
       "css": ["zalo-content.css"],
       "run_at": "document_idle"
     }

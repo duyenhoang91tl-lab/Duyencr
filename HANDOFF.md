@@ -11,6 +11,32 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên Claude — làm bù Zalo AI ⇄ Pancake AI + Đơn kẹt) — ĐANG LÀM, chia bước nhỏ, mỗi bước push main riêng
+
+**Quy tắc Duyên đặt cho phiên này:** chia bước nhỏ, mỗi bước là 1 file/1 khối hoàn chỉnh → push main ngay → cuối bước cập nhật mục này (đã xong / đang làm / bước kế tiếp). QUY TẮC SONG SONG (KB `docs/crm-kb/08-extension-parity.md`): Pancake AI có gì thì Zalo AI có đó và ngược lại; kiểm tra bằng `node tools/check-ext-parity.js --list`.
+
+### ✅ Đã xong & đã lên main (trước bước 1, đều có test + đã thử đột biến)
+- Zalo AI có (giống Pancake AI): 🎁 Tra cứu khuyến mãi (`test-ctkm-ui.js`), 📊 Doanh số & hoa hồng (`test-stats-ui.js`), 📚 Mẫu tin nhắn tư vấn (`test-tpl-ui.js`), 🖼 Tìm ảnh sản phẩm (`test-img-ui.js`), 🤖 Hỏi AI về giá (`test-price-ai-ui.js`, GAS `priceQa`), 🧾 Soạn đơn S1 giỏ hàng theo SĐT (`test-cart-ui.js`), 🧩 Soạn đơn S2 bộ chọn sản phẩm + CTKM + 💎 Loại đá (`test-builder-ui.js`). `tools/test-zalo-smoke.js` nạp NGUYÊN `zalo-content.js` trong jsdom để bắt lỗi "biến không tồn tại lúc chạy".
+- **Đơn kẹt** (Chăm sóc & tái mua): bấm dòng → hộp chi tiết KHÁCH + ĐƠN + CS phụ trách + theo dõi (CS phụ trách/admin tích 👁/🛠/✅, sheet `Theo dõi đơn kẹt`, GAS `stuckFollowSet`) — KB `05-sasum-reports-ui.md` mục "Chăm sóc & tái mua › dòng Đơn kẹt", test `tools/test-stuck-orders.js`.
+
+### Bước 1 — `extension-zalo/zalo-promo.js` ✅ (đã push)
+Bản SAO NGUYÊN VĂN `pancake-promo.js` (engine tính CT tự động, hàm thuần `calcPromo_`/`promoNormalize_`) + khai báo trong `extension-zalo/manifest.json` (`zalo-promo.js` đứng TRƯỚC `zalo-content.js`) + `tools/test-promo-engine.js` kiểm tra lệch 3 bản (web CRM `js/53`, Pancake, Zalo) + smoke test nạp engine trước content. Chưa có UI dùng nó (bước 2).
+
+### Bước kế tiếp (làm lần lượt, mỗi bước 1 commit + push)
+2. **Zalo giỏ hàng: dòng "🎁 CT tự động" + nút Tính CT / Áp vào đơn** (S3a): port `_loadPromoCfg_`/`_calcAutoPromo_` từ `pancake-content.js` (GAS `getSettings&keys=promoConfig`), thêm dòng vào HTML giỏ Zalo (lần S1 cố ý bỏ ra), mở rộng `tools/test-cart-ui.js` (HTML giữ dòng promo ở CẢ 2 bên + kịch bản tính/áp/voucher/lỗi/xác nhận khi đã có giảm giá tay).
+3. Zalo Options: chỉnh **đơn giá vàng** (Pancake có ở Options; Zalo chỉ chỉnh được ở CRM) — xem handler `SET_GOLD_UNIT` ở `pancake-background.js`.
+4. Zalo tab "🔎 Gõ tìm": đổi giá theo **Loại đá** (SAPHIA/RUBY) như Pancake (hiện loại đá chỉ tác động bộ chọn Soạn đơn).
+5. **Tra đơn theo SĐT** (`donOrdersByPhone`) cho Zalo.
+6. **📋 Data được chia** (`assign`/`toggleAssignDone`) — cần thiết kế: mở hội thoại theo SĐT trên Zalo khác Pancake.
+- Còn lệch theo dõi tay: Pancake hiện ảnh sản phẩm kèm gợi ý trả lời AI (nút "📷 Copy ảnh"), Zalo chưa.
+- Gap do phiên khác thêm riêng cho Pancake (cần Duyên chốt có làm bù Zalo không): `webLogin`/`tplPending`/`approveMessageTemplate` (duyệt mẫu ngay trên Pancake AI), `scanBanned` (quét từ cấm), `verifyLogin`, `getKnowledge`.
+
+### Lưu ý khi làm tiếp
+- `git merge` (KHÔNG rebase) qua `TK=<token> bash tools/safe-push.sh`; token KHÔNG lưu vào file/memory. Môi trường sandbox có thể bị khởi tạo lại BẤT KỲ LÚC NÀO (đã mất việc 2 lần): **commit + push ngay sau mỗi bước nhỏ**, đừng để merge/sửa dở qua nhiều lượt.
+- `node tools/build-dist.js` tự sinh lại `css/99-dark-auto.css` — KHÔNG commit thay đổi đó nếu không chủ ý (`git restore css/99-dark-auto.css`).
+- Test lỗi CÓ SẴN trên origin/main, không do phiên này: `tools/test-pancake-tpl-lines.js`, `tools/test-zalo-tpl-lines.js`.
+
+
 ## 2026-11-09 (phiên 45) — Báo cáo check ngược Base: hiện KÊNH + SALE + SẢN PHẨM từng đơn gốc Base cạnh đơn Pos — XONG code, ĐÃ COMMIT cục bộ; CHƯA PUSH (chờ token mới của Duyên)
 - **Duyên yêu cầu (ảnh đơn Nguyễn Hải Phương: 1 đơn Pos 8.123.000 tách 2 đơn Base 79T11 + 62T11):** hiện rõ 2 đơn Base để check ngược, xem được order sản phẩm của kênh Base + Sale Base tương ứng.
 - **NGUYÊN NHÂN GỐC thiếu thông tin:** `baseOrders` (gas_v13.js ~5860) chỉ có sản phẩm khi `withProduct` bật (chỉ báo cáo đơn chia M bật), và KHÔNG có cột Kênh bán (cột M DT TỔNG); màn hình chỉ in 1 dòng chữ mã·người tạo·sale·giá.
