@@ -674,8 +674,10 @@ function buildSalesReportB_(filters) {
 
   // GHEP DON POS <-> BASE (cot Q ghi chu): tach ma bo dem tu ghi chu, chi doc "DT TỔNG " khi THUC SU co ma.
   var codesByRow = [], wantedCodes = {}, anyCodes = false, minCodesG = _posGhepMinCodes_();
+  var singleCodesByRow = {};   // chi so don -> ma bo dem cua don Pos co it ma hon nguong ghep (chi dung de loai khi don goc Base That bai)
   for (var pi = 0; pi < pre.length; pi++) {
     var cds = POS_GHEP_BASE_ENABLED_ ? _splitBhCodes_(_extractCounterCodes_(pre[pi].ghiChu)).normal : [];   // ma BH = don doc lap, khong tham gia ghep
+    if (cds.length && cds.length < minCodesG) { singleCodesByRow[pi] = cds; cds.forEach(function(c) { wantedCodes[c] = true; anyCodes = true; }); }   // 2026-11-10 (Duyen chot): don Pos 1 ma van phai tra Base de LOAI khi don goc Base That bai/Huy (khong ghep, khong doi tien)
     if (cds.length < minCodesG) cds = []; // mac dinh chi don ghep (>=2 ma thuong) moi check nguoc Base; 0-1 ma -> tinh thuan Pos theo The (Settings POS_GHEP_MIN_CODES=1 de don 1 ma cung ghep)
     codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
@@ -710,6 +712,16 @@ function buildSalesReportB_(filters) {
     var rowP = pre[pj];
     var exAm = acctInfo.exCount ? _acctMatchExtra_(acctInfo, _acctRowCodes_(rowP.ghiChu)) : null;   // bang chia bo sung CRM: UU TIEN hon ghep Base va file ke toan
     var gh = (!exAm && codesByRow[pj].length) ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows, Number(rowP.giaTriSauGiam) || 0, _donSaleNamesFromThe_(rowP.theSale)) : null;
+    // DON POS 1 MA (< nguong ghep) co don goc Base da That bai/Huy -> LOAI khoi doanh thu (Duyen chot 2026-11-10; vd 110T11). NGUYEN NHAN GOC cu: don 1 ma khong tra Base nen van tinh theo Pos du Base That bai.
+    if (!gh && !exAm && singleCodesByRow[pj] && baseIdx && !/(len lai|\bdoi\b|\bbh\b|bao hanh)/.test(_stripVN_(String(rowP.ghiChu || '')))) {   // don 'LEN LAI don hoan / DOI / BH' tham chieu don goc da That bai/Hoan nhung CHINH LA don moi (Duyen chot 1: van tinh) -> khong loai
+      var sRows = [], sOk = true;
+      singleCodesByRow[pj].forEach(function(c) { var rr = _pickBaseRowsForCode_(c, baseIdx); if (!rr || !rr.length) sOk = false; else sRows = sRows.concat(rr); });
+      if (sOk && sRows.length && sRows.every(function(br) { return _isExcludedOrderStatus_(br.trangThai); })) {
+        ghepStats.gocBiLoai++;
+        if (ghepStats.gocBiLoaiList.length < 100) ghepStats.gocBiLoaiList.push({ ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, khach: rowP.khachHang, theSale: rowP.theSale, giaPos: Number(rowP.giaTriSauGiam) || 0, ma: singleCodesByRow[pj], ghiChu: String(rowP.ghiChu || '').substring(0, 120) });
+        continue;
+      }
+    }
     var effRow = rowP;
     if (gh) {
       ghepStats.donCoMa++;
