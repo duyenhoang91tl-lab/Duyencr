@@ -3829,13 +3829,38 @@ function _salePersonIdentity_(observed) {
     });
   } catch (e3) {}
   // ten chinh theo thu tu uu tien (cac quy tac chay SAU khi da gop xong nen khoa 'find' la khoa cuoi cung)
-  try { var tg = JSON.parse(getSetting_('salePersonTags') || '{}') || {}; Object.keys(tg).forEach(function(p) { if ((tg[p] || []).length) setPrim(p); }); } catch (e4) {}
+  var tagFixed = {};   // nhom da co TEN CHINH do admin dat o Khop sale -> khong doi
+  try { var tg = JSON.parse(getSetting_('salePersonTags') || '{}') || {}; Object.keys(tg).forEach(function(p) { if ((tg[p] || []).length) { setPrim(p); var kp = _normTxt_(p); if (kp) tagFixed[find(kp)] = 1; } }); } catch (e4) {}
   try { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) { if (String(u.role || 'cs') !== 'cs') return; var first = ((u.names || []).filter(function(x) { return !_isNumericTag_(x); })[0]) || u.name; if (first) setPrim(first); }); } catch (e5) {}
   try { (readSaleDirectory_().list || []).forEach(function(rec) { if (rec.userBase) setPrim(rec.userBase); }); } catch (e6) {}
   // quy tac cuoi: chua co ten chinh -> ten nho nhat (chu cai) trong cac ten da biet + ten quan sat duoc
   (observed || []).forEach(function(n) { note(n); });
   var minOf = {};
   Object.keys(disp).forEach(function(k) { var r = find(k); if (prim[r]) return; if (!minOf[r] || k < _normTxt_(minOf[r])) minOf[r] = disp[k]; });
+  // TEN CHINH KHONG DUOC LA TEN HIEN THI CO KHOANG TRANG (Duyen 2026-11-10: Bao cao B hien "Nguyễn Thị Bích", "Trịnh Phương Anh", "Nguyễn Phương Anh",
+  // "Nguyễn Thị Hải Yến" thay cho Biichnguyen1993/anhtrinh1995/anhNP1999/yenNTH2004 nhu Bao cao A). NGUYEN NHAN GOC: quy tac (2) lay TEN DAU TIEN cua tai khoan
+  // CRM, voi 1 so nguoi do la ten day du. Ten Base/Pos/Pancake la username KHONG khoang trang (token co khoang trang bi loai khoi cot The) nen neu ten chinh dang
+  // chua khoang trang ma nhom co username -> doi sang username (uu tien co chu so, roi theo user Base trong danh ba, roi chu cai). Nhom admin da dat ten chinh
+  // o Khop sale (tagFixed) KHONG doi. Them: ten chinh la chu khong co so ("ninhLTK") ma nhom co username Base tuong ung ("ninhLTK1984") -> doi ve username Base.
+  var dirBase = {}; try { (readSaleDirectory_().list || []).forEach(function(rec) { if (rec.userBase) dirBase[_normTxt_(rec.userBase)] = 1; }); } catch (e7) {}
+  var fixedWs = {};
+  Object.keys(disp).forEach(function(k0) {
+    var r = find(k0); if (fixedWs[r] || tagFixed[r]) return;
+    var cur = prim[r] || minOf[r]; if (!cur) return;
+    var curWs = /\s/.test(cur), curNorm = _normTxt_(cur), cands = [];
+    // ten chinh la chu khong co so (vd "ninhLTK") ma nhom co username Base bat dau bang chinh no + so (vd "ninhLTK1984") -> cung doi ve username Base de khop Bao cao A
+    if (!curWs && /\d/.test(cur)) return;
+    Object.keys(disp).forEach(function(k1) {
+      if (find(k1) !== r || /\s/.test(disp[k1])) return;
+      if (curWs || (/\d/.test(disp[k1]) && _normTxt_(disp[k1]).indexOf(curNorm) === 0)) cands.push(disp[k1]);
+    });
+    if (!cands.length) return;
+    cands.sort(function(a, b) {
+      var sa = (dirBase[_normTxt_(a)] ? 0 : 2) + (/\d/.test(a) ? 0 : 1), sb = (dirBase[_normTxt_(b)] ? 0 : 2) + (/\d/.test(b) ? 0 : 1);
+      return sa !== sb ? sa - sb : (_normTxt_(a) < _normTxt_(b) ? -1 : 1);
+    });
+    fixedWs[r] = 1; prim[r] = cands[0];
+  });
   return {
     key: function(name) { return find(_normTxt_(name)); },
     members: function(name) {

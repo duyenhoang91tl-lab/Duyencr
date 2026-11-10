@@ -19,7 +19,9 @@ vm.runInContext(`
   buildPancakeReport_ = function() { return { byCS: [], byPage: [] }; }; _pancakeKnownSaleNameSet_ = function() { return {}; };
   // Giong code that: chon 1 ten trong nhom thi mo rong ra DU moi ten cung nguoi (thuydinh95 <-> Thuydinh1995)
   _expandSaleFilterWithPancakeAliases_ = function(a) { var out = a.slice(), g = ['thuydinh95', 'Thuydinh1995']; if (a.some(function(x) { return g.indexOf(x) !== -1; })) g.forEach(function(x) { if (out.indexOf(x) === -1) out.push(x); }); return out; };
-  readTeams_ = function() { return []; }; readMktTeams_ = function() { return []; }; readUsers_ = function() { return []; };
+  readTeams_ = function() { return []; }; readMktTeams_ = function() { return []; };
+  // Tai khoan CRM co ten DAY DU o dau danh sach ten (nguyen nhan hien 'Nguyễn Thị Bích' thay vi Biichnguyen1993)
+  readUsers_ = function() { return [{ username: 'bich', role: 'cs', name: 'Nguyễn Thị Bích', names: ['Nguyễn Thị Bích', 'Biichnguyen1993'] }, { username: 'ninh', role: 'cs', name: 'ninhLTK', names: ['ninhLTK', 'ninhLTK1984'] }, { username: 'trang', role: 'cs', name: 'Nguyễn Huyền Trang', names: [] }]; };
   _mktKenhWeights_ = function() { return {}; }; readKPITargets_ = function() { return {}; };
   // Danh ba: Base chuan "Thuydinh1995" cung nguoi voi the Pos "thuydinh95"
   readSaleDirectory_ = function() { return { list: [{ maSale: '', code: '', tenFacebook: '', userBase: 'Thuydinh1995', tenTagPancake: 'thuydinh95' }] }; };
@@ -58,4 +60,14 @@ ok(B.orders.every(o => J(o.bs).every(p => p[0] === 'Thuydinh1995')), 'bs cua tun
 // 9) _foldRevMapByPerson_: anh chup chot thang luc cu mang ten goc -> khop ten chinh hien tai, khong sinh khoan tru gia
 const fold = J(vm.runInContext('_foldRevMapByPerson_({ thuydinh95: 100, Thuydinh1995: 50, minhanh99: 70 }, [{ Thuydinh1995: 1 }])', ctx));
 ok(fold.Thuydinh1995 === 150 && fold.minhanh99 === 70 && !fold.thuydinh95, '_foldRevMapByPerson_: thuydinh95 100 + Thuydinh1995 50 -> Thuydinh1995 150');
+// 10) Ten chinh co khoang trang -> doi sang username Base (khong hien ten day du)
+B = run([don('biichnguyen1993', 500000), don('Biichnguyen1993', 700000)]);
+ok(B.bySale.length === 1 && B.bySale[0].name === 'Biichnguyen1993', 'tai khoan CRM ten day du "Nguyễn Thị Bích": bang van hien username Biichnguyen1993 (nhan: ' + B.bySale.map(r => r.name).join('|') + ')');
+const pr = J(vm.runInContext('(function(){ var id = _salePersonIdentity_([]); return [id.primary("biichnguyen1993"), id.primary("ninhLTK1984"), id.primary("Nguyễn Huyền Trang")]; })()', ctx));
+ok(pr[0] === 'Biichnguyen1993' && pr[1] === 'ninhLTK1984', 'primary: Biichnguyen1993 / ninhLTK1984 (uu tien username co so) (nhan: ' + pr.join(' | ') + ')');
+ok(pr[2] === 'Nguyễn Huyền Trang', 'nhom chi co ten day du (khong co username): giu nguyen');
+// 11) admin da dat ten chinh o Khop sale (ke ca ten co khoang trang) -> KHONG doi
+vm.runInContext('getSetting_ = function(k) { return k === "salePersonTags" ? JSON.stringify({ "Nguyễn Thị Bích": ["Biichnguyen1993"] }) : null; };', ctx);
+const pr2 = J(vm.runInContext('_salePersonIdentity_([]).primary("Biichnguyen1993")', ctx));
+ok(pr2 === 'Nguyễn Thị Bích', 'ten chinh admin dat o Khop sale duoc giu nguyen (nhan: ' + pr2 + ')');
 console.log(fails ? '\nFAILED ' + fails : '\nALL SALE-NAME-MERGE TESTS PASSED'); process.exit(fails ? 1 : 0);
