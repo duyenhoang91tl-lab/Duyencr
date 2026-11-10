@@ -130,6 +130,7 @@ function doGetCore_(e) {
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
     if (action === 'posMonthAdjust') return jsonOut_(posMonthAdjust_(e.parameter.month));
+    if (action === 'posMonthK') return jsonOut_(posKReport_(e.parameter.month));   // Bao cao K — Chot thang (doanh thu + sau hoan/huy, chi sale phong kinh doanh/phong Sale/Online)
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
