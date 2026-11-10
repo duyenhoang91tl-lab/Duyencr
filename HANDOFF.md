@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-10 (phiên 49) — Đối chiếu Báo cáo B (Pos) T11 với export Pos orders_6.xlsx — XONG 1/1: CHƯA KẾT LUẬN ĐƯỢC "CHUẨN", phát hiện tên sale tách đôi
+- **Dữ liệu:** `orders_6.xlsx` = 652 dòng Pos 01–10/11 (export lúc ~10:58, màn hình chụp 09:41 → file có thêm đơn 10/11). 270 đơn không có sale trong cột Thẻ = Quầy Hào Nam (157) + Bảo hành (106) + vài đơn Fb → KHÔNG thuộc báo cáo sale (đúng). `orders_4/5` chỉ 30 dòng (Pos giới hạn khi xuất) — không dùng được.
+- **Khớp nội bộ:** 1.730.149.333 ÷ 319 = 5.423.666; tổng các sale = tổng thẻ (lệch 1đ làm tròn). ngocnb2003saleoff, mainguyen97, trangnh2005, dungnguyen1995 khớp Pos thuần.
+- **Lệch so với Pos thuần** (CRM 1.719,3tr vs Pos 1.789,7tr cho các sale trên màn hình): huyenmaii1990 −48,6tr, anhtrinh1995 −12,7tr, ninhnga99 +18,0tr, ninhltk1984 +10,3tr... — phần lớn dự kiến do ghép Base/bảng chia kế toán/gộp tách đơn (tool KHÔNG mô phỏng) + file mới hơn màn hình 77 phút. Chưa xác nhận từng đơn.
+- **NGHI LỖI:** màn hình hiện cả `Thuydinh1995` (147,7tr, tên chuẩn Base) lẫn `thuydinh95` (54,3tr, tag Pos); tương tự `Biichnguyen1993/biichnguyen1993`, `Dungnguyen1995/dungnguyen1995` → 1 người bị tách thành 2 dòng (tổng không đổi). Chưa mở code gom tên sale của `buildSalesReportB_` (gần `_resolveBonusSale_`/`aliasMemoB_`) để sửa. Pos thuần: thuydinh95 = 242,3tr; CRM cộng 2 dòng = 202,1tr (−40,2tr).
+- [x] `tools/recon-base-a/recon_pos_b.py` + `crm_screen_b_2026-11-10.json`. Không commit file có tiền từng người.
+- [ ] **VIỆC KẾ TIẾP:** (1) Sửa gom tên sale Báo cáo B không phân biệt hoa/thường + alias thuydinh95→thuydinh1995 (grep mọi nơi gọi trước khi sửa); (2) lấy sheet "dữ liệu đơn" (không phải export Pos 30 dòng) để đối chiếu đúng nguồn B; (3) xem phiên 48: Báo cáo A thiếu 31 đơn nguồn.
+
 ## 2026-11-10 (phiên 48) — Kiểm tra Báo cáo A (Base) T11 so với export Base — XONG 1/1: CÔNG THỨC ĐÚNG, SỐ LIỆU NGUỒN THIẾU 31 ĐƠN
 - **Duyên hỏi:** Báo cáo A (01/11–30/11, Phòng KD 23 sale: 217 đơn, 1.405.628.000đ) tính chuẩn chưa. Đối chiếu với export Base "don-cac-kenh" (14 sale có đơn: 246 đơn, 1.575.438.000đ).
 - **KẾT LUẬN:** công thức `buildSalesReportA_` ĐÚNG (loại Thất bại, chia đều theo số sale, đếm nguyên đơn, TB/đơn = DT ÷ đơn). 6/14 sale khớp từng đồng. **NGUYÊN NHÂN GỐC lệch:** nguồn dữ liệu CRM (sheet "DT TỔNG " hoặc bản sao Supabase `dt_tong`) THIẾU 30 đơn tạo 01/11 từ 12:03→23:03 (mã 9T11→39T11, liên tục, ≈185,1tr) + 348T11 (10/11 08:57, 5,46tr, có thể chỉ chậm đồng bộ). Bỏ các đơn đó khỏi export thì 8 sale lệch còn lại khớp tuyệt đối. Ngoài ra CRM DƯ 2 đơn so với export: huyenmaii1990 +4,65tr (nghi 110T11 đã Thất bại trong Base nhưng CRM chưa cập nhật trạng thái), thuydinh1995 +16,136tr (không thấy trong export; export cũng thiếu mã 200/202/291T11).
