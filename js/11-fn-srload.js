@@ -1244,16 +1244,29 @@ function _srPosAdjustBlockHtml_(a, mergedRows){
   }
   return h + '</tbody></table>';
 }
+// Thẻ KPI Báo cáo B khi có lọc Sale = tổng phần các sale được chọn (cùng nguồn với bảng Theo Sale). Hàm THUẦN: tools/test-b-kpi-sale-filter.js.
+function _srBKpiForSaleFilter_(d, mergedRows, sel, byCreator){
+  var base = { orders: d.totalOrders || 0, giaTri: d.totalGiaTri || 0, cod: d.totalCod || 0 };
+  if (!sel || !sel.length || byCreator) return base;
+  var rows = _srKeepSelectedSales_(mergedRows || [], sel);
+  if (!rows.length) return base;
+  return { orders: base.orders, giaTri: rows.reduce(function(a, r){ return a + (r.giaTri || 0); }, 0), cod: rows.reduce(function(a, r){ return a + (r.cod || 0); }, 0) };
+}
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
-  var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
+  // Đang lọc Sale: thẻ KPI phải là PHẦN CỦA SALE (khớp bảng "Theo Sale"), không phải giá trị CẢ ĐƠN.
+  // NGUYÊN NHÂN GỐC lệch (vd ngocNB2003saleoff 120.527.000 vs 113.812.000): backend giữ nguyên đơn có sale đó nên totalGiaTri/totalCod là cả đơn,
+  // còn bySale chia theo frac cho đơn bán chung. Số đơn giữ nguyên (đơn đếm đủ cho từng sale). Không lọc Sale -> giữ nguyên số backend.
+  var bSaleMerged_ = _srMergeStoreIntoBySale_(d.bySale||[], (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) ? _srState.dataBStore : null);   // Pos + phần Sale 30% đơn quầy (Báo cáo L)
+  var kpi_ = _srBKpiForSaleFilter_(d, bSaleMerged_.rows, _srState.bSale, _srState.byCreator);
+  var bTb = kpi_.orders ? Math.round(kpi_.giaTri/kpi_.orders) : 0;
   var pAdj = d.posAdjust || null;   // Chốt tháng Pos: GAS giữ doanh thu CHUẨN, chỉ trả thêm phần trừ hoàn/hủy tháng trước (gas_v13.js applyPosMonthAdjustToReportB_) → hiện ở khối riêng dưới bảng Theo Sale
   var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(kpi_.giaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
     _srCloseRateKpiCard_(d) +
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(kpi_.cod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 
   // Da bo 2 dong thong bao vang (lech so phan tu cot San pham/Ma/So luong + thong ke ghep don Pos<->Base) theo yeu cau Duyen 2026-10-05.
@@ -1261,7 +1274,6 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var bSaleMerged_ = _srMergeStoreIntoBySale_(d.bySale||[], (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) ? _srState.dataBStore : null);   // Pos + phần Sale 30% đơn quầy (Báo cáo L)
   var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span class="sr-sub">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
