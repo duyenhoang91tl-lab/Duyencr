@@ -162,7 +162,7 @@ setTimeout(_syncBizRulesFromGAS, 0);
 // vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
 var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
   ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
-  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng'],['M','Báo cáo M – Tổng quan đơn chia'],['N','Báo cáo N — Tính đơn thuần']];
+  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['K','Báo cáo K — Chốt tháng'],['L','Báo cáo L — KH qua cửa hàng'],['M','Báo cáo M – Tổng quan đơn chia'],['N','Báo cáo N — Tính đơn thuần']];
 var REPORTS_CFG = {};
 function _rcApply_(raw) {
   var out = {}, before = JSON.stringify(REPORTS_CFG);
@@ -181,7 +181,7 @@ function _srItems_() {
 }
 // Báo cáo N (Tính đơn thuần) = CHẾ ĐỘ XEM của Báo cáo B: dùng chung dữ liệu salesReportB + thanh lọc + bộ lọc đã lưu của B nên _srState.sub vẫn là 'B', chỉ thêm cờ _srState.bView === 'pure'.
 // Mã báo cáo hiển thị/cấu hình (A–N) tính qua _srCurCode_(); chuyển báo cáo qua _srApplySub_(mã) (N -> sub 'B' + bView 'pure'; mã khác xóa cờ).
-function _srCurCode_() { return _srState.sub === 'K' ? 'G' : ((_srState.sub === 'B' && _srState.bView === 'pure') ? 'N' : _srState.sub); }
+function _srCurCode_() { return _srState.sub === 'BD' ? 'G' : ((_srState.sub === 'B' && _srState.bView === 'pure') ? 'N' : _srState.sub); }
 function _srApplySub_(code) { if (code === 'N') { _srState.sub = 'B'; _srState.bView = 'pure'; } else { _srState.sub = code; _srState.bView = ''; } }
 // Người không phải admin đang đứng ở báo cáo bị ẩn => chuyển sang báo cáo bật đầu tiên. Trả true nếu đã đổi.
 function _srEnsureSubAllowed_() {

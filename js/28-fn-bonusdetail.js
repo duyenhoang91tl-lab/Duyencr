@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  TAB "CHI TIẾT THƯỞNG (ĐẾM SẢN PHẨM)" — _srState.sub === 'K' (yêu cầu Duyên 2026-10-10)
+//  TAB "CHI TIẾT THƯỞNG (ĐẾM SẢN PHẨM)" — _srState.sub === 'BD' (yêu cầu Duyên 2026-10-10)
 //  Liệt kê từng DÒNG sản phẩm của các đơn GỐC (STT, tên sale, ngày lên đơn Base, mã bộ đếm, mã SP, SL, doanh thu).
 //  Duyên tích: gom SP 1,2,… / Không tính / Quà, và ô "Vòng chuỗi" / "Charm mix" cho từng mã.
 //  LƯU: theo MÃ sản phẩm → BONUS_PRODUCT_MAP (áp cho mọi đơn sau); tinh chỉnh riêng từng đơn → BONUS_ORDER_OVR (slot SP, doanh thu dòng).
@@ -24,7 +24,7 @@ async function _bdSyncFromGAS(){
       }
     } catch(e){ /* giữ bản local nếu lỗi mạng/parse */ }
   }
-  if (typeof _srState !== 'undefined' && (_srState.sub === 'K' || _srState.sub === 'E' || _srState.sub === 'G')) renderSalesReportTab();
+  if (typeof _srState !== 'undefined' && (_srState.sub === 'BD' || _srState.sub === 'E' || _srState.sub === 'G')) renderSalesReportTab();
 }
 async function _bdPersist_(which){
   var isMap = which === 'map';
@@ -161,18 +161,16 @@ function _bdRenderBody_(d){
   if (list.length > shown) html += '<div style="margin-top:8px"><button class="btn sm" onclick="_bdState.limit+=120;renderSalesReportTab()">Xem thêm ('+fmt(list.length-shown)+' đơn)</button></div>';
   return html;
 }
-function renderSalesReportTabK_(wrap, subTabs){
+function renderSalesReportTabBD_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
   wrap.innerHTML = _srGFiltersHtml_() +
-    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body +
-    // Duyên 2026-11-10: Chốt tháng Pos + trừ hoàn/hủy tháng trước chuyển từ Báo cáo B sang màn K (chỉ Admin; _srPosMonthPanelHtml_ ở js/11 tự trả '' nếu không phải admin).
-    (typeof _srPosMonthPanelHtml_ === 'function' ? _srPosMonthPanelHtml_() : '');
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
 }
 
 // ── Từ Báo cáo G: bấm "Chi tiết" của 1 sale → màn hình chi tiết đơn thưởng (K) lọc theo sale đó ──
 function _bdOpenForSale(name){
   _bdState.sale = String(name || ''); _bdState.search = ''; _bdState.onlyReview = false; _bdState.limit = 120;
-  _srSetSub('K');
+  _srSetSub('BD');
 }
 
 // ── Popup thông tin 1 đơn (bấm tiêu đề đơn ở màn K, hoặc 1 lượt thưởng "theo đơn" ở báo cáo G) ──

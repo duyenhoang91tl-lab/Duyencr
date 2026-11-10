@@ -125,7 +125,9 @@ async function _srLoad(){
   } else if (_srState.sub === 'M') {
     // Tổng quan đơn chia (js/50): tổng đơn thực tế, doanh thu, TB/đơn + theo từng sale số đơn chia / doanh thu từ đơn chia — GAS splitOrderReport
     await splitReportLoad_();
-  } else if (_srState.sub === 'G' || _srState.sub === 'K') {
+  } else if (_srState.sub === 'K') {
+    await _srKLoad_();   // Báo cáo K — Chốt tháng (js/67-report-k.js)
+  } else if (_srState.sub === 'G' || _srState.sub === 'BD') {
     // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
     // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
     if (_srState.gDateQuick && _srState.gDateQuick !== 'custom'){
@@ -644,6 +646,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'L') { renderSalesReportTabL_(wrap, subTabs); return; }
   if (_srState.sub === 'M') { renderSalesReportTabM_(wrap, subTabs); return; }
   if (_srState.sub === 'K') { renderSalesReportTabK_(wrap, subTabs); return; }
+  if (_srState.sub === 'BD') { renderSalesReportTabBD_(wrap, subTabs); return; }
 
   var bar = _srBarHtml_();
 
@@ -1393,7 +1396,7 @@ function _srRenderB(d){
   }
   if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
-  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang màn K (js/28 renderSalesReportTabK_ → _srPosMonthPanelHtml_).
+  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang Báo cáo K — Chốt tháng (js/67-report-k.js).
   return html;
 }
 
