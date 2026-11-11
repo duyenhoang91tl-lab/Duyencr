@@ -267,6 +267,17 @@ function posKReport_(month) {
     Object.keys(snap.bySale || {}).forEach(function(n) { add(n, 'snap', snap.bySale[n]); });
     Object.keys(now.bySale || {}).forEach(function(n) { add(n, 'now', now.bySale[n]); });
   }
+  // Duyên 2026-11-11: báo cáo K báo "thấp hơn thực tế mấy trăm triệu" — NGUYÊN NHÂN cần soi: K chỉ cộng sale thuộc Online/Văn phòng/Phòng Sale (đúng yêu cầu) nên mọi doanh thu
+  // của sale NGOÀI phạm vi (thử việc, chưa phân nhóm, "(chưa gán sale)", tên chưa gộp được về người trong danh sách) bị loại NGẦM, không hiện ở đâu. Trả thêm `recon`
+  // để màn K đối chiếu thẳng với tổng Báo cáo B: tổng B = trong K + ngoài phạm vi (liệt kê tên + số tiền) + phần không gán được cho tên sale nào.
+  var outByP = {}, bySaleSum = 0;
+  Object.keys(cur.bySale || {}).forEach(function(n) {
+    var v = Number(cur.bySale[n]) || 0; bySaleSum += v;
+    var k = pk(n); if (k && members[k]) return;
+    var o = outByP[k || n] || (outByP[k || n] = { name: String(n).trim(), revenue: 0 }); o.revenue += v;
+  });
+  var outside = Object.keys(outByP).map(function(k) { return outByP[k]; }).filter(function(o) { return Math.abs(o.revenue) > 0.5; }).sort(function(a, b) { return b.revenue - a.revenue; });
+  var outsideTotal = outside.reduce(function(sum, o) { return sum + o.revenue; }, 0);
   var rows = Object.keys(byP).map(function(k) {
     var o = byP[k], ded = snap ? (o.snap - o.now) : 0;
     return { name: o.name, group: o.group, revenue: o.revenue, deduction: ded, net: o.revenue - ded };
@@ -276,7 +287,8 @@ function posKReport_(month) {
   try { Logger.log('PERF posMonthK month=' + month + ' ms=' + (Date.now() - t0) + ' members=' + Object.keys(members).length + ' rows=' + rows.length); } catch (eL) {}
   var out = { ok: true, month: month, prevMonth: prev, applied: !!snap, closedAt: snap ? snap.closedAt : '', closedMonths: closedMonths,
     thisClosedAt: snaps[month] ? snaps[month].closedAt : '', canClose: !!cc.ok, canCloseReason: cc.ok ? '' : cc.error,
-    memberCount: Object.keys(members).length, total: tot, rows: rows };
+    memberCount: Object.keys(members).length, total: tot, rows: rows,
+    recon: { allTotal: Number(cur.total) || bySaleSum, inScope: tot.revenue, outsideTotal: outsideTotal, outsideCount: outside.length, outside: outside.slice(0, 40), unattributed: (Number(cur.total) || bySaleSum) - bySaleSum } };
   if (!snap) out.reason = 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy — bấm "Chốt tháng" cho ' + prev + ' (từ mùng 1 sau khi cập nhật đủ dữ liệu) thì tháng ' + month + ' mới có cột trừ hoàn/hủy.';
   return out;
 }

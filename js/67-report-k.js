@@ -40,7 +40,21 @@ function _srKBodyHtml_(d){
   });
   if (!(d.rows || []).length) h += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Chưa có sale nào thuộc phòng kinh doanh / phòng Sale có doanh thu trong tháng này.</td></tr>';
   else h += '<tr style="font-weight:700"><td style="' + cell + '" colspan="2">TỔNG (' + d.rows.length + ' sale)</td><td style="' + num + '">' + _srMoney(d.total.revenue) + '</td><td style="' + num + '">' + (d.total.deduction ? '−' + _srMoney(d.total.deduction) : '—') + '</td><td style="' + num + '">' + _srMoney(d.total.net) + '</td></tr>';
-  return h + '</tbody></table></div>';
+  h += '</tbody></table></div>';
+  var rc = d.recon;   // Duyên 2026-11-11: đối chiếu với tổng Báo cáo B để thấy ngay khoản bị loại khỏi K (K chỉ cộng sale Online/Văn phòng/Phòng Sale)
+  if (rc) {
+    var out = rc.outside || [], un = Math.round(rc.unattributed || 0);
+    h += '<div class="dash-section-title" style="margin-top:18px">🔎 Đối chiếu với Báo cáo B (tháng ' + esc(d.month) + ')</div>' +
+      '<div style="font-size:12px;margin-bottom:8px;line-height:1.7">Tổng doanh thu Báo cáo B: <b>' + _srMoney(rc.allTotal) + '</b> = Trong K <b>' + _srMoney(rc.inScope) + '</b> + Sale ngoài phạm vi K <b>' + _srMoney(rc.outsideTotal) + '</b>' +
+      (Math.abs(un) > 1 ? ' + Không gán được cho sale nào <b>' + _srMoney(un) + '</b>' : '') + '.</div>';
+    if (out.length) {
+      h += '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Các sale <b>không nằm trong phạm vi K</b> (chưa phân Online/Văn phòng/Phòng Sale, thử việc, hoặc tên chưa gộp về đúng người) — nếu có người đáng lẽ phải tính thì vào Cài đặt kênh/phòng ban để xếp nhóm:</div>' +
+        '<div style="overflow-x:auto"><table class="dash-table" style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;' + cell + '">Sale ngoài phạm vi</th><th style="' + num + '">Doanh thu</th></tr></thead><tbody>' +
+        out.map(function(o){ return '<tr><td style="' + cell + '">' + esc(o.name) + '</td><td style="' + num + '">' + _srMoney(o.revenue) + '</td></tr>'; }).join('') +
+        (rc.outsideCount > out.length ? '<tr><td style="' + cell + ';color:var(--muted)" colspan="2">… và ' + (rc.outsideCount - out.length) + ' sale khác</td></tr>' : '') + '</tbody></table></div>';
+    }
+  }
+  return h;
 }
 function _srKCloseHtml_(d){
   if (!_srIsAdmin()) return '';

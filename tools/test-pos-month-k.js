@@ -12,7 +12,7 @@ vm.runInContext(`
   var __s = {}; getSetting_ = function(k) { return __s[k] == null ? null : __s[k]; };
   var __last = false; _todayYm_ = function() { return '2026-11'; }; _isLastDayOfMonthVn_ = function() { return __last; };
   _salePersonKeyFn_ = function() { return function(n) { return String(n || '').trim().toLowerCase(); }; };
-  var __rev = {}; _posRevenueBySaleCached_ = function(ym) { return { total: 0, bySale: JSON.parse(JSON.stringify(__rev[ym] || {})) }; };
+  var __rev = {}; var __unatt = 0; _posRevenueBySaleCached_ = function(ym) { var b = JSON.parse(JSON.stringify(__rev[ym] || {})), t = 0; Object.keys(b).forEach(function(n){ t += b[n]; }); return { total: t + (__unatt || 0), bySale: b }; };
 `, ctx);
 const set = (k, v) => { ctx.__tmp = JSON.stringify(v); vm.runInContext('__s["' + k + '"] = __tmp', ctx); };
 const K = m => J(vm.runInContext('posKReport_("' + m + '")', ctx));
@@ -33,6 +33,17 @@ ok(r.rows.some(x => x.name === 'Hoa'), 'Hoa thu viec den 15/11 roi len Online: t
 ok(r.rows.some(x => x.name === 'Dung') === false, 'Dung khong co doanh thu thang 11 -> khong hien dong 0');
 ok(r.applied === false && r.total.deduction === 0 && r.total.net === r.total.revenue && /Chưa chốt/.test(r.reason), 'chua chot thang 10: khong tru, applied:false + ly do');
 ok(r.total.revenue === 1000 + 500 + 300 + 200 + 100, 'tong doanh thu chi cong thanh vien');
+
+// ===== Duyên 2026-11-11: recon — đối chiếu tổng Báo cáo B với K =====
+vm.runInContext('__unatt = 1000', ctx);
+r = K('2026-11');
+const rc = r.recon;
+ok(rc && rc.inScope === r.total.revenue, 'recon.inScope = tong doanh thu trong K');
+ok(rc.outsideTotal === 700 + 900 + 50 && rc.outsideCount === 3, 'recon: sale ngoai pham vi = Chi(thu viec 700) + Gia(ke toan 900) + Khac 50 -> ' + rc.outsideTotal);
+ok(rc.outside[0].name === 'Gia' && rc.outside[1].name === 'Chi', 'recon: liet ke ngoai pham vi xep doanh thu giam dan');
+ok(rc.unattributed === 1000, 'recon: phan khong gan duoc cho sale nao = 1000');
+ok(rc.inScope + rc.outsideTotal + rc.unattributed === rc.allTotal, 'recon: Tong B = trong K + ngoai pham vi + khong gan duoc');
+vm.runInContext('__unatt = 0', ctx);
 
 set('posMonthSnapshots', { '2026-10': { closedAt: '2026-10-31', total: 1450, bySale: { An: 900, Binh: 400, Em: 250, Chi: 999 } } });
 r = K('2026-11');
