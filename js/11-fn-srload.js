@@ -2010,14 +2010,7 @@ async function _impUpload(kind){
         _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
         return;
       }
-      var _askBody = ''
-        + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
-        + '• ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ: ' + (d0.wouldUpdateRows ? 'CẬP NHẬT ' + fmt(d0.wouldUpdateRows) + ' đơn có thông tin đổi (' + fmt(d0.wouldUpdateCells) + ' ô; chỉ ghi ô file có giá trị mới khác, KHÔNG xóa trắng ô cũ, giá trị cũ được lưu vào sheet "Nhật ký cập nhật nhập file"), còn lại giống hệt → bỏ qua' : 'giống dữ liệu cũ → bỏ qua, không ghi đè, không xóa') + '\n'
-        + (d0.updateOverLimit ? '• Còn ' + fmt(d0.updateOverLimit) + ' đơn đổi nữa — vượt giới hạn 1 lần, nhập lại cùng file để cập nhật tiếp\n' : '')
-        + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
-        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?';
-      var _go = await _impAsk_('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước', _askBody, '✅ Nhập');
-      if (!_go) { toast('Đã hủy — chưa ghi gì. (Xem trước: thêm ' + fmt(d0.wouldWrite) + ' dòng mới, ' + fmt(d0.skippedExisting || 0) + ' đơn đã có.)'); return; }
+      // Duyên 2026-11-11: "cho mình nhập dữ liệu thì nhập luôn đi, không cần hỏi lại" — bỏ hộp xác nhận xem trước; vẫn đã dry-run ở trên để báo 'không có dòng mới'. Dữ liệu cũ vẫn giữ nguyên (chỉ thêm dòng mới + cập nhật ô đổi, có nhật ký).
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
       d = await _impPost_(impUrl, { action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }, 'write', 0);
