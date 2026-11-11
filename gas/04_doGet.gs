@@ -377,9 +377,10 @@ function doGetCore_(e) {
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  sanPham: pC.sanPham || '',
-                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
+                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true',
+                 part: pC.part || '' };   // 'cur'/'prev' = chi khoi dong cache Pos cua 1 ky (client goi song song truoc khi lay ket qua)
       var cacheC = CacheService.getScriptCache();
-      var cKeyC = _reportCacheKey_('salesC_', fC);
+      var cKeyC = _reportCacheKey_('salesC2_', fC);
       var cachedC = cacheC.get(cKeyC);
       if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
       var resC = buildSalesReportC_(fC);

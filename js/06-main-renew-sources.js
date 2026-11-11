@@ -160,7 +160,7 @@ setTimeout(_syncBizRulesFromGAS, 0);
 // ── DANH SÁCH BÁO CÁO CẤU HÌNH ĐƯỢC (Settings 'reportsConfig') — mỗi công ty bật/tắt + đặt tên báo cáo riêng (CRM bán ra ngoài). ──
 // { "<mã A-L>": { enabled: false, label: "tên hiển thị" } }. Chưa cài = bật hết, tên mặc định. Chỉ ẨN trên giao diện chọn báo cáo; quyền xem dữ liệu
 // vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
-var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
+var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Pos'],['D','Báo cáo D — Sale tự thêm'],
   ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
   ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['K','Báo cáo K — Chốt tháng'],['L','Báo cáo L — KH qua cửa hàng'],['M','Báo cáo M – Tổng quan đơn chia'],['N','Báo cáo N — Tính đơn thuần']];
 var REPORTS_CFG = {};
