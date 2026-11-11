@@ -347,7 +347,8 @@ function doGetCore_(e) {
       var tB0_ = Date.now();
       var resB = buildSalesReportB_(fB);
       var tB1_ = Date.now();
-      try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
+      // Duyen 2026-11-10: Bao cao B "load mai khong duoc bao cao thang 10" -> B CHI tinh binh thuong, KHONG con tru hoan/huy thang truoc (applyPosMonthAdjustToReportB_ chay LAI ca Bao cao B thang truoc de lay so
+      // hien tai => xem thang 10 la tinh them ca thang 9). Phan Chot thang + tru hoan/huy chuyen sang man K (action posMonthAdjust / closePosMonth_, doc so moi, KHONG qua Bao cao B).
       var tB2_ = Date.now(), jsB_ = '';
       try { jsB_ = JSON.stringify(resB); _cachePutBig_(cKeyB, jsB_, 120); } catch(ec) {}
       try { Logger.log('PERF salesReportB from=' + fB.dateFrom + ' to=' + fB.dateTo + ' buildMs=' + (tB1_ - tB0_) + ' adjustMs=' + (tB2_ - tB1_) + ' totalMs=' + (Date.now() - tB0_) + ' bytes=' + jsB_.length + ' orders=' + (resB.totalOrders || 0)); } catch (eL) {}   // xem: Apps Script -> Executions

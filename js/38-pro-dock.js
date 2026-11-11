@@ -304,6 +304,7 @@ function proDockEnsure_(){
   var p = document.createElement('div'); p.id = 'pro-ai';
   p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button></div>'
+    + '<div class="pro-ai-range" id="pro-ai-range" style="display:none"></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
     + '<div class="pro-ai-log" id="pro-ai-log"></div><div class="pro-ai-sug" id="pro-ai-sug"></div>'
     + '<div class="pro-ai-in"><textarea id="pro-ai-q" rows="2" maxlength="600" placeholder="Hỏi về khách hoặc doanh số…"></textarea><button type="button" id="pro-ai-send" class="btn primary">Gửi</button></div>';
@@ -329,12 +330,13 @@ function proAiMode_(m){
   var p = document.getElementById('pro-ai'); if (!p) return;
   p.querySelectorAll('[data-mode]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });
   var qIn = document.getElementById('pro-ai-q'); if (qIn) qIn.placeholder = m==='price' ? 'Hỏi giá sản phẩm… (vd: giá + tên sản phẩm)' : 'Hỏi về khách hoặc doanh số…';
+  proRangeRender_();
   document.getElementById('pro-ai-sug').innerHTML = PRO_AI_SUGGEST[m].map(function(x){ return '<button type="button" class="pro-chip" data-sug="'+proEsc_(x)+'">'+proEsc_(x)+'</button>'; }).join('');
   proAiLogRender_();
 }
 function proAiLogRender_(){
   var el = document.getElementById('pro-ai-log'); if (!el) return;
-  var hint = _proDock.mode==='price' ? 'Gõ tên sản phẩm để tra giá trong bảng giá (có thể kèm chất liệu, size, SAPHIA/RUBY). Giá lấy trực tiếp từ DANH_MUC, không do AI tự nghĩ.' : _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo phạm vi bạn được xem (dữ liệu màn 🏠 Tổng quan).';
+  var hint = _proDock.mode==='price' ? 'Gõ tên sản phẩm để tra giá trong bảng giá (có thể kèm chất liệu, size, SAPHIA/RUBY). Giá lấy trực tiếp từ DANH_MUC, không do AI tự nghĩ.' : _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo BÁO CÁO B (Pos). Chọn kỳ bằng thanh lọc phía trên: Hôm nay / Tuần này / Tháng này / Khác… hoặc chọn từ ngày → đến ngày.';
   el.innerHTML = (_proDock.log.length ? '' : '<div class="pro-ai-hint">'+hint+'</div>') + _proDock.log.map(function(m, mi){
     var chips = (m.chips && m.chips.length) ? '<div class="pro-ai-chips">'+m.chips.map(function(c, ci){ return '<button type="button" class="pro-pc'+(c.kind==='reset'?' alt':'')+'" data-pc="'+mi+':'+ci+'">'+proEsc_(c.label)+'</button>'; }).join('')+'</div>' : '';
     return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+chips+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
@@ -385,6 +387,127 @@ async function proPriceChip_(mi, ci){
     _proDock.log.push({ role:'user', text:c.label }); proPriceShow_(item, sel); proAiLogRender_();
   }
 }
+// ═══ TRỢ LÝ AI — 📊 Doanh số tính theo BÁO CÁO B (Pos "dữ liệu đơn") + lọc nhanh Hôm nay/Tuần/Tháng/… hoặc chọn ngày (Duyên 2026-11-09) ═══
+// NGUYÊN NHÂN GỐC "hỏi AI ra 0đ": chế độ Doanh số đọc số của màn 🏠 Tổng quan (_ov = orgOverview, kỳ cố định theo Tổng quan, KHÔNG phải Báo cáo B),
+// không có ô chọn kỳ nên không đổi được ngày/tháng. Nay gọi thẳng action salesReportB (cùng nguồn Báo cáo B) theo khoảng ngày chọn ở thanh lọc của panel.
+var PRO_B_TTL_ = 120000;   // cache 2 phút / mỗi khoảng ngày — hỏi liên tiếp không tính lại B
+function proRangeInit_(){
+  if (_proDock.range) return _proDock.range;
+  var r = (typeof _pkQuickRange==='function') ? _pkQuickRange('thisMonth') : null;
+  _proDock.range = { quick:'thisMonth', from: r ? r.from : '', to: r ? r.to : '' };
+  return _proDock.range;
+}
+// Tải B (+ phần Sale 30% đơn quầy giống bảng "Theo Sale" của B). deps tiêm vào để test: { fetchB(action,params), errFn() }
+async function proSalesBLoad_(from, to, deps){
+  deps = deps || {};
+  var fetchB = deps.fetchB || function(a, p){ return _srFetch(a, p); };
+  var errFn = deps.errFn || function(){ return (typeof _srState!=='undefined' && _srState.lastFetchError) || ''; };
+  var cache = _proDock.bCache || (_proDock.bCache = {}), key = from+'|'+to, hit = cache[key];
+  if (hit && Date.now()-hit.t < PRO_B_TTL_) return { ok:true, B:hit.B };
+  var d = await fetchB('salesReportB', { dateFrom:from, dateTo:to });
+  if (!d || d.error) return { ok:false, error: errFn() || (d && d.error) || 'Không tải được Báo cáo B — thử lại.' };
+  var store = null;
+  try { var ds = await fetchB('storeCaseReport', { dateFrom:from, dateTo:to }); if (ds && ds.ok!==false && !ds.error) store = ds; } catch(e){ /* đơn quầy lỗi/thiếu quyền: B vẫn tính doanh thu Pos như cũ */ }
+  var B = proSalesBBuild_(d, store, from, to);
+  cache[key] = { t:Date.now(), B:B };
+  return { ok:true, B:B };
+}
+function proSalesBBuild_(d, storeData, from, to){
+  var merged = (typeof _srMergeStoreIntoBySale_==='function') ? _srMergeStoreIntoBySale_(d.bySale||[], storeData) : { rows:(d.bySale||[]).map(function(r){ return Object.assign({}, r); }), storeTotal:0, storeOrders:0 };
+  var rows = (merged.rows||[]).filter(function(r){ return (r.giaTri||0)>0 || (r.orders||0)>0; }).sort(function(a,b){ return (b.giaTri||0)-(a.giaTri||0); });
+  var orders = Number(d.totalOrders)||0, rev = Number(d.totalGiaTri)||0;
+  return { from:from||'', to:to||'', rev:rev, orders:orders, aov: orders ? Math.round(rev/orders) : 0, cod:Number(d.totalCod)||0, storeTotal:merged.storeTotal||0, storeOrders:merged.storeOrders||0, rows:rows };
+}
+function proSalesBContext_(B){
+  var money = proMoney_, top = B.rows.slice(0,15);
+  return ['LOẠI: doanh số theo Báo cáo B (Pos "dữ liệu đơn"). Kỳ: '+B.from+' → '+B.to,
+    'Tổng: doanh thu (giá trị sau giảm giá) '+money(B.rev)+' | '+B.orders+' đơn | TB/đơn '+money(B.aov)+' | COD '+money(B.cod)+(B.storeTotal ? ' | phần sale đơn quầy '+money(B.storeTotal)+' ('+B.storeOrders+' lượt)' : ''),
+    'Tiền đơn nhiều sale đã chia đều cho từng sale, số đơn giữ nguyên.',
+    'Top '+top.length+' sale theo doanh thu (tên | doanh thu | đơn | TB đơn):'
+  ].concat(top.map(function(r){ return '- '+proClip_(r.name,40)+' | '+money(r.giaTri)+' | '+(r.orders||0)+' | '+money(r.orders ? Math.round(r.giaTri/r.orders) : 0); })).join('\n');
+}
+function proSalesBIntent_(q){
+  var n = proNorm_(q);
+  if (/\btop\b|cao nhat|dan dau|xep hang|nhieu nhat|tung sale|theo sale|ai ban/.test(n)) return 'top';
+  return proIntent_('sales', q);
+}
+function proRuleSalesB_(intent, B){
+  var money = proMoney_, head = 'Báo cáo B (Pos) · '+B.from+' → '+B.to;
+  if (!B.orders && !(B.rev>0) && !B.rows.length) return head+':\nKhông có đơn nào trong khoảng này. Chọn kỳ khác ở thanh lọc phía trên (vd Tháng trước).';
+  var rows = B.rows, total = rows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
+  var line = function(r,i){ return (i+1)+'. '+r.name+' — '+money(r.giaTri)+' · '+(r.orders||0)+' đơn'; };
+  var store = B.storeTotal ? ['(Bảng theo sale đã cộng thêm phần sale đơn quầy '+money(B.storeTotal)+'.)'] : [];
+  if (intent==='summary') return [head+':', 'Doanh thu '+money(B.rev)+' · '+B.orders+' đơn · TB/đơn '+money(B.aov)+' · COD '+money(B.cod)+'.'].concat(rows.length ? ['Top: '+rows.slice(0,3).map(function(r,i){ return (i+1)+'. '+r.name+' ('+money(r.giaTri)+')'; }).join(' · ')] : [], store).join('\n');
+  if (intent==='top') return [head+' — xếp theo doanh thu:'].concat(rows.slice(0,10).map(line), store).join('\n');
+  if (intent==='support'){
+    var low = rows.filter(function(r){ return (r.orders||0)>0; }).slice().sort(function(a,b){ return (a.giaTri||0)-(b.giaTri||0); }).slice(0,5);
+    if (!low.length) return head+':\nChưa có sale nào có đơn trong khoảng này.';
+    return [head+' — doanh thu thấp nhất (Báo cáo B chưa có KPI nên xếp theo doanh thu):'].concat(low.map(function(r){ return '• '+r.name+': '+money(r.giaTri)+' · '+(r.orders||0)+' đơn'; })).join('\n');
+  }
+  if (intent==='notable'){
+    var Bl = [];
+    if (rows.length){ Bl.push('Dẫn đầu: '+rows[0].name+' ('+money(rows[0].giaTri)+').');
+      if (rows.length>2 && total>0 && rows[0].giaTri/total>0.4) Bl.push('Doanh thu tập trung: '+rows[0].name+' chiếm '+Math.round(rows[0].giaTri/total*100)+'% — phụ thuộc nhiều vào 1 người.');
+      var ao = rows.filter(function(r){ return (r.orders||0)>=3; }).sort(function(a,b){ return b.giaTri/b.orders - a.giaTri/a.orders; })[0];
+      if (ao) Bl.push('TB đơn cao nhất: '+ao.name+' ('+money(Math.round(ao.giaTri/ao.orders))+'/đơn, '+ao.orders+' đơn).'); }
+    Bl.push('Cả kỳ '+B.orders+' đơn, TB '+money(B.aov)+'/đơn.');
+    return head+':\n'+Bl.slice(0,4).map(function(x){ return '• '+x; }).join('\n');
+  }
+  return PRO_RULE_HELP;
+}
+function proRuleSalesBAnswer_(question, B){ var it = proSalesBIntent_(question); return it ? proRuleSalesB_(it, B) : PRO_RULE_HELP; }
+// Thanh lọc ngày trong panel (chỉ hiện ở chế độ Doanh số): viên thuốc nhanh dùng chung (qrPillsHtml_ + _pkQuickRange) + 2 ô chọn ngày
+function proRangeBarHtml_(){
+  var r = proRangeInit_();
+  var pills = (typeof qrPillsHtml_==='function') ? qrPillsHtml_(r.quick, 'proAiQuick_(this.value)') : '';
+  return pills + '<span class="pro-ai-dates"><input type="date" id="pro-ai-from" value="'+proEsc_(r.from)+'" onchange="proAiDates_()" aria-label="Từ ngày"><span>→</span><input type="date" id="pro-ai-to" value="'+proEsc_(r.to)+'" onchange="proAiDates_()" aria-label="Đến ngày"></span>';
+}
+function proRangeRender_(){
+  var el = document.getElementById('pro-ai-range'); if (!el) return;
+  var on = _proDock.mode==='sales'; el.style.display = on ? '' : 'none';
+  if (on) el.innerHTML = proRangeBarHtml_();
+}
+function proRangeSync_(){ var r = proRangeInit_(), f = document.getElementById('pro-ai-from'), t = document.getElementById('pro-ai-to'); if (f) f.value = r.from||''; if (t) t.value = r.to||''; }
+function proRangeAsk_(){ if (_proDock.busy) return; var q = document.getElementById('pro-ai-q'); if (!q) return; q.value = 'Tóm tắt doanh số kỳ này'; proAiSend_(); }
+function proAiQuick_(key){
+  var r = proRangeInit_();
+  if (key==='custom'){ r.quick = 'custom'; return; }
+  var q = (typeof _pkQuickRange==='function') ? _pkQuickRange(key) : null; if (!q) return;
+  r.quick = key; r.from = q.from; r.to = q.to; proRangeSync_(); proRangeAsk_();
+}
+function proAiDates_(){
+  var r = proRangeInit_(), f = document.getElementById('pro-ai-from'), t = document.getElementById('pro-ai-to');
+  r.from = (f && f.value) || ''; r.to = (t && t.value) || ''; r.quick = 'custom';
+  var g = document.querySelector('#pro-ai-range .qr-pills');
+  if (g){ Array.prototype.forEach.call(g.querySelectorAll('button'), function(b){ b.classList.remove('on'); }); var s = g.querySelector('select'); if (s){ s.value = ''; s.classList.remove('on'); } }
+  if (r.from && r.to && r.from<=r.to) proRangeAsk_();
+}
+async function proAiSalesCtx_(){
+  var r = proRangeInit_();
+  if (!r.from && !r.to){   // để trống cả 2 ngày = tính TOÀN BỘ đơn → quá 55s như lỗi Báo cáo B cũ; tự đặt Tháng này
+    var q = (typeof _pkQuickRange==='function') ? _pkQuickRange('thisMonth') : null;
+    if (q){ r.quick = 'thisMonth'; r.from = q.from; r.to = q.to; proRangeRender_(); }
+  }
+  if (r.from && r.to && r.from>r.to) return { error:'Ngày bắt đầu lớn hơn ngày kết thúc — chọn lại khoảng ngày.' };
+  var res = await proSalesBLoad_(r.from, r.to);
+  if (!res.ok) return { error:res.error };
+  return { text: proSalesBContext_(res.B), raw:{ B:res.B } };
+}
+async function proAiSendSales_(question, q){
+  _proDock.log.push({ role:'user', text:question }); q.value = ''; _proDock.busy = true;
+  _proDock.log.push({ role:'bot', text:'⏳ Đang tải Báo cáo B…' }); proAiLogRender_();
+  var ctx; try { ctx = await proAiSalesCtx_(); } catch(e){ ctx = { error:String(e&&e.message||e) }; }
+  _proDock.log.pop();
+  if (ctx.error){ _proDock.log.push({ role:'bot', text:'⚠ '+ctx.error }); _proDock.busy = false; proAiLogRender_(); return; }
+  if (PRO_AI_ENGINE==='rule'){
+    _proDock.log.push({ role:'bot', text:proRuleSalesBAnswer_(question, ctx.raw.B), provider:'Quy tắc · Báo cáo B (không dùng AI)' }); _proDock.busy = false; proAiLogRender_(); return;
+  }
+  var hist = _proDock.log.slice(0,-1).filter(function(m){ return m.text.indexOf('⏳')!==0; });
+  _proDock.log.push({ role:'bot', text:'⏳ Đang hỏi AI…' }); proAiLogRender_();
+  var r = await proAskRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proAskPrompt_(ctx.text, question, hist), fetch);
+  _proDock.log.pop(); _proDock.log.push(r.ok ? { role:'bot', text:r.text, provider:r.provider } : { role:'bot', text:'⚠ '+r.error });
+  _proDock.busy = false; proAiLogRender_();
+}
 async function proAiSend_(){
   if (_proDock.busy) return;
   var q = document.getElementById('pro-ai-q'), question = (q.value||'').trim(); if (!question) return;
@@ -399,6 +522,7 @@ async function proAiSend_(){
     _proDock.log.push(pm);
     _proDock.busy = false; proAiLogRender_(); return;
   }
+  if (_proDock.mode==='sales') return proAiSendSales_(question, q);   // Doanh số = Báo cáo B + khoảng ngày chọn
   var ctx = proAiContext_();
   if (ctx.error){ _proDock.log.push({ role:'bot', text:ctx.error }); proAiLogRender_(); return; }
   if (PRO_AI_ENGINE==='rule'){
@@ -419,4 +543,4 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_ };
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_ };

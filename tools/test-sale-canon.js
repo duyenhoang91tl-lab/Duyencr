@@ -31,8 +31,9 @@ eq(prim('anhNP1999'), 'anhnp99', 'The (salePersonTags) co uu tien cao nhat: ten 
 set([], null, [{ maSale: 'S4', tenFacebook: 'Thu Nguyen', userBase: 'thuNH1986', tenTagPancake: 'thuNH1986tag' }]);
 eq(prim('Thu Nguyen'), 'thuNH1986', 'SaleDirectory: ten chinh = user Base'); eq(prim('S4'), 'thuNH1986', 'ma Sale cung ve ten chinh');
 set([], null, [], { 'Hai Yen FB': 'yenNTH2004', 'Chung': 'saleX|saleY' });
-eq(prim('Hai Yen FB', ['yenNTH2004']), 'Hai Yen FB', 'chua co quy tac -> ten nho nhat theo chu cai trong cac ten da biet (on dinh)');
-eq(prim('yenNTH2004'), 'Hai Yen FB', 'tu ten kia cung ra CUNG ten chinh (hai chieu)');
+// 2026-11-10: ten chinh KHONG con la ten hien thi co khoang trang ("Hai Yen FB") khi nhom co username Base — bao cao hien yenNTH2004 nhu Bao cao A
+eq(prim('Hai Yen FB', ['yenNTH2004']), 'yenNTH2004', 'chua co quy tac -> uu tien username khong khoang trang (khop Bao cao A), on dinh');
+eq(prim('yenNTH2004'), 'yenNTH2004', 'tu ten kia cung ra CUNG ten chinh (hai chieu)');
 eq(prim('saleX'), 'saleX', 'ten khong ai khop -> giu nguyen'); eq(prim(''), '', 'rong -> rong');
 // leader liet ke nhieu nguoi KHONG gop
 set([U('saleA', 'Anh', ['anhNP1999']), U('saleD', 'Dung', ['dungnguyen1995']), U('lead1', 'Lan', ['anhNP1999', 'dungnguyen1995'], 'leader')]);

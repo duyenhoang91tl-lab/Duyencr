@@ -12,7 +12,7 @@ const ctx = { esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replac
   _srTotalRowHtml_: cells => '<tr class="tot">' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>', _srCloseRateKpiCard_: () => '', _srCloseRateBarHtml_: () => '',
   _SR_COLTH_ROWSFN_: {}, _SR_COLTH_GETTER_: {}, _srNoDataHtml_: () => 'NODATA', _srMergeStoreIntoBySale_: function(rows){ return { rows: rows, storeTotal: 0 }; }, _srPosMonthPanelHtml_: () => '', _srBaseCheckPanelHtml_: () => '', _srChartSvg: () => 'CHART' };
 vm.createContext(ctx);
-vm.runInContext(fnSrc('_srPosAdjustBannerHtml_') + '\n' + fnSrc('_srPosAdjustBlockHtml_') + '\n' + fnSrc('_srRenderB'), ctx);
+vm.runInContext(fnSrc('_srPosAdjustBannerHtml_') + '\n' + fnSrc('_srPosAdjustBlockHtml_') + '\n' + fnSrc('_srBKpiForSaleFilter_') + '\n' + fnSrc('_srRenderB'), ctx);
 let h;
 const base = { totalOrders: 10, totalGiaTri: 1200000, totalCod: 0, bySale: [
   { name: 'anhtrinh1995', orders: 6, giaTri: 700000, giaTriGoc: 700000, truHoanHuy: 150000, giaTriSauTru: 550000, cod: 0 }, { name: 'yenNTH2004', orders: 4, giaTri: 500000, giaTriGoc: 500000, truHoanHuy: 0, giaTriSauTru: 500000, cod: 0 }] };
