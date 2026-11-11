@@ -659,10 +659,11 @@ function buildSalesReportC_(filters) {
   // tat ca sale dung ten tren don (mac dinh, giu nguyen hanh vi cu).
   var byCreator = !!filters.byCreator;
 
-  var rows = readDTTong_();
+  var rows = null;   // doc DT Tong LAZY: che do Pos (mac dinh) khong can doc -> bao cao C nhanh hon
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
   // nhu buildSalesReportA_ (so don khong chia — o day khong can so don nen bo qua, chi lay tien).
   function aggregate(fromStr, toStr) {
+    if (rows === null) rows = readDTTong_();
     var bySale = {}, byKenh = {};
     var matchedOrders = [];
     for (var i = 0; i < rows.length; i++) {
@@ -693,8 +694,50 @@ function buildSalesReportC_(filters) {
     return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
   }
 
-  var curAgg = aggregate(per.curFrom, per.curTo);
-  var prevAgg = aggregate(per.prevFrom, per.prevTo);
+  // NGUON SO LIEU (Duyen 2026-11-10: "bao cao C tinh theo POS"): mac dinh lay tu Bao cao B (don Pos, da ghep Base/chia theo phan tung sale) cho CA 2 KY,
+  // loc Sale/Kenh/San pham cua mau loc nhanh ap NHU NHAU cho 2 ky. Giu DT Tong (Base) khi: filters.source==='base', hoac 'tinh theo nguoi tao don' (Pos khong co cot nay),
+  // hoac moc ngay 'thoiGianHT' (Pos khong co ngay hoan thanh).
+  var usePos = filters.source !== 'base' && !byCreator && dateField === 'ngayTao';
+  var _kenhPageById = null, _kenhPageByName = null;
+  function kenhOfPosOrder_(o) {
+    if (!_kenhPageById) { _kenhPageById = readPancakePageMap_(); _kenhPageByName = readPancakePageMapByName_(); }
+    return _donKenhFromNguon_(o.nguonDon, _kenhPageById, _kenhPageByName) || o.nguonDon || '(chưa có kênh)';   // kenh chuan qua PancakePageMap (cung bo chon Kenh ban voi Bao cao A); khong khop -> giu Nguon don
+  }
+  // Don Pos cua 1 ky (da gan kenh chuan + phan chia tung sale), CACHE rieng tung ky de 2 ky tinh SONG SONG (xem warmPart) va xem lai ra ngay.
+  function posOrdersForPeriod_(fromStr, toStr) {
+    var ck = _reportCacheKey_('salesCpos_', { f: fromStr, t: toStr, sale: saleFilterArr, sp: filters.sanPham || '' });
+    var hit = _cacheGetBig_(ck);
+    if (hit) { try { return JSON.parse(hit); } catch (eH) {} }
+    var rb = buildSalesReportB_({ dateFrom: fromStr, dateTo: toStr, sale: saleFilterArr, sanPham: filters.sanPham || '' });
+    var list = (rb.orders || []).map(function(o) {
+      return { ngayTao: o.ngayTaoDon, kenh: kenhOfPosOrder_(o), shares: (o.bsx || []).filter(function(x) { return x[0] !== UNASSIGNED; }),   // B bo dong "(chua gan sale)" khoi Theo Sale -> C cung bo, de 2 bao cao khop nhau
+               sanPham: o.sanPham, giaTriDon: o.giaTriSauGiam, trangThai: o.trangThai, id: o.posRow || '' };
+    });
+    try { _cachePutBig_(ck, JSON.stringify(list), 600); } catch (eP) {}
+    return list;
+  }
+  function aggregatePos(fromStr, toStr) {
+    var bySale = {}, byKenh = {}, matchedOrders = [];
+    posOrdersForPeriod_(fromStr, toStr).forEach(function(o) {
+      if (kenhFilterArr.length && kenhFilterArr.indexOf(o.kenh) === -1) return;
+      var total = 0;
+      o.shares.forEach(function(x) { bySale[x[0]] = (bySale[x[0]] || 0) + x[1]; total += x[1]; });
+      byKenh[o.kenh] = (byKenh[o.kenh] || 0) + total;
+      matchedOrders.push({ ngayTao: o.ngayTao, thoiGianHT: '', kenhBan: o.kenh, saleBan: o.shares.map(function(x) { return x[0]; }).join(', '),
+                           sanPham: o.sanPham, giaTriCoc: 0, giaTriDon: o.giaTriDon, giaiDoan: '', trangThai: o.trangThai, id: o.id });
+    });
+    return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
+  }
+
+  // NGUYEN NHAN GOC \"Bao cao C khong tai duoc\" (Duyen 2026-11-10): C Pos goi Bao cao B 2 lan NOI TIEP trong 1 request, B moi lan da cham => qua 55s client huy (_srFetch) / treo \"Dang tai\".
+  // Nay client goi truoc 2 request SONG SONG (part=cur / part=prev) chi de tinh + cache don Pos tung ky, roi goi request that -> doc cache, tra ngay.
+  if (usePos && (filters.part === 'cur' || filters.part === 'prev')) {
+    if (filters.part === 'cur') posOrdersForPeriod_(per.curFrom, per.curTo); else posOrdersForPeriod_(per.prevFrom, per.prevTo);
+    return { warm: filters.part };
+  }
+
+  var curAgg = usePos ? aggregatePos(per.curFrom, per.curTo) : aggregate(per.curFrom, per.curTo);
+  var prevAgg = usePos ? aggregatePos(per.prevFrom, per.prevTo) : aggregate(per.prevFrom, per.prevTo);
 
   function buildTable(curMap, prevMap, entType) {
     var names = Object.keys(Object.assign({}, curMap, prevMap));
@@ -722,6 +765,7 @@ function buildSalesReportC_(filters) {
   };
 
   return {
+    source: usePos ? 'pos' : 'base',
     period: per,
     byEmployee: buildTable(curAgg.bySale, prevAgg.bySale, 'sale'),
     byKenh: buildTable(curAgg.byKenh, prevAgg.byKenh, 'kenh'),

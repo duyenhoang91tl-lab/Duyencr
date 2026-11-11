@@ -46,6 +46,18 @@ async function _srLoad(){
       } catch (eStoreB) { /* bo qua: B van hien thi doanh thu Pos nhu cu */ }
     }
   } else if (_srState.sub === 'C') {
+    // C tính theo Pos = tính 2 kỳ (mỗi kỳ chạy Báo cáo B, chậm): bắn 2 request SONG SONG để backend tính + cache từng kỳ, rồi mới lấy kết quả (1 request nối tiếp 2 kỳ vượt 55s → treo "Đang tải").
+    // Bỏ qua lỗi ở bước này; request chính bên dưới tự tính lại nếu cache không có.
+    if (!_srState.byCreator && _srState.cDateField !== 'thoiGianHT') {
+      var _cBase = {
+        dateField: _srState.cDateField, periodType: _srState.cPeriodType,
+        weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
+        customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
+        customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
+        sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','), sanPham: _srState.cSanPham || '', byCreator: ''
+      };
+      try { await Promise.all(['cur', 'prev'].map(function(pt){ return _srFetch('salesReportC', Object.assign({}, _cBase, { part: pt })); })); } catch (eWarmC) { /* bỏ qua */ }
+    }
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
@@ -125,7 +137,9 @@ async function _srLoad(){
   } else if (_srState.sub === 'M') {
     // Tổng quan đơn chia (js/50): tổng đơn thực tế, doanh thu, TB/đơn + theo từng sale số đơn chia / doanh thu từ đơn chia — GAS splitOrderReport
     await splitReportLoad_();
-  } else if (_srState.sub === 'G' || _srState.sub === 'K') {
+  } else if (_srState.sub === 'K') {
+    await _srKLoad_();   // Báo cáo K — Chốt tháng (js/67-report-k.js)
+  } else if (_srState.sub === 'G' || _srState.sub === 'BD') {
     // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
     // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
     if (_srState.gDateQuick && _srState.gDateQuick !== 'custom'){
@@ -644,6 +658,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'L') { renderSalesReportTabL_(wrap, subTabs); return; }
   if (_srState.sub === 'M') { renderSalesReportTabM_(wrap, subTabs); return; }
   if (_srState.sub === 'K') { renderSalesReportTabK_(wrap, subTabs); return; }
+  if (_srState.sub === 'BD') { renderSalesReportTabBD_(wrap, subTabs); return; }
 
   var bar = _srBarHtml_();
 
@@ -1413,7 +1428,7 @@ function _srRenderB(d){
   }
   if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
-  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang màn K (js/28 renderSalesReportTabK_ → _srPosMonthPanelHtml_).
+  // Duyên 2026-11-10: khối 🔒 Chốt tháng Pos & trừ hoàn/hủy KHÔNG còn ở Báo cáo B (B tính bình thường cho nhanh) — đã chuyển sang Báo cáo K — Chốt tháng (js/67-report-k.js).
   return html;
 }
 
@@ -1982,14 +1997,7 @@ async function _impUpload(kind){
         _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
         return;
       }
-      var _askBody = ''
-        + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
-        + '• ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ: ' + (d0.wouldUpdateRows ? 'CẬP NHẬT ' + fmt(d0.wouldUpdateRows) + ' đơn có thông tin đổi (' + fmt(d0.wouldUpdateCells) + ' ô; chỉ ghi ô file có giá trị mới khác, KHÔNG xóa trắng ô cũ, giá trị cũ được lưu vào sheet "Nhật ký cập nhật nhập file"), còn lại giống hệt → bỏ qua' : 'giống dữ liệu cũ → bỏ qua, không ghi đè, không xóa') + '\n'
-        + (d0.updateOverLimit ? '• Còn ' + fmt(d0.updateOverLimit) + ' đơn đổi nữa — vượt giới hạn 1 lần, nhập lại cùng file để cập nhật tiếp\n' : '')
-        + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
-        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?';
-      var _go = await _impAsk_('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước', _askBody, '✅ Nhập');
-      if (!_go) { toast('Đã hủy — chưa ghi gì. (Xem trước: thêm ' + fmt(d0.wouldWrite) + ' dòng mới, ' + fmt(d0.skippedExisting || 0) + ' đơn đã có.)'); return; }
+      // Duyên 2026-11-11: "cho mình nhập dữ liệu thì nhập luôn đi, không cần hỏi lại" — bỏ hộp xác nhận xem trước; vẫn đã dry-run ở trên để báo 'không có dòng mới'. Dữ liệu cũ vẫn giữ nguyên (chỉ thêm dòng mới + cập nhật ô đổi, có nhật ký).
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
       d = await _impPost_(impUrl, { action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }, 'write', 0);
