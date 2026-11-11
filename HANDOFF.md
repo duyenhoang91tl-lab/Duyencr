@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-11 (phiên 59) — Báo cáo B: bấm dòng Sale → chi tiết DOANH THU TỪNG ĐƠN (5 thông tin) — BƯỚC 1/2 XONG (đã push); CHỜ Duyên xem thực tế
+- **Yêu cầu Duyên:** trong Báo cáo B, sale xem được chi tiết doanh thu theo từng đơn để biết đơn nào nhận doanh thu thế nào, gồm: (1) ngày lên đơn theo Base, (2) thông tin sản phẩm order, (3) sale tham gia, (4) doanh thu cá nhân, (5) nguồn.
+- **Cách làm (chỉ client, KHÔNG sửa gas_v13.js → không cần deploy GAS):** cửa sổ chi tiết có sẵn khi bấm dòng Sale ở B (`js/59-report-drill.js`, kind `bSale`) đổi sang bố cục mới: `Ngày lên đơn (Base) | Khách hàng | SĐT | Sản phẩm order | Sale tham gia | Doanh thu cá nhân | Nguồn | Cách tính`. Dữ liệu lấy từ `d.orders` backend đã trả sẵn: `ghepBase[].ngay` / `baseNgayTao` (ngày Base), `sanPham`+`soLuong`, `_srOrderShares_(o,'adj')` (sale + % chia, cùng cách chia với bảng Theo Sale), `x.share` (= phần của sale đang xem, khớp bảng), `nguonDon`. Cột "Cách tính" (thêm ngoài 5 mục): Ghép Base / Chia theo file kế toán / Quầy 30/70 / Chia đều theo Thẻ Pos. Xuất Excel dùng đúng các cột này. Các ô B khác (Nguồn, Team, MKT, Sản phẩm...) GIỮ nguyên bố cục cũ.
+- **Quy ước ngày:** đơn đã ghép Base → ngày các đơn Base ĐANG TÍNH (bỏ đơn gốc bị loại; nhiều đơn gốc khác ngày → liệt kê hết); đơn CHƯA ghép được Base → hiện ngày Pos kèm "(Pos)" (vì chưa có ngày Base để lấy).
+- [x] Test mới `tools/test-report-b-sale-detail.js` (13 ca) ĐẠT; `test-report-drill.js` (44 ca, có jsdom) vẫn ĐẠT; `node -c js/*.js` OK; `index.html` js/59 `?v=20261111a`.
+- [ ] **VIỆC KẾ TIẾP:** (a) Duyên Ctrl+F5 CRM, vào Báo cáo B → bấm 1 dòng Sale → kiểm tra 5 cột; (b) nếu muốn: đơn Pos 1 mã (không ghép) cũng hiện NGÀY BASE thật — hiện backend chỉ trả `ghepBase` cho đơn ghép nên cần sửa `gas_v13.js` (`buildSalesReportB_`, nhánh `singleCodesByRow` ~6470: lưu ngày hàng Base đã tra vào đơn) + `split-gas` + test; (c) nếu muốn: thêm cột Mã đơn Base, hoặc mở cửa sổ này khi bấm Team/Kênh.
+
 ## 2026-11-10 (phiên 58) — Báo cáo C (Pos) không tải được, treo "Đang tải..." — XONG 1/1 (đã push); CHỜ deploy GAS + Duyên thử
 - **Hiện tượng (ảnh Duyên):** C, kỳ tùy chỉnh 01–09/10 so 01–09/11, mẫu lọc nhanh "Phòng kinh doanh" 23 sale → "Đang tải..." mãi. (Dòng "Unchecked runtime.lastError… Receiving end does not exist" là log của extension Chrome, KHÔNG liên quan.)
 - **NGUYÊN NHÂN GỐC (suy ra từ code, chưa đo được thời gian GAS thật):** phiên 57 làm C gọi `buildSalesReportB_` 2 lần NỐI TIẾP trong 1 request; B vốn đã chậm (đọc Pos + đối chiếu Base) nên cộng 2 kỳ vượt 55s của `_srFetch` (client huỷ) / GAS chậm → treo.
