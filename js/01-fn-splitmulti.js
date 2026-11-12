@@ -1344,7 +1344,7 @@ async function syncFromGS(opts) {
         const clJson = JSON.parse(clText);   // lỗi parse -> catch bên dưới (như clR.json() trước đây)
         if (clJson && clJson.rows) {
           const newLeads = {};
-          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
+          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'', page: r.page||'' }; });
           const knownPhones = _assignCustMap();   // Map cache, khong dung lai Set 136k phan tu moi tick
           for (const ph in newLeads) {
             if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }

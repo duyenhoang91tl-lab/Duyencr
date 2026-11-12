@@ -127,7 +127,7 @@ var PK_TAG_STATS_HEADERS = ['date','pageId','pageName','tagId','tagName','count'
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
-var CARE_LEAD_HEADERS = ['phone','name','note','cs','createdAt'];
+var CARE_LEAD_HEADERS = ['phone','name','note','cs','createdAt','page'];
 
 // ─── HELPERS ───────────────────────────────────────────────────
 function getSheet_(name, headers) {
