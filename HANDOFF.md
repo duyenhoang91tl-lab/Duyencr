@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-13 (phiên 67) — Đổi chữ "Sasum" → "CRM", bỏ "vào Sasum" ở các nút/thông báo lưu — XONG 1/1 (đã push); CHỜ Duyên reload extension + F5 CRM
+- **Yêu cầu Duyên:** các đoạn ghi "lưu vào Sasum" đổi thành "lưu"; tên Sasum đổi thành CRM.
+- [x] Chỉ đổi CHỮ HIỂN THỊ cho người dùng: Pancake AI (`pancake-content.js`: nút "💾 Lưu", "✓ Đã lưu.", hướng dẫn khách mới/đã có trong CRM, đồng bộ từ CRM...), Zalo AI (`zalo-content.js`: nhãn URL Web App GAS, đồng bộ trạng thái kết bạn lên CRM, tooltip/alert chiến dịch bị admin tắt trên CRM...), tiêu đề tab `Báo cáo ngày — CRM` (`js/16`), nhãn "Nhãn (tự đặt trong CRM)" (`index.html`). 24 dòng, `node -c` OK, test pancake/zalo/msgtpl ĐẠT.
+- **CỐ Ý KHÔNG ĐỔI:** comment trong code, tên hằng/biến (`OLD_SASUM_GAS_URL` dùng để migrate link GAS cũ), key lưu trữ, tên file, docs/lịch sử HANDOFF, thư mục `extension/` (bản cũ). Không sửa `gas_v13.js` → không cần deploy GAS.
+- [ ] **VIỆC KẾ TIẾP:** (a) Duyên reload extension Zalo AI + Pancake AI (chrome://extensions) và Ctrl+F5 CRM; (b) nếu muốn đổi nốt: thông báo lỗi cũ trong `gas_v13.js` dòng ~8309 ("không còn đồng bộ từ Sasum") — phải sửa GAS + `gas/*.gs` + deploy lại nên chưa làm; (c) docs/crm-kb còn tên Sasum (chỉ là tài liệu nội bộ).
+
 ## 2026-11-13 (phiên 66) — Pancake AI: bấm "➕ Tạo mẫu lưu sẵn" không thấy gì — XONG 1/1 (đã push); CHỜ Duyên reload extension + thử
 - **Hiện tượng (video Duyên):** panel Pancake AI, mục "Mẫu lưu sẵn / Mẫu tư vấn" → bấm "➕ Tạo mẫu lưu sẵn" không ra form; ô "CS đang dùng" đang để "— Chọn CS —".
 - **NGUYÊN NHÂN GỐC:** `openTplForm_` (extension-pancake/pancake-content.js) chặn khi chưa chọn CS (`settings.csName` rỗng — mẫu cần biết người tạo để chờ admin duyệt) nhưng chỉ ghi lời nhắc vào `#pk-ai-status`, dòng trạng thái nằm CUỐI panel (dưới nút "Lấy gợi ý mới"), xa mục mẫu → CS không thấy gì, tưởng nút hỏng. Không phải lỗi GAS/lưu mẫu.

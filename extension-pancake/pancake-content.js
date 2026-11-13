@@ -1394,7 +1394,7 @@
       panelEl.querySelector("#pk-ai-customer").innerHTML =
         `<div class="pk-ai-no-phone-hint">
           📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
-          • Khách <b>đã có</b> trong Sasum: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
+          • Khách <b>đã có</b> trong CRM: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
           • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
           rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
         </div>`;
@@ -1504,7 +1504,7 @@
     _lastServerCare = {};
     renderCustomerCard(phone, { care: null, orders: [] }, { blankNew: true });
     setStatus(phone
-      ? `Đã mở form thêm mới cho ${phone} — điền thông tin rồi bấm Lưu vào Sasum.`
+      ? `Đã mở form thêm mới cho ${phone} — điền thông tin rồi bấm Lưu.`
       : 'Đã mở form thêm khách mới — dán SĐT vào ô "SĐT khách" trong form rồi điền và bấm Lưu.');
     const inCardPhone = panelEl.querySelector('#pk-newphone-input');
     if (inCardPhone) inCardPhone.focus();
@@ -1705,7 +1705,7 @@
              <label class="pk-label-top">SĐT khách <span style="color:#dc2626">*</span></label>
              <input type="text" id="pk-newphone-input" class="pk-full-input" placeholder="Dán SĐT khách vào đây..." value="${escapeHtml(phone || '')}" />`
           : `<div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>`}
-        <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
+        <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống CRM — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
         ${blankNew ? '' : _pkLatestOrderHtml_(orders, data.don)}
@@ -1786,7 +1786,7 @@
         </div>
         <input type="hidden" id="pk-note-raw" value="${escapeHtml(care?.note || '')}" />
 
-        <button id="pk-save-btn" class="pk-save-btn">💾 Lưu vào Sasum</button>
+        <button id="pk-save-btn" class="pk-save-btn">💾 Lưu</button>
       </div>
     `;
 
@@ -1952,7 +1952,7 @@
       const d = panelEl.querySelector('#pk-hen-date'), n = panelEl.querySelector('#pk-hen-note');
       if (d) d.value = ap.dataset.date;
       if (n && !n.value.trim()) n.value = nba.act.replace(/ —.*$/, '');
-      setStatus('📅 Đã điền ngày hẹn ' + fmtDate_(ap.dataset.date) + ' — kiểm tra rồi bấm "Lưu vào Sasum".');
+      setStatus('📅 Đã điền ngày hẹn ' + fmtDate_(ap.dataset.date) + ' — kiểm tra rồi bấm "Lưu".');
       refreshNba_();
     });
     const mb = main.querySelector('#pk-nba-msg-btn');
@@ -2135,7 +2135,7 @@
     // Doc lai ban MOI NHAT ngay truoc khi ghi — chan ca truong hop CS bam Luu qua nhanh
     safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (lookupResp) => {
       if (!lookupResp?.ok) {
-        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu'; }
         setStatus('Chưa kiểm tra được dữ liệu cũ của số này nên tạm dừng để an toàn — bấm Lưu lại lần nữa.');
         return;
       }
@@ -2144,7 +2144,7 @@
       const isTrulyNew = !serverCare && !serverOrders.length;
       const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
       safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
-        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu'; }
         if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
         _currentCare = row;
         _currentPhone = phone;
@@ -2221,7 +2221,7 @@
     // Luồng cũ (đã tra cứu khách sẵn rồi mới sửa): giữ nguyên như trước
     const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
     safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
-      if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
       _currentCare = row;
       _currentPhone = phone;
@@ -2239,7 +2239,7 @@
       if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
       // Ghi nhớ liên kết đoạn chat đang mở với SĐT này -> lần sau vào lại tự nhận diện luôn
       learnChatKeyForPhone_(phone);
-      setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
+      setStatus('✓ Đã lưu.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
     });
   }
 
@@ -2281,7 +2281,7 @@
       const serverCare = lk.data.care || null;
       if (!serverCare && !(lk.data.orders || []).length) {
         if (btn) btn.disabled = false;
-        setStatus('Khách này chưa có trong Sasum — bấm "Lưu vào Sasum" trước rồi mới thêm lịch nhắc.');
+        setStatus('Khách này chưa có trong CRM — bấm "Lưu" trước rồi mới thêm lịch nhắc.');
         return;
       }
       const arr = _pkParseScheds_(serverCare ? serverCare.schedules : '');
@@ -2380,7 +2380,7 @@
     _currentCare = newCare;
     _lastServerCare = Object.assign({}, newCare);
     refreshNba_();
-    setStatus('🔄 Vừa đồng bộ dữ liệu mới từ Sasum.');
+    setStatus('🔄 Vừa đồng bộ dữ liệu mới từ CRM.');
   }
 
   // ── NHẮC HẸN HÔM NAY (tất cả khách, không chỉ khách đang xem) ──
@@ -2634,7 +2634,7 @@
         if (!h.donePhones.includes(phone)) h.donePhones.push(phone);
       }
       renderAssignedList_(true);
-      setStatus('✓ Đã lưu vào Sasum · đã tự tick "Đã gọi" trong Data được chia.');
+      setStatus('✓ Đã lưu · đã tự tick "Đã gọi" trong Data được chia.');
     });
   }
   function _pkAssignCacheUpdate_(phone, care) { // gọi sau khi sale Lưu → dòng trong danh sách cập nhật theo
