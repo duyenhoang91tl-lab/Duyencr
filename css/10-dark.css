@@ -4,13 +4,15 @@ html[data-theme="dark"] {
   color-scheme: dark;
   --bg:#14151a; --surface:#1d1f26; --surface2:#262932; --surface3:#30343f;
   --border:rgba(255,255,255,0.10); --border-md:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.26);
-  --text:#e8e6e1; --muted:#c4c1ba; --hint:#a3a09a;
-  --green:#3ecf8e; --green-bg:#12301f; --green-mid:#34b27b;
-  --vip:#a78bfa; --vip-bg:#2a2147; --vip-b:#5b4b9b;
-  --tt:#60a5fa; --tt-bg:#15283f; --tt-b:#2c5a96;
-  --tn:#fbbf24; --tn-bg:#3a2a12; --tn-b:#8a6a1f;
-  --red:#f87171; --red-bg:#3a1c1c; --red-b:#7f2d2d;
-  --blue:#60a5fa; --blue-bg:#14253b; --blue-b:#2c5a96;
+  /* 2026-11-13 (Duyên báo "chế độ tối chữ mờ"): nâng chữ sáng hơn nữa — text e8e6e1→f6f4ef, muted c4c1ba→e6e3dc, hint a3a09a→d2cfc8
+     (hint trên nền sidebar xanh #285234 từ 3.4:1 → 5.8:1; chữ phụ ≥ 7:1 trên mọi nền tối). Màu nhấn sáng hơn, vẫn ≥ 7:1 trên chip nền của chính nó. */
+  --text:#f6f4ef; --muted:#e6e3dc; --hint:#d2cfc8;
+  --green:#4ee0a0; --green-bg:#12301f; --green-mid:#34b27b;
+  --vip:#c0aefc; --vip-bg:#2a2147; --vip-b:#5b4b9b;
+  --tt:#7cb8fd; --tt-bg:#15283f; --tt-b:#2c5a96;
+  --tn:#fcd34d; --tn-bg:#3a2a12; --tn-b:#8a6a1f;
+  --red:#fca5a5; --red-bg:#3a1c1c; --red-b:#7f2d2d;
+  --blue:#7cb8fd; --blue-bg:#14253b; --blue-b:#2c5a96;
   --shadow:0 1px 3px rgba(0,0,0,.4); --shadow-md:0 4px 14px rgba(0,0,0,.5);
 }
 html[data-theme="dark"] .btn.primary { color:#0b1a12; }
@@ -127,3 +129,17 @@ html[data-theme="dark"] #deploy-guide-banner{background:var(--surface)!important
 html[data-theme="dark"] #qs-input { background:var(--surface2)!important; color:var(--text)!important; border-color:var(--border-strong)!important; }
 html[data-theme="dark"] #qs-input:focus { border-color:var(--green)!important; }
 html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder { color:var(--muted); opacity:1; }
+
+/* 2026-11-13 chữ mờ ở chế độ tối: nhiều chỗ làm mờ bằng opacity (không phải biến màu) nên nâng biến vẫn không sáng lên — nâng riêng.
+   Chỉ trong chế độ tối; chế độ sáng giữ nguyên. Giữ hiệu ứng "đã xong/tắt" nhưng vẫn đọc được. */
+html[data-theme="dark"] .th-filter-icon { opacity:.8; }
+html[data-theme="dark"] .nickzalo-chip .nz-x,
+html[data-theme="dark"] .zalophone-chip .zp-x,
+html[data-theme="dark"] html.ui-pro #pro-tabbar .pro-tab b { opacity:1; }
+html[data-theme="dark"] .cs-combo.disabled { opacity:.8; }
+html[data-theme="dark"] .my-data-done { opacity:.7; }
+html[data-theme="dark"] .tf-tl-row.tf-todo { opacity:.8; }
+html[data-theme="dark"] .aa-table tr.off td { opacity:.75; }
+/* nhãn nhỏ (10–11px) khó đọc hơn chữ thường: thêm độ đậm nhẹ + sáng hẳn */
+html[data-theme="dark"] .sb-label,
+html[data-theme="dark"] .cs-filter-label { color:var(--muted); font-weight:600; }

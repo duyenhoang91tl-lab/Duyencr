@@ -84,6 +84,12 @@ ok(!/body\{font-family:-apple-system/.test(base), 'khong con font he thong cu o 
   const bgs = [v('surface'), v('bg'), v('surface2'), '#0f1a12', '#12301f'];
   ok(bgs.every(Boolean), 'doc duoc cac mau nen toi tu css/10-dark.css');
   for (const n of ['muted', 'hint']) ok(v(n) && bgs.every(b => contrast(v(n), b) >= 4.5), '--' + n + ' (' + v(n) + ') phai >= 4.5:1 tren moi nen toi (chu phu khong duoc chim)');
+  // (2026-11-13) Duyên báo "chữ mờ": nâng ngưỡng — chữ phải >= 7:1 trên nền tối thường, chữ phụ >= 5.5:1 trên nền sidebar xanh (#24422d..#285234, chỗ chìm nhất)
+  const darkBgs = [v('surface'), v('bg'), v('surface2'), v('surface3'), '#0f1a12'];
+  for (const n of ['text', 'muted', 'hint']) ok(v(n) && darkBgs.every(b => contrast(v(n), b) >= 7), '--' + n + ' (' + v(n) + ') >= 7:1 tren moi nen toi thuong');
+  for (const n of ['muted', 'hint']) ok(contrast(v(n), '#285234') >= 5.5 && contrast(v(n), '#24422d') >= 5.5, '--' + n + ' >= 5.5:1 tren nen sidebar xanh toi');
+  for (const [n, chip] of [['vip', 'vip-bg'], ['tt', 'tt-bg'], ['tn', 'tn-bg'], ['red', 'red-bg'], ['green', 'green-bg'], ['blue', 'blue-bg']]) ok(v(n) && v(chip) && contrast(v(n), v(chip)) >= 7, '--' + n + ' >= 7:1 tren chip --' + chip);
+  ok(/th-filter-icon\s*\{\s*opacity:\.8/.test(dk) && /\.my-data-done\s*\{\s*opacity:\.7/.test(dk), 'cac cho lam mo bang opacity duoc nang len o che do toi');
   ok(/html\[data-theme="dark"\] #qs-input\s*\{[^}]*background:var\(--surface2\)!important/.test(dk), 'o tim nhanh #qs-input co nen toi (khong con chu sang tren nen trang)');
   ok(/html\[data-theme="dark"\] input::placeholder[^}]*color:var\(--muted\)/.test(dk), 'placeholder o che do toi dung --muted (doc duoc)');
 }
