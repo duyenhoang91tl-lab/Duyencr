@@ -21238,26 +21238,31 @@ function _tbDailyCounts_(dtRows, from, to, memberOf, cfg) {
   return out;
 }
 // Chon top ty le chot trong 1 ky tu dong "saleCloseRate" (held = tuong tac, closed = don Base, closeRate %).
-function _tbPickClose_(rows, memberOf) {
+function _tbPickClose_(rows, memberOf, active) {
   var mem = {};
   (rows || []).forEach(function (r) {
     var m = memberOf[_normTxt_(r.name)]; if (!m) return;
     var o = mem[m] || (mem[m] = { name: m, held: 0, closed: 0 });
     o.held += Number(r.held) || 0; o.closed += Number(r.closed) || 0;
   });
-  var list = Object.keys(mem).map(function (k) { return mem[k]; }).filter(function (x) { return x.held > 0; });
+  // DUYEN CHOT 2026-11-13: "tuong tac TB team" chi tinh tren sale Online/Offline CON LAM VIEC, co tuong tac trong THANG (active = ten cac sale do; null = ky nay chinh la thang -> sale co tuong tac > 0).
+  // Tuan: mau so = so sale active (ke ca nguoi tuan do 0 tuong tac), tu so = tong tuong tac cua ho trong tuan. Sale ngoai tap active khong xet thuong.
+  var inSet = null; if (active) { inSet = {}; active.forEach(function (n) { inSet[n] = 1; }); }
+  var list = Object.keys(mem).map(function (k) { return mem[k]; }).filter(function (x) { return inSet ? inSet[x.name] === 1 : x.held > 0; });
   var sumHeld = 0; list.forEach(function (x) { sumHeld += x.held; });
-  var avg = list.length ? sumHeld / list.length : 0;
+  var denom = inSet ? Object.keys(inSet).length : list.length;
+  var avg = denom ? sumHeld / denom : 0;
+  list = list.filter(function (x) { return x.held > 0; });
   list.forEach(function (x) { x.closeRate = Math.round(x.closed / x.held * 1000) / 10; x.eligible = x.held >= avg; });
   list.sort(function (a, b) { return b.closeRate - a.closeRate || b.closed - a.closed || (a.name < b.name ? -1 : 1); });
   var el = list.filter(function (x) { return x.eligible && x.closed > 0; }), winners = [];
   if (el.length) winners = el.filter(function (x) { return x.closeRate === el[0].closeRate && x.closed === el[0].closed; });   // dong hang (cung ty le + cung so don) cung nhan
   return { avgHeld: Math.round(avg * 10) / 10, rows: list, winners: winners };
 }
-function _tbCloseFor_(dtRows, from, to, memberOf) {
+function _tbCloseFor_(dtRows, from, to, memberOf, active) {
   try {
     var sec = _srCloseRateSectionsFromBase_({ dateFrom: from, dateTo: to }, dtRows, 'nguoitao');   // ep dem don Base theo NGUOI TAO (Duyen 2026-10-31), bat ke Settings closeRateBy cua bao cao A/B
-    var pick = _tbPickClose_(sec && sec.saleCloseRate, memberOf);
+    var pick = _tbPickClose_(sec && sec.saleCloseRate, memberOf, active);
     pick.noData = !(sec && sec.saleCloseRate && sec.saleCloseRate.length);
     return pick;
   } catch (e) { Logger.log('_tbCloseFor_ ' + from + '..' + to + ': ' + e); return { avgHeld: 0, rows: [], winners: [], noData: true, error: String(e && e.message || e) }; }
@@ -21275,16 +21280,16 @@ function _tbComputeRewards_(month, cfg) {
     var top = arr.length ? arr[0].orders : 0, topE = elig.length ? elig[0].orders : 0, ok = elig.length > 0;
     out.daily.push({ date: d, partial: d === today, top: top, qualified: ok, winners: ok ? elig.filter(function (x) { return x.orders === topE; }) : [], list: arr.slice(0, 8), excluded: day.excluded });
   }
+  var pm = _tbCloseFor_(dtRows, from, to, team.memberOf), activeNames = pm.rows.map(function (x) { return x.name; });   // sale co tuong tac trong thang = tap tinh TB tuong tac (tuan + thang)
   // Tuan: Thu 2 -> Chu nhat; tinh vao thang chua ngay Chu nhat. Tuan chua ket thuc / chua bat dau xu ly theo "to".
   var mon = from; while (_tbDow_(mon) !== 0) mon = _tbYmdAdd_(mon, -1);
   for (; mon <= mEnd; mon = _tbYmdAdd_(mon, 7)) {
     var sun = _tbYmdAdd_(mon, 6);
     if (sun < from || sun > mEnd) continue;           // chi tuan ket thuc (Chu nhat) trong thang
     if (mon > today) continue;
-    var eff = sun < today ? sun : today, pk = _tbCloseFor_(dtRows, mon, eff, team.memberOf);
+    var eff = sun < today ? sun : today, pk = _tbCloseFor_(dtRows, mon, eff, team.memberOf, activeNames);
     out.weekly.push({ from: mon, to: sun, effTo: eff, partial: sun > today, label: _tbFmtDm_(mon) + ' – ' + _tbFmtDm_(sun), avgHeld: pk.avgHeld, rows: pk.rows, winners: pk.winners, noData: !!pk.noData });
   }
-  var pm = _tbCloseFor_(dtRows, from, to, team.memberOf);
   out.monthly = { from: from, to: mEnd, effTo: to, partial: mEnd > today, avgHeld: pm.avgHeld, rows: pm.rows, winners: pm.winners, noData: !!pm.noData };
   return out;
 }

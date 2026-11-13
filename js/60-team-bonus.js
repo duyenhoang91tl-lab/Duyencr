@@ -55,7 +55,7 @@ function _tbCloseTableHtml_(p, reward){
   return h + '</tbody></table></div>';
 }
 function _tbPeriodsHtml_(d){
-  var cfg = d.cfg || {}, h = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Tỷ lệ chốt = đơn gốc Base ÷ tương tác Pancake (cùng cách tính Báo cáo A/B). Chỉ xét sale có tương tác kỳ đó ≥ tương tác trung bình của đội. Thưởng tuần <b>' + _tbMoney_(cfg.weeklyReward) + '</b>, thưởng tháng <b>' + _tbMoney_(cfg.monthlyReward) + '</b>.</div>';
+  var cfg = d.cfg || {}, h = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Tỷ lệ chốt = đơn gốc Base ÷ tương tác Pancake (cùng cách tính Báo cáo A/B). Chỉ xét sale có tương tác kỳ đó ≥ tương tác trung bình của đội (trung bình tính trên các sale Online/Văn phòng có tương tác trong THÁNG). Thưởng tuần <b>' + _tbMoney_(cfg.weeklyReward) + '</b>, thưởng tháng <b>' + _tbMoney_(cfg.monthlyReward) + '</b>.</div>';
   var m = d.monthly;
   if (m) {
     h += '<div class="dash-section-title" style="margin-top:10px">Thưởng THÁNG ' + _tbEsc_(d.month) + (m.partial ? ' <span style="color:#d97706;font-size:12px">⏳ tạm tính đến ' + _tbDmy_(m.effTo) + '</span>' : '') + '</div>';
