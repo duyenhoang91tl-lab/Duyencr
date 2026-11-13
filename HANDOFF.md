@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-13 (phiên 66) — Pancake AI: bấm "➕ Tạo mẫu lưu sẵn" không thấy gì — XONG 1/1 (đã push); CHỜ Duyên reload extension + thử
+- **Hiện tượng (video Duyên):** panel Pancake AI, mục "Mẫu lưu sẵn / Mẫu tư vấn" → bấm "➕ Tạo mẫu lưu sẵn" không ra form; ô "CS đang dùng" đang để "— Chọn CS —".
+- **NGUYÊN NHÂN GỐC:** `openTplForm_` (extension-pancake/pancake-content.js) chặn khi chưa chọn CS (`settings.csName` rỗng — mẫu cần biết người tạo để chờ admin duyệt) nhưng chỉ ghi lời nhắc vào `#pk-ai-status`, dòng trạng thái nằm CUỐI panel (dưới nút "Lấy gợi ý mới"), xa mục mẫu → CS không thấy gì, tưởng nút hỏng. Không phải lỗi GAS/lưu mẫu.
+- [x] Sửa: chưa chọn CS → hiện NGAY trong khung mẫu (`#pk-tpl-form`) khung vàng "⚠️ Chưa chọn CS" + nút "👤 Chọn CS ngay"; tự cuộn tới ô `#pk-cs-search`, focus, viền cam 2,5s. Chọn CS xong bấm lại là mở form bình thường. Vẫn ghi `setStatus` như cũ. Zalo AI KHÔNG cần sửa (đã có `zai-tpl-status` ngay trong mục mẫu).
+- [x] Test mới `tools/test-pancake-tpl-nocs.js` (6 ca, jsdom) ĐẠT; `test-pancake-tpl-form`, `test-pancake-apierr`, `test-pancake-price-tpl-split`, `test-msgtpl` vẫn ĐẠT; `node -c` OK. KHÔNG sửa gas_v13.js (không cần deploy GAS).
+- [ ] **VIỆC KẾ TIẾP:** (a) Duyên **reload extension Pancake AI** trong chrome://extensions + F5 trang Pancake, thử bấm Tạo mẫu khi chưa chọn CS (phải thấy khung vàng + ô CS sáng) rồi khi đã chọn CS (ra form); (b) nếu đã chọn CS mà VẪN không ra form/không lưu được: gửi ảnh/lỗi Console + thông báo ở dòng trạng thái cuối panel (khi đó mới đến lỗi lưu `SAVE_MESSAGE_TEMPLATE` / GAS).
+
 ## 2026-11-13 (phiên 65) — Chat: dán NHIỀU ảnh + kéo-thả tệp ảnh/ghi âm vào khung chat — CẢ 2 BƯỚC XONG (đã push); CHỜ Duyên thử thực tế
 - **Yêu cầu Duyên:** "tiếp bước còn thiếu" (các mục chưa làm ở cuối phiên 64: dán nhiều ảnh, kéo-thả tệp; KHÔNG làm tự gửi sau khi dán vì dễ gửi nhầm, và chưa làm extension Zalo/Pancake AI vì khác khung chat + phải làm song song 2 extension).
 - [x] **Bước A:** `js/48-fn-medialib.js` — `mlibOnPaste_` gom TẤT CẢ ảnh trong clipboard (tối đa 10), `mlibAddImagesToChat_` tải lên lần lượt (không song song, đỡ quá tải GAS) và chèn mỗi ảnh 1 dòng đúng thứ tự. Dán 1 ảnh/dán chữ/ô khác giữ nguyên. `index.html` js/48 `?v=20261113d`. Test jsdom 24 ca ĐẠT. Không sửa GAS.

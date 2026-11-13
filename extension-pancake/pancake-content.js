@@ -3132,7 +3132,26 @@
   // Extension khong co tai khoan dang nhap nen KHONG duyet/sua mau da duyet tai day (server cung chan).
   function openTplForm_(t) {
     const host = panelEl.querySelector('#pk-tpl-form');
-    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để tạo mẫu.'); return; }
+    if (!settings.csName) {
+      // 13/11/2026 (Duyen bao: bam "Tao mau luu san" khong thay gi): chua chon CS thi thong bao chi ghi vao #pk-ai-status — dong trang thai nam cuoi panel, xa muc Mau tu van nen CS KHONG THAY.
+      // Nay hien ngay trong khung mau + tu keo toi o "CS dang dung" va to sang de chon.
+      const msg = 'Chọn tên CS của bạn trước (ô "CS đang dùng" ở đầu panel) rồi bấm lại ➕ Tạo mẫu lưu sẵn.';
+      setStatus(msg);
+      host.innerHTML = '<div class="pk-tpl-form-box" style="border-color:#f59e0b;background:#fffbeb"><div class="pk-tpl-form-title">⚠️ Chưa chọn CS</div>' +
+        '<div style="font-size:12px;margin-bottom:6px">' + msg + '</div>' +
+        '<button type="button" class="pk-btn-outline" id="pk-tpl-goto-cs">👤 Chọn CS ngay</button></div>';
+      const goCs = () => {
+        const el = panelEl.querySelector('#pk-cs-search');
+        if (!el) return;
+        if (el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (el.focus) el.focus();
+        const old = el.style.outline; el.style.outline = '2px solid #f59e0b';
+        setTimeout(() => { el.style.outline = old; }, 2500);
+      };
+      host.querySelector('#pk-tpl-goto-cs').addEventListener('click', goCs);
+      goCs();
+      return;
+    }
     host.innerHTML = `
       <div class="pk-tpl-form-box">
         <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
