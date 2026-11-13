@@ -33,7 +33,7 @@ const o = (d, sale, extra) => Object.assign({ ngayTao: d, nguoiTao: sale, saleBa
 const many = (n, d, sale, extra) => Array.from({ length: n }, () => o(d, sale, extra));
 const cfg = vm.runInContext('teamBonusCfg_()', ctx);
 ok(cfg.dailyMinOrders === 6 && cfg.dailyReward === 50000 && cfg.weeklyReward === 50000 && cfg.monthlyReward === 100000, 'mac dinh: min 6 don, 50k ngay, 50k tuan, 100k thang');
-ok(cfg.penalties.length === 5 && J(cfg.penalties.map(p => p.amount)) === '[50000,50000,50000,200000,50000]', '5 loai phat: 50k/50k/50k/200k/50k');
+ok(cfg.penalties.length === 9 && J(cfg.penalties.map(p => p.amount)) === '[50000,50000,50000,200000,50000,200000,1000000,50000,50000]', '9 loai phat: 50k/50k/50k/200k/50k + PCMT 200k, Ptucam 1tr, Pxltc 50k, Psaiqt 50k');
 
 // Doi sale = chi online + offline (Quay, Thu viec khong thuoc doi)
 const team = vm.runInContext('_tbTeam_()', ctx);

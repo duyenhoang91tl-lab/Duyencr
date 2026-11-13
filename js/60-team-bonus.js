@@ -4,7 +4,7 @@
 //  Số liệu từ máy chủ: action teamBonusReport (gas_v13.js, gas/33_TeamBonus.gs). Thưởng tính trên ĐƠN GỐC BASE (ngày tạo), không tính trên Pos.
 //  Số đơn (thưởng ngày + đơn Base của tỷ lệ chốt tuần/tháng) tính theo NGƯỜI TẠO ĐƠN (Duyên 2026-10-31); doanh thu ở báo cáo vẫn chia như cũ.
 //  Thưởng ngày: nhiều đơn nhất ngày, tối thiểu 6 đơn, không tính đổi trả/bảo hành/thay dây. Thưởng tuần/tháng: tỷ lệ chốt cao nhất,
-//  tương tác ≥ trung bình đội. Phạt 5 loại nhập tay (chỉ Admin ghi/xoá). Panel tự tải theo tháng chọn, không phụ thuộc bộ lọc của Báo cáo B.
+//  tương tác ≥ trung bình đội. Phạt 9 loại nhập tay (chỉ Admin ghi/xoá). Panel tự tải theo tháng chọn, không phụ thuộc bộ lọc của Báo cáo B.
 //  Test: node tools/test-team-bonus-ui.js
 // ═══════════════════════════════════════════════════════════════
 var _tbState = { month: '', data: null, loading: false, err: '', open: true, tab: 'total', form: { date: '', sale: '', type: '1', amount: '', note: '' }, saving: false, sg: { date: '', data: null, loading: false, err: '', sale: {} } };

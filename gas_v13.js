@@ -21157,7 +21157,7 @@ function splitDoPost_(action, d) {
 //    (1) Sale nhieu don nhat TRONG NGAY, toi thieu 6 don VA doanh thu ngay >= 50tr (admin cai tren web, Settings teamBonusCfg), khong tinh don doi tra / bao hanh / thay day: 50k. (2) Top ty le chot TUAN (Thu 2 - Chu nhat): 50k.
 //    (3) Top ty le chot THANG: 100k. (2)+(3) chi xet sale co so tuong tac trong ky >= tuong tac trung binh cua team. Ty le chot dung CUNG ham voi Bao cao A/B
 //    (_srCloseRateSectionsFromBase_: don Base / tuong tac Pancake) nen ra cung so.
-//  PHAT (nhap tay, vi du lieu nhan tin/bao cao khong co trong he thong): 5 loai — luu o sheet 'ThuongPhatDoiSale'. Chi admin ghi/xoa.
+//  PHAT (nhap tay, vi du lieu nhan tin/bao cao khong co trong he thong): 9 loai (1-5 + PCMT/Ptucam/Pxltc/Psaiqt) — luu o sheet 'ThuongPhatDoiSale'. Chi admin ghi/xoa.
 //  Doi sale = ten xep nhom Online/Van phong trong saleChannels. Ngay/tuan/thang theo gio Viet Nam. Tuan tinh vao THANG chua ngay Chu nhat cua tuan do.
 //  So tien va quy tac luu o Settings 'teamBonusCfg' (JSON, thieu khoa thi lay mac dinh ben duoi).
 // ═══════════════════════════════════════════════════════════════
@@ -21174,7 +21174,11 @@ var TEAM_BONUS_DEFAULT_ = {
     { type: 2, label: 'Không gửi báo cáo đúng khung giờ (sáng trước 9h30, chiều 13h30, kết thúc ca, tối 20h nếu bật tin)', amount: 50000 },
     { type: 3, label: 'Đã đọc nhưng không phản hồi', amount: 50000 },
     { type: 4, label: 'Đơn gộp Sale bán chung trong 72 giờ: Sale lên đơn không chia doanh thu cho các Sale cùng tham gia', amount: 200000 },
-    { type: 5, label: 'Nhắn tin khai thác mong cầu trong 15 phút nhưng không gửi kèm từ 04 hình ảnh hoặc ghi âm', amount: 50000 }
+    { type: 5, label: 'Nhắn tin khai thác mong cầu trong 15 phút nhưng không gửi kèm từ 04 hình ảnh hoặc ghi âm', amount: 50000 },
+    { type: 6, label: 'PCMT: Sale check nhầm nội dung cmt thể hiện trên page / trả lời tin nhắn cmt: báo giá', amount: 200000 },
+    { type: 7, label: 'Ptucam: Sử dụng từ cấm', amount: 1000000 },
+    { type: 8, label: 'Pxltc: Không xử lý từ chối của khách hàng', amount: 50000 },
+    { type: 9, label: 'Psaiqt: Tư vấn hời hợt, không khai thác mong cầu, nhắn tin hàng loạt không cá nhân hoá khách hàng', amount: 50000 }
   ]
 };
 function teamBonusCfg_() {
@@ -21365,7 +21369,7 @@ function teamBonusDoPost_(action, d) {
       }
       var cfg = teamBonusCfg_(), type = Number(d.type), ymd = String(d.date || '').trim(), sale = String(d.sale || '').trim();
       var def = null; cfg.penalties.forEach(function (x) { if (x.type === type) def = x; });
-      if (!def) return jsonOut_({ ok: false, error: 'Loai phat khong hop le (1-5).' });
+      if (!def) return jsonOut_({ ok: false, error: 'Loai phat khong hop le (1-9).' });
       if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le (yyyy-mm-dd).' });
       if (!sale) return jsonOut_({ ok: false, error: 'Chua chon sale.' });
       var tm = _tbTeam_(); sale = tm.memberOf[_normTxt_(sale)] || sale;
@@ -21390,6 +21394,18 @@ function teamBonusDoPost_(action, d) {
 // GIOI HAN DA BIET (admin xem xet truoc khi ghi): (a) khong phan biet duoc "tin nhay tu Sale khac" (chuyen hoi thoai) — Pancake khong gui co nay; (b) ten nhan vien tra loi
 // la ten Pancake co the thieu (xem docs/PANCAKE-INBOX.md) nen sale co the de trong de Admin chon; (c) tra loi tu dong (chatbot) van tinh la da tra loi.
 var TB_MSG_SCAN_MAX_ROWS_ = 6000;
+// Thoi gian cho (phut) giua 2 moc ms, TRU phan trung khung KHONG PHAT tin troi (Duyen 2026-11-13): trua 12h-13h30, toi 17h-19h30 (gio VN). Chi dung cho loai 1 (Ptroi).
+function _tbWaitMin_(aMs, bMs) {
+  if (!(bMs > aMs)) return 0;
+  var OFF = 7 * 3600000, DAY = 86400000, W = [[720, 810], [1020, 1170]], sum = (bMs - aMs) / 60000;
+  for (var d0 = Math.floor((aMs + OFF) / DAY) * DAY; d0 <= bMs + OFF; d0 += DAY) {
+    for (var i = 0; i < W.length; i++) {
+      var s0 = d0 + W[i][0] * 60000 - OFF, e0 = d0 + W[i][1] * 60000 - OFF, lo = Math.max(aMs, s0), hi = Math.min(bMs, e0);
+      if (hi > lo) sum -= (hi - lo) / 60000;
+    }
+  }
+  return sum;
+}
 function _tbScanMsgs_(rows, nowMs, endMs, thrMin, staffNames, memberOf) {
   var by = {};
   (rows || []).forEach(function (r) {
@@ -21407,13 +21423,13 @@ function _tbScanMsgs_(rows, nowMs, endMs, thrMin, staffNames, memberOf) {
     g.msgs.forEach(function (m) {
       if (m.dir === 'in') { if (pend === null) pend = m.t; }
       else if (m.dir === 'out' && pend !== null) {
-        var gap = (m.t - pend) / 60000;
+        var gap = _tbWaitMin_(pend, m.t);   // da tru khung 12h-13h30 va 17h-19h30
         if (gap > thrMin) out.push({ key: 'm:' + cid + ':' + iso(pend), type: 1, convId: cid, customer: cust, phone: ph, inAt: new Date(pend).toISOString(), outAt: new Date(m.t).toISOString(), gapMin: Math.round(gap), open: false, sale: who(m.staff), saleRaw: m.staff, page: c.page_id || '' });
         pend = null;
       }
     });
     if (pend !== null && !(c.is_replied === true)) {
-      var gap2 = (cut - pend) / 60000;
+      var gap2 = c.seen === true ? (cut - pend) / 60000 : _tbWaitMin_(pend, cut);   // loai 3 (Pkrep, da doc) khong co ngoai le gio; loai 1 chua doc thi tru khung nghi
       if (gap2 > thrMin) {
         var sr = ass.join(', '), sl = ''; ass.forEach(function (n) { if (!sl) sl = who(n); });
         out.push({ key: 'm:' + cid + ':' + iso(pend), type: c.seen === true ? 3 : 1, convId: cid, customer: cust, phone: ph, inAt: new Date(pend).toISOString(), outAt: null, gapMin: Math.round(gap2), open: true, sale: sl, saleRaw: sr, page: c.page_id || '' });
