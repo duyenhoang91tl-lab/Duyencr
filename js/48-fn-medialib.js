@@ -48,6 +48,9 @@ var MLIB = (function () {
     }
     return h + '</div>';
   }
+  // 2026-11-13: tải lên / ghi âm dùng được cả trong hộp chọn của chat (trước chỉ ở menu Social > Thư viện) -> vẽ lại đúng nơi đang mở.
+  function refresh() { if ($('ml-pick')) pickRender(); else render(); }
+  function curType() { return $('ml-pick') ? S.pickType : S.type; }
   function byId(id) { return S.items.filter(function (i) { return i.id === id; })[0]; }
 
   function render() {
@@ -75,7 +78,7 @@ var MLIB = (function () {
   }
   function gridHtml(list, pick) {
     var T = pick ? S.pickType : S.type;
-    return list.length ? '<div class="ml-grid">' + list.map(function (i) { return cardHtml(i, pick); }).join('') + '</div>' : (!pick && S.loading ? '<div class="ml-empty">Đang tải…</div>' : '<div class="ml-empty">' + (pick ? 'Thư viện chưa có mục nào — thêm ở menu Social → Thư viện.' : 'Chưa có mục nào. ' + (T === 'template' ? 'Bấm "+ Mẫu tin mới".' : 'Bấm "Tải lên" hoặc "Từ Google Drive".')) + '</div>');
+    return list.length ? '<div class="ml-grid">' + list.map(function (i) { return cardHtml(i, pick); }).join('') + '</div>' : (!pick && S.loading ? '<div class="ml-empty">Đang tải…</div>' : '<div class="ml-empty">' + (pick ? (S.pickType === 'template' ? 'Chưa có mẫu tin nào — thêm ở menu Social → Thư viện.' : 'Thư viện chưa có mục nào — bấm ⬆ Tải lên để thêm ' + (S.pickType === 'image' ? 'ảnh' : 'ghi âm') + '.') : 'Chưa có mục nào. ' + (T === 'template' ? 'Bấm "+ Mẫu tin mới".' : 'Bấm "Tải lên" hoặc "Từ Google Drive".')) + '</div>');
   }
 
   // ── Ảnh: thu nhỏ trước khi gửi (nhẹ, nhanh, khỏi vượt giới hạn 6MB) ──
@@ -95,21 +98,21 @@ var MLIB = (function () {
     });
   }
   async function upload(files) {
-    var T = S.type;
+    var T = curType();
     for (var i = 0; i < files.length; i++) {
       var f = files[i]; say('⏳ Đang tải lên ' + f.name + '…');
       try {
         var p = T === 'image' ? await shrinkImage(f) : { b64: await fileToB64(f), mime: f.type || 'audio/mpeg', name: f.name };
         var j = await post({ action: 'mlibUpload', type: T, name: p.name, mimeType: p.mime, base64: p.b64 });
         if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Tải lên lỗi')); continue; }
-        S.items.unshift(j.item); say('✓ Đã thêm ' + p.name); render();
+        S.items.unshift(j.item); say('✓ Đã thêm ' + p.name); refresh();
       } catch (e) { say('✕ Tải lên lỗi: ' + (e && e.message || e)); }
     }
   }
   async function fromDrive() {
     var link = prompt('Dán link (hoặc ID) tệp Google Drive.\nTệp phải được chia sẻ cho tài khoản chạy GAS hoặc "Bất kỳ ai có link":'); if (!link) return;
     say('⏳ Đang lấy từ Drive…');
-    try { var j = await post({ action: 'mlibAddDrive', type: S.type, link: link }); if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Lỗi')); return; } S.items.unshift(j.item); say('✓ Đã thêm từ Drive'); render(); }
+    try { var j = await post({ action: 'mlibAddDrive', type: curType(), link: link }); if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Lỗi')); return; } S.items.unshift(j.item); say('✓ Đã thêm từ Drive'); refresh(); }
     catch (e) { say('✕ Không kết nối được máy chủ'); }
   }
   // ── Ghi âm ──
@@ -119,14 +122,14 @@ var MLIB = (function () {
       var stream = await navigator.mediaDevices.getUserMedia({ audio: true }), chunks = [], mr = new MediaRecorder(stream);
       mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       mr.onstop = async function () {
-        stream.getTracks().forEach(function (t) { t.stop(); }); S.rec = null; render();
+        stream.getTracks().forEach(function (t) { t.stop(); }); S.rec = null; refresh();
         var blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
         var name = prompt('Đặt tên cho bản ghi âm:', 'Ghi âm ' + new Date().toLocaleString('vi-VN')); if (!name) return;
         say('⏳ Đang lưu ghi âm…');
-        try { var j = await post({ action: 'mlibUpload', type: 'audio', name: name, mimeType: blob.type, base64: await fileToB64(blob) }); if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Lỗi')); return; } S.items.unshift(j.item); say('✓ Đã lưu ghi âm'); render(); }
+        try { var j = await post({ action: 'mlibUpload', type: 'audio', name: name, mimeType: blob.type, base64: await fileToB64(blob) }); if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Lỗi')); return; } S.items.unshift(j.item); say('✓ Đã lưu ghi âm'); refresh(); }
         catch (e) { say('✕ Lưu ghi âm lỗi'); }
       };
-      mr.start(); S.rec = mr; render();
+      mr.start(); S.rec = mr; refresh();
     } catch (e) { say('Không bật được micro: cần cho phép quyền micro.'); }
   }
   function recStop() { if (S.rec && S.rec.state !== 'inactive') S.rec.stop(); }
@@ -159,7 +162,10 @@ var MLIB = (function () {
   }
   function pickRender() {
     var d = $('ml-pick'); if (!d) return; var type = S.pickType, list = visible(type);
-    d.innerHTML = '<div class="ml-box"><div class="ml-bar"><div class="ml-seg">' + [['image', '🖼️ Ảnh'], ['audio', '🎙️ Ghi âm'], ['template', '💬 Mẫu tin']].map(function (t) { return '<button class="' + (type === t[0] ? 'on' : '') + '" onclick="MLIB.pickTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div><input class="ml-q" placeholder="🔍 Tìm…" value="' + esc(S.q) + '" oninput="MLIB.search(this.value)"><button class="btn sm" onclick="document.getElementById(\'ml-pick\').remove()">✕ Đóng</button></div>'
+    d.innerHTML = '<div class="ml-box"><div class="ml-bar"><div class="ml-seg">' + [['image', '🖼️ Ảnh'], ['audio', '🎙️ Ghi âm'], ['template', '💬 Mẫu tin']].map(function (t) { return '<button class="' + (type === t[0] ? 'on' : '') + '" onclick="MLIB.pickTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div><input class="ml-q" placeholder="🔍 Tìm…" value="' + esc(S.q) + '" oninput="MLIB.search(this.value)">'
+      + (type === 'template' ? '' : '<button class="btn primary sm" onclick="document.getElementById(\'ml-pfile\').click()">⬆ Tải lên</button><input id="ml-pfile" type="file" multiple style="display:none" accept="' + (type === 'image' ? 'image/*' : 'audio/*') + '" onchange="MLIB.upload(this.files);this.value=\'\'">')
+      + (type === 'audio' ? (S.rec ? '<button class="btn sm ml-rec" onclick="MLIB.recStop()">⏹ Dừng & lưu</button>' : '<button class="btn sm" onclick="MLIB.recStart()">🔴 Ghi âm</button>') : '')
+      + '<button class="btn sm" onclick="document.getElementById(\'ml-pick\').remove()">✕ Đóng</button></div>'
       + '<div id="ml-pick-out">' + gridHtml(list, true) + '</div></div>';
   }
   function _pickId(id) { var it = byId(id), d = $('ml-pick'); if (d) d.remove(); if (it && _cb) _cb(it); }
