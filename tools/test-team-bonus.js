@@ -13,7 +13,7 @@ const ctx = {
   _csJsonSetting_: (k, f) => (settings[k] === undefined ? f : settings[k]),
   _salePersonIdentity_: () => ({ key: n => String(n).trim().toLowerCase(), members: n => [String(n).trim()] }),
   _expandSaleFilterWithPancakeAliases_: a => a,
-  _stripVN_: strip, _normTxt_: s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(),
+  _stripVN_: strip, _dtOrderRevenue_: r => Number(r.rev) || 0, _normTxt_: s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(),
   _isNumericTag_: s => /^\d+$/.test(String(s).trim()),
   splitMulti_: (s, sep) => String(s || '').split(sep).map(x => x.trim()).filter(Boolean),
   _isExcludedOrderStatus_: t => /huy|hoan|that bai/.test(strip(t).toLowerCase()),
@@ -29,7 +29,7 @@ vm.createContext(ctx);
 vm.runInContext("var TEAM_BONUS_DEFAULT_ = " + src.slice(src.indexOf('var TEAM_BONUS_DEFAULT_ = ') + 26, src.indexOf('};', src.indexOf('var TEAM_BONUS_DEFAULT_ = ')) + 2) + ";", ctx);
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const J = JSON.stringify;
-const o = (d, sale, extra) => Object.assign({ ngayTao: d, nguoiTao: sale, saleBan: sale, trangThai: 'Thành công', phanLoai: 'Bán mới', kenhBan: 'Fb Shop', giaiDoan: '', bhZero: false }, extra || {});
+const o = (d, sale, extra) => Object.assign({ ngayTao: d, nguoiTao: sale, saleBan: sale, trangThai: 'Thành công', phanLoai: 'Bán mới', kenhBan: 'Fb Shop', giaiDoan: '', bhZero: false, rev: 10000000 }, extra || {});
 const many = (n, d, sale, extra) => Array.from({ length: n }, () => o(d, sale, extra));
 const cfg = vm.runInContext('teamBonusCfg_()', ctx);
 ok(cfg.dailyMinOrders === 6 && cfg.dailyReward === 50000 && cfg.weeklyReward === 50000 && cfg.monthlyReward === 100000, 'mac dinh: min 6 don, 50k ngay, 50k tuan, 100k thang');

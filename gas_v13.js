@@ -7883,7 +7883,7 @@ function doPost(e) {
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
-    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg' || String(d0.key || '').trim() === 'POS_GHEP_MIN_CODES' || String(d0.key || '').trim() === 'POS_GHEP_RATIO' || String(d0.key || '').trim() === ACCT_EXTRA_KEY_ || String(d0.key || '').trim() === 'resaleNotifyLookback' || String(d0.key || '').trim() === 'resaleNotifyDays' || String(d0.key || '').trim() === 'resaleNotify')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
+    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg' || String(d0.key || '').trim() === 'teamBonusCfg' || String(d0.key || '').trim() === 'POS_GHEP_MIN_CODES' || String(d0.key || '').trim() === 'POS_GHEP_RATIO' || String(d0.key || '').trim() === ACCT_EXTRA_KEY_ || String(d0.key || '').trim() === 'resaleNotifyLookback' || String(d0.key || '').trim() === 'resaleNotifyDays' || String(d0.key || '').trim() === 'resaleNotify')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
   }
   if (d0 && typeof d0 === 'object') {
     _AUDIT_TOKEN_ = String(d0.token || '');
@@ -21154,7 +21154,7 @@ function splitDoPost_(action, d) {
 // ═══════════════════════════════════════════════════════════════
 //  THUONG PHAT DOI SALE ONLINE + VAN PHONG (Phong kinh doanh) — Duyen yeu cau 2026-10-29. HIEN THI TRONG BAO CAO B, TACH RIENG cac chuong trinh thuong cua cong ty.
 //  THUONG (tu dong, tinh tren DON GOC BASE — DT TONG theo NGAY TAO, KHONG tinh tren Pos vi Pos co the lech ngay):
-//    (1) Sale nhieu don nhat TRONG NGAY, toi thieu 6 don, khong tinh don doi tra / bao hanh / thay day: 50k. (2) Top ty le chot TUAN (Thu 2 - Chu nhat): 50k.
+//    (1) Sale nhieu don nhat TRONG NGAY, toi thieu 6 don VA doanh thu ngay >= 50tr (admin cai tren web, Settings teamBonusCfg), khong tinh don doi tra / bao hanh / thay day: 50k. (2) Top ty le chot TUAN (Thu 2 - Chu nhat): 50k.
 //    (3) Top ty le chot THANG: 100k. (2)+(3) chi xet sale co so tuong tac trong ky >= tuong tac trung binh cua team. Ty le chot dung CUNG ham voi Bao cao A/B
 //    (_srCloseRateSectionsFromBase_: don Base / tuong tac Pancake) nen ra cung so.
 //  PHAT (nhap tay, vi du lieu nhan tin/bao cao khong co trong he thong): 5 loai — luu o sheet 'ThuongPhatDoiSale'. Chi admin ghi/xoa.
@@ -21167,7 +21167,7 @@ var TEAM_PENALTY_HEADERS_ = ['id', 'date', 'sale', 'type', 'amount', 'note', 'by
 var TEAMBONUS_GET_ACTIONS_ = { teamBonusReport: 1, teamPenaltySuggest: 1 };
 var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1, teamPenaltyIgnore: 1 };
 var TEAM_BONUS_DEFAULT_ = {
-  dailyMinOrders: 6, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000,
+  dailyMinOrders: 6, dailyMinRevenue: 50000000, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000,
   excludeRe: 'doi tra|doi hang|bao hanh|thay day',   // so khop KHONG DAU voi Phan loai / Kenh ban / Giai doan cua don Base (don bhZero = BH khong doanh thu luon bi loai)
   penalties: [
     { type: 1, label: 'Tin trôi quá 30 phút không phản hồi (không phải tin nhảy từ Sale khác)', amount: 50000 },
@@ -21181,7 +21181,7 @@ function teamBonusCfg_() {
   var cfg = JSON.parse(JSON.stringify(TEAM_BONUS_DEFAULT_)), raw = null;
   try { raw = _csJsonSetting_('teamBonusCfg', null); } catch (e) {}
   if (raw && typeof raw === 'object') {
-    ['dailyMinOrders', 'dailyReward', 'weeklyReward', 'monthlyReward'].forEach(function (k) { var n = Number(raw[k]); if (isFinite(n) && n >= 0) cfg[k] = n; });
+    ['dailyMinOrders', 'dailyMinRevenue', 'dailyReward', 'weeklyReward', 'monthlyReward'].forEach(function (k) { var n = Number(raw[k]); if (isFinite(n) && n >= 0) cfg[k] = n; });
     if (typeof raw.excludeRe === 'string' && raw.excludeRe.trim()) cfg.excludeRe = raw.excludeRe.trim();
     if (Array.isArray(raw.penalties)) raw.penalties.forEach(function (pn) {
       var t = Number(pn && pn.type), n = Number(pn && pn.amount);
@@ -21228,11 +21228,12 @@ function _tbDailyCounts_(dtRows, from, to, memberOf, cfg) {
   for (var i = 0; i < dtRows.length; i++) {
     var r = dtRows[i], dt = parseVNDate_(r.ngayTao); if (!dt) continue;
     var ymd = _vnYmd_(dt); if (ymd < from || ymd > to) continue;
-    var day = out[ymd] || (out[ymd] = { counts: {}, total: 0, excluded: 0 });
+    var day = out[ymd] || (out[ymd] = { counts: {}, rev: {}, total: 0, excluded: 0 });
     if (!_tbOrderCounts_(r, re)) { day.excluded++; continue; }
     var creator = r.nguoiTao ? String(r.nguoiTao).trim() : '', m = creator ? memberOf[_normTxt_(creator)] : '';
     if (!m) continue;   // nguoi tao khong thuoc doi Online/Van phong (hoac trong) -> khong tinh
     day.counts[m] = (day.counts[m] || 0) + 1; day.total++;
+    day.rev[m] = (day.rev[m] || 0) + (Number(_dtOrderRevenue_(r)) || 0);   // DOANH THU ngay cua nguoi tao (cung ham voi Bao cao A theo nguoi tao) — dieu kien thuong ngay >= dailyMinRevenue (Duyen 2026-11-13)
   }
   return out;
 }
@@ -21267,10 +21268,12 @@ function _tbComputeRewards_(month, cfg) {
   var team = _tbTeam_(), dtRows = readDTTong_(true), out = { daily: [], weekly: [], monthly: null, team: team.list.map(function (m) { return { name: m.name, group: m.group }; }) };
   var dc = _tbDailyCounts_(dtRows, from, to, team.memberOf, cfg);
   for (var d = from; d <= to; d = _tbYmdAdd_(d, 1)) {
-    var day = dc[d] || { counts: {}, total: 0, excluded: 0 };
-    var arr = Object.keys(day.counts).map(function (k) { return { name: k, orders: day.counts[k] }; }).sort(function (a, b) { return b.orders - a.orders || (a.name < b.name ? -1 : 1); });
-    var top = arr.length ? arr[0].orders : 0, ok = top >= cfg.dailyMinOrders;
-    out.daily.push({ date: d, partial: d === today, top: top, qualified: ok, winners: ok ? arr.filter(function (x) { return x.orders === top; }) : [], list: arr.slice(0, 8), excluded: day.excluded });
+    var day = dc[d] || { counts: {}, rev: {}, total: 0, excluded: 0 };
+    var arr = Object.keys(day.counts).map(function (k) { return { name: k, orders: day.counts[k], revenue: Math.round(day.rev[k] || 0) }; }).sort(function (a, b) { return b.orders - a.orders || (a.name < b.name ? -1 : 1); });
+    // DUYEN CHOT 2026-11-13: thuong ngay can DU CA 2 dieu kien — >= dailyMinOrders don VA doanh thu ngay >= dailyMinRevenue (50tr). Nguoi dat ca 2 moi xet "nhieu don nhat"; dong hang cung nhan.
+    var elig = arr.filter(function (x) { return x.orders >= cfg.dailyMinOrders && x.revenue >= (cfg.dailyMinRevenue || 0); });
+    var top = arr.length ? arr[0].orders : 0, topE = elig.length ? elig[0].orders : 0, ok = elig.length > 0;
+    out.daily.push({ date: d, partial: d === today, top: top, qualified: ok, winners: ok ? elig.filter(function (x) { return x.orders === topE; }) : [], list: arr.slice(0, 8), excluded: day.excluded });
   }
   // Tuan: Thu 2 -> Chu nhat; tinh vao thang chua ngay Chu nhat. Tuan chua ket thuc / chua bat dau xu ly theo "to".
   var mon = from; while (_tbDow_(mon) !== 0) mon = _tbYmdAdd_(mon, -1);
@@ -21307,7 +21310,7 @@ function teamBonusReport_(p, acc) {
   var month = String(p.month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(month)) month = _vnYmd_(new Date()).substring(0, 7);
   var cfg = teamBonusCfg_(), today = _vnYmd_(new Date()), mEnd = _tbMonthEnd_(month);
-  var ck = 'tb_rw_v1_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.excludeRe]), rw = null;
+  var ck = 'tb_rw_v1_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe]), rw = null;
   try { var raw = _cacheGetBig_(ck); if (raw) rw = JSON.parse(raw); } catch (e0) {}
   if (!rw || p.nocache === '1') {
     rw = _tbComputeRewards_(month, cfg);
