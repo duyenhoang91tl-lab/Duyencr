@@ -299,6 +299,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // NHAC QUY TRINH CHAT (GAS v13.60-coach): hoi GAS chatCoach?conv=<page_id>_<psid> (khoa ek tu gan o lop fetch chung) -> viec sale con thieu theo kich ban
+  // (gui anh + ghi am, bao gia kem CTKM, size tay, xac nhan don...). Content script hien the "Nhac quy trinh" trong panel (docs/NHAC-QUY-TRINH-CHAT.md).
+  if (msg?.type === "GET_CHAT_COACH") {
+    handleGetChatCoach(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Danh sach PHANG cho "Tim anh san pham" — action:'productImageFlat', cung co che voi
   // GET_PRICE_FLAT (cascading Nhom SP -> Ten SP -> Kieu/Size -> Chat lieu), kem link anh moi
   // dong de FE goi tiep GET_DRIVE_IMAGE khi CS da thu hep dung ve 1 dong.
@@ -1195,6 +1204,21 @@ async function handleAskPrice(payload) {
 // handleGetPrice o tren, chi doi sang sheet CTKM. Ten rieng (khac handleGetCtkm() ben duoi,
 // vom load nguyen van cho "Soan don") de tranh dam ten ham (function hoisting se de 1 ham
 // ghi de ham kia neu trung ten).
+// GET chatCoach: payload { conv } = ma hoi thoai Pancake (tham so c_id tren URL = <page_id>_<psid>). Chi DOC.
+// Tra ve nguyen object cua GAS (reminders[], steps[], ctkm[]...). found:false / loi AUTH -> nem loi de content script AN the (khong lam phien sale).
+async function handleGetChatCoach(payload) {
+  const conv = String((payload && payload.conv) || "").trim();
+  if (!conv) throw new Error("Thieu ma hoi thoai (c_id).");
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const url = cfg.gasUrl + (cfg.gasUrl.includes("?") ? "&" : "?") + "action=chatCoach&conv=" + encodeURIComponent(conv);
+  const res = await fetch(url, { method: "GET", redirect: "follow" });
+  const data = await res.json();
+  if (!data || data.ok === false || data.error) throw new Error((data && (data.error || data.code)) || "GAS khong tra ket qua.");
+  return data;
+}
+
 async function handleGetCtkmSearch(payload) {
   const settings = await chrome.storage.sync.get(null);
   const cfg = { ...DEFAULT_SETTINGS, ...settings };

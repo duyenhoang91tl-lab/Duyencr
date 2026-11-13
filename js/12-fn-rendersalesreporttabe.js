@@ -841,7 +841,7 @@ function _srRenderG_(d){
   _srGProbationHints_(g, d.orders || []).forEach(function(h){
     html += '<div style="font-size:11.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ Sale Thử việc <b>'+esc(h.name)+'</b> chưa có thưởng: '+h.reason+'.</div>';
   });
-  html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
+  html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'BD\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
     var h = '<div class="dash-section-title" style="margin-top:16px">'+title+'</div>';

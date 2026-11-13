@@ -1002,12 +1002,12 @@ function _srbComboHTML(key){
 var _srbMenu = { open:false, cat:null, q:'', exp:{} };
 
 // ── Cấu hình từng báo cáo: ngày, các mục lọc trong menu, tác vụ, phần phụ ──
-function _srbSaleOpts_(){ return (_srState.sub === 'B' || _srState.sub === 'E' || _srState.sub === 'F' || _srState.sub === 'G' || _srState.sub === 'K' || _srState.sub === 'L') ? (_srState.saleBOptions || []) : (_srState.saleOptions || []); }
+function _srbSaleOpts_(){ return (_srState.sub === 'B' || _srState.sub === 'E' || _srState.sub === 'F' || _srState.sub === 'G' || _srState.sub === 'BD' || _srState.sub === 'L') ? (_srState.saleBOptions || []) : (_srState.saleOptions || []); }
 // Sale Online/Van phong duoc chon them ten nhom Quay + phong CSKH o bo loc Sale (viewNames tu may chu; xem _srViewNames o js/10). false neu khong co.
 function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srIsAdmin() && _srViewNames().length > 0; }
 function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
 function _srbMenuCats_(){
-  var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'K') ? 'G' : _srState.sub;
+  var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'BD') ? 'G' : _srState.sub;
   function flat(key, label, icon, ph, stateKey, optFn){
     cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:stateKey, ph:ph, opts:optFn });
   }
@@ -1089,7 +1089,7 @@ function _srbMenuCats_(){
 }
 // Tên khoá state ngày / phần phụ / tác vụ của từng báo cáo
 function _srbSubCfg_(){
-  var sub = (_srState.sub === 'K') ? 'G' : _srState.sub, admin = _srIsAdmin();
+  var sub = (_srState.sub === 'BD') ? 'G' : _srState.sub, admin = _srIsAdmin();
   var P = {A:['dateQuick','dateFrom','dateTo'], B:['dateQuick','dateFrom','dateTo'], D:['dDateQuick','dDateFrom','dDateTo'], E:['eDateQuick','eDateFrom','eDateTo'],
     F:['fDateQuick','fDateFrom','fDateTo'], G:['gDateQuick','gDateFrom','gDateTo'], H:['hDateQuick','hDateFrom','hDateTo'], I:['iDateQuick','iDateFrom','iDateTo'], L:['lDateQuick','lDateFrom','lDateTo'], M:['mDateQuick','mDateFrom','mDateTo']};
   var lockKey = {A:'sale',B:'bSale',C:'cSale',E:'eSale',F:'fSale',G:'gSale',L:'lSale',M:'mSale'}[sub];
@@ -1261,7 +1261,7 @@ function _srbMenuPanelHtml_(){
     '<div class="srb-m-list" id="srb-menu-list">' + _srbMenuListHtml_(cat) + '</div>';
 }
 function _srbMenuHTML_(){
-  var mode = (_srState.sub === 'K') ? 'G' : _srState.sub;
+  var mode = (_srState.sub === 'BD') ? 'G' : _srState.sub;
   if (_srbMenu.mode !== mode){ _srbMenu.mode = mode; _srbMenu.open = false; _srbMenu.cat = null; _srbMenu.q = ''; _srbMenu.exp = {}; }
   var total = _srbMenuTotal_();
   return '<div class="srb-menu" id="srb-menu">' +

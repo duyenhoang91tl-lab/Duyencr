@@ -23,7 +23,7 @@ Bấm icon extension → "Mở cài đặt chi tiết" → trang Options có:
 ## Giao diện/chức năng đồng bộ với Zalo AI
 
 Panel Pancake AI đi theo đúng bố cục và các tính năng của Zalo AI:
-- Chọn CS đang dùng (sticky), quét SĐT, form sửa Tên/Trạng thái CS/Trạng thái Zalo/Trạng thái KH/Sinh nhật/Lịch hẹn/Ghi chú, đồng bộ về CareData
+- Chọn CS đang dùng (sticky; ô chọn có **tìm kiếm** — bấm vào rồi gõ tên, không cần gõ dấu, ↑/↓ + Enter để chọn), quét SĐT, form sửa Tên/Trạng thái CS/Trạng thái Zalo/Trạng thái KH/Sinh nhật/Lịch hẹn/Ghi chú, đồng bộ về CareData
 - Bộ chọn **giọng văn** (Thân thiện/Chuyên nghiệp/Ngắn gọn/Nhiệt tình) + ô **Ngữ cảnh** tự do + checkbox **Tra cứu sản phẩm** ngay trong panel (không cần vào Options)
 - Nút **"💬 Tạo 3 câu mở đầu"** — soạn sẵn 3 hướng chủ động nhắn khách (hỏi thăm trải nghiệm / gợi ý sản phẩm liên quan / khơi gợi trò chuyện), y hệt nội dung 3 hướng bên Zalo AI
 - Prompt AI được ghép thêm hồ sơ khách (tên, SĐT, số đơn đã mua, sản phẩm đã mua, tình trạng CS, ghi chú gần nhất) — cùng cấu trúc `buildCustLines()` bên Zalo AI, để 2 kênh tư vấn nhất quán

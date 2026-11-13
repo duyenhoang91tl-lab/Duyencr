@@ -370,6 +370,15 @@
     } catch (e) {}
   }
 
+  // Đồng bộ ô tìm kiếm CS (#pk-cs-search) theo giá trị của <select id="pk-cs-sel"> (select ẩn là nguồn dữ liệu
+  // duy nhất — các chỗ khác đọc .value / nghe 'change' như cũ). Gọi sau MỌI lần gán csSel.value bằng code
+  // (gán bằng code không bắn sự kiện). Đang gõ tìm (ô đang focus) thì không ghi đè chữ người dùng gõ.
+  function _csComboSync_() {
+    const s = panelEl && panelEl.querySelector('#pk-cs-search');
+    const sel = panelEl && panelEl.querySelector('#pk-cs-sel');
+    if (s && sel && document.activeElement !== s) s.value = sel.value || '';
+  }
+
   function injectPanel() {
     if (panelEl) return;
     panelEl = document.createElement("div");
@@ -387,7 +396,11 @@
         <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
-          <select id="pk-cs-sel"></select>
+          <div id="pk-cs-combo">
+            <input type="text" id="pk-cs-search" autocomplete="off" spellcheck="false" placeholder="— Chọn CS — (gõ để tìm)" title="Bấm vào rồi gõ tên để tìm nhanh (không cần gõ dấu). Enter hoặc bấm để chọn." />
+            <div id="pk-cs-list"></div>
+          </div>
+          <select id="pk-cs-sel" style="display:none"></select>
         </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
@@ -596,6 +609,7 @@
       settings.csName = name;
       chrome.storage.sync.set({ csName: name });
       csSel.value = name;
+      _csComboSync_();
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'assign') loadAssignedData_(); // đang xem data được chia → tải lại cho CS mới
       loadReminders_();
@@ -606,13 +620,64 @@
       if (target === prev) return;
       if (!prev) {
         if (!target) return;
-        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; return; }
+        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; _csComboSync_(); return; }
         _applyCs_(target);
         return;
       }
       csSel.value = prev; // da khoa → hien lai CS cu, chi doi khi dang nhap thanh cong
+      _csComboSync_();
       if (target) _openCsLoginModal_(target, prev, _applyCs_);
     });
+
+    // ── Ô chọn CS có TÌM KIẾM (thay cho dropdown cuộn dài): gõ để lọc theo tên, không cần gõ dấu,
+    //    ↑/↓ + Enter hoặc bấm để chọn. Chọn xong chỉ gán csSel.value + bắn 'change' → toàn bộ logic khoá CS
+    //    /xác nhận/đăng nhập đổi CS ở trên giữ nguyên, không đổi gì.
+    const csSearch = panelEl.querySelector('#pk-cs-search');
+    const csList = panelEl.querySelector('#pk-cs-list');
+    let _csActive = -1;
+    const _csFold_ = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().trim();
+    function _csRender_(q) {
+      const fq = _csFold_(q);
+      const cur = csSel.value;
+      const items = Array.from(csSel.options).map((o) => o.value).filter((v) => v && (!fq || _csFold_(v).indexOf(fq) !== -1));
+      if (fq) items.sort((a, b) => (_csFold_(b).startsWith(fq) ? 1 : 0) - (_csFold_(a).startsWith(fq) ? 1 : 0)); // tên BẮT ĐẦU bằng từ khoá lên trước
+      csList.innerHTML = items.length
+        ? items.map((n, i) => `<div class="pk-cs-opt${n === cur ? ' pk-cs-cur' : ''}${i === 0 ? ' pk-cs-act' : ''}" data-v="${escapeHtml(n)}">${escapeHtml(n)}</div>`).join('')
+        : '<div class="pk-cs-none">Không tìm thấy CS nào</div>';
+      _csActive = items.length ? 0 : -1;
+      csList.style.display = 'block';
+    }
+    function _csSetActive_(i) {
+      const els = csList.querySelectorAll('.pk-cs-opt');
+      if (!els.length) return;
+      _csActive = (i + els.length) % els.length;
+      els.forEach((e, k) => e.classList.toggle('pk-cs-act', k === _csActive));
+      els[_csActive].scrollIntoView({ block: 'nearest' });
+    }
+    function _csClose_() { csList.style.display = 'none'; csSearch.value = csSel.value || ''; }
+    function _csPick_(name) {
+      csList.style.display = 'none';
+      csSearch.blur();
+      if (name && name !== csSel.value) { csSel.value = name; csSel.dispatchEvent(new Event('change')); }
+      csSearch.value = csSel.value || '';
+    }
+    csSearch.addEventListener('focus', () => { csSearch.select(); _csRender_(''); });
+    csSearch.addEventListener('click', () => { if (csList.style.display !== 'block') { csSearch.select(); _csRender_(''); } });
+    csSearch.addEventListener('input', () => _csRender_(csSearch.value));
+    csSearch.addEventListener('blur', _csClose_);
+    csSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (csList.style.display !== 'block') _csRender_(csSearch.value); else _csSetActive_(_csActive + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _csSetActive_(_csActive - 1); }
+      else if (e.key === 'Enter') { e.preventDefault(); const a = csList.querySelectorAll('.pk-cs-opt')[_csActive]; if (a) _csPick_(a.dataset.v); }
+      else if (e.key === 'Escape') { e.preventDefault(); csSearch.blur(); }
+    });
+    // mousedown (không phải click) + preventDefault: để ô tìm kiếm chưa kịp blur/đóng danh sách trước khi chọn xong
+    csList.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const o = e.target.closest('.pk-cs-opt');
+      if (o) _csPick_(o.dataset.v);
+    });
+    _csComboSync_();
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
@@ -868,6 +933,7 @@
       csSel.innerHTML = '<option value="">— Chọn CS —</option>' +
         names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
       csSel.value = settings.csName || '';
+      _csComboSync_();
     });
   }
 

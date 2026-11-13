@@ -721,7 +721,7 @@ function _toggleAddOrderForm() {
 function openQuickAddModal(){
   const m = document.getElementById('quick-add-modal');
   if (m) m.style.display = 'flex';
-  ['qa-name','qa-phone','qa-note'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['qa-name','qa-phone','qa-page','qa-note'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   setTimeout(() => { const el = document.getElementById('qa-name'); if (el) el.focus(); }, 50);
 }
 function closeQuickAddModal(){
@@ -732,6 +732,8 @@ async function submitQuickAddCustomer(){
   const name  = (document.getElementById('qa-name').value || '').trim();
   const phoneRaw = (document.getElementById('qa-phone').value || '').trim();
   const note  = (document.getElementById('qa-note').value || '').trim();
+  const pageEl = document.getElementById('qa-page');
+  const pageVal = pageEl ? (pageEl.value || '').trim() : '';   // page/fanpage khách đến từ (không bắt buộc)
   if (!name)  { toast('Vui lòng nhập tên khách hàng'); return; }
   if (!phoneRaw) { toast('Vui lòng nhập số điện thoại'); return; }
   if (!note)  { toast('Vui lòng nhập ghi chú'); return; }
@@ -769,7 +771,8 @@ async function submitQuickAddCustomer(){
     name: existingLead.name || name,
     note: mergedNoteStr,
     cs: existingLead.cs || userName,
-    createdAt: existingLead.createdAt || new Date().toISOString()
+    createdAt: existingLead.createdAt || new Date().toISOString(),
+    page: pageVal || existingLead.page || ''   // để trống thì giữ page đã lưu trước đó
   };
   saveLS('ome_care_leads', careLeads);
 
@@ -788,7 +791,7 @@ async function submitQuickAddCustomer(){
     queueCareSync(phone);
     try {
       await fetch(gsUrl, { method:'POST', redirect:'follow',
-        body: JSON.stringify({ action:'addCareLead', phone, name: careLeads[phone].name, note: careLeads[phone].note, cs: careLeads[phone].cs }) });
+        body: JSON.stringify({ action:'addCareLead', phone, name: careLeads[phone].name, note: careLeads[phone].note, cs: careLeads[phone].cs, page: careLeads[phone].page || '' }) });
     } catch(e) { console.warn('addCareLead sync error:', e.message); }
   }
 }
