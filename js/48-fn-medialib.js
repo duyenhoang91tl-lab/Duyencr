@@ -110,6 +110,16 @@ var MLIB = (function () {
       } catch (e) { say('✕ Tải lên lỗi: ' + (e && e.message || e)); }
     }
   }
+  // Tải 1 ảnh (vd ảnh dán Ctrl+V) lên thư viện rồi trả mục vừa tạo (null nếu lỗi) — dùng cho dán ảnh vào khung chat.
+  async function uploadImageFile(f) {
+    say('⏳ Đang tải ảnh lên…');
+    try {
+      var p = await shrinkImage(f);
+      var j = await post({ action: 'mlibUpload', type: 'image', name: p.name, mimeType: p.mime, base64: p.b64 });
+      if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Tải lên lỗi')); return null; }
+      S.items.unshift(j.item); say('✓ Đã thêm ảnh vào thư viện'); return j.item;
+    } catch (e) { say('✕ Tải lên lỗi: ' + (e && e.message || e)); return null; }
+  }
   async function fromDrive() {
     var link = prompt('Dán link (hoặc ID) tệp Google Drive.\nTệp phải được chia sẻ cho tài khoản chạy GAS hoặc "Bất kỳ ai có link":'); if (!link) return;
     say('⏳ Đang lấy từ Drive…');
@@ -180,7 +190,7 @@ var MLIB = (function () {
       if ($('ml-pick')) { var po = $('ml-pick-out'); if (po) po.innerHTML = gridHtml(visible(S.pickType), true); }
       else { var o = $('ml-out'); if (o) o.innerHTML = gridHtml(visible(S.type), false); }
     },
-    upload: upload, fromDrive: fromDrive, recStart: recStart, recStop: recStop, editTpl: editTpl, cancelTpl: cancelTpl, saveTpl: saveTpl, del: del, copy: copy,
+    upload: upload, uploadImageFile: uploadImageFile, fromDrive: fromDrive, recStart: recStart, recStop: recStop, editTpl: editTpl, cancelTpl: cancelTpl, saveTpl: saveTpl, del: del, copy: copy,
     pickTab: function (t) { S.pickType = t; pickRender(); },
     pick: pick, _pickId: _pickId, _render: render, _load: load
   };
@@ -189,10 +199,24 @@ async function renderMediaLibTab() { MLIB._render(); await MLIB._load(false); ML
 
 // Nút 📎 trong khung soạn tin của chat: chọn ảnh/ghi âm/mẫu tin từ thư viện rồi chèn vào ô soạn (chưa gửi — người dùng bấm Gửi).
 // Ảnh/ghi âm chèn dạng LINK (Pancake API đang gửi văn bản); mẫu tin chèn nội dung.
-function mlibChatPick(inputId, type, asMarker) {
-  MLIB.pick(type || 'template', function (it) {
-    var ta = document.getElementById(inputId); if (!ta) return;
-    var add = it.type === 'template' ? it.text : asMarker ? '[[ml:' + it.type + '|' + it.url + '|' + String(it.name || '').replace(/[\]|\n]/g, ' ').slice(0, 80) + ']]' : (it.name ? it.name + ': ' : '') + it.url;
-    ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n' + add : add; ta.focus();
-  });
+function mlibInsertToChat_(inputId, it, asMarker) {
+  var ta = document.getElementById(inputId); if (!ta || !it) return;
+  var add = it.type === 'template' ? it.text : asMarker ? '[[ml:' + it.type + '|' + it.url + '|' + String(it.name || '').replace(/[\]|\n]/g, ' ').slice(0, 80) + ']]' : (it.name ? it.name + ': ' : '') + it.url;
+  ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n' + add : add; ta.focus();
 }
+function mlibChatPick(inputId, type, asMarker) {
+  MLIB.pick(type || 'template', function (it) { mlibInsertToChat_(inputId, it, asMarker); });
+}
+// Dán ảnh (Ctrl+V, vd ảnh chụp màn hình) vào khung soạn tin của chat: tự tải lên Thư viện rồi chèn y như chọn từ 📎 (chưa gửi — bấm Gửi).
+// Chat nội bộ (tc-input) chèn dạng dấu hiệu [[ml:image|URL|tên]] để vẽ ảnh; Pancake/Social chèn link. Dán chữ bình thường KHÔNG bị ảnh hưởng.
+var MLIB_PASTE_INPUTS_ = { 'tc-input': true, 'pkc-input': false, 'sc-input': false };
+function mlibOnPaste_(e) {
+  var t = e.target; if (!t || !t.id || !Object.prototype.hasOwnProperty.call(MLIB_PASTE_INPUTS_, t.id)) return;
+  var items = (e.clipboardData && e.clipboardData.items) || [], file = null;
+  for (var i = 0; i < items.length; i++) if (items[i].kind === 'file' && /^image\//.test(items[i].type || '')) { file = items[i].getAsFile(); break; }
+  if (!file) return;
+  e.preventDefault();
+  var id = t.id;
+  MLIB.uploadImageFile(file).then(function (it) { if (it) mlibInsertToChat_(id, it, MLIB_PASTE_INPUTS_[id]); });
+}
+if (typeof document !== 'undefined' && !window.__mlibPasteBound) { window.__mlibPasteBound = true; document.addEventListener('paste', mlibOnPaste_, true); }
