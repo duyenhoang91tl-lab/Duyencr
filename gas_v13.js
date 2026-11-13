@@ -6455,6 +6455,7 @@ function buildSalesReportB_(filters) {
   var ghepCheck = [];   // don CHI GAN CO (khong tu sua tien): ghi chu co "ghep" hoac >=2 ma khong phai bao hanh -> doi chieu tay
   var ghepCheckCount = 0;
   var usedBaseRows = {};
+  var ghepPosPhuByKey = {};   // 2026-11-13: khoa 'SDT|ma1|ma2' -> {phu,rows} cua don Pos DA GHEP; cac dong Pos CUNG SDT + CUNG bo ma (don Pos bi tach nhieu dong) cong vao day de bao cao check nguoc Base so DUNG tong Pos (xem chu thich o nhanh trungDonGoc)
   var aliasMemoB_ = {};
   // SUA 2026-10-06: khongKhop[]/trungDonGoc[] CHI giu toi da 30 vi du de tra ve (tranh phinh to
   // response) — nhung truoc day lay dung .length cua 2 mang nay lam "so don khong ghep duoc" hien
@@ -6488,8 +6489,10 @@ function buildSalesReportB_(filters) {
         var candSales = gh.shares.map(function(x) { return x.name; });
         _donSaleNamesFromThe_(rowP.theSale).forEach(function(nm) { if (candSales.indexOf(nm) === -1) candSales.push(nm); });
         var bonusList = _resolveBonusSale_(gh.creators, candSales, aliasMemoB_);
+        var ppKey = normPhone_(rowP.soDienThoai) + '|' + codesByRow[pj].map(_normCounterCode_).sort().join('|'), ppHolder = { phu: 0, rows: 0 };
+        ghepPosPhuByKey[ppKey] = ppHolder;
         effRow = Object.assign({}, rowP, { giaTriPos: rowP.giaTriSauGiam, giaTriSauGiam: gh.total, ghepShares: gh.shares, ghepCodes: gh.codes,
-          ghepCreators: gh.creators || [], ghepScale: gh.scale || undefined, ghepDu: gh.remainder || undefined, ghepDuSale: (gh.remainderSales && gh.remainderSales.length) ? gh.remainderSales.join(',') : undefined, ghepBase: gh.baseOrders || [], baseNgayTao: gh.baseNgayTao || '', bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
+          ghepCreators: gh.creators || [], ghepScale: gh.scale || undefined, ghepDu: gh.remainder || undefined, ghepDuSale: (gh.remainderSales && gh.remainderSales.length) ? gh.remainderSales.join(',') : undefined, ghepBase: gh.baseOrders || [], baseNgayTao: gh.baseNgayTao || '', ghepPosPhu: ppHolder, bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
       } else if (gh.status === 'gocBiLoai') {
         ghepStats.gocBiLoai++;
         if (ghepStats.gocBiLoaiList.length < 100) ghepStats.gocBiLoaiList.push({ ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, khach: rowP.khachHang, theSale: rowP.theSale, giaPos: Number(rowP.giaTriSauGiam) || 0, ma: gh.codes, ghiChu: String(rowP.ghiChu || '').substring(0, 120) }); // vi du (toi da 100) de ke toan biet don Pos nao bi bo vi don goc Base da Huy/Hoan
@@ -6497,7 +6500,16 @@ function buildSalesReportB_(filters) {
       } else {
         var wInfo = { ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, ghiChu: String(rowP.ghiChu || '').substring(0, 120), maCoDon: gh.codes, maKhongTim: gh.missing };
         if (gh.status === 'khongKhop') { ghepStats.khongKhopCount++; if (ghepStats.khongKhop.length < 30) ghepStats.khongKhop.push(wInfo); }
-        else { ghepStats.trungDonGocCount++; if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo); }
+        else {
+          ghepStats.trungDonGocCount++;
+          // NGUYEN NHAN GOC (2026-11-13, don #M47323 ghi chu "62T11 + 79T11/2026": Pos 13.973.000 = 8.123.000 + 5.850.000 = dung tong 2 don Base, nhung bao cao check nguoc van bao lech 5.850.000):
+          // don Pos nay nam o 2 DONG trong \"dữ liệu đơn\" cung ghi chu/SDT/bo ma; dong 1 ghep Base (so Pos 8.123.000 voi Base 13.973.000), dong 2 gap lai cung don goc -> 'trungDonGoc' -> tinh theo Pos rieng.
+          // Bao cao check nguoc so Pos cua RIENG dong 1 voi TONG Base nen luon lech dung bang dong con lai. Nay cong gia tri cac dong 'anh em' (cung SDT + cung bo ma) vao ghepPosPhu cua don da ghep CHI de so sanh o bao cao check nguoc;
+          // KHONG doi cach tinh doanh thu (dong anh em van di theo nhanh Pos nhu cu).
+          var sibH = ghepPosPhuByKey[normPhone_(rowP.soDienThoai) + '|' + codesByRow[pj].map(_normCounterCode_).sort().join('|')];
+          if (sibH) { sibH.phu += Number(rowP.giaTriSauGiam) || 0; sibH.rows++; wInfo.giaPos = Number(rowP.giaTriSauGiam) || 0; wInfo.gopVaoDonGhep = true; }
+          if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo);
+        }
       }
     }
     effRow = _applyOrderSaleOvr_(effRow, codesByRow[pj], ovrSaleMap_);   // ép sale theo từng đơn (Settings orderSaleOverride)
@@ -6783,6 +6795,8 @@ function buildSalesReportB_(filters) {
         // Don GHEP voi Base: giaTriSauGiam o tren = tong doanh thu cac don goc Base (da thay gia tri Pos); giaTriPos = gia tri Pos
         // goc (de doi chieu); saleShares = ty le chia cho tung sale cua don goc (tong = 1); ghepCodes = ma bo dem da khop.
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,
+        giaTriPosPhu: (m.ghepPosPhu && m.ghepPosPhu.phu) ? m.ghepPosPhu.phu : undefined,   // tong gia tri cac dong Pos 'anh em' (cung SDT + bo ma, don Pos tach nhieu dong) — chi de bao cao check nguoc Base so Pos = giaTriPos + giaTriPosPhu
+        posPhuRows: (m.ghepPosPhu && m.ghepPosPhu.rows) ? m.ghepPosPhu.rows : undefined,
         saleShares: m.ghepShares ? _cn.shares(m.ghepShares) : undefined,
         ghepBase: m.ghepBase || undefined, // tung don goc Base da khop (dong, ma, ngay, nguoiTao, saleBan, trangThai, giaTri, tinh) — cho Excel check nguoc Base
         saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70
@@ -20887,7 +20901,7 @@ function splitFixList_(p, user) {
   (rb.orders || []).forEach(function (o) {
     var gb = o.ghepBase || [];
     if (!gb.length) return;
-    var posVal = Number(o.giaTriPos) || Number(o.giaTriSauGiam) || 0, baseSum = 0, baseNames = {}, base = [];
+    var posVal = (Number(o.giaTriPos) || Number(o.giaTriSauGiam) || 0) + (Number(o.giaTriPosPhu) || 0), baseSum = 0, baseNames = {}, base = [];
     gb.forEach(function (b) {
       var gt = Number(b.giaTri) || 0, names = _saleNamesClean_(b.saleBan).filter(function (x) { return !_isNumericTag_(x); });
       if (b.tinh) { baseSum += gt; names.forEach(function (n) { baseNames[_normTxt_(n)] = n; }); }
