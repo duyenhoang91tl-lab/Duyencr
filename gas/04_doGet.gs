@@ -130,6 +130,7 @@ function doGetCore_(e) {
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
     if (action === 'posMonthAdjust') return jsonOut_(posMonthAdjust_(e.parameter.month));
+    if (action === 'posMonthK') return jsonOut_(posKReport_(e.parameter.month));   // Bao cao K — Chot thang (doanh thu + sau hoan/huy, chi sale phong kinh doanh/phong Sale/Online)
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
@@ -347,7 +348,8 @@ function doGetCore_(e) {
       var tB0_ = Date.now();
       var resB = buildSalesReportB_(fB);
       var tB1_ = Date.now();
-      try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
+      // Duyen 2026-11-10: Bao cao B "load mai khong duoc bao cao thang 10" -> B CHI tinh binh thuong, KHONG con tru hoan/huy thang truoc (applyPosMonthAdjustToReportB_ chay LAI ca Bao cao B thang truoc de lay so
+      // hien tai => xem thang 10 la tinh them ca thang 9). Phan Chot thang + tru hoan/huy chuyen sang man K (action posMonthAdjust / closePosMonth_, doc so moi, KHONG qua Bao cao B).
       var tB2_ = Date.now(), jsB_ = '';
       try { jsB_ = JSON.stringify(resB); _cachePutBig_(cKeyB, jsB_, 120); } catch(ec) {}
       try { Logger.log('PERF salesReportB from=' + fB.dateFrom + ' to=' + fB.dateTo + ' buildMs=' + (tB1_ - tB0_) + ' adjustMs=' + (tB2_ - tB1_) + ' totalMs=' + (Date.now() - tB0_) + ' bytes=' + jsB_.length + ' orders=' + (resB.totalOrders || 0)); } catch (eL) {}   // xem: Apps Script -> Executions
@@ -375,9 +377,10 @@ function doGetCore_(e) {
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  sanPham: pC.sanPham || '',
-                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
+                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true',
+                 part: pC.part || '' };   // 'cur'/'prev' = chi khoi dong cache Pos cua 1 ky (client goi song song truoc khi lay ket qua)
       var cacheC = CacheService.getScriptCache();
-      var cKeyC = _reportCacheKey_('salesC_', fC);
+      var cKeyC = _reportCacheKey_('salesC2_', fC);
       var cachedC = cacheC.get(cKeyC);
       if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
       var resC = buildSalesReportC_(fC);

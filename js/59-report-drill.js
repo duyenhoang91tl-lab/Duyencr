@@ -14,6 +14,37 @@ function _srDrillSumPairs_(pairs, key){
 }
 function _srDrillSplit_(v, sep){ return String(v == null ? '' : v).split(sep).map(function(x){ return x.trim(); }).filter(Boolean); }
 
+// ── CHI TIẾT DOANH THU TỪNG ĐƠN CỦA 1 SALE (Duyên 2026-11-11): Báo cáo B → bấm dòng Sale → mỗi đơn hiện: (1) ngày lên đơn theo Base, (2) sản phẩm order,
+//    (3) sale tham gia (+% chia), (4) doanh thu cá nhân của sale đang xem, (5) nguồn. Dữ liệu có sẵn trong d.orders (ghepBase / baseNgayTao / saleShares) → KHÔNG cần sửa GAS.
+function _srDrillIsSaleDetail_(r){ return !!(r && r.isB && !r.isN && r.what === 'Sale'); }
+function _srDrillYmdToDmy_(s){ var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s || ''); }
+// Ngày lên đơn = ngày tạo đơn gốc trên Base (đơn ghép nhiều đơn Base → liệt kê các ngày khác nhau); chưa ghép được Base → ngày Pos (đánh dấu fromBase=false).
+function _srDrillBaseDate_(o){
+  var gb = (o.ghepBase || []), live = gb.filter(function(b){ return b && b.tinh !== false; }), src = live.length ? live : gb, seen = {}, list = [];
+  src.forEach(function(b){ var d = _srDrillYmdToDmy_(b && b.ngay); if (d && !seen[d]) { seen[d] = 1; list.push(d); } });
+  if (!list.length && o.baseNgayTao) list.push(_srDrillYmdToDmy_(o.baseNgayTao));
+  return list.length ? { text: list.join(', '), fromBase: true } : { text: o.ngayTaoDon || '', fromBase: false };
+}
+function _srDrillProdText_(o){
+  var names = _srDrillSplit_(o.sanPham, ','), qtys = _srDrillSplit_(o.soLuong, ',');
+  if (names.length && names.length === qtys.length) return names.map(function(n, i){ return n + ' × ' + qtys[i]; }).join('; ');
+  return String(o.sanPham || '') + (o.soLuong ? ' (SL: ' + o.soLuong + ')' : '');
+}
+// Các sale cùng chia đơn này + % (cùng cách chia với bảng Theo Sale). Thiếu _srOrderShares_ (test nạp riêng js/59) → rơi về chuỗi Thẻ Pos.
+function _srDrillSaleParts_(o){
+  if (typeof _srOrderShares_ !== 'function') return [];
+  var un = (typeof _SR_UNASSIGNED_ !== 'undefined') ? _SR_UNASSIGNED_ : '(chưa gán sale)';
+  return _srOrderShares_(o, 'adj').filter(function(x){ return x.name !== un; }).map(function(x){ return { name: x.name, pct: Math.round((Number(x.frac) || 0) * 1000) / 10 }; });
+}
+function _srDrillSalePartsText_(o){
+  var ps = _srDrillSaleParts_(o);
+  return ps.length ? ps.map(function(x){ return x.name + ' (' + x.pct + '%)'; }).join(', ') : String(o.theSale || '');
+}
+function _srDrillHowText_(o){
+  var t = (typeof _srAdjTypes_ === 'function') ? _srAdjTypes_(o) : [];
+  return t.length ? t.join(' + ') : 'Chia đều theo Thẻ Pos';
+}
+
 // Tính danh sách đơn của 1 ô. Trả { ok, rows:[{o, share, extra}], msg, tableRow, label }.
 function _srDrillCompute_(kind, key){
   var isN = kind.charAt(0) === 'n', isB = kind.charAt(0) === 'b' || isN, d = isB ? _srState.dataB : _srState.dataA;
@@ -74,6 +105,7 @@ function _srDrillComputeN_(kind, key, d){
 }
 
 function _srDrillCols_(r){
+  if (_srDrillIsSaleDetail_(r)) return ['Ngày lên đơn (Base)', 'Khách hàng', 'SĐT', 'Sản phẩm order', 'Sale tham gia', 'Doanh thu cá nhân', 'Nguồn', 'Cách tính'];
   if (r.isB) {
     var c = ['Ngày tạo', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale', 'Sản phẩm', 'Trạng thái', r.isN ? 'Giá Pos gốc' : 'Giá trị sau giảm', 'COD', 'Ghi chú Pos'];
     if (r.what === 'Prod') c.push('SL sản phẩm này');
@@ -85,6 +117,7 @@ function _srDrillCols_(r){
 function _srDrillCells_(r, x){
   var o = x.o, ph = String(o.soDienThoai || ''), cm = (typeof customerMap !== 'undefined' && customerMap) ? customerMap[(typeof normPhone === 'function' ? normPhone(ph) : '') || ph] : null;
   var name = r.isB ? (o.khachHang || '') : (cm && cm.name ? cm.name : '');
+  if (_srDrillIsSaleDetail_(r)) { var bd = _srDrillBaseDate_(o); return [bd.text + (bd.fromBase ? '' : ' (Pos)'), name, ph, _srDrillProdText_(o), _srDrillSalePartsText_(o), Math.round(x.share), o.nguonDon || '', _srDrillHowText_(o)]; }
   if (r.isB) {
     var cells = [o.ngayTaoDon || '', name, ph, o.nguonDon || '', o.theSale || '', o.sanPham || '', o.trangThai || '', r.isN && o.giaTriPos != null ? Number(o.giaTriPos) || 0 : Number(o.giaTriSauGiam) || 0, Number(o.cod) || 0, o.ghiChu || ''];
     if (r.what === 'Prod') cells.push(x.extra || 0);
@@ -94,6 +127,16 @@ function _srDrillCells_(r, x){
     [o.giaiDoan, o.trangThai].filter(Boolean).join(' · '), Number(o.giaTriDon) || 0, Math.round(x.share)];
 }
 function _srDrillRowHtml_(r, x){
+  if (_srDrillIsSaleDetail_(r)) {
+    var o = x.o, c = _srDrillCells_(r, x), ph0 = String(o.soDienThoai || ''), bd = _srDrillBaseDate_(o);
+    var link = function(inner){ return ph0 && typeof _custLinkHtml_ === 'function' ? _custLinkHtml_(ph0, inner) : inner; };
+    return '<tr><td style="white-space:nowrap">' + esc(bd.text) + (bd.fromBase ? '' : ' <span style="color:var(--muted);font-size:11px" title="Chưa ghép được đơn Base — hiện ngày tạo đơn Pos">(Pos)</span>') + '</td>' +
+      '<td>' + link(esc(c[1])) + '</td><td style="white-space:nowrap">' + link(esc(c[2])) + '</td>' +
+      '<td style="max-width:280px">' + esc(c[3].length > 160 ? c[3].slice(0, 160) + '…' : c[3]) + '</td>' +
+      '<td style="max-width:220px">' + esc(c[4]) + '</td>' +
+      '<td style="text-align:right;white-space:nowrap"><b>' + _srMoney(c[5]) + '</b></td>' +
+      '<td>' + esc(c[6]) + '</td><td style="color:var(--muted);font-size:11.5px">' + esc(c[7]) + '</td></tr>';
+  }
   var cells = _srDrillCells_(r, x), phIdx = 2, moneyIdx = r.isB ? [7, 8, cells.length - 1] : [8, 9];
   var td = cells.map(function(v, i){
     if (moneyIdx.indexOf(i) !== -1) return '<td style="text-align:right;white-space:nowrap">' + (i === cells.length - 1 ? '<b>' + _srMoney(v) + '</b>' : _srMoney(v)) + '</td>';
@@ -121,7 +164,7 @@ function _srDrillBodyHtml_(){
   var cols = _srDrillCols_(r);
   var shown = r.rows.slice(0, D.limit);
   var html = head + '<div style="overflow:auto;max-height:62vh;border:1px solid var(--border);border-radius:8px"><table class="dash-table" style="margin:0;min-width:760px"><thead><tr>' +
-    cols.map(function(c, i){ return '<th style="position:sticky;top:0;background:var(--surface2,#f3f4f6);' + (/^(Giá|COD|Tính|SL)/.test(c) ? 'text-align:right;' : '') + '">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    cols.map(function(c, i){ return '<th style="position:sticky;top:0;background:var(--surface2,#f3f4f6);' + (/^(Giá|COD|Tính|SL|Doanh thu)/.test(c) ? 'text-align:right;' : '') + '">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
     (shown.length ? shown.map(function(x){ return _srDrillRowHtml_(r, x); }).join('') : '<tr><td colspan="' + cols.length + '" style="text-align:center;padding:16px;color:var(--muted)">Không có đơn nào</td></tr>') +
     '</tbody></table></div>';
   if (r.rows.length > shown.length) html += '<div style="text-align:center;margin-top:8px"><button class="btn sm" onclick="_srDrill.limit+=300;_srDrillRerender_()">Hiện thêm (' + (r.rows.length - shown.length) + ' đơn còn lại)</button></div>';
@@ -166,4 +209,4 @@ document.addEventListener('click', function(e){
   if (sel && !/^\s*$/.test(sel)) return;   // đang bôi đen chữ để copy
   _srDrillOpen_(t.getAttribute('data-drill'), t.getAttribute('data-drill-key') || '');
 });
-if (typeof module !== 'undefined') module.exports = { _srDrillCompute_: _srDrillCompute_ };
+if (typeof module !== 'undefined') module.exports = { _srDrillCompute_: _srDrillCompute_, _srDrillCols_: _srDrillCols_, _srDrillCells_: _srDrillCells_, _srDrillRowHtml_: _srDrillRowHtml_ };

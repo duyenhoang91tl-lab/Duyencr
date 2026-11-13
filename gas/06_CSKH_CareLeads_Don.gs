@@ -349,7 +349,7 @@ function readCareLeads_() {
     if (!r[0]) continue;
     out.push({
       phone: normPhone_(String(r[0])), name: String(r[1]||''), note: String(r[2]||''),
-      cs: String(r[3]||''), createdAt: r[4] || ''
+      cs: String(r[3]||''), createdAt: r[4] || '', page: String(r[5]||'')
     });
   }
   return out;
@@ -366,7 +366,11 @@ function addCareLead_(data) {
       if (normPhone_(String(colP[i][0])) === phone) { rowIdx = i + 2; break; }
     }
   }
-  var row = [phone, data.name||'', data.note||'', data.cs||'', new Date().toISOString()];
+  // Cot "page" (page/fanpage khach den tu): chi ghi de khi client GUI KEM page. Zalo AI / Pancake AI cu
+  // goi addCareLead KHONG co page -> giu nguyen page da luu o dong cu, de lan luu lai khong lam mat page.
+  var pageVal = (data.page === undefined || data.page === null) ? null : String(data.page).trim();
+  if (pageVal === null) pageVal = rowIdx > 0 ? String(sh.getRange(rowIdx, 6).getValue() || '') : '';
+  var row = [phone, data.name||'', data.note||'', data.cs||'', new Date().toISOString(), pageVal];
   if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, CARE_LEAD_HEADERS.length).setValues([row]);
   else sh.appendRow(row);
   try { CacheService.getScriptCache().remove('care_leads_v1'); } catch(ec) {}

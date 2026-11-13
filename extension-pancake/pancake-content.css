@@ -290,13 +290,46 @@
   white-space: nowrap;
 }
 
-#pk-cs-sel {
+/* <select id="pk-cs-sel"> giờ ẩn (chỉ giữ làm nguồn dữ liệu); người dùng thao tác qua ô tìm kiếm bên dưới */
+#pk-cs-sel { display: none; }
+
+#pk-cs-combo {
   flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+#pk-cs-search {
+  width: 100%;
+  box-sizing: border-box;
   padding: 4px 6px;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 12px;
+  background: #fff;
 }
+
+#pk-cs-list {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  z-index: 10;
+}
+
+#pk-cs-list .pk-cs-opt { padding: 5px 8px; font-size: 12px; cursor: pointer; }
+#pk-cs-list .pk-cs-opt:hover,
+#pk-cs-list .pk-cs-act { background: #eff6ff; }
+#pk-cs-list .pk-cs-cur { font-weight: 700; }
+#pk-cs-list .pk-cs-none { padding: 6px 8px; font-size: 12px; color: #9ca3af; }
 
 #pk-link-chat-btn {
   border: 1px solid #ccc;
@@ -1431,3 +1464,17 @@
 /* Muc "Mau tin nhan tu van": o loc nhom san pham duoi o tim kiem */
 #pk-tpl-filter-row { margin:4px 0 6px; }
 #pk-tpl-filter-row select { width:100%; box-sizing:border-box; padding:4px 6px; font-size:12px; border:1px solid #d1d5db; border-radius:6px; }
+
+/* Hang tich tuoi vang 10K/14K/18K (SP boc/ma vang) */
+.pk-cart-vang-row {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 3px 7px 0;
+}
+.pk-cart-vang-row .pk-cl-multi-label { margin: 0 8px 4px 0; color: #92400e; }

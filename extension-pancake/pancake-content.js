@@ -370,6 +370,15 @@
     } catch (e) {}
   }
 
+  // Đồng bộ ô tìm kiếm CS (#pk-cs-search) theo giá trị của <select id="pk-cs-sel"> (select ẩn là nguồn dữ liệu
+  // duy nhất — các chỗ khác đọc .value / nghe 'change' như cũ). Gọi sau MỌI lần gán csSel.value bằng code
+  // (gán bằng code không bắn sự kiện). Đang gõ tìm (ô đang focus) thì không ghi đè chữ người dùng gõ.
+  function _csComboSync_() {
+    const s = panelEl && panelEl.querySelector('#pk-cs-search');
+    const sel = panelEl && panelEl.querySelector('#pk-cs-sel');
+    if (s && sel && document.activeElement !== s) s.value = sel.value || '';
+  }
+
   function injectPanel() {
     if (panelEl) return;
     panelEl = document.createElement("div");
@@ -387,7 +396,11 @@
         <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
-          <select id="pk-cs-sel"></select>
+          <div id="pk-cs-combo">
+            <input type="text" id="pk-cs-search" autocomplete="off" spellcheck="false" placeholder="— Chọn CS — (gõ để tìm)" title="Bấm vào rồi gõ tên để tìm nhanh (không cần gõ dấu). Enter hoặc bấm để chọn." />
+            <div id="pk-cs-list"></div>
+          </div>
+          <select id="pk-cs-sel" style="display:none"></select>
         </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
@@ -596,6 +609,7 @@
       settings.csName = name;
       chrome.storage.sync.set({ csName: name });
       csSel.value = name;
+      _csComboSync_();
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'assign') loadAssignedData_(); // đang xem data được chia → tải lại cho CS mới
       loadReminders_();
@@ -606,13 +620,64 @@
       if (target === prev) return;
       if (!prev) {
         if (!target) return;
-        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; return; }
+        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; _csComboSync_(); return; }
         _applyCs_(target);
         return;
       }
       csSel.value = prev; // da khoa → hien lai CS cu, chi doi khi dang nhap thanh cong
+      _csComboSync_();
       if (target) _openCsLoginModal_(target, prev, _applyCs_);
     });
+
+    // ── Ô chọn CS có TÌM KIẾM (thay cho dropdown cuộn dài): gõ để lọc theo tên, không cần gõ dấu,
+    //    ↑/↓ + Enter hoặc bấm để chọn. Chọn xong chỉ gán csSel.value + bắn 'change' → toàn bộ logic khoá CS
+    //    /xác nhận/đăng nhập đổi CS ở trên giữ nguyên, không đổi gì.
+    const csSearch = panelEl.querySelector('#pk-cs-search');
+    const csList = panelEl.querySelector('#pk-cs-list');
+    let _csActive = -1;
+    const _csFold_ = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().trim();
+    function _csRender_(q) {
+      const fq = _csFold_(q);
+      const cur = csSel.value;
+      const items = Array.from(csSel.options).map((o) => o.value).filter((v) => v && (!fq || _csFold_(v).indexOf(fq) !== -1));
+      if (fq) items.sort((a, b) => (_csFold_(b).startsWith(fq) ? 1 : 0) - (_csFold_(a).startsWith(fq) ? 1 : 0)); // tên BẮT ĐẦU bằng từ khoá lên trước
+      csList.innerHTML = items.length
+        ? items.map((n, i) => `<div class="pk-cs-opt${n === cur ? ' pk-cs-cur' : ''}${i === 0 ? ' pk-cs-act' : ''}" data-v="${escapeHtml(n)}">${escapeHtml(n)}</div>`).join('')
+        : '<div class="pk-cs-none">Không tìm thấy CS nào</div>';
+      _csActive = items.length ? 0 : -1;
+      csList.style.display = 'block';
+    }
+    function _csSetActive_(i) {
+      const els = csList.querySelectorAll('.pk-cs-opt');
+      if (!els.length) return;
+      _csActive = (i + els.length) % els.length;
+      els.forEach((e, k) => e.classList.toggle('pk-cs-act', k === _csActive));
+      els[_csActive].scrollIntoView({ block: 'nearest' });
+    }
+    function _csClose_() { csList.style.display = 'none'; csSearch.value = csSel.value || ''; }
+    function _csPick_(name) {
+      csList.style.display = 'none';
+      csSearch.blur();
+      if (name && name !== csSel.value) { csSel.value = name; csSel.dispatchEvent(new Event('change')); }
+      csSearch.value = csSel.value || '';
+    }
+    csSearch.addEventListener('focus', () => { csSearch.select(); _csRender_(''); });
+    csSearch.addEventListener('click', () => { if (csList.style.display !== 'block') { csSearch.select(); _csRender_(''); } });
+    csSearch.addEventListener('input', () => _csRender_(csSearch.value));
+    csSearch.addEventListener('blur', _csClose_);
+    csSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (csList.style.display !== 'block') _csRender_(csSearch.value); else _csSetActive_(_csActive + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _csSetActive_(_csActive - 1); }
+      else if (e.key === 'Enter') { e.preventDefault(); const a = csList.querySelectorAll('.pk-cs-opt')[_csActive]; if (a) _csPick_(a.dataset.v); }
+      else if (e.key === 'Escape') { e.preventDefault(); csSearch.blur(); }
+    });
+    // mousedown (không phải click) + preventDefault: để ô tìm kiếm chưa kịp blur/đóng danh sách trước khi chọn xong
+    csList.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const o = e.target.closest('.pk-cs-opt');
+      if (o) _csPick_(o.dataset.v);
+    });
+    _csComboSync_();
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
@@ -868,6 +933,7 @@
       csSel.innerHTML = '<option value="">— Chọn CS —</option>' +
         names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
       csSel.value = settings.csName || '';
+      _csComboSync_();
     });
   }
 
@@ -3828,6 +3894,7 @@
       price: item.price || 0,
       chatLieu: clOptions ? '' : (item.chatLieu || ''),
       chatLieuOptions: clOptions || null,
+      vangTuoi: '', // tuoi vang 10K/14K/18K (chi dung khi SP co boc/ma vang)
       mauSac: item.mauSac || '',
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
@@ -3839,6 +3906,16 @@
     });
     saveCart_();
     renderCart_();
+  }
+
+  // Tuoi vang (10K/14K/18K) cho san pham co BOC/MA vang — Duyen yeu cau 2026-11-10. Khi chat lieu / ten SP
+  // co chu "boc vang", "ma vang", "co vang"... (hoac "vang 10k/14k/18k") thi dong gio hien 3 o tich chon
+  // 1 tuoi vang; ket qua nam o it.vangTuoi va tu them vao don gui khach ("... chat lieu x vang 14k").
+  // Muon them 24K: them '24K' vao mang duoi day, khong can sua cho khac.
+  const PK_GOLD_KARATS = ['10K', '14K', '18K'];
+  function _hasGoldPlating_(it) {
+    const txt = _stripVNlocal_([it.name, it.chatLieu, (it.chatLieuOptions || []).join(' ')].join(' ')).toLowerCase();
+    return /(boc|ma|gan|dat|co|kem|vien|phu)\s*vang/.test(txt) || /vang\s*(10|14|18|24)\s*k/.test(txt);
   }
 
   function renderCart_() {
@@ -3874,6 +3951,14 @@
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
         <div class="pk-cart-detail-row">
           ${chatLieuHtml}
+          <div class="pk-cart-vang-row" style="${_hasGoldPlating_(it) ? '' : 'display:none'}">
+            <span class="pk-cl-multi-label">Vàng:</span>
+            ${PK_GOLD_KARATS.map((kt) => `
+              <label class="pk-cl-opt">
+                <input type="checkbox" class="pk-vang-chk" data-kt="${kt}" ${it.vangTuoi === kt ? 'checked' : ''} />
+                <span>${kt}</span>
+              </label>`).join('')}
+          </div>
           <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
           <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
         </div>
@@ -3908,8 +3993,28 @@
       });
     });
 
+    // Tich tuoi vang: chi chon 1 (tich o khac thi bo o cu; tich lai o dang chon thi bo chon)
+    list.querySelectorAll('.pk-vang-chk').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const rowEl = e.target.closest('.pk-cart-row');
+        const val = e.target.checked ? e.target.dataset.kt : '';
+        rowEl.querySelectorAll('.pk-vang-chk').forEach((c) => { c.checked = (c.dataset.kt === val); });
+        _updateCartItem_(rowEl.dataset.id, 'vangTuoi', val);
+      });
+    });
+    // Hien/an hang tich vang theo chat lieu / ten dang go (khong render lai de khong mat con tro)
+    const _refreshGoldRow_ = (rowEl) => {
+      const it2 = _cartItems.find((x) => x.id === rowEl.dataset.id);
+      const g = rowEl.querySelector('.pk-cart-vang-row');
+      if (it2 && g) g.style.display = _hasGoldPlating_(it2) ? '' : 'none';
+    };
+    list.querySelectorAll('.pk-cl-opt-chk').forEach((chk) => chk.addEventListener('change', (e) => _refreshGoldRow_(e.target.closest('.pk-cart-row'))));
+
     list.querySelectorAll('.pk-cart-row').forEach((row) => {
       const id = row.dataset.id;
+      row.querySelector('.pk-cart-name').addEventListener('input', () => _refreshGoldRow_(row));
+      const clTxt = row.querySelector('.pk-cart-chatlieu');
+      if (clTxt) clTxt.addEventListener('input', () => _refreshGoldRow_(row));
       row.querySelector('.pk-cart-chk').addEventListener('change', (e) => { _updateCartItem_(id, 'checked', e.target.checked); saveCart_(); });
       const nameEl = row.querySelector('.pk-cart-name');
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
@@ -4110,8 +4215,9 @@
       const name = _sentenceCase_(String(i.name || '').replace(/^trang sức\s+/i, ''));
       const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
       const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
+      const vang = (i.vangTuoi && _hasGoldPlating_(i)) ? ' vàng ' + String(i.vangTuoi).toLowerCase() : '';
       const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
-      const desc = `${name}${size}${cl}${mau}`;
+      const desc = `${name}${size}${cl}${vang}${mau}`;
       const qty = Math.max(1, Number(i.qty) || 1);
       const unit = Number(i.price) || 0;
       const total = _lineTotal_(i);

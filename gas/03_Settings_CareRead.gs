@@ -64,6 +64,19 @@ function _ymAdd_(ym, delta) {
   y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
   return y + '-' + ('0' + (m + 1)).slice(-2);
 }
+// Gop tien theo NGUOI khi so sanh anh chup chot thang (ten luc chot co the la ten goc cu: thuydinh95) voi so tinh lai (nay ra ten chinh Thuydinh1995).
+// map: {ten: tien}; refs: cac {ten: ...} dang dung de hien thi — ten trong refs duoc uu tien lam ten dai dien, neu khong co thi dung TEN CHINH.
+function _foldRevMapByPerson_(map, refs) {
+  map = map || {};
+  var names = Object.keys(map), refNames = [];
+  (refs || []).forEach(function(r) { Object.keys(r || {}).forEach(function(n) { refNames.push(n); }); });
+  if (!names.length) return {};
+  var id; try { id = _salePersonIdentity_(names.concat(refNames)); } catch (e) { return map; }
+  var refByKey = {}; refNames.forEach(function(n) { refByKey[id.key(n)] = n; });
+  var out = {};
+  names.forEach(function(n) { var t = refByKey[id.key(n)] || id.primary(n) || n; out[t] = Math.round(((out[t] || 0) + (Number(map[n]) || 0)) * 100) / 100; });
+  return out;
+}
 function _posRevenueBySale_(ym) {
   var a = buildSalesReportB_({ dateFrom: _ymFirstDay_(ym), dateTo: _ymLastDay_(ym) });
   var out = {};
@@ -152,13 +165,15 @@ function applyPosMonthAdjustToReportB_(res, filters) {
   var prev = _ymAdd_(month, -1), snap = _readPosSnapshots_()[prev];
   var info = { applied: false, month: month, prevMonth: prev };
   res.posAdjust = info;
-  if (!snap) { info.reason = 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy.'; return res; }
+  if (!snap) { info.reason = 'Chưa chốt tháng ' + prev + ' nên chưa có báo cáo đơn hoàn/hủy tháng ' + prev + '.'; return res; }
   var other = ['nguon', 'marketer', 'careStatus', 'khStatus', 'zaloStatus'].some(function(k) { return filters[k] && filters[k].length; }) || filters.sanPham || filters.nickZalo;
-  if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không trừ hoàn/hủy (số trừ tính cho cả tháng). Bỏ các bộ lọc này để xem số sau trừ.'; return res; }
+  if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không hiện báo cáo đơn hoàn/hủy tháng trước (báo cáo tính cho cả tháng). Bỏ các bộ lọc này để xem.'; return res; }
   var now = _posRevenueBySaleCached_(prev), want = null;   // cache 180s: truoc day moi lan cache bao cao het han lai chay LAI ca Bao cao B cua thang truoc (gap doi thoi gian)
   if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
-  var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
-  var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
+  var _rowNamesA = {}; (res.bySale || []).forEach(function(r) { _rowNamesA[r.name] = 1; });
+  var snapBy = _foldRevMapByPerson_(snap.bySale, [_rowNamesA, now.bySale]), nowBy = _foldRevMapByPerson_(now.bySale, [_rowNamesA]);   // gop theo nguoi: ten luc chot != ten chinh hien tai khong con tao khoan tru gia
+  var names = {}; Object.keys(snapBy).forEach(function(n) { names[n] = 1; }); Object.keys(nowBy).forEach(function(n) { names[n] = 1; });
+  var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snapBy[n]) || 0) - (Number(nowBy[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
   // DOANH THU CHUAN cua thang (bang Theo Sale + tong) GIU NGUYEN — KHONG tru truc tiep (Duyen chot 2026-11-03: "cho doanh thu chuan cua thang truoc, ngay ben duoi la bao cao
   // phan tru hoan/huy cua thang truoc"). Phan tru tra RIENG: moi dong co truHoanHuy + giaTriSauTru, va posAdjust.rows (ca sale chi co hoan/huy thang truoc, khong co don thang nay)
   // de giao dien hien bang "Tru hoan/huy thang truoc" ngay duoi bang chinh.
@@ -200,15 +215,82 @@ function posMonthAdjust_(month) {
       rows: Object.keys(cur.bySale).map(function(n) { return { name: n, revenue: cur.bySale[n], deduction: 0, net: cur.bySale[n] }; }).sort(function(a, b) { return b.net - a.net; }) };
   }
   var now = _posRevenueBySale_(prev); // doanh thu thang truoc tinh lai theo du lieu HIEN TAI (da loai don hoan/huy phat sinh sau luc chot)
-  var names = {}; Object.keys(cur.bySale).forEach(function(n) { names[n] = 1; }); Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; });
+  var snapBy2 = _foldRevMapByPerson_(snap.bySale, [cur.bySale, now.bySale]), nowBy2 = _foldRevMapByPerson_(now.bySale, [cur.bySale]);   // gop theo nguoi (xem _foldRevMapByPerson_)
+  var names = {}; Object.keys(cur.bySale).forEach(function(n) { names[n] = 1; }); Object.keys(snapBy2).forEach(function(n) { names[n] = 1; });
   var rows = Object.keys(names).map(function(n) {
-    var deduction = (Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0);
+    var deduction = (Number(snapBy2[n]) || 0) - (Number(nowBy2[n]) || 0);
     var revenue = Number(cur.bySale[n]) || 0;
     return { name: n, revenue: revenue, deduction: deduction, net: revenue - deduction };
   }).filter(function(r) { return r.revenue || r.deduction; }).sort(function(a, b) { return b.net - a.net; });
   var totalDed = rows.reduce(function(s, r) { return s + r.deduction; }, 0);
   return { ok: true, month: month, prevMonth: prev, applied: true, closedAt: snap.closedAt, closedMonths: closedMonths,
     total: cur.total, totalDeduction: totalDed, totalNet: cur.total - totalDed, rows: rows };
+}
+
+// ═══ BAO CAO K — CHOT THANG (Duyen yeu cau 2026-11-10: "bao cao K la moi hoan toan, dat la bao cao chot thang; chi gom sale thuoc phong kinh doanh, phong sale, sale online;
+// chi de tinh doanh thu va doanh thu sau hoan huy"). Thay cho khoi chot thang cu o Bao cao B (B nay chi tinh binh thuong cho nhanh).
+// PHAM VI SALE (Duyen chot): doi Online + doi Van phong (2 doi nay gop lai = phong kinh doanh, nguon saleChannels + moc ngay saleChannelPeriods tai CUOI thang xem) + phong ban Sale (saleDepts key 'sale',
+// theo file nhan su). Moi nguoi chi 1 dong (gop ten khac cua cung nguoi qua _salePersonKeyFn_); nguoi thuoc nhieu nhom: uu tien doi Online/Van phong, roi moi toi Phong Sale.
+// SO LIEU: doanh thu thang M = _posRevenueBySale_(M) (cung so Bao cao B); TRU hoan/huy = (so luc CHOT thang M-1) − (so thang M-1 tinh lai theo du lieu HIEN TAI); Sau hoan huy = doanh thu − tru.
+// Chua chot M-1 -> khong tru gi (applied:false + ly do). Dung ban cache 180s (_posRevenueBySaleCached_) cho 2 thang de xem nhanh; CHOT thang (closePosMonth_) van doc so MOI.
+function _posKMembers_(month) {
+  var pk = _salePersonKeyFn_(), out = {}, endYmd = _ymLastDay_(month), channels = {}, periods = {}, lbl = { online: 'Online', offline: 'Văn phòng' };
+  try { readSaleGroups_().forEach(function(g) { if (g.key === 'online' || g.key === 'offline') lbl[g.key] = g.label || lbl[g.key]; }); } catch (eG) {}
+  try { var rc = getSetting_('saleChannels'); if (rc) { var oc = JSON.parse(rc); if (oc && typeof oc === 'object') channels = oc; } } catch (eC) {}
+  try { var rp = getSetting_('saleChannelPeriods'); if (rp) { var op = JSON.parse(rp); if (op && typeof op === 'object' && !Array.isArray(op)) periods = op; } } catch (eP) {}
+  var names = {}; Object.keys(channels).forEach(function(n) { names[n] = 1; }); Object.keys(periods).forEach(function(n) { names[n] = 1; });
+  Object.keys(names).forEach(function(n) {
+    var ch = String(channels[n] || ''), list = Array.isArray(periods[n]) ? periods[n].filter(function(e) { return e && /^(\d{4}-\d{2}-\d{2})?$/.test(String(e.from || '')); }) : [];
+    list.sort(function(a, b) { return String(a.from || '') < String(b.from || '') ? -1 : String(a.from || '') > String(b.from || '') ? 1 : 0; });
+    var hit = null; for (var i = 0; i < list.length; i++) { if (String(list[i].from || '') <= endYmd) hit = list[i]; else break; }   // giong _saleChannelOn_ ben web (js/62): moc cuoi co hieu luc <= ngay xem
+    if (hit) ch = String(hit.channel == null ? '' : hit.channel);
+    if (ch !== 'online' && ch !== 'offline') return;
+    var k = pk(n); if (k && !out[k]) out[k] = lbl[ch];
+  });
+  var sd = readSaleDepts_(), lblDept = 'Phòng Sale';
+  try { readDeptList_().forEach(function(g) { if (g.key === 'sale' && g.label) lblDept = 'Phòng ' + g.label; }); } catch (eD) {}
+  Object.keys(sd.byNorm).forEach(function(k0) { if (sd.byNorm[k0].key !== 'sale') return; var k = pk(sd.byNorm[k0].name); if (k && !out[k]) out[k] = lblDept; });
+  return out;
+}
+function posKReport_(month) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) month = _todayYm_();
+  var t0 = Date.now(), prev = _ymAdd_(month, -1), snaps = _readPosSnapshots_(), closedMonths = Object.keys(snaps).sort(), snap = snaps[prev] || null;
+  var cur = _posRevenueBySaleCached_(month), now = snap ? _posRevenueBySaleCached_(prev) : null;
+  var pk = _salePersonKeyFn_(), members = _posKMembers_(month), byP = {};
+  function add(name, f, v) {
+    var k = pk(name); if (!k || !members[k]) return;
+    var o = byP[k] || (byP[k] = { name: String(name).trim(), group: members[k], revenue: 0, snap: 0, now: 0 });
+    o[f] += Number(v) || 0;
+  }
+  Object.keys(cur.bySale || {}).forEach(function(n) { add(n, 'revenue', cur.bySale[n]); });
+  if (snap) {
+    Object.keys(snap.bySale || {}).forEach(function(n) { add(n, 'snap', snap.bySale[n]); });
+    Object.keys(now.bySale || {}).forEach(function(n) { add(n, 'now', now.bySale[n]); });
+  }
+  // Duyên 2026-11-11: báo cáo K báo "thấp hơn thực tế mấy trăm triệu" — NGUYÊN NHÂN cần soi: K chỉ cộng sale thuộc Online/Văn phòng/Phòng Sale (đúng yêu cầu) nên mọi doanh thu
+  // của sale NGOÀI phạm vi (thử việc, chưa phân nhóm, "(chưa gán sale)", tên chưa gộp được về người trong danh sách) bị loại NGẦM, không hiện ở đâu. Trả thêm `recon`
+  // để màn K đối chiếu thẳng với tổng Báo cáo B: tổng B = trong K + ngoài phạm vi (liệt kê tên + số tiền) + phần không gán được cho tên sale nào.
+  var outByP = {}, bySaleSum = 0;
+  Object.keys(cur.bySale || {}).forEach(function(n) {
+    var v = Number(cur.bySale[n]) || 0; bySaleSum += v;
+    var k = pk(n); if (k && members[k]) return;
+    var o = outByP[k || n] || (outByP[k || n] = { name: String(n).trim(), revenue: 0 }); o.revenue += v;
+  });
+  var outside = Object.keys(outByP).map(function(k) { return outByP[k]; }).filter(function(o) { return Math.abs(o.revenue) > 0.5; }).sort(function(a, b) { return b.revenue - a.revenue; });
+  var outsideTotal = outside.reduce(function(sum, o) { return sum + o.revenue; }, 0);
+  var rows = Object.keys(byP).map(function(k) {
+    var o = byP[k], ded = snap ? (o.snap - o.now) : 0;
+    return { name: o.name, group: o.group, revenue: o.revenue, deduction: ded, net: o.revenue - ded };
+  }).filter(function(r) { return r.revenue || r.deduction; }).sort(function(a, b) { return (b.net - a.net) || (a.name < b.name ? -1 : 1); });
+  var tot = rows.reduce(function(s, r) { s.revenue += r.revenue; s.deduction += r.deduction; s.net += r.net; return s; }, { revenue: 0, deduction: 0, net: 0 });
+  var cc = _posCanCloseMonth_(month);
+  try { Logger.log('PERF posMonthK month=' + month + ' ms=' + (Date.now() - t0) + ' members=' + Object.keys(members).length + ' rows=' + rows.length); } catch (eL) {}
+  var out = { ok: true, month: month, prevMonth: prev, applied: !!snap, closedAt: snap ? snap.closedAt : '', closedMonths: closedMonths,
+    thisClosedAt: snaps[month] ? snaps[month].closedAt : '', canClose: !!cc.ok, canCloseReason: cc.ok ? '' : cc.error,
+    memberCount: Object.keys(members).length, total: tot, rows: rows,
+    recon: { allTotal: Number(cur.total) || bySaleSum, inScope: tot.revenue, outsideTotal: outsideTotal, outsideCount: outside.length, outside: outside.slice(0, 40), unattributed: (Number(cur.total) || bySaleSum) - bySaleSum } };
+  if (!snap) out.reason = 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy — bấm "Chốt tháng" cho ' + prev + ' (từ mùng 1 sau khi cập nhật đủ dữ liệu) thì tháng ' + month + ' mới có cột trừ hoàn/hủy.';
+  return out;
 }
 
 // ─── NHOM SALE (truoc chi co 2 nhom co dinh Online/Van phong, gio Admin tu dinh nghia them nhom

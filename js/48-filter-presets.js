@@ -23,7 +23,7 @@
     H: { keys:['hCsList'], sale:'hCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['hTeam','hCs'] },
     I: { keys:['iCsList'], sale:'iCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['iTeam','iCs'] }   // (02/11/2026) Báo cáo M (đơn chia) có ô Sale + Kênh bán nhiều lựa chọn như các báo cáo khác
   };
-  CFG.K = CFG.G;   // K = màn Thưởng (cùng bộ lọc với G; _srState.sub === 'K' khi xem theo kiểu khác)
+  CFG.BD = CFG.G;   // BD = màn Chi tiết thưởng (cùng bộ lọc với G; _srState.sub === 'BD'). K nay là Báo cáo Chốt tháng (không có bộ lọc sale)
   function curSub(){ return (typeof _srState !== 'undefined') ? _srState.sub : ''; }
   var D = { editId:'', sub:'', name:'', sales:{}, q:'' };   // trạng thái hộp "Tạo / sửa mẫu"
 

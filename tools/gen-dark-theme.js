@@ -185,7 +185,7 @@ function attrSelectors(raw, kind) {   // cac selector khop DUNG khai bao `raw` t
 function main() {
   nRules = 0; inlineMap.clear(); protList.length = 0;
   const out = []; const css = [];
-  const files = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css') && !/^(10-dark|99-dark-auto)/.test(f)).sort();
+  const files = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css') && !/^(10-dark|99-dark-auto|19-theme-sunset)/.test(f)).sort();   // 19-theme-sunset = bảng màu hồng CHỈ chế độ sáng (mọi quy tắc đã có :not([data-theme="dark"])) → không sinh lớp tối cho nó (trước đây sinh ra selector hỏng, làm test "quy tắc KHÔNG có tiền tố" đỏ)
   for (const f of files) { out.push('/* ── ' + f + ' ── */'); const rules = parseCss(fs.readFileSync(path.join(ROOT, 'css', f), 'utf8')); const sub = []; emitRules(rules, '', sub); out.push(...sub); css.push(f); }
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const styleBlocks = [...idx.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]);
