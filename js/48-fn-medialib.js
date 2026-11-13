@@ -120,6 +120,19 @@ var MLIB = (function () {
       S.items.unshift(j.item); say('✓ Đã thêm ảnh vào thư viện'); return j.item;
     } catch (e) { say('✕ Tải lên lỗi: ' + (e && e.message || e)); return null; }
   }
+  // Tải 1 tệp ảnh HOẶC âm thanh (kéo-thả vào khung chat) lên thư viện; loại theo MIME của tệp. Trả mục vừa tạo, null nếu lỗi.
+  async function uploadMediaFile(f) {
+    if (/^audio\//.test(f.type || '')) {
+      say('⏳ Đang tải ' + f.name + '…');
+      try {
+        var j = await post({ action: 'mlibUpload', type: 'audio', name: f.name, mimeType: f.type, base64: await fileToB64(f) });
+        if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Tải lên lỗi')); return null; }
+        S.items.unshift(j.item); say('✓ Đã thêm ' + f.name); return j.item;
+      } catch (e) { say('✕ Tải lên lỗi: ' + (e && e.message || e)); return null; }
+    }
+    if (/^image\//.test(f.type || '')) return uploadImageFile(f);
+    say('✕ Chỉ nhận ảnh hoặc file ghi âm: ' + f.name); return null;
+  }
   async function fromDrive() {
     var link = prompt('Dán link (hoặc ID) tệp Google Drive.\nTệp phải được chia sẻ cho tài khoản chạy GAS hoặc "Bất kỳ ai có link":'); if (!link) return;
     say('⏳ Đang lấy từ Drive…');
@@ -190,7 +203,7 @@ var MLIB = (function () {
       if ($('ml-pick')) { var po = $('ml-pick-out'); if (po) po.innerHTML = gridHtml(visible(S.pickType), true); }
       else { var o = $('ml-out'); if (o) o.innerHTML = gridHtml(visible(S.type), false); }
     },
-    upload: upload, uploadImageFile: uploadImageFile, fromDrive: fromDrive, recStart: recStart, recStop: recStop, editTpl: editTpl, cancelTpl: cancelTpl, saveTpl: saveTpl, del: del, copy: copy,
+    upload: upload, uploadImageFile: uploadImageFile, uploadMediaFile: uploadMediaFile, fromDrive: fromDrive, recStart: recStart, recStop: recStop, editTpl: editTpl, cancelTpl: cancelTpl, saveTpl: saveTpl, del: del, copy: copy,
     pickTab: function (t) { S.pickType = t; pickRender(); },
     pick: pick, _pickId: _pickId, _render: render, _load: load
   };
@@ -213,7 +226,7 @@ var MLIB_PASTE_INPUTS_ = { 'tc-input': true, 'pkc-input': false, 'sc-input': fal
 // Nhận 1 hay NHIỀU tệp ảnh: tải lên lần lượt (không song song để khỏi quá tải GAS), mỗi ảnh chèn 1 dòng vào ô soạn theo đúng thứ tự dán.
 async function mlibAddImagesToChat_(inputId, files) {
   for (var i = 0; i < files.length; i++) {
-    var it = await MLIB.uploadImageFile(files[i]);
+    var it = await MLIB.uploadMediaFile(files[i]);
     if (it) mlibInsertToChat_(inputId, it, MLIB_PASTE_INPUTS_[inputId]);
   }
 }
@@ -225,4 +238,20 @@ function mlibOnPaste_(e) {
   e.preventDefault();
   mlibAddImagesToChat_(t.id, files.slice(0, 10));   // tối đa 10 ảnh / lần dán
 }
+// Kéo-thả tệp ảnh / ghi âm từ máy vào khung soạn tin (cùng 3 ô như dán ảnh): tải lên Thư viện rồi chèn, chờ bấm Gửi. Kéo chữ/tệp khác loại không bị chặn.
+function mlibDragHasMedia_(e) {
+  var it = (e.dataTransfer && e.dataTransfer.items) || [];
+  for (var i = 0; i < it.length; i++) if (it[i].kind === 'file' && /^(image|audio)\//.test(it[i].type || '')) return true;
+  return false;
+}
+function mlibOnDragOver_(e) { var t = e.target; if (t && t.id && Object.prototype.hasOwnProperty.call(MLIB_PASTE_INPUTS_, t.id) && mlibDragHasMedia_(e)) e.preventDefault(); }
+function mlibOnDrop_(e) {
+  var t = e.target; if (!t || !t.id || !Object.prototype.hasOwnProperty.call(MLIB_PASTE_INPUTS_, t.id)) return;
+  var fl = (e.dataTransfer && e.dataTransfer.files) || [], files = [];
+  for (var i = 0; i < fl.length; i++) if (/^(image|audio)\//.test(fl[i].type || '')) files.push(fl[i]);
+  if (!files.length) return;
+  e.preventDefault();
+  mlibAddImagesToChat_(t.id, files.slice(0, 10));
+}
+if (typeof document !== 'undefined' && !window.__mlibDropBound) { window.__mlibDropBound = true; document.addEventListener('dragover', mlibOnDragOver_, true); document.addEventListener('drop', mlibOnDrop_, true); }
 if (typeof document !== 'undefined' && !window.__mlibPasteBound) { window.__mlibPasteBound = true; document.addEventListener('paste', mlibOnPaste_, true); }
