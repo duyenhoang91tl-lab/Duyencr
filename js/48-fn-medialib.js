@@ -53,6 +53,11 @@ var MLIB = (function () {
   function curType() { return $('ml-pick') ? S.pickType : S.type; }
   function byId(id) { return S.items.filter(function (i) { return i.id === id; })[0]; }
 
+  function tplFormHtml() {
+    var e = S.edit;
+    return '<div class="ml-form"><input id="mt-name" placeholder="Tên mẫu (vd: Chào khách mới)" value="' + esc(e.name) + '"><textarea id="mt-text" rows="5" placeholder="Nội dung tin nhắn…">' + esc(e.text) + '</textarea>'
+      + '<input id="mt-tags" placeholder="Thẻ (tuỳ chọn, cách nhau bằng dấu phẩy)" value="' + esc(e.tags) + '"><div class="ml-act"><button class="btn primary" onclick="MLIB.saveTpl()">Lưu</button><button class="btn" onclick="MLIB.cancelTpl()">Huỷ</button></div></div>';
+  }
   function render() {
     var w = $('mlib-wrap'); if (!w) return;
     var T = S.type, list = visible(T);
@@ -68,11 +73,7 @@ var MLIB = (function () {
     }
     h += '<button class="btn sm" onclick="MLIB.reload()">↻</button></div>';
     if (S.err) h += '<div class="ml-empty" style="color:#b91c1c">' + esc(S.err) + '</div>';
-    if (T === 'template' && S.edit) {
-      var e = S.edit;
-      h += '<div class="ml-form"><input id="mt-name" placeholder="Tên mẫu (vd: Chào khách mới)" value="' + esc(e.name) + '"><textarea id="mt-text" rows="5" placeholder="Nội dung tin nhắn…">' + esc(e.text) + '</textarea>'
-        + '<input id="mt-tags" placeholder="Thẻ (tuỳ chọn, cách nhau bằng dấu phẩy)" value="' + esc(e.tags) + '"><div class="ml-act"><button class="btn primary" onclick="MLIB.saveTpl()">Lưu</button><button class="btn" onclick="MLIB.cancelTpl()">Huỷ</button></div></div>';
-    }
+    if (T === 'template' && S.edit) h += tplFormHtml();
     h += '<div id="ml-out">' + gridHtml(list, false) + '</div>';
     w.innerHTML = h;
   }
@@ -134,13 +135,13 @@ var MLIB = (function () {
   }
   function recStop() { if (S.rec && S.rec.state !== 'inactive') S.rec.stop(); }
   // ── Mẫu tin ──
-  function editTpl(id) { var it = id ? byId(id) : null; S.edit = { id: id, name: it ? it.name : '', text: it ? it.text : '', tags: it ? it.tags : '' }; render(); }
-  function cancelTpl() { S.edit = null; render(); }
+  function editTpl(id) { var it = id ? byId(id) : null; S.edit = { id: id, name: it ? it.name : '', text: it ? it.text : '', tags: it ? it.tags : '' }; refresh(); }
+  function cancelTpl() { S.edit = null; refresh(); }
   async function saveTpl() {
     var e = S.edit; if (!e) return;
     var j = await post({ action: 'mlibSaveTpl', id: e.id, name: ($('mt-name') || {}).value, text: ($('mt-text') || {}).value, tags: ($('mt-tags') || {}).value });
     if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Lưu lỗi')); return; }
-    S.items = S.items.filter(function (i) { return i.id !== j.item.id; }); S.items.unshift(j.item); S.edit = null; say('✓ Đã lưu mẫu tin'); render();
+    S.items = S.items.filter(function (i) { return i.id !== j.item.id; }); S.items.unshift(j.item); S.edit = null; say('✓ Đã lưu mẫu tin'); refresh();
   }
   async function del(id) {
     if (!confirm('Xoá mục này khỏi thư viện?')) return;
@@ -164,8 +165,10 @@ var MLIB = (function () {
     var d = $('ml-pick'); if (!d) return; var type = S.pickType, list = visible(type);
     d.innerHTML = '<div class="ml-box"><div class="ml-bar"><div class="ml-seg">' + [['image', '🖼️ Ảnh'], ['audio', '🎙️ Ghi âm'], ['template', '💬 Mẫu tin']].map(function (t) { return '<button class="' + (type === t[0] ? 'on' : '') + '" onclick="MLIB.pickTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div><input class="ml-q" placeholder="🔍 Tìm…" value="' + esc(S.q) + '" oninput="MLIB.search(this.value)">'
       + (type === 'template' ? '' : '<button class="btn primary sm" onclick="document.getElementById(\'ml-pfile\').click()">⬆ Tải lên</button><input id="ml-pfile" type="file" multiple style="display:none" accept="' + (type === 'image' ? 'image/*' : 'audio/*') + '" onchange="MLIB.upload(this.files);this.value=\'\'">')
+      + (type === 'template' ? '<button class="btn primary sm" onclick="MLIB.editTpl(\'\')">+ Mẫu tin mới</button>' : '<button class="btn sm" onclick="MLIB.fromDrive()">📁 Từ Google Drive</button>')
       + (type === 'audio' ? (S.rec ? '<button class="btn sm ml-rec" onclick="MLIB.recStop()">⏹ Dừng & lưu</button>' : '<button class="btn sm" onclick="MLIB.recStart()">🔴 Ghi âm</button>') : '')
       + '<button class="btn sm" onclick="document.getElementById(\'ml-pick\').remove()">✕ Đóng</button></div>'
+      + (type === 'template' && S.edit ? tplFormHtml() : '')
       + '<div id="ml-pick-out">' + gridHtml(list, true) + '</div></div>';
   }
   function _pickId(id) { var it = byId(id), d = $('ml-pick'); if (d) d.remove(); if (it && _cb) _cb(it); }
