@@ -11,6 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-13 (phiên 65) — Chat: dán NHIỀU ảnh một lúc (BƯỚC A XONG, đã push); bước B = kéo-thả tệp ảnh/ghi âm vào khung chat (đang làm)
+- **Yêu cầu Duyên:** "tiếp bước còn thiếu" (các mục chưa làm ở cuối phiên 64: dán nhiều ảnh, kéo-thả tệp; KHÔNG làm tự gửi sau khi dán vì dễ gửi nhầm, và chưa làm extension Zalo/Pancake AI vì khác khung chat + phải làm song song 2 extension).
+- [x] **Bước A:** `js/48-fn-medialib.js` — `mlibOnPaste_` gom TẤT CẢ ảnh trong clipboard (tối đa 10), `mlibAddImagesToChat_` tải lên lần lượt (không song song, đỡ quá tải GAS) và chèn mỗi ảnh 1 dòng đúng thứ tự. Dán 1 ảnh/dán chữ/ô khác giữ nguyên. `index.html` js/48 `?v=20261113d`. Test jsdom 24 ca ĐẠT. Không sửa GAS.
+- [ ] **Bước B (kế tiếp):** kéo-thả tệp ảnh/ghi âm vào khung chat (xem mục phiên 66 nếu đã xong).
+
 ## 2026-11-13 (phiên 64) — Giám sát chat: "không thấy ai quét bắt từ cấm + gửi thông báo nữa" — ĐÃ KIỂM CODE + THÊM CÔNG CỤ CHẨN ĐOÁN (đã push); CHỜ Duyên chạy chẩn đoán
 - **Đã kiểm (code KHÔNG hỏng):** `cvScanOnce_`, `_cvBannedCompiled_`, `_cvAdmins_`, `cvScanMessages_`, `batGiamSatChat` GIỐNG HỆT bản lúc còn chạy (không commit nào đổi từ 22/10; `_cvNotify_` đổi 22/10 vẫn đúng độ rộng cột `NOTIF_HEADERS`); không hàm nào ngoài `tatGiamSatChat/batGiamSatChat` xóa trigger `chatAuditScan`; `test-chat-audit.js`, `test-banned-cfg.js` đạt. Phiên này KHÔNG gọi được Apps Script/Supabase nên chưa biết nguyên nhân thật ở phía chạy.
 - **Các nguyên nhân khả dĩ (thứ tự nghi ngờ):** (1) **hết hạn mức Apps Script trong ngày** — dự án chạy ≥ 6 trigger (`chatAuditScan` 5', `rbScanTick_` 10', `sbOrdersTick_` 10', `sbCareTick_` 10', `tonKhoTruDonTick_` 10', `pkLichSuTick_` 10'…) trên tài khoản Gmail thường (tổng thời gian trigger ~90'/ngày, UrlFetch 20.000/ngày — đã từng dính "urlfetch quá nhiều lần/ngày" 27/10, xem mục 2026-10-27); hết hạn mức thì MỌI trigger lỗi im lặng; (2) trigger `chatAuditScan` bị mất/bị Google tạm dừng; (3) webhook Pancake ngừng ghi `pk_messages` (không có tin thì không có gì để quét); (4) danh sách từ cấm rỗng (⚙ Cấu hình → 🚫 Từ cấm: tắt "Dùng thêm sheet" + không có từ thêm, hoặc `chatAuditIgnore` bỏ hết); (5) `cvCursor` ở tương lai; (6) tài khoản admin nhận cảnh báo (`chatAuditAdmins`, mặc định `duyenht`) sai tên/bị khóa.

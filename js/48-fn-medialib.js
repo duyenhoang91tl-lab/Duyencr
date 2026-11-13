@@ -210,13 +210,19 @@ function mlibChatPick(inputId, type, asMarker) {
 // Dán ảnh (Ctrl+V, vd ảnh chụp màn hình) vào khung soạn tin của chat: tự tải lên Thư viện rồi chèn y như chọn từ 📎 (chưa gửi — bấm Gửi).
 // Chat nội bộ (tc-input) chèn dạng dấu hiệu [[ml:image|URL|tên]] để vẽ ảnh; Pancake/Social chèn link. Dán chữ bình thường KHÔNG bị ảnh hưởng.
 var MLIB_PASTE_INPUTS_ = { 'tc-input': true, 'pkc-input': false, 'sc-input': false };
+// Nhận 1 hay NHIỀU tệp ảnh: tải lên lần lượt (không song song để khỏi quá tải GAS), mỗi ảnh chèn 1 dòng vào ô soạn theo đúng thứ tự dán.
+async function mlibAddImagesToChat_(inputId, files) {
+  for (var i = 0; i < files.length; i++) {
+    var it = await MLIB.uploadImageFile(files[i]);
+    if (it) mlibInsertToChat_(inputId, it, MLIB_PASTE_INPUTS_[inputId]);
+  }
+}
 function mlibOnPaste_(e) {
   var t = e.target; if (!t || !t.id || !Object.prototype.hasOwnProperty.call(MLIB_PASTE_INPUTS_, t.id)) return;
-  var items = (e.clipboardData && e.clipboardData.items) || [], file = null;
-  for (var i = 0; i < items.length; i++) if (items[i].kind === 'file' && /^image\//.test(items[i].type || '')) { file = items[i].getAsFile(); break; }
-  if (!file) return;
+  var items = (e.clipboardData && e.clipboardData.items) || [], files = [];
+  for (var i = 0; i < items.length; i++) if (items[i].kind === 'file' && /^image\//.test(items[i].type || '')) { var f = items[i].getAsFile(); if (f) files.push(f); }
+  if (!files.length) return;
   e.preventDefault();
-  var id = t.id;
-  MLIB.uploadImageFile(file).then(function (it) { if (it) mlibInsertToChat_(id, it, MLIB_PASTE_INPUTS_[id]); });
+  mlibAddImagesToChat_(t.id, files.slice(0, 10));   // tối đa 10 ảnh / lần dán
 }
 if (typeof document !== 'undefined' && !window.__mlibPasteBound) { window.__mlibPasteBound = true; document.addEventListener('paste', mlibOnPaste_, true); }

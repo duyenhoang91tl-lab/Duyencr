@@ -67,5 +67,17 @@ w.eval(fs.readFileSync(__dirname + '/../js/48-fn-medialib.js', 'utf8'));
   ev = paste(other, [{ kind: 'file', type: 'image/png', getAsFile: () => new w.File(['i'], 'c.png', { type: 'image/png' }) }]);
   await new Promise(r => setTimeout(r, 50));
   ok(!ev.defaultPrevented && posts.length === n2, 'Ô nhập khác (không phải khung chat): không can thiệp');
+  // Bước A: dán NHIỀU ảnh một lúc
+  const tc2 = mk('sc-input'); const nb = posts.length;
+  const im = n => ({ kind: 'file', type: 'image/png', getAsFile: () => new w.File(['i' + n], 'm' + n + '.png', { type: 'image/png' }) });
+  paste(tc2, [im(1), im(2), im(3)]);
+  await new Promise(r => setTimeout(r, 300));
+  ok(posts.length === nb + 3, 'Dán 3 ảnh: tải lên đủ 3 lần (có ' + (posts.length - nb) + ')');
+  const lines = tc2.value.split('\n');
+  ok(lines.length === 3 && /^m1\.png: /.test(lines[0]) && /^m2\.png: /.test(lines[1]) && /^m3\.png: /.test(lines[2]), 'Chèn 3 dòng đúng thứ tự dán — ' + JSON.stringify(lines));
+  const many = []; for (let k = 0; k < 15; k++) many.push(im(100 + k));
+  const nb2 = posts.length; paste(mk('tc-input2'), []); paste(tc2, many);
+  await new Promise(r => setTimeout(r, 600));
+  ok(posts.length - nb2 === 10, 'Dán 15 ảnh: chỉ nhận tối đa 10 (có ' + (posts.length - nb2) + ')');
   console.log(fail ? '\n' + fail + ' LỖI' : '\nTẤT CẢ ĐẠT'); process.exit(fail ? 1 : 0);
 })();
