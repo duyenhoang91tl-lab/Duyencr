@@ -206,7 +206,7 @@ function _reconIndexRows_(info, groups, meta, B, warnings){
   var checks = [], rOrd = rows.length + 1;
   rows.push(['Số đơn Pos trong khoảng lọc', 'B', B.bOrders, '', '', 'Số đơn máy chủ trả về cho Báo cáo B.']);
   var rVal = rows.length + 1;
-  rows.push(['Tổng giá trị đơn', 'B', B.bTotal, '', '', B.adj ? 'Doanh thu chuẩn của tháng (KHÔNG bị trừ hoàn/hủy). Phần trừ hoàn/hủy tháng ' + B.adj.prevMonth + ' là khối "Chốt tháng" riêng (xem sheet "B Đối chiếu tổng" để nối với số sau trừ).' : 'Tổng giá trị sau giảm giá của các đơn Pos.']);
+  rows.push(['Tổng giá trị đơn', 'B', B.bTotal, '', '', B.adj ? 'Doanh thu chuẩn của tháng (KHÔNG bị trừ hoàn/hủy). Danh sách đơn hoàn/hủy tháng ' + B.adj.prevMonth + ' (đã chốt) ở sheet \"B Hoàn hủy tháng trước\" — chỉ để đối chiếu.' : 'Tổng giá trị sau giảm giá của các đơn Pos.']);
   var diffRow = function(name, code, val, why, strict){
     var r = rows.length + 1, d = _reconR2_(val - B.bTotal), ok = Math.abs(d) < tol;
     rows.push([name, code, _reconR2_(val), { t: 'n', v: d, f: 'ROUND(C' + r + '-C' + rVal + ',2)' }, strict ? (ok ? okTxt : badTxt) : 'ℹ tham khảo', why]);

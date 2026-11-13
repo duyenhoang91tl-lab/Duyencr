@@ -3,9 +3,9 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function grab(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, j = src.indexOf('{', i);
   for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); } } }
-const ctx = { _normTxt_: s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase() };
+const ctx = { Math, _normTxt_: s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase() };
 Object.assign(ctx, { splitMulti_: (s, sep) => String(s || '').split(sep).map(x => x.trim()).filter(Boolean), _isNumericTag_: s => /^\d+$/.test(String(s).trim()), _tbOrderCounts_: r => !r.excl });
-vm.createContext(ctx); ['_tbScanMsgs_', '_tbParseTs_', '_tbScanMergedOrders_'].forEach(n => vm.runInContext(grab(n), ctx));
+vm.createContext(ctx); ['_tbWaitMin_', '_tbScanMsgs_', '_tbParseTs_', '_tbScanMergedOrders_'].forEach(n => vm.runInContext(grab(n), ctx));
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (h, m) => new Date(Date.UTC(2026, 9, 30, h, m)).toISOString();
 const mo = { hoa: 'Hoa', nam: 'Nam' };
@@ -36,8 +36,8 @@ ok(r.length === 0, 'tin treo nhung hoi thoai da duoc tra loi hom sau -> bo');
 r = ctx._tbScanMsgs_([M('e', 'in', T(22, 45), '', conv({ is_replied: false }))], now, end, 30, {}, mo);
 ok(r.length === 0, 'moi 15p chua phat');
 // 8) sap xep giam theo gap, khoa on dinh
-r = ctx._tbScanMsgs_([M('a', 'in', T(8, 0)), M('a', 'out', T(8, 40), 'Hoa'), M('b', 'in', T(9, 0)), M('b', 'out', T(11, 0), 'Hoa')], now, end, 30, {}, mo);
-ok(r.length === 2 && r[0].gapMin === 120 && /^m:b:2026-10-30T09:00$/.test(r[0].key), 'sap xep & khoa');
+r = ctx._tbScanMsgs_([M('a', 'in', T(8, 0)), M('a', 'out', T(8, 40), 'Hoa'), M('b', 'in', T(2, 0)), M('b', 'out', T(4, 0), 'Hoa')], now, end, 30, {}, mo);
+ok(r.length === 2 && r[0].gapMin === 120 && /^m:b:2026-10-30T02:00$/.test(r[0].key), 'sap xep & khoa');
 // 9) nhieu luot trong 1 hoi thoai
 r = ctx._tbScanMsgs_([M('a', 'in', T(8, 0)), M('a', 'out', T(9, 0), 'Hoa'), M('a', 'in', T(13, 0)), M('a', 'out', T(14, 0), 'Hoa')], now, end, 30, {}, mo);
 ok(r.length === 2, 'hai luot tre trong cung hoi thoai');
@@ -58,4 +58,21 @@ o4 = ctx._tbScanMergedOrders_([O('A1', '29/10/2026 09:00', 'Hoa', 'Hoa'), O('A2'
 ok(o4.length === 0, 'chi xet don tao dung ngay chon');
 o4 = ctx._tbScanMergedOrders_([O('X/1 2', '29/10/2026', 'Hoa', 'Hoa'), O('X/2 3', '30/10/2026', 'Nam', 'Lan')], '2026-10-30', mem, /x/, 72);
 ok(o4.length === 1 && o4[0].sale === 'Nam' && /^o:[A-Za-z0-9_\-:.]+$/.test(o4[0].key), 'khong co gio -> van tinh; khoa duoc lam sach; creator khong thuoc doi -> lay sale dau tien');
-console.log(fail ? fail + ' FAIL' : 'ALL OK'); process.exit(fail ? 1 : 0);
+console.log(fail ? fail + ' FAIL' : 'ALL OK'); 
+// ---- Ngoai le gio Ptroi (Duyen 2026-11-13): khong phat 12h-13h30 va 17h-19h30 (gio VN). T(h,m) = UTC tu gio VN? Test nay dung T = UTC, nen doi sang gio VN: VN = UTC+7.
+const V = (h, m) => new Date(Date.UTC(2026, 9, 30, h - 7, m)).toISOString();   // gio VN
+const nowV = Date.parse(V(23, 0)), endV = Date.parse(V(23, 59));
+r = ctx._tbScanMsgs_([M('t1', 'in', V(12, 10)), M('t1', 'out', V(13, 20), 'Hoa')], nowV, endV, 30, {}, mo);
+ok(r.length === 0, 'Ptroi: nhan 12:10 tra 13:20 (70p nhung nam trong nghi trua) -> khong phat');
+r = ctx._tbScanMsgs_([M('t2', 'in', V(11, 50)), M('t2', 'out', V(13, 55), 'Hoa')], nowV, endV, 30, {}, mo);
+ok(r.length === 1 && r[0].gapMin === 35, 'Ptroi: nhan 11:50 tra 13:55 -> cho thuc 10p + 25p = 35p > 30 -> phat (35p)');
+r = ctx._tbScanMsgs_([M('t3', 'in', V(17, 30)), M('t3', 'out', V(18, 30), 'Hoa')], nowV, endV, 30, {}, mo);
+ok(r.length === 0, 'Ptroi: 17:30 -> 18:30 (khung 17h-19h30) -> khong phat');
+r = ctx._tbScanMsgs_([M('t4', 'in', V(19, 40)), M('t4', 'out', V(20, 30), 'Hoa')], nowV, endV, 30, {}, mo);
+ok(r.length === 1 && r[0].gapMin === 50, 'Ptroi: 19:40 -> 20:30 (ngoai khung) -> phat 50p');
+r = ctx._tbScanMsgs_([M('t5', 'in', V(9, 0)), M('t5', 'out', V(9, 45), 'Hoa')], nowV, endV, 30, {}, mo);
+ok(r.length === 1 && r[0].gapMin === 45, 'Ptroi: gio hanh chinh 9:00 -> 9:45 van phat 45p');
+r = ctx._tbScanMsgs_([M('t6', 'in', V(12, 5), '', conv({ seen: true, is_replied: false })), M('t6b', 'in', V(12, 5), '', conv({ seen: false, is_replied: false }))], Date.parse(V(13, 20)), endV, 30, {}, mo);
+ok(r.length === 1 && r[0].type === 3 && r[0].convId === 't6', 'chua tra loi: da doc (loai 3 Pkrep) khong co ngoai le gio; chua doc 12:05->13:20 nam trong nghi trua -> khong phat loai 1');
+
+process.exit(fail ? 1 : 0);

@@ -25,6 +25,7 @@ for i,(l,v,_) in enumerate(rows,5):
     q.cell(row=i,column=1,value=l).font=font(); c=q.cell(row=i,column=2,value=v); c.font=font(color='0000FF',bold=True); c.fill=INP; c.number_format='#,##0'; c.border=BOX
 q['A9']='Đơn tính thưởng = ĐƠN GỐC BASE (theo ngày tạo), không tính theo Pos. Không tính đơn đổi trả, bảo hành, thay dây, huỷ/hoàn.'; q['A9'].font=font(italic=True,color='666666')
 q['A10']='Thưởng tuần/tháng: chỉ xét sale có số tương tác trong kỳ ≥ tương tác trung bình của đội. Tỷ lệ chốt = đơn Base ÷ tương tác Pancake. Số đơn tính theo NGƯỜI TẠO ĐƠN (không chia theo Sale bán).'; q['A10'].font=font(italic=True,color='666666')
+q['A11']='Thưởng ngày (cập nhật 13/11/2026): ngoài số đơn tối thiểu còn cần doanh thu ngày ≥ 50.000.000đ — web CRM đã kiểm tra điều kiện này; file mẫu này chưa tự kiểm tra, nên đối chiếu theo web.'; q['A11'].font=font(italic=True,color='C00000')
 q['A12']='PHẠT'; q['A12'].font=font(bold=True,size=11)
 for i,h in enumerate(['Mã lỗi','Nội dung vi phạm','Số tiền phạt (đ)'],1):
     c=q.cell(row=13,column=i,value=h); c.font=font(bold=True,color='FFFFFF'); c.fill=HDR; c.border=BOX; c.alignment=Alignment(horizontal='center')
@@ -32,14 +33,18 @@ pen=[(1,'Tin trôi quá 30 phút không phản hồi (không phải tin nhảy t
 (2,'Không gửi báo cáo đúng khung giờ (sáng trước 9h30, chiều 13h30, kết thúc ca, tối 20h nếu bật tin)',50000),
 (3,'Đã đọc nhưng không phản hồi',50000),
 (4,'Đơn gộp Sale bán chung trong 72 giờ: Sale lên đơn không chia doanh thu cho các Sale cùng tham gia',200000),
-(5,'Nhắn tin khai thác mong cầu trong 15 phút nhưng không gửi kèm từ 04 hình ảnh hoặc ghi âm',50000)]
+(5,'Nhắn tin khai thác mong cầu trong 15 phút nhưng không gửi kèm từ 04 hình ảnh hoặc ghi âm',50000),
+(6,'PCMT: Sale check nhầm nội dung cmt thể hiện trên page / trả lời tin nhắn cmt: báo giá',200000),
+(7,'Ptucam: Sử dụng từ cấm',1000000),
+(8,'Pxltc: Không xử lý từ chối của khách hàng',50000),
+(9,'Psaiqt: Tư vấn hời hợt, không khai thác mong cầu, nhắn tin hàng loạt không cá nhân hoá khách hàng',50000)]
 for i,(m,n,a) in enumerate(pen,14):
     q.cell(row=i,column=1,value=m).font=font(); q.cell(row=i,column=1).alignment=Alignment(horizontal='center'); q.cell(row=i,column=1).border=BOX
     c=q.cell(row=i,column=2,value=n); c.font=font(); c.alignment=Alignment(wrap_text=True,vertical='top'); c.border=BOX
     c=q.cell(row=i,column=3,value=a); c.font=font(color='0000FF',bold=True); c.fill=INP; c.number_format='#,##0'; c.border=BOX
     q.row_dimensions[i].height=30
 q.column_dimensions['A'].width=46; q.column_dimensions['B'].width=88; q.column_dimensions['C'].width=18
-q['A20']='Chú thích màu: chữ xanh dương = số nhập tay / quy định · chữ đen = công thức tự tính · nền vàng = ô cần nhập.'; q['A20'].font=font(italic=True,color='666666')
+q['A24']='Chú thích màu: chữ xanh dương = số nhập tay / quy định · chữ đen = công thức tự tính · nền vàng = ô cần nhập.'; q['A20'].font=font(italic=True,color='666666')
 
 # ---- Danh sach sale ----
 d=wb.create_sheet('Danh sach sale')
@@ -54,22 +59,22 @@ SALES="'Danh sach sale'!$A$5:$A$44"
 
 # ---- Nhat ky phat ----
 p=wb.create_sheet('Nhat ky phat')
-title(p,'NHẬT KÝ PHẠT','Mỗi lần vi phạm ghi 1 dòng: Ngày · Sale · Mã lỗi (1-5). Số tiền tự lấy từ "Quy dinh" — muốn phạt khác mức mặc định thì gõ đè số vào cột "Số tiền".')
-head(p,4,['Ngày vi phạm','Sale','Mã lỗi (1-5)','Nội dung vi phạm','Số tiền phạt (đ)','Ghi chú (khách/tin nhắn…)','Người ghi','Tháng'],[14,30,12,52,16,40,16,10])
+title(p,'NHẬT KÝ PHẠT','Mỗi lần vi phạm ghi 1 dòng: Ngày · Sale · Mã lỗi (1-9). Số tiền tự lấy từ "Quy dinh" — muốn phạt khác mức mặc định thì gõ đè số vào cột "Số tiền".')
+head(p,4,['Ngày vi phạm','Sale','Mã lỗi (1-9)','Nội dung vi phạm','Số tiền phạt (đ)','Ghi chú (khách/tin nhắn…)','Người ghi','Tháng'],[14,30,12,52,16,40,16,10])
 N0,N1=5,504
 for r in range(N0,N1+1):
     for col in (1,2,3,6,7): 
         c=p.cell(row=r,column=col); c.fill=INP; c.border=BOX; c.font=font(color='0000FF')
     p.cell(row=r,column=1).number_format='dd/mm/yyyy'
-    d_=p.cell(row=r,column=4,value=f'=IF(C{r}="","",IFERROR(INDEX(\'Quy dinh\'!$B$14:$B$18,MATCH(C{r},\'Quy dinh\'!$A$14:$A$18,0)),"Mã lỗi không hợp lệ"))'); d_.font=font(); d_.border=BOX; d_.alignment=Alignment(wrap_text=True,vertical='top')
-    e=p.cell(row=r,column=5,value=f'=IF(C{r}="","",IFERROR(INDEX(\'Quy dinh\'!$C$14:$C$18,MATCH(C{r},\'Quy dinh\'!$A$14:$A$18,0)),0))'); e.font=font(); e.number_format=MONEY; e.border=BOX
+    d_=p.cell(row=r,column=4,value=f'=IF(C{r}="","",IFERROR(INDEX(\'Quy dinh\'!$B$14:$B$22,MATCH(C{r},\'Quy dinh\'!$A$14:$A$22,0)),"Mã lỗi không hợp lệ"))'); d_.font=font(); d_.border=BOX; d_.alignment=Alignment(wrap_text=True,vertical='top')
+    e=p.cell(row=r,column=5,value=f'=IF(C{r}="","",IFERROR(INDEX(\'Quy dinh\'!$C$14:$C$22,MATCH(C{r},\'Quy dinh\'!$A$14:$A$22,0)),0))'); e.font=font(); e.number_format=MONEY; e.border=BOX
     h=p.cell(row=r,column=8,value=f'=IF(A{r}="","",TEXT(A{r},"yyyy-mm"))'); h.font=font(); h.border=BOX; h.alignment=Alignment(horizontal='center')
 # vi du
 import datetime
 p['A5']=datetime.date(2026,10,5); p['B5']='Sale A (ví dụ — thay bằng tên thật)'; p['C5']=4; p['F5']='VÍ DỤ: xoá dòng này khi bắt đầu nhập thật'; p['G5']='Admin'
 for col in (1,2,3,6,7): p.cell(row=5,column=col).font=font(color='7F7F7F',italic=True)
 dv=DataValidation(type='list',formula1=f'={SALES}',allow_blank=True); dv.error='Chọn tên trong "Danh sach sale"'; p.add_data_validation(dv); dv.add(f'B{N0}:B{N1}')
-dv2=DataValidation(type='whole',operator='between',formula1='1',formula2='5',allow_blank=True); dv2.error='Mã lỗi từ 1 đến 5'; p.add_data_validation(dv2); dv2.add(f'C{N0}:C{N1}')
+dv2=DataValidation(type='whole',operator='between',formula1='1',formula2='9',allow_blank=True); dv2.error='Mã lỗi từ 1 đến 9'; p.add_data_validation(dv2); dv2.add(f'C{N0}:C{N1}')
 p.freeze_panes='A5'
 
 # ---- Thuong ngay ----

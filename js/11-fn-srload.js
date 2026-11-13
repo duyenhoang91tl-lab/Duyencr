@@ -1585,7 +1585,8 @@ function _srPureExport_(){
 // ═══════════════════════════════════════════════════════════════════════════
 function _srBcOrders_(d){ return ((d && d.orders) || []).filter(function(o){ return o.ghepBase && o.ghepBase.length; }); }
 function _srBcBaseSum_(o){ return (o.ghepBase || []).reduce(function(s, b){ return s + (b.tinh ? (Number(b.giaTri) || 0) : 0); }, 0); }
-function _srBcPosVal_(o){ return (o.giaTriPos !== undefined && o.giaTriPos !== null) ? (Number(o.giaTriPos) || 0) : (Number(o.giaTriSauGiam) || 0); }
+// 2026-11-13: + giaTriPosPhu = các dòng Pos CÙNG SĐT + CÙNG bộ mã (1 đơn Pos bị tách nhiều dòng trong "dữ liệu đơn", vd #M47323 "62T11 + 79T11/2026" = 8.123.000 + 5.850.000) — backend chỉ ghép dòng đầu với Base nên trước đây so 8.123.000 với tổng Base 13.973.000 và báo lệch sai.
+function _srBcPosVal_(o){ return ((o.giaTriPos !== undefined && o.giaTriPos !== null) ? (Number(o.giaTriPos) || 0) : (Number(o.giaTriSauGiam) || 0)) + (Number(o.giaTriPosPhu) || 0); }
 function _srBcQuayTxt_(o){ return (o.saleRatio && Number(o.saleRatio) !== 1) ? ('Quầy ' + Math.round(Number(o.saleRatio) * 100) + '%') : ''; }
 // Dựng 3 bảng dữ liệu (mảng-của-mảng, dòng đầu là tiêu đề) + tổng. Tiền của đơn (Giá Pos / Tổng Base / Chênh) CHỈ ghi ở dòng đầu mỗi đơn để SUM cột không bị cộng lặp.
 // Duyên 2026-11-09: Base > Pos đúng 40.000đ = tiền SHIP khách trả (Base cộng ship, Pos không) → coi là KHỚP, không báo lệch. Chỉ chiều Base cao hơn; muốn thêm mức ship khác thì thêm vào mảng này.
@@ -1739,7 +1740,7 @@ function _srBaseCheckPanelHtml_(d){
     var edCell = _srBcEditCellHtml_(oi, o);
     if (edCell) sh = '<div style="color:var(--muted);margin-bottom:3px">✏️ Admin sửa tay:</div>' + edCell;
     h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + (o.sanPham ? '<br><span style="color:var(--muted);font-size:11px">🛒 ' + esc(String(o.sanPham).substring(0, 120)) + '</span>' : '') + '</td>' +
-      '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
+      '<td style="text-align:right">' + _srMoney(posV) + (o.giaTriPosPhu ? '<br><span style="color:var(--muted);font-size:11px" title="Đơn Pos này nằm ở ' + ((o.posPhuRows || 0) + 1) + ' dòng cùng SĐT + cùng mã bộ đếm; đã cộng dòng còn lại">gồm ' + ((o.posPhuRows || 0) + 1) + ' dòng Pos</span>' : '') + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
   });
   h += '</tbody></table></div>';
   if (lechOrders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(lechOrders.length) + ' đơn lệch (lệch lớn nhất trước) — bấm <b>Xuất Excel</b> để xem đủ.</div>';
