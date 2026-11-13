@@ -20528,8 +20528,112 @@ function cvScanOnce_() {
   } catch (e) { res.note = 'loi: ' + (e && e.message || e); Logger.log('cvScanOnce_: ' + res.note); return res; }
   finally { try { lock.releaseLock(); } catch (e9) {} }
 }
-function chatAuditScan() { var r = cvScanOnce_(); Logger.log('Giam sat chat: quet ' + r.scanned + ' tin, ' + r.violations + ' vi pham moi, ' + r.notified + ' thong bao. ' + (r.note || '')); return r; }
+// Handler cua trigger 5 phut. 13/11/2026: ghi "dau da chay" (cvLastRun / cvLastOkAt / cvLastRes) vao Script Properties de chanDoanGiamSatChat biet
+// trigger CO chay hay khong va lan chay gan nhat co loi khong. Truoc day loi chi nam trong Logger (Executions) nen quet hong im lang, khong ai hay.
+function chatAuditScan() {
+  var r = cvScanOnce_();
+  try {
+    var p = PropertiesService.getScriptProperties(), nowIso = new Date().toISOString();
+    p.setProperty('cvLastRun', nowIso); p.setProperty('cvLastRes', JSON.stringify(r).slice(0, 500));
+    if (!/^loi/.test(String(r.note || ''))) p.setProperty('cvLastOkAt', nowIso);
+  } catch (e) {}
+  Logger.log('Giam sat chat: quet ' + r.scanned + ' tin, ' + r.violations + ' vi pham moi, ' + r.notified + ' thong bao. ' + (r.note || ''));
+  return r;
+}
 function chayGiamSatChat() { return chatAuditScan(); }
+// CHAN DOAN GIAM SAT CHAT (13/11/2026, Duyen: "khong thay ai quet bat tu cam va gui thong bao nua"). Chay trong Apps Script Editor, CHI DOC (khong ghi gi,
+// khong quet that). Kiem lan luot: trigger -> dau da chay -> moc quet -> webhook Pancake (pk_messages) -> danh sach tu cam -> ChatViolations/Thong bao,
+// roi in "KET LUAN" liet ke dung cho hong. Nguyen nhan hay gap nhat: Google chan trigger/UrlFetch vi het han muc ngay (hien bang thong bao loi trong buoc 2/3).
+function chanDoanGiamSatChat() {
+  var bad = [], now = Date.now();
+  var say = function (s) { Logger.log(s); };
+  var flag = function (s) { bad.push(s); Logger.log('   ❌ ' + s); };
+  var ok = function (s) { Logger.log('   ✅ ' + s); };
+  var ageMin = function (iso) { var t = Date.parse(iso); return isFinite(t) ? Math.round((now - t) / 60000) : null; };
+  var human = function (m) { return m === null ? '?' : (m < 0 ? 'tương lai ' + (-m) + ' phút' : (m < 180 ? m + ' phút trước' : (m < 2880 ? Math.round(m / 60) + ' giờ trước' : Math.round(m / 1440) + ' ngày trước'))); };
+  var isQuota = function (msg) { return /too many times|urlfetch|quota|limit|exceeded|hết hạn mức|maximum/i.test(String(msg || '')); };
+  var QUOTA_HINT = 'Nghi HẾT HẠN MỨC Apps Script trong ngày (UrlFetch 20.000 lượt/ngày hoặc tổng thời gian chạy trigger ~90 phút/ngày với tài khoản Gmail thường) — khi hết, MỌI trigger (cả chia data, đồng bộ đơn…) lỗi cho tới khi Google reset. Xem Apps Script → Executions (Thực thi): có dòng lỗi "Service invoked too many times" hoặc "Exceeded maximum" là đúng. Muốn bớt tải: giảm tần suất/tắt các trigger tick không cần (đồng bộ đơn, tồn kho, lịch sử Pancake, mua lại…) hoặc chuyển dự án sang tài khoản Google Workspace (hạn mức cao hơn).';
+  var props = PropertiesService.getScriptProperties();
+
+  say('══ CHẨN ĐOÁN GIÁM SÁT CHAT (từ cấm) ══');
+
+  say('1) TRIGGER');
+  try {
+    var trs = ScriptApp.getProjectTriggers(), mine = trs.filter(function (t) { return t.getHandlerFunction() === 'chatAuditScan'; });
+    say('   Tổng ' + trs.length + '/20 trigger: ' + trs.map(function (t) { return t.getHandlerFunction(); }).join(', '));
+    if (!mine.length) flag('KHÔNG có trigger "chatAuditScan" → không có ai quét. Sửa: chạy batGiamSatChat(24) (tạo lại trigger 5 phút, quét lùi 24 giờ).');
+    else ok('có ' + mine.length + ' trigger chatAuditScan');
+    if (mine.length > 1) flag('có ' + mine.length + ' trigger chatAuditScan trùng nhau (chạy chồng, tranh khóa). Sửa: chạy batGiamSatChat(24) (xóa hết rồi tạo lại 1 cái).');
+    if (trs.length >= 19) flag('đã ' + trs.length + '/20 trigger — sắp/đã chạm giới hạn 20, không tạo thêm được.');
+  } catch (e1) { flag('không đọc được danh sách trigger: ' + (e1 && e1.message || e1)); }
+
+  say('2) LẦN CHẠY GẦN NHẤT CỦA TRIGGER (dấu đã chạy)');
+  var lastRun = props.getProperty('cvLastRun'), lastOk = props.getProperty('cvLastOkAt'), lastRes = props.getProperty('cvLastRes') || '';
+  if (!lastRun) say('   (chưa có dấu chạy: bản mã này mới triển khai hoặc trigger chưa chạy lần nào kể từ đó — đợi 5–10 phút rồi chạy lại chanDoanGiamSatChat)');
+  else {
+    say('   Chạy gần nhất: ' + human(ageMin(lastRun)) + '; lần thành công gần nhất: ' + (lastOk ? human(ageMin(lastOk)) : '(chưa có)') + '; kết quả: ' + lastRes);
+    var ar = ageMin(lastRun);
+    if (ar !== null && ar > 20) flag('trigger KHÔNG chạy trong ' + human(ar) + ' (phải mỗi 5 phút). Trigger có thể bị Google tạm dừng. ' + QUOTA_HINT);
+    else if (/"note":"loi/.test(lastRes)) flag('lần chạy gần nhất BÁO LỖI: ' + lastRes + (isQuota(lastRes) ? ' → ' + QUOTA_HINT : ''));
+    else ok('trigger đang chạy đều, lần gần nhất không lỗi');
+  }
+
+  say('3) MỐC QUÉT + WEBHOOK PANCAKE (bảng pk_messages)');
+  var cursor = props.getProperty('cvCursor') || '', cAge = cursor ? ageMin(cursor) : null;
+  say('   Mốc quét cvCursor = ' + (cursor || '(trống)') + (cursor ? ' (' + human(cAge) + ')' : ''));
+  if (cAge !== null && cAge < -5) flag('mốc quét nằm ở TƯƠNG LAI (' + human(cAge) + ') → mọi tin mới đều bị coi là "cũ", không quét gì. Sửa: chạy batGiamSatChat(24) để đặt lại mốc.');
+  try {
+    var lo = sb_('GET', 'pk_messages?select=sent_at&direction=eq.out&order=sent_at.desc.nullslast&limit=1').json || [];
+    var loAge = lo.length ? ageMin(lo[0].sent_at) : null;
+    say('   Tin GỬI RA mới nhất trong Supabase: ' + (lo.length ? lo[0].sent_at + ' (' + human(loAge) + ')' : '(không có)'));
+    if (!lo.length || (loAge !== null && loAge > 1440)) flag('Supabase KHÔNG nhận tin gửi ra mới trong ' + (loAge === null ? 'một thời gian dài' : human(loAge)) + ' → webhook Pancake đã ngừng ghi (token/page bị ngắt, hoặc Worker/Supabase lỗi). Không có tin thì không có gì để quét. Kiểm tra webhook Pancake + bảng pk_webhook_raw.');
+    else ok('webhook đang ghi tin gửi ra');
+    if (cursor) {
+      var pend = sb_('GET', 'pk_messages?select=id&direction=eq.out&sent_at=gt.' + _pkEnc_(cursor) + '&limit=500').json || [];
+      say('   Tin gửi ra CHƯA quét (sau mốc): ' + pend.length + (pend.length >= 500 ? '+' : ''));
+      if (pend.length && lastOk && ageMin(lastOk) <= 20 && cAge !== null && cAge > 60) flag('trigger chạy ổn nhưng mốc quét không nhúc nhích (lần cuối: ' + human(cAge) + ') dù có ' + pend.length + ' tin chưa quét → quét bị kẹt ở một tin lỗi. Báo Claude kèm dòng "kết quả" ở mục 2.');
+    }
+  } catch (e2) {
+    var m2 = String(e2 && e2.message || e2);
+    flag('KHÔNG đọc được Supabase (pk_messages): ' + m2 + (isQuota(m2) ? ' → ' + QUOTA_HINT : ' → kiểm tra khóa/URL Supabase trong Script Properties.'));
+  }
+
+  say('4) DANH SÁCH TỪ CẤM');
+  try {
+    var cfg = _bannedCfg_(), comp = _cvBannedCompiled_();
+    say('   Cấu hình: dùng thêm sheet = ' + (cfg.useSheet ? 'BẬT' : 'TẮT') + ', từ thêm trong ⚙ Cấu hình = ' + cfg.items.length + '; từ bỏ qua = "' + (getSetting_('chatAuditIgnore') || '') + '"; ĐANG DÙNG ' + comp.length + ' từ/cụm');
+    if (!comp.length) flag('danh sách từ cấm đang RỖNG → quét dừng ("chưa đọc được danh sách từ cấm"). Sửa: ⚙ Cấu hình → 🚫 Từ cấm → bật "Dùng thêm sheet" hoặc thêm từ; kiểm tra Settings chatAuditIgnore không bỏ hết.');
+    else ok(comp.length + ' từ/cụm cấm đang dùng');
+  } catch (e3) { flag('không dựng được danh sách từ cấm: ' + (e3 && e3.message || e3)); }
+
+  say('5) NGƯỜI NHẬN THÔNG BÁO');
+  try {
+    var ad = _cvAdmins_(), ns = String(getSetting_('chatAuditNotifySale') || '').trim().toLowerCase();
+    say('   Admin nhận: ' + ad.join(', ') + '; báo cả chính sale: ' + ((ns === '0' || ns === 'false' || ns === 'off' || ns === 'tat') ? 'TẮT' : 'BẬT'));
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [], have = {};
+    users.forEach(function (u) { have[String(u.username || '').toLowerCase()] = u; });
+    ad.forEach(function (a) { if (!have[a]) flag('admin nhận cảnh báo "' + a + '" KHÔNG có trong sheet tài khoản (sai tên đăng nhập?) → thông báo gửi cho người không tồn tại. Sửa: datChatAuditAdmin("tên đăng nhập đúng").'); else if (have[a].active === false) flag('tài khoản admin "' + a + '" đang bị KHÓA → không nhận thông báo.'); });
+  } catch (e4) { say('   (không kiểm tra được người nhận: ' + (e4 && e4.message || e4) + ')'); }
+
+  say('6) KẾT QUẢ ĐÃ GHI (sheet ChatViolations + Thông báo)');
+  try {
+    var cv = getSheet_(CV_SHEET, CV_HEADERS), n = cv.getLastRow();
+    if (n < 2) say('   ChatViolations: chưa có dòng nào (chưa từng phát hiện vi phạm)');
+    else {
+      var vr = cv.getRange(Math.max(2, n - 299), 2, Math.min(300, n - 1), 1).getValues(), d24 = 0, d7 = 0;
+      vr.forEach(function (r) { var a = ageMin(r[0]); if (a !== null && a <= 1440) d24++; if (a !== null && a <= 10080) d7++; });
+      say('   ChatViolations: ' + (n - 1) + ' dòng; phát hiện gần nhất ' + human(ageMin(cv.getRange(n, 2).getValue())) + '; 24 giờ qua: ' + d24 + ', 7 ngày qua: ' + d7);
+    }
+    var nt = getSheet_(SH_NOTIF, NOTIF_HEADERS), nn = nt.getLastRow(), lastN = null;
+    if (nn >= 2) { var nr = nt.getRange(Math.max(2, nn - 999), 1, Math.min(1000, nn - 1), NOTIF_HEADERS.length).getValues(); for (var i = nr.length - 1; i >= 0; i--) { if (String(nr[i][3]) === 'chatviolation') { lastN = nr[i][8]; break; } } }
+    say('   Thông báo "chatviolation" gần nhất: ' + (lastN ? human(ageMin(lastN)) : '(không thấy trong 1000 thông báo gần nhất)'));
+  } catch (e5) { say('   (không đọc được kết quả đã ghi: ' + (e5 && e5.message || e5) + ')'); }
+
+  say('══ KẾT LUẬN ══');
+  if (!bad.length) say('✅ Không thấy lỗi hệ thống: trigger chạy, webhook ghi tin, từ cấm có, người nhận hợp lệ. Nếu vẫn không có cảnh báo thì có thể đơn giản là KHÔNG có tin nào dùng từ cấm trong khoảng này (hoặc từ đó nằm trong chatAuditIgnore). Thử: chayGiamSatChat rồi xem log.');
+  else { say('Tìm thấy ' + bad.length + ' vấn đề:'); bad.forEach(function (b, i) { say((i + 1) + '. ' + b); }); }
+  return { problems: bad };
+}
 // Bat giam sat: tao trigger 5 phut/lan va dat moc quet tu gioQuaKhu gio truoc (mac dinh 1 gio; toi da 72).
 function batGiamSatChat(gioQuaKhu) {
   var h = Math.min(72, Math.max(0, Number(gioQuaKhu) >= 0 ? Number(gioQuaKhu) : 1));

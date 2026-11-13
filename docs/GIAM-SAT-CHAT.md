@@ -21,6 +21,9 @@ Yêu cầu Duyên: Pancake AI kiểm soát được việc nhắn tin của nhâ
 4. `batGiamSatChat(24)` — tạo trigger 5 phút/lần và quét lùi 24 giờ (tối đa 72). Chạy thử ngay: `chayGiamSatChat`, rồi xem sheet `ChatViolations` + chuông thông báo của `duyenht`.
 5. Tắt: `tatGiamSatChat`.
 
+## Chẩn đoán khi "không thấy ai quét / không có thông báo" (13/11/2026)
+Chạy **`chanDoanGiamSatChat`** trong Apps Script Editor (chỉ đọc, không quét thật, không ghi gì). Nó kiểm: (1) trigger `chatAuditScan` có tồn tại/trùng/gần chạm 20 trigger; (2) dấu đã chạy `cvLastRun/cvLastOkAt/cvLastRes` (do `chatAuditScan` ghi mỗi 5 phút) — trigger im > 20 phút hoặc lần gần nhất báo `loi` thì nêu rõ; (3) mốc `cvCursor` (ở tương lai? đứng yên dù có tin chưa quét?) + tin gửi ra mới nhất trong `pk_messages` (webhook còn ghi không); (4) danh sách từ cấm đang dùng (rỗng → quét dừng); (5) admin nhận cảnh báo có tồn tại/không bị khóa; (6) dòng mới nhất ở `ChatViolations` và thông báo `chatviolation`. Cuối log có **KẾT LUẬN** liệt kê vấn đề + cách sửa. Nguyên nhân hay gặp nhất: hết hạn mức Apps Script trong ngày (mọi trigger lỗi im lặng) hoặc trigger bị mất → `batGiamSatChat(24)`. Test: `node tools/test-chat-audit-diag.js`.
+
 ## Giới hạn đã biết (đọc kỹ)
 - **Ai là người gửi:** Pancake KHÔNG trả tên nhân viên cho từng tin gửi từ app Pancake (docs/PANCAKE-INBOX.md). Tên lấy theo thứ tự `crm_user` > `staff_name` > `raw.from.admin_name`; không có thì ghi **"(chưa rõ nhân viên)"** kèm Page + hội thoại để tra. Chạy `pkXemNguoiChat` nếu muốn xác nhận trường tên thật.
 - **Không chặn trước khi gửi** (giai đoạn 1 chỉ phát hiện sau khi tin đã gửi, trễ ≤ 5 phút). Chặn/cảnh báo trước khi gửi là giai đoạn 2.
