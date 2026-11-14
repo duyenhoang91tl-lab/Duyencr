@@ -135,7 +135,7 @@ function treeRows(n, depth) {
       (has && open ? '<div class="tkids">' + treeRows(c, depth + 1) + '</div>' : '');
   }).join('');
 }
-function expandPath(p) { var parts = p.split('/'); for (var i = 1; i < parts.length; i++) S.open[parts.slice(0, i).join('/')] = true; }
+function expandPath(p) { var parts = p.split('/'); for (var i = 1; i <= parts.length; i++) S.open[parts.slice(0, i).join('/')] = true; }
 function allPaths(n, out) { sortedKids(n).forEach(function (c) { out.push(c.path); allPaths(c, out); }); return out; }
 function fillNhom() {
   var t = buildTree();

@@ -58,6 +58,87 @@ function _vtCustomerName() {
   return null;
 }
 
+
+// ---------- CÂY THƯ MỤC mẹ/con (2026-11-14, Duyên: chọn thư mục kiểu dropdown, mẹ xổ con theo hàng dọc; tạo mẫu cũng tạo được thư mục mẹ/con) ----------
+// nhom = đường dẫn "Mẹ/Con/Cháu" (server _vtNhom_ cắt tối đa 3 cấp). 2 panel dùng chung 1 bộ vẽ cây: 'f' = LỌC danh sách, 'p' = CHỌN thư mục trong form (thêm ＋ con / mẹ mới).
+// Chọn thư mục mẹ = gồm mọi con cháu (khớp theo tiền tố path + '/', nên "Túi" KHÔNG khớp nhầm "Túi tiền").
+var _VT_CHUNG = '*chung', _VT_MAXDEPTH = 3;
+_vtSt.nf = ''; _vtSt.fold = {}; _vtSt.open = { f: {}, p: {} };
+function _vtNP(n) { return String(n || '').split(/[\/\\>]+/).map(function (x) { return x.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('/'); }
+function _vtInNhom(sn, sel) { if (!sel) return true; var p = _vtNP(sn); if (sel === _VT_CHUNG) return p === ''; return p === sel || p.indexOf(sel + '/') === 0; }
+function _vtTreeBuild() {
+  var root = { kids: {} }, chung = 0;
+  _vtSt.list.forEach(function (s) {
+    var parts = _vtNP(s.nhom).split('/').filter(Boolean); if (!parts.length) { chung++; return; }
+    var cur = root; parts.forEach(function (nm, i) { if (!cur.kids[nm]) cur.kids[nm] = { name: nm, path: parts.slice(0, i + 1).join('/'), kids: {}, count: 0 }; cur = cur.kids[nm]; cur.count++; });
+  });
+  return { root: root, chung: chung };
+}
+function _vtKids(n) { return Object.keys(n.kids).sort(function (a, b) { return a.localeCompare(b, 'vi'); }).map(function (k) { return n.kids[k]; }); }
+function _vtPaths(n, out) { _vtKids(n).forEach(function (c) { out.push(c.path); _vtPaths(c, out); }); return out; }
+function _vtTreeRows(n, kind, sel) {
+  return _vtKids(n).map(function (c) {
+    var has = _vtKids(c).length > 0, open = !!_vtSt.open[kind][c.path], depth = c.path.split('/').length;
+    return '<div class="vtn' + (sel === c.path ? ' on' : '') + '"><span class="vtg" data-vtn="tg" data-p="' + _vtEsc(c.path) + '">' + (has ? (open ? '▾' : '▸') : '·') + '</span>' +
+      '<span class="vtl" data-vtn="pick" data-p="' + _vtEsc(c.path) + '">📁 ' + _vtEsc(c.name) + '</span><span class="vtc">' + c.count + '</span>' +
+      (kind === 'p' && depth < _VT_MAXDEPTH ? '<span class="vta" data-vtn="add" data-p="' + _vtEsc(c.path) + '" title="Tạo thư mục con trong ' + _vtEsc(c.name) + '">＋</span>' : '') + '</div>' +
+      (has && open ? '<div class="vtk">' + _vtTreeRows(c, kind, sel) + '</div>' : '');
+  }).join('');
+}
+function _vtPanelHtml(kind) {
+  var t = _vtTreeBuild(), sel = kind === 'f' ? _vtSt.nf : _vtNP((document.getElementById('vt-f-nhom') || {}).value);
+  var h = '<div class="vtt"><a href="#" data-vtn="all" data-v="1">Mở hết</a><a href="#" data-vtn="all" data-v="0">Thu hết</a>' + (kind === 'p' ? '<a href="#" data-vtn="newroot">＋ Thư mục mẹ mới</a>' : '') + '</div>';
+  if (kind === 'f') {
+    h += '<div class="vtn' + (!sel ? ' on' : '') + '"><span class="vtg"></span><span class="vtl" data-vtn="pick" data-p="">🗂 Tất cả thư mục</span><span class="vtc">' + _vtSt.list.length + '</span></div>';
+    if (t.chung) h += '<div class="vtn' + (sel === _VT_CHUNG ? ' on' : '') + '"><span class="vtg"></span><span class="vtl" data-vtn="pick" data-p="' + _VT_CHUNG + '">Chưa phân nhóm</span><span class="vtc">' + t.chung + '</span></div>';
+  } else h += '<div class="vtn' + (!sel ? ' on' : '') + '"><span class="vtg"></span><span class="vtl" data-vtn="pick" data-p="">Không thư mục (chưa phân nhóm)</span></div>';
+  var rows = _vtTreeRows(t.root, kind, sel);
+  return h + (rows || (kind === 'p' ? '<div style="font-size:11px;color:var(--muted);padding:6px">Chưa có thư mục nào — bấm "＋ Thư mục mẹ mới" hoặc gõ thẳng vào ô (VD: Túi tiền/Cổ).</div>' : ''));
+}
+function _vtExpandTo(kind, p) { var a = String(p || '').split('/'); for (var i = 1; i <= a.length; i++) _vtSt.open[kind][a.slice(0, i).join('/')] = true; }
+function _vtRenderPanel(kind) { var el = document.getElementById(kind === 'f' ? 'vt-nf-panel' : 'vt-np-panel'); if (el) el.innerHTML = _vtPanelHtml(kind); }
+function _vtNfLabel() { var v = _vtSt.nf; return v === '' ? '🗂 Tất cả thư mục ▾' : v === _VT_CHUNG ? 'Chưa phân nhóm ▾' : '📁 ' + v.split('/').join(' › ') + ' ▾'; }
+function vtToggleTree(kind) {
+  var el = document.getElementById(kind === 'f' ? 'vt-nf-panel' : 'vt-np-panel'); if (!el) return;
+  var other = document.getElementById(kind === 'f' ? 'vt-np-panel' : 'vt-nf-panel'); if (other) other.hidden = true;
+  if (el.hidden) { var cur = kind === 'f' ? _vtSt.nf : _vtNP(document.getElementById('vt-f-nhom').value); if (cur && cur !== _VT_CHUNG) _vtExpandTo(kind, cur); _vtRenderPanel(kind); }
+  el.hidden = !el.hidden;
+}
+function _vtAskName(parent) {
+  var nm = prompt(parent ? 'Tên thư mục con trong "' + parent.split('/').join(' › ') + '":' : 'Tên thư mục mẹ mới:'); if (nm == null) return '';
+  nm = _vtNP(nm); if (!nm || nm.indexOf('/') >= 0) { if (nm) alert('Tên thư mục không được chứa dấu / hoặc >.'); return ''; } return nm;
+}
+(function () {
+  try { var st = document.createElement('style'); st.id = 'vt-tree-css'; st.textContent =
+    '.vt-tree-wrap{position:relative;display:inline-block}.vt-tree-panel{position:absolute;left:0;top:calc(100% + 4px);z-index:60;min-width:280px;max-width:min(92vw,380px);max-height:60vh;overflow:auto;background:var(--surface,#fff);border:1px solid var(--border,#d0d0d0);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:6px;font-size:13px}' +
+    '.vt-tree-panel[hidden]{display:none}.vtt{display:flex;gap:12px;padding:2px 6px 6px;font-size:12px}.vtt a{color:var(--accent,#1e66f5);text-decoration:none}' +
+    '.vtn{display:flex;align-items:center;gap:4px;border-radius:7px;padding:1px 2px}.vtn:hover{background:var(--surface2,#f3f4f6)}.vtn.on{background:rgba(30,102,245,.12);font-weight:700}' +
+    '.vtg{flex:0 0 26px;text-align:center;cursor:pointer;color:var(--muted);padding:6px 0}.vtl{flex:1;min-width:0;cursor:pointer;padding:6px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vtc{font-size:11px;color:var(--muted)}' +
+    '.vta{cursor:pointer;color:var(--accent,#1e66f5);font-weight:700;padding:4px 8px;border-radius:6px}.vta:hover{background:rgba(30,102,245,.15)}.vtk{margin-left:16px;border-left:2px solid var(--border,#e3e6ea)}' +
+    '.vt-fold{cursor:pointer;user-select:none}';
+    document.head.appendChild(st); } catch (e) {}
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-vtn]');
+    if (!t) { if (!(e.target.closest && e.target.closest('.vt-tree-wrap'))) ['vt-nf-panel', 'vt-np-panel'].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = true; }); return; }
+    var act = t.getAttribute('data-vtn'), p = t.getAttribute('data-p') || '', pan = t.closest('.vt-tree-panel'), kind = pan ? (pan.id === 'vt-nf-panel' ? 'f' : 'p') : '';
+    if (act === 'fold') { _vtSt.fold[p] = !_vtSt.fold[p]; vtRender(); return; }
+    if (!pan) return;
+    if (act === 'all') { e.preventDefault(); _vtSt.open[kind] = {}; if (t.getAttribute('data-v') === '1') _vtPaths(_vtTreeBuild().root, []).forEach(function (x) { _vtSt.open[kind][x] = true; }); _vtRenderPanel(kind); return; }
+    if (act === 'tg') { _vtSt.open[kind][p] = !_vtSt.open[kind][p]; _vtRenderPanel(kind); return; }
+    if (act === 'pick') {
+      pan.hidden = true;
+      if (kind === 'f') { _vtSt.nf = p; vtRender(); } else document.getElementById('vt-f-nhom').value = p;
+      return;
+    }
+    if (act === 'add' || act === 'newroot') {
+      e.preventDefault(); var nm = _vtAskName(act === 'add' ? p : ''); if (!nm) return;
+      var np = act === 'add' ? p + '/' + nm : nm; if (np.split('/').length > _VT_MAXDEPTH) { alert('Tối đa ' + _VT_MAXDEPTH + ' cấp thư mục.'); return; }
+      document.getElementById('vt-f-nhom').value = np; pan.hidden = true;
+      if (typeof toast === 'function') toast('Thư mục "' + np.split('/').join(' › ') + '" sẽ được tạo khi bấm Lưu viết tắt');
+    }
+  });
+})();
+
 // ---------- nạp dữ liệu ----------
 function loadVietTat(force) {
   if (typeof gsUrl === 'undefined' || !gsUrl) return Promise.resolve();
@@ -79,10 +160,12 @@ function vtRender() {
   var q = _vtFold((document.getElementById('vt-search') || {}).value || '');
   var sf = (document.getElementById('vt-scope-filter') || {}).value || '';
   var hint = document.getElementById('vt-hint');
+  var nfb = document.getElementById('vt-nf-btn'); if (nfb) nfb.textContent = _vtNfLabel();
   if (hint) hint.textContent = _vtSt.canTeam ? 'Bạn là admin: mục "👥 Chung" cả team dùng được; mục "🙋 Của tôi" chỉ mình bạn thấy.' : 'Mục "👥 Chung" do admin quản lý (cả team dùng). Bạn tạo được mục "🙋 Của tôi" — chỉ mình bạn thấy và dùng.';
   if (_vtSt.err && !_vtSt.list.length) { el.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải viết tắt: ' + _vtEsc(_vtSt.err) + ' <button class="btn sm" onclick="loadVietTat(true)">Thử lại</button></div>'; return; }
   var rows = _vtSt.list.filter(function (s) {
     if (sf && s.scope !== sf) return false;
+    if (_vtSt.nf && !_vtInNhom(s.nhom, _vtSt.nf)) return false;
     if (!q) return true;
     return _vtFold([s.abbr, s.keyword, s.nhom, s.options.join(' ')].join(' ')).indexOf(q) >= 0;
   });
@@ -93,10 +176,14 @@ function vtRender() {
   names.forEach(function (g) {
     var parts = g ? g.split('/') : [], depth = Math.max(parts.length - 1, 0);
     if (!g) html += '<div style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px">🗂 Chưa phân nhóm</div>';
-    for (var k = 1; k <= parts.length; k++) {   // thư mục cha chưa có mục riêng vẫn hiện tiêu đề để thấy cây
+    var qOn = !!q, hid = function (path, self) { var ps = path ? path.split('/') : [], lim = self ? ps.length : ps.length - 1; for (var j = 1; j <= lim; j++) if (_vtSt.fold[ps.slice(0, j).join('/')]) return true; return false; };
+    for (var k = 1; k <= parts.length; k++) {   // thư mục cha chưa có mục riêng vẫn hiện tiêu đề để thấy cây; bấm tiêu đề = thu/xổ thư mục con
       var pre = parts.slice(0, k).join('/'); if (shown[pre]) continue; shown[pre] = 1;
-      html += '<div title="' + _vtEsc(pre) + '" style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px;padding-left:' + ((k - 1) * 16) + 'px">' + (k > 1 ? '└ ' : '') + '🗂 ' + _vtEsc(parts[k - 1]) + '</div>';
+      if (!qOn && hid(pre, false)) continue;
+      var cnt = rows.filter(function (r) { return _vtInNhom(r.nhom, pre); }).length;
+      html += '<div class="vt-fold" data-vtn="fold" data-p="' + _vtEsc(pre) + '" title="Bấm để ' + (_vtSt.fold[pre] ? 'xổ' : 'thu') + ' thư mục — ' + _vtEsc(pre) + '" style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px;padding-left:' + ((k - 1) * 16) + 'px">' + (_vtSt.fold[pre] && !qOn ? '▸' : '▾') + ' 🗂 ' + _vtEsc(parts[k - 1]) + ' <span style="font-weight:400">(' + cnt + ')</span></div>';
     }
+    if (!qOn && hid(g, true)) return;
     html += (groups[g] || []).sort(function (a, b) { return String(a.abbr).localeCompare(String(b.abbr), 'vi'); }).map(function (s) {
       var can = _vtCanEdit(s);
       var kw = String(s.keyword || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean).map(function (k) { return '<span class="zi-chip">' + _vtEsc(k) + '</span>'; }).join(' ');
@@ -125,6 +212,7 @@ function vtAddOpt(v) { var w = document.getElementById('vt-f-opts'); if (w && w.
 function vtOpenForm(id) {
   var s = id ? _vtSt.list.find(function (x) { return x.id === id; }) : null;
   if (s && s.fromTpl) { alert('Mục này lấy từ Mẫu tin đã duyệt — sửa ở 📚 Quản lý mẫu (tab Zalo AI).'); return; }
+  var pp0 = document.getElementById('vt-np-panel'); if (pp0) pp0.hidden = true;
   document.getElementById('vt-f-id').value = s ? s.id : '';
   document.getElementById('vt-f-abbr').value = s ? s.abbr : '';
   document.getElementById('vt-f-keyword').value = s ? (s.keyword || '') : '';
@@ -252,7 +340,7 @@ async function _vtUploadFiles(files) {
     (over ? ' · Bỏ qua ' + over + ' ảnh vì mỗi mục tối đa ' + _VT_MAX_IMGS + ' ảnh.' : '') + (notImg ? ' · Bỏ qua ' + notImg + ' tệp không phải ảnh.' : '') +
     (okN ? ' Nhớ bấm Lưu.' : ''));
 }
-function vtCloseForm() { _vtUploadSeq++; _vtUploading = 0; _vtSetUploadBusy(false); document.getElementById('vt-form-wrap').style.display = 'none'; }
+function vtCloseForm() { var pp = document.getElementById('vt-np-panel'); if (pp) pp.hidden = true; _vtUploadSeq++; _vtUploading = 0; _vtSetUploadBusy(false); document.getElementById('vt-form-wrap').style.display = 'none'; }
 async function vtSave() {
   var abbr = (document.getElementById('vt-f-abbr').value || '').trim();
   var opts = Array.prototype.map.call(document.querySelectorAll('#vt-f-opts textarea'), function (t) { return t.value.trim(); }).filter(Boolean);

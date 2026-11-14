@@ -838,6 +838,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         </div>
         <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="vt-tree-wrap"><button type="button" class="assign-input" id="vt-nf-btn" onclick="vtToggleTree('f')" style="font-size:12px;padding:4px 8px;cursor:pointer;text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lọc theo thư mục — chọn thư mục mẹ sẽ gồm cả thư mục con">🗂 Tất cả thư mục ▾</button><div id="vt-nf-panel" class="vt-tree-panel" hidden></div></span>
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
           <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
@@ -860,6 +861,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
+            <span class="vt-tree-wrap"><button type="button" class="btn sm" id="vt-np-btn" onclick="vtToggleTree('p')" title="Chọn thư mục có sẵn (mẹ/con) hoặc tạo thư mục mới">📂 Chọn / tạo thư mục ▾</button><div id="vt-np-panel" class="vt-tree-panel" hidden></div></span>
             <select id="vt-f-scope" class="assign-input" style="min-width:170px" title="Chung: cả team dùng (chỉ admin tạo). Của tôi: chỉ mình bạn thấy"><option value="me">🙋 Của tôi (chỉ mình tôi)</option><option value="team">👥 Chung (cả team)</option></select>
           </div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
@@ -1785,7 +1787,7 @@ function openBcLogModal(phone){
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
 <script src="js/59-fn-mobilefit.js"></script>
-<script src="js/57-viettat.js?v=20261114a"></script>
+<script src="js/57-viettat.js?v=20261114b"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-conn-diag.js"></script>
 <script src="js/59-report-drill.js?v=20261111a"></script>

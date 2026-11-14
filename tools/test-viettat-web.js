@@ -33,7 +33,7 @@ function mk(opts) {
   ok(d.getElementById('setup').style.display === 'block' && d.getElementById('top').style.display === 'none', 'chua co ten CS -> man nhap Ten CS');
   d.getElementById('nm').value = 'Mai'; d.getElementById('save').click(); await sleep(20);
   ok(urls.length === 1 && /action=vietTat&by=Mai$/.test(urls[0]) && w.localStorage.getItem('vt_name') === 'Mai', 'luu ten -> goi GAS action=vietTat&by=Mai, nho ten tren may');
-  ok(d.querySelectorAll('.chip').length === 4, 'chua go gi -> hien chip thu muc (4 thu muc)');
+  ok(d.querySelectorAll('.chip').length === 3, 'chua go gi -> hien chip thu muc CAP 1 (Tui tien, Anh, Chung = 3; con Co/Lac nam trong cay)');
   const q = d.getElementById('q'); const type = v => { q.value = v; q.dispatchEvent(new w.Event('input')); };
   type('ch'); ok(d.querySelectorAll('.card').length === 2 && /ch/.test(d.querySelector('.grp').textContent), 'go "ch" -> 2 lua chon cua muc ch');
   type('chao'); ok(d.querySelectorAll('.card').length === 2, 'tu khoa khong dau "chao" khop "chào"');
@@ -52,7 +52,13 @@ function mk(opts) {
   ok(/Đã sao chép 2/.test(d.getElementById('toast').textContent), 'bao da sao chep 2 noi dung');
   d.getElementById('clear').click(); ok(d.getElementById('copy').disabled, 'Bo chon -> nut Sao chep tat');
   // chon thu muc bang chip
-  type(''); d.querySelector('.chip[data-nhom="Túi tiền/Lắc"]').click(); ok(d.querySelectorAll('.card').length === 1 && d.getElementById('nhom').value === 'Túi tiền/Lắc', 'bam chip thu muc -> loc theo thu muc');
+  type(''); d.querySelector('.chip[data-nhom="Túi tiền"]').click();
+  ok(d.querySelectorAll('.card').length === 3, 'bam chip thu muc ME "Tui tien" -> gom ca thu muc con Co + Lac (2+1 noi dung): ' + d.querySelectorAll('.card').length);
+  // cay thu muc: mo dropdown -> con hien theo hang doc -> chon thu muc con
+  d.getElementById('nhomBtn').click(); ok(!d.getElementById('nhomPanel').hidden, 'dropdown thu muc mo ra');
+  ok(d.querySelector('#nhomPanel [data-pick="Túi tiền/Lắc"]'), 'thu muc me dang chon -> con Lac hien trong cay');
+  d.querySelector('#nhomPanel [data-pick="Túi tiền/Lắc"]').click();
+  ok(d.querySelectorAll('.card').length === 1 && d.getElementById('nhomBtn').textContent.indexOf('Lắc') >= 0, 'chon thu muc con trong cay -> loc dung 1 noi dung + nut hien ten');
   // mat mang: dung ban da luu tren may
   ({ w, d } = mk({ name: 'Mai' })); await sleep(20);
   const cache = w.localStorage.getItem('vt_cache'); ok(cache && JSON.parse(cache).length === 4, 'tai xong -> luu ban sao tren may');
