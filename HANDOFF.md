@@ -14,7 +14,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
   - Mapping: `id=tpl_<id mẫu>`, `abbr` = tiêu đề bỏ dấu + khoảng trắng (≤30 ký tự; trùng → thêm số 2,3…; viết tắt trong sheet `VietTat` luôn THẮNG), `nhom` = `Mẫu tin[/Nhóm SP]`, `options` = [nội dung mẫu], `keyword` = tiêu đề, chữ cái đầu (vd `ckm`), từng sản phẩm, chủ đề, tag, từng từ (≤200 ký tự; client khớp theo tiền tố), `images` = ảnh đính kèm mẫu (lấy ID Drive từ URL; `vietTatImage_` tự cho phép vì đi qua `readVietTat_`). Cờ `fromTpl:true, tplId`. Tối đa 300 mẫu (mới nhất trước). Lỗi đọc mẫu/Users → bỏ qua im lặng, Viết tắt cũ vẫn chạy.
   - Phạm vi CỐ Ý hẹp: chỉ mẫu ADMIN tạo (theo yêu cầu "duyenht"); mẫu nhân viên đề xuất rồi được duyệt KHÔNG tự vào Viết tắt. Muốn mở rộng → bỏ dòng lọc `admins[...]` trong `_vtFromTemplates_`.
   - Test: `node tools/test-viettat-tpl.js` (24 ca: chỉ duyệt+admin, trùng viết tắt, ảnh, quyền ảnh, Users lỗi, trần 300; đã thử đột biến bỏ lọc admin / bỏ lọc duyệt → FAIL); `test-viettat-gas/same`, `test-msgtpl`, `test-tpl-notify-gas` vẫn PASS. GAS tự deploy (Actions `deploy-gas.yml` xanh).
-### ⏭ Bước 4 — CRM tab Viết tắt (`js/57-viettat.js`): mục `fromTpl` hiện nhãn "từ Mẫu tin" và ẨN nút Sửa/Xoá (sửa ở Quản lý mẫu); bump `?v=` trong index.html.
+### ✅ Bước 4 — CRM tab Viết tắt (`js/57-viettat.js`, `?v=20261114a`): mục `fromTpl` hiện nhãn "📝 Từ Mẫu tin", ẨN nút Sửa/Xoá, và `vtOpenForm`/`vtDelete` chặn có báo "sửa ở 📚 Quản lý mẫu" (không gọi server). Test mới `NODE_PATH=<jsdom> node tools/test-viettat-crm-tpl.js` (17 ca, đã thử đột biến); `test-viettat-crm.js` vẫn PASS; `build-dist` + `test-dist-equivalence` OK. **Duyên: Ctrl+F5 CRM.**
+
+### 🧪 CÒN LẠI — Duyên làm tay để kiểm chứng thật (máy chat không có Chrome/Zalo/Pancake thật)
+1. Chờ tab Actions: "Deploy GAS to Apps Script" xanh (bước 3 là backend).
+2. Ctrl+F5 CRM; reload extension **Pancake AI** + **Zalo AI** ở `chrome://extensions`.
+3. Mỗi extension: Cài đặt → đăng nhập admin (`duyenht` + mật khẩu CRM). Rồi tạo 1 mẫu tin trong panel → thông báo phải ra "dùng được ngay" và CRM → Zalo AI → 📚 Quản lý mẫu thấy trạng thái **Đã duyệt**. Nếu chưa đăng nhập admin ở extension thì mẫu VẪN "Chờ duyệt" (cố ý — không tin tên CS tự khai).
+4. Gõ viết tắt/từ khoá (vd `chaokhachmoi` hoặc chữ cái đầu `ckm`, hoặc gõ đầu tên sản phẩm) trong ô chat Pancake / Zalo / app Android (☁ CRM cập nhật) → mẫu hiện trong gợi ý; CRM → ⌨️ Viết tắt thấy thư mục "Mẫu tin" nhãn "📝 Từ Mẫu tin". Extension tự cập nhật viết tắt mỗi 5 phút (hoặc bấm nút cập nhật ngay).
+5. Chưa làm / quyết định mở: (a) mẫu nhân viên đề xuất rồi được duyệt KHÔNG tự vào Viết tắt (chỉ mẫu admin tạo); (b) CRM web đã duyệt luôn từ trước nên không đổi.
 - ⚠ Lỗi CÓ SẴN (không phải do phiên này, đã kiểm tại commit f9b082e): (1) `node tools/check-ext-parity.js` FAIL vì action `chatCoach` chỉ có ở Pancake AI, chưa ghi vào `tools/ext-parity-allow.json`; (2) `NODE_PATH=<jsdom> node tools/test-tpl-ui.js` FAIL ca "Pancake: chưa chọn CS → nhắc, không mở form" (sau commit 31e0286 "Tạo mẫu lưu sẵn khi chưa chọn CS").
 
 

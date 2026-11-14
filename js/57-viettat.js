@@ -72,7 +72,8 @@ function loadVietTat(force) {
 }
 
 // ---------- quản lý (tab Zalo AI) ----------
-function _vtCanEdit(s) { return s.scope === 'team' ? _vtSt.canTeam : true; }
+// Muc fromTpl = mau tin da duyet cua admin do SERVER them vao danh sach (khong nam trong sheet VietTat): sua/xoa o "Quan ly mau", khong o day (gui saveVietTat/deleteVietTat se bao 'khong tim thay').
+function _vtCanEdit(s) { return s.fromTpl ? false : (s.scope === 'team' ? _vtSt.canTeam : true); }
 function vtRender() {
   var el = document.getElementById('vt-list'); if (!el) return;
   var q = _vtFold((document.getElementById('vt-search') || {}).value || '');
@@ -102,7 +103,7 @@ function vtRender() {
       var imgs = (s.images || []).length ? '<div class="vt-imgs" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center"><span style="font-size:11px;color:var(--muted)">🖼 ' + s.images.length + ' ảnh</span>' +
         s.images.slice(0, 12).map(function (im) { return '<img src="' + _vtEsc(_vtThumb(im.id)) + '" alt="' + _vtEsc(im.name) + '" title="' + _vtEsc(im.name) + '" loading="lazy" referrerpolicy="no-referrer" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'; }).join('') + (s.images.length > 12 ? '<span style="font-size:11px;color:var(--muted)">+' + (s.images.length - 12) + ' ảnh nữa</span>' : '') + '</div>' : '';
       return '<div style="margin-left:' + (depth * 16) + 'px;border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);display:flex;gap:10px;align-items:flex-start;margin-bottom:4px">' +
-        '<div style="min-width:70px"><code style="font-size:13px;font-weight:700">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)">' + (s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
+        '<div style="min-width:70px"><code style="font-size:13px;font-weight:700">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt của admin — sửa/xoá ở 📚 Quản lý mẫu"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
         '<div style="flex:1;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
         s.options.map(function (o, i) { return '<div style="font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + '</div>' +
         (can ? '<div style="display:flex;gap:4px;flex-shrink:0"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtOpenForm(this.dataset.vtId)" title="Sửa">✏️</button><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtDelete(this.dataset.vtId)" title="Xoá">🗑</button></div>' : '') +
@@ -123,6 +124,7 @@ function _vtOptRow(v) {
 function vtAddOpt(v) { var w = document.getElementById('vt-f-opts'); if (w && w.children.length < 10) { var r = _vtOptRow(v); w.appendChild(r); r.querySelector('textarea').focus(); } }
 function vtOpenForm(id) {
   var s = id ? _vtSt.list.find(function (x) { return x.id === id; }) : null;
+  if (s && s.fromTpl) { alert('Mục này lấy từ Mẫu tin đã duyệt — sửa ở 📚 Quản lý mẫu (tab Zalo AI).'); return; }
   document.getElementById('vt-f-id').value = s ? s.id : '';
   document.getElementById('vt-f-abbr').value = s ? s.abbr : '';
   document.getElementById('vt-f-keyword').value = s ? (s.keyword || '') : '';
@@ -272,6 +274,7 @@ async function vtSave() {
 }
 async function vtDelete(id) {
   var s = _vtSt.list.find(function (x) { return x.id === id; });
+  if (s && s.fromTpl) { alert('Mục này lấy từ Mẫu tin đã duyệt — xoá ở 📚 Quản lý mẫu (tab Zalo AI).'); return; }
   if (!confirm('Xoá viết tắt "' + (s ? s.abbr : '') + '"?' + (s && s.scope === 'team' ? '\n(Mục CHUNG — cả team sẽ không dùng được nữa.)' : ''))) return;
   try {
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteVietTat', id: id }) });
