@@ -8,8 +8,9 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 ### ✅ Bước 1 — Hướng dẫn ẩn/hiện bằng nút 👁 (ext `2026.11.14.2`)
 `requestCustomerLookup`: thay khối hướng dẫn luôn hiện bằng nút `.pk-ai-hint-toggle` ("👁 Hướng dẫn tra cứu" ↔ "🙈 Ẩn hướng dẫn") + khối `.pk-ai-no-phone-hint` mặc định `display:none`. Nguyên nhân gốc: khối hướng dẫn chiếm ~1/3 chiều cao panel mỗi lần không nhận ra SĐT, đẩy mọi mục bên dưới xuống. Đã test mô phỏng jsdom (ẩn → hiện → ẩn: PASS). Chưa lưu trạng thái giữa các lần tra cứu (mỗi lần render lại mặc định ẩn — cố ý).
-### ⏭ Bước 2 — (ĐANG LÀM) chuyển `#pk-menu-wrap` lên ngay dưới `#pk-ai-phone-row`, trước `#pk-ai-customer`.
-### ⏭ Bước 3 — nút tắt (✕) trong `#pk-menu-wrap`: đặt `#pk-menu-sel` về "" + ẩn mọi `*-body` (dùng chung 1 hàm với handler change để không lệch). Lưu ý các chỗ khác set `#pk-menu-sel.value` rồi dispatch `change` (vd ~4334 "Mở mẫu tin nhắn") vẫn phải chạy.
+### ✅ Bước 2 — Dropdown "Chọn mục" lên đầu (ext `2026.11.14.2`)
+`injectPanel`: chuyển `<div id="pk-ai-customer">` xuống SAU `#pk-menu-wrap` → thứ tự trong `#pk-ai-body` giờ là: key-banner → cs-row → phone-row → **menu-wrap** → customer (thẻ khách/hướng dẫn) → cart… Nguyên nhân gốc: thẻ khách/hướng dẫn nằm trước dropdown nên đẩy dropdown xuống dưới. Mọi code dùng `querySelector('#pk-ai-customer')` theo id nên không phụ thuộc thứ tự (đã grep: không có nextElementSibling/insertBefore). Test jsdom kiểm thứ tự DOM: PASS.
+### ⏭ Bước 3 — (ĐANG LÀM) nút tắt (✕) trong `#pk-menu-wrap`: đặt `#pk-menu-sel` về "" + ẩn mọi `*-body` (dùng chung 1 hàm với handler change để không lệch). Lưu ý các chỗ khác set `#pk-menu-sel.value` rồi dispatch `change` (vd ~4334 "Mở mẫu tin nhắn") vẫn phải chạy.
 ### 🧪 Duyên làm tay: reload extension Pancake AI ở `chrome://extensions` rồi mở panel kiểm chứng (máy chat không có Pancake thật).
 
 

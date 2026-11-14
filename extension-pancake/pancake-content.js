@@ -408,8 +408,6 @@
           <button id="pk-link-chat-btn" title="Liên kết đoạn chat ĐANG MỞ với khách này — làm 1 lần để lần sau tự nhận diện dù không đọc được SĐT/khung Sản phẩm order">🔗</button>
           <button id="pk-add-new-btn" title="Mở ngay form thêm khách mới — không cần tra cứu trước, dán SĐT vào form rồi điền và lưu">＋ Thêm KH</button>
         </div>
-        <div id="pk-ai-customer"></div>
-
         <div id="pk-menu-wrap">
           <select id="pk-menu-sel">
             <option value="">— Chọn mục —</option>
@@ -479,6 +477,8 @@
             </div>
           </div>
         </div>
+
+        <div id="pk-ai-customer"></div>
 
         <div id="pk-cart-section" style="display:none">
           <div id="pk-cart-header" style="display:flex;justify-content:space-between;align-items:center">
