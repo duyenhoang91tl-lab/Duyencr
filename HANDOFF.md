@@ -14,7 +14,11 @@ Kế hoạch: **A** GAS · **B** CRM `js/57-viettat.js` (form "+ Tệp ghi âm")
 - Mục từ Mẫu tin (`fromTpl`) có `audios: []`.
 - Test mới `node tools/test-viettat-audio-gas.js` (40 ca, đã thử đột biến bỏ kiểm quyền → FAIL); 4 test Viết tắt cũ (`-gas/-same/-tpl/-tree`) cập nhật danh sách hàm + PASS.
 - GAS tự deploy (Actions `deploy-gas.yml`). **Chưa có client nào dùng** cho tới khi xong B/C.
-### ⏭ B — CRM `js/57-viettat.js`: nút "+ Tệp ghi âm" trong form Viết tắt (chọn nhiều tệp, tải từng tệp, nghe thử, gỡ), hiện 🎤 N ở danh sách; bump `?v=`. Rồi C — Android.
+### ✅ B — CRM `js/57-viettat.js` (`?v=20261114b`): form Viết tắt có "Chọn tệp ghi âm" (nhiều tệp, input accept audio/*,.m4a,.mp3,.aac,.wav,.ogg,.opus,.amr,.3gp,.flac)
+- Tải TUẦN TỰ từng tệp qua `vietTatUploadAudio`; bỏ tệp không phải âm thanh (nhận theo đuôi khi Android báo mime lạ), >10MB, vượt 10 tệp/mục; 1 tệp lỗi không làm hỏng các tệp còn lại.
+- Nghe thử: tệp vừa chọn dùng bản cục bộ; tệp đã lưu tải qua GET `vietTatAudio` rồi cache. Gỡ từng tệp. Lưu gửi `audios:[{id,name}]` (gỡ hết → `[]`). Bấm Lưu khi đang tải bị chặn; đóng/mở mục khác giữa lúc tải không làm tệp chui sang mục mới. Danh sách hiện "🎤 N tệp ghi âm: tên…".
+- Test mới `NODE_PATH=<jsdom> node tools/test-viettat-crm-audio.js` ALL OK; `test-viettat-crm/-crm-tpl/-tree` PASS; inline script OK; build-dist + test-dist-equivalence OK. Chưa thử trên trình duyệt thật. Cần Ctrl+F5.
+### ⏭ C — Android (☁ CRM tải tệp `audios` về dùng như 🎤) — chưa làm; không build được ở môi trường chat.
 
 ## 2026-11-14 (phiên Claude — Viết tắt: THƯ MỤC MẸ/CON dạng dropdown cây) — ĐANG LÀM, mỗi bước 1 push
 

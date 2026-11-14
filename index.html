@@ -875,6 +875,14 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px"><textarea id="vt-f-imglinks" class="zai-textarea" rows="2" data-vt="off" placeholder="https://drive.google.com/drive/folders/... hoặc https://drive.google.com/file/d/..." style="flex:1;min-width:0"></textarea><button type="button" class="btn sm" id="vt-f-imgbtn" onclick="vtFetchImgs()">➕ Lấy ảnh từ link</button></div>
           <div id="vt-f-imgmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
           <div id="vt-f-imgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
+          <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🎤 Tệp ghi âm kèm theo</b> <span id="vt-f-audcount"></span> — thêm <b>tệp ghi âm CÓ SẴN</b> trong máy / điện thoại (mp3, m4a, wav, ogg, aac, amr…), <b>không cần bấm ghi âm</b>. Tối đa <b>10 tệp</b>/mục, mỗi tệp tối đa <b>10 MB</b>. Bấm ▶ để nghe thử. Nhớ bấm <b>Lưu</b> sau khi thêm. (Mục vẫn cần có chữ ở phần Nội dung chèn.)</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="file" id="vt-f-audfiles" accept="audio/*,.m4a,.mp3,.aac,.wav,.ogg,.opus,.amr,.3gp,.flac" multiple data-vt="off" style="display:none" onchange="vtUploadAudios(this.files); this.value=''">
+            <button type="button" class="btn sm" id="vt-f-audbtn" onclick="document.getElementById('vt-f-audfiles').click()">🎵 Chọn tệp ghi âm từ máy / điện thoại</button>
+            <span style="font-size:11px;color:var(--muted)">chọn được nhiều tệp cùng lúc</span>
+          </div>
+          <div id="vt-f-audmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
+          <div id="vt-f-auds" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
             <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
             <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
@@ -1787,7 +1795,7 @@ function openBcLogModal(phone){
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
 <script src="js/59-fn-mobilefit.js"></script>
-<script src="js/57-viettat.js?v=20261114c"></script>
+<script src="js/57-viettat.js?v=20261114b"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-conn-diag.js"></script>
 <script src="js/59-report-drill.js?v=20261111a"></script>
