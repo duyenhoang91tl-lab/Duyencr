@@ -1,6 +1,20 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Viết tắt: THƯ MỤC MẸ/CON dạng dropdown cây) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên (kèm ảnh menu "BÁO CÁO" có nhóm mẹ + mục con thụt lề):** app Viết tắt chọn thư mục bằng dropdown, bấm xổ thư mục mẹ → thư mục con hiện theo hàng dọc; khi TẠO mẫu viết tắt cũng chọn/tạo được thư mục mẹ-con; có thể tìm các mẫu có sẵn theo thư mục.
+**Nền tảng đã có (không cần đổi backend):** trường `nhom` của mỗi mục Viết tắt là chuỗi đường dẫn `Mẹ/Con/Cháu` (CRM `js/57-viettat.js` đã gợi ý theo tiền tố ở `vt-nhom-list`; Android đọc `nhom` thành thư mục). Chưa có UI cây.
+**Kế hoạch:** (B1) `viettat.html` PWA điện thoại: dropdown cây · (B2) CRM `js/57-viettat.js`: bộ lọc thư mục dạng cây + ô "Thư mục" trong form tạo/sửa chọn từ cây (vẫn gõ được thư mục mới `Mẹ/Con`) · (B3) test + cập nhật tài liệu. Android (Kotlin): KHÔNG build được ở môi trường chat → ghi chú, chưa sửa.
+
+### ✅ B1 — `viettat.html` (PWA): dropdown cây thư mục
+Nguyên nhân gốc: `fillNhom()` dựng `<select>` PHẲNG theo từng chuỗi `nhom` nguyên văn ("Sản phẩm/Vòng tay" hiện như 1 mục độc lập "Sản phẩm › Vòng tay"), lọc bằng so khớp đúng-bằng nên chọn thư mục mẹ KHÔNG ra mục của thư mục con; chip "Chung" có `data-nhom=""` trùng nghĩa "Tất cả" (lỗi nhỏ).
+Đã làm: thay `<select id="nhom">` bằng nút `#nhomBtn` + panel `#nhomPanel`; mỗi dòng `▸/▾` (bấm = xổ/thu con) + tên (bấm = chọn) + số mục; con thụt lề, kẻ dọc; "Mở hết/Thu hết"; chọn mẹ = gồm mọi con cháu (`inNhom`: bằng hoặc tiền tố `path + '/'`, nên "Sản phẩm/Vòng" KHÔNG khớp nhầm "Sản phẩm/Vòng tay"); "Chung" dùng giá trị riêng `*chung`; trang chủ chỉ hiện chip thư mục cấp 1 kèm số mục. Chọn xong tự đóng; bấm ra ngoài đóng.
+Test mô phỏng jsdom với dữ liệu mẹ/con/cháu (14 ca: xổ/thu, chọn mẹ gồm con cháu, không khớp một phần tên, Chung, tìm kiếm toàn bộ): ALL PASS. Chưa chạy trên điện thoại thật.
+### ⏭ B2 — (KẾ TIẾP) CRM `js/57-viettat.js`: bộ lọc thư mục dạng cây (vùng ~dòng 87-115 `_vtRender`, group theo `s.nhom`) + ô "Thư mục" trong form (`vt-f-nhom` ~dòng 131/266) cho chọn từ cây hoặc gõ mới; chỗ tạo mẫu viết tắt từ Mẫu tin/Import cũng dùng cùng ô. Cần grep mọi nơi đọc `vt-f-nhom`/`vt-nhom-list` trước khi sửa.
+### 🧪 Duyên làm tay: mở lại `viettat.html` (trang tự lấy bản mới vì sw ưu tiên mạng; nếu vẫn thấy cũ: đóng hẳn app mở lại) → mục thư mục phải là dropdown cây. Không cần deploy GAS / reload extension ở bước này (chỉ đổi `viettat.html`).
+
+
 ## 2026-11-14 (phiên Claude — Viết tắt riêng cho từng MẪU TIN: nhập khi tạo mẫu ở CRM + sửa ở tab Viết tắt) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** "cho mình quyền thêm từ viết tắt khi tạo mẫu tin ở CRM và sửa được ở app Viết tắt".
