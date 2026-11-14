@@ -769,6 +769,31 @@
       sel.value = "";
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    // ── Giao diện v2 (2026-11-14): lưới nút công cụ thay cho ô chọn "— Chọn mục —" ──
+    // <select id="pk-menu-sel"> VẪN là nguồn dữ liệu duy nhất (mọi chỗ khác gán .value / nghe 'change' / đổi chữ option như cũ);
+    // lưới nút chỉ vẽ lại từ các <option> (kèm số đếm "(n)") và bấm = gán .value rồi bắn 'change' qua đúng đường cũ.
+    (function () {
+      const sel = panelEl.querySelector("#pk-menu-sel"), row = panelEl.querySelector("#pk-menu-row");
+      if (!sel || !row || panelEl.querySelector("#pk-menu-chips")) return;
+      const grid = document.createElement("div"); grid.id = "pk-menu-chips"; row.parentNode.insertBefore(grid, row);
+      const paint = () => {
+        grid.textContent = "";
+        [...sel.options].filter((o) => o.value).forEach((o) => {
+          const m = /^(\S+)\s+(.*?)(?:\s*\((\d+)\))?$/.exec(o.textContent.trim()) || [];
+          const b = document.createElement("button"); b.type = "button"; b.className = "pk-chip" + (sel.value === o.value ? " active" : ""); b.dataset.v = o.value;
+          b.title = o.textContent.trim();
+          const ic = document.createElement("span"); ic.className = "pk-chip-ic"; ic.textContent = m[1] || "•";
+          const tx = document.createElement("span"); tx.className = "pk-chip-tx"; tx.textContent = m[2] || o.textContent.trim();
+          b.appendChild(ic); b.appendChild(tx);
+          if (m[3] !== undefined) { const n = document.createElement("span"); n.className = "pk-chip-n" + (m[3] === "0" ? " zero" : ""); n.textContent = m[3]; b.appendChild(n); }
+          b.addEventListener("click", () => { sel.value = sel.value === o.value ? "" : o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); });
+          grid.appendChild(b);
+        });
+      };
+      paint();
+      sel.addEventListener("change", paint);
+      try { new MutationObserver(paint).observe(sel, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);

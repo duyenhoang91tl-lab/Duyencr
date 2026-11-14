@@ -4,7 +4,7 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 ## 2026-11-14 (phiên Claude — Pancake AI: GÕ TẮT mặc định TẮT + nút bật/tắt, rồi TRÌNH BÀY LẠI panel) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** Pancake AI có nút bật/tắt gõ tắt, ai muốn bật mới bật; và trình bày lại panel Pancake AI cho thông minh, khoa học, đẹp hơn (bản hiện tại bị chê "chán").
-**Kế hoạch:** (1) gõ tắt mặc định tắt + nút trên panel · (2) trình bày lại panel (header, nhóm chức năng, thẻ khách, giỏ hàng) bằng `pancake-content.css` + markup `injectPanel()` · (3) kiểm + tài liệu.
+**Kế hoạch:** (1) gõ tắt mặc định tắt + nút trên panel ✅ · (2) trình bày lại panel (header, lưới nút công cụ, thẻ) ✅ · (3) chỉnh theo phản hồi + tài liệu.
 
 ### ✅ Bước 1 — gõ tắt mặc định TẮT (extension-pancake, manifest 2026.11.14.3)
 NGUYÊN NHÂN GỐC: `pancake-viettat.js` đọc `enabled = v.vtOn !== false` (khuyết = BẬT) nên ai cài extension cũng bị bật gõ tắt dù không cần, và luôn gọi GAS `vietTat` mỗi 5 phút. Nay `enabled = v.vtOn === true` (khuyết = TẮT); khi tắt thì KHÔNG gọi GAS và ẩn popup gợi ý; bật lên thì nạp ngay (`storage.onChanged` → `loadLocal` → `refresh`).
@@ -15,7 +15,14 @@ NGUYÊN NHÂN GỐC: `pancake-viettat.js` đọc `enabled = v.vtOn !== false` (k
 - ⚠ Người đang dùng gõ tắt sẽ thấy nó TẮT sau khi cập nhật (vì chưa từng lưu vtOn) → bấm nút ⌨ trên panel để bật lại.
 - ⚠ KHÔNG đụng Zalo AI (`zalo-viettat.js` vẫn mặc định bật như cũ). `tools/derive-zalo-viettat.js` ĐÃ HỎNG SẴN trước phiên này ("Khong thay doan const resp = await new Promise…" vì dòng đó trong pancake-viettat.js đã được sửa thêm comment lastError) → chưa sinh lại được; việc riêng cần sửa trước khi đồng bộ Zalo.
 - Không đổi GAS → không cần deploy GAS. Cần reload extension Pancake trong chrome://extensions.
-- [ ] VIỆC KẾ TIẾP: bước 2 — trình bày lại panel Pancake AI.
+### ✅ Bước 2 — trình bày lại panel Pancake AI (giao diện v2; manifest 2026.11.14.4)
+NGUYÊN NHÂN GỐC "chán": panel cũ phẳng — header xanh trơn, mọi nhóm (CS, SĐT, chọn mục, thẻ khách) là các hàng trần cùng 1 kiểu, 7 chức năng giấu sau 1 ô chọn "— Chọn mục —" (phải bấm 2 lần, không thấy số nhắc hẹn/data được chia nếu chưa mở).
+- `pancake-content.css` (khối "GIAO DIỆN V2" ở CUỐI file, chỉ đổi màu/khoảng cách, KHÔNG đổi id/class JS dùng): header gradient tím→hồng, nền xám nhạt, mỗi nhóm là 1 thẻ trắng bo 12px, ô nhập có viền focus, nút Tra cứu dạng gradient.
+- `pancake-content.js` (đoạn "Giao diện v2" trong `injectPanel`): LƯỚI NÚT CÔNG CỤ 2 cột thay ô chọn mục — mỗi nút icon + tên + badge số đếm (Nhắc hẹn, Data được chia hiện sẵn, đỏ khi >0). `<select id="pk-menu-sel">` GIỮ NGUYÊN làm nguồn dữ liệu (ẩn bằng CSS) nên mọi chỗ khác gán `.value`/nghe `change`/đổi chữ option vẫn chạy; bấm nút = gán value + bắn `change`; bấm lại nút đang mở = tắt; MutationObserver cập nhật badge khi đếm đổi.
+- `tools/test-pancake-chips.js` (mới, 9 ca jsdom) PASS; `test-viettat-ext.js` PASS; `node -c` OK.
+- Quay về giao diện cũ: xoá khối "GIAO DIỆN V2" cuối CSS + đoạn "Giao diện v2" trong JS (ghi sẵn trong comment CSS).
+- ⚠ CHƯA nhìn được bằng mắt trên Pancake thật (chat không có trình duyệt có đăng nhập) → Duyên reload extension (chrome://extensions) + F5 Pancake, xem panel; chê chỗ nào (màu, cỡ chữ, thứ tự) nói để chỉnh tiếp. Không đổi GAS.
+- [ ] VIỆC KẾ TIẾP: bước 3 — chỉnh theo phản hồi của Duyên sau khi xem thật; có thể làm tiếp thẻ khách (`.pk-ai-cust-card`: nhóm trạng thái/lịch hẹn/ghi chú), khối gợi ý AI và giỏ hàng; cập nhật `docs/crm-kb/04-extension-pancake.md` (ghi nút gõ tắt + lưới nút) khi giao diện chốt.
 
 ## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử
 

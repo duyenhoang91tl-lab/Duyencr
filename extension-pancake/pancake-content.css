@@ -1518,3 +1518,74 @@
 #pk-ai-header #pk-vt-toggle.pk-vt-off { background: rgba(255,255,255,.2); color: #fff; }
 #pk-ai-header #pk-vt-toggle.pk-vt-on { background: #22c55e; color: #fff; }
 #pk-ai-panel.pk-ai-collapsed #pk-vt-toggle { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GIAO DIỆN V2 — Pancake AI (2026-11-14). Lớp phủ ở CUỐI file: chỉ đổi màu/khoảng cách/hình dạng,
+   KHÔNG đổi id/class nào mà JS dùng. Muốn quay về giao diện cũ: xoá từ dòng này đến hết file
+   (trừ khối ".pk-chip" nếu còn dùng) và bỏ đoạn "Giao diện v2" trong pancake-content.js.
+   Bảng màu: tím chàm → hồng (hoàng hôn), nền xám nhạt, thẻ trắng bo 12px.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#pk-ai-panel {
+  --pk-grad: linear-gradient(135deg, #4f46e5 0%, #9333ea 55%, #db2777 100%);
+  --pk-accent: #7c3aed; --pk-accent-soft: #f3e8ff; --pk-ink: #1f2937; --pk-mute: #6b7280;
+  --pk-border: #e5e7eb; --pk-bg: #f5f5fa;
+  border: none; border-radius: 16px; background: var(--pk-bg); color: var(--pk-ink);
+  box-shadow: 0 10px 40px rgba(79, 70, 229, .22), 0 2px 8px rgba(0, 0, 0, .12);
+}
+#pk-ai-panel.pk-ai-collapsed { background: var(--pk-grad); border-radius: 50%; }
+#pk-ai-header { background: var(--pk-grad); padding: 10px 12px; gap: 4px; }
+#pk-ai-panel.pk-ai-collapsed #pk-ai-header { background: transparent; }
+#pk-ai-header-title > div:first-child { font-size: 14px; letter-spacing: .2px; }
+#pk-ai-header-title > div:last-child { margin-top: 1px; }
+#pk-ai-header #pk-ai-settings, #pk-ai-header #pk-ai-collapse {
+  background: rgba(255, 255, 255, .18); border-radius: 8px; padding: 4px 8px; min-width: 26px; transition: background .15s;
+}
+#pk-ai-header #pk-ai-settings:hover, #pk-ai-header #pk-ai-collapse:hover { background: rgba(255, 255, 255, .32); }
+#pk-ai-panel.pk-ai-collapsed #pk-ai-collapse { background: transparent; }
+#pk-ai-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+#pk-ai-body > * { margin-bottom: 0 !important; }
+
+/* Thẻ trắng cho từng nhóm chức năng */
+#pk-ai-cs-row, #pk-ai-phone-row, #pk-menu-wrap, #pk-ai-customer:not(:empty) {
+  background: #fff; border: 1px solid var(--pk-border); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04);
+}
+#pk-ai-cs-row label { font-weight: 700; color: var(--pk-accent); text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
+#pk-ai-panel input[type="text"], #pk-ai-panel input[type="number"], #pk-ai-panel select, #pk-ai-panel textarea {
+  border: 1px solid #d1d5db; border-radius: 8px; transition: border-color .15s, box-shadow .15s;
+}
+#pk-ai-panel input[type="text"]:focus, #pk-ai-panel input[type="number"]:focus, #pk-ai-panel select:focus, #pk-ai-panel textarea:focus {
+  outline: none; border-color: var(--pk-accent); box-shadow: 0 0 0 3px rgba(124, 58, 237, .18);
+}
+#pk-ai-phone-row button { border-color: var(--pk-accent); color: var(--pk-accent); border-radius: 8px; font-weight: 600; transition: background .15s, color .15s; }
+#pk-ai-phone-row button:hover { background: var(--pk-accent-soft); }
+#pk-ai-phone-row #pk-ai-phone-btn { background: var(--pk-grad); color: #fff; border-color: transparent; }
+#pk-ai-phone-row #pk-ai-phone-btn:hover { filter: brightness(1.08); background: var(--pk-grad); }
+
+/* Lưới nút công cụ (thay ô chọn mục; <select> gốc vẫn có trong DOM làm nguồn dữ liệu) */
+#pk-menu-wrap { padding: 8px; }
+#pk-menu-sel { display: none; }
+#pk-menu-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.pk-chip {
+  display: flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 9px; border: 1px solid var(--pk-border); border-radius: 10px;
+  background: #fafafa; color: var(--pk-ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left;
+  transition: background .15s, border-color .15s, transform .1s, box-shadow .15s;
+}
+.pk-chip:hover { background: var(--pk-accent-soft); border-color: #c4b5fd; }
+.pk-chip:active { transform: scale(.97); }
+.pk-chip.active { background: var(--pk-grad); color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(124, 58, 237, .35); }
+.pk-chip-ic { font-size: 15px; line-height: 1; flex: 0 0 auto; }
+.pk-chip-tx { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-chip-n { flex: 0 0 auto; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; }
+.pk-chip-n.zero { background: #e5e7eb; color: #6b7280; }
+.pk-chip.active .pk-chip-n.zero { background: rgba(255, 255, 255, .28); color: #fff; }
+#pk-menu-row { margin-top: 6px; }
+#pk-menu-row:has(#pk-menu-close[style*="display: none"]), #pk-menu-row:has(#pk-menu-close[style*="display:none"]) { display: none; }   /* chưa mở mục nào → ẩn nút Tắt (chỉ còn lưới nút) */
+#pk-menu-close { border-radius: 8px; padding: 5px 10px; width: 100%; }
+#pk-menu-content { margin-top: 6px; }
+
+/* Thẻ khách + giỏ hàng */
+.pk-ai-cust-card { border-radius: 10px; }
+#pk-cart-section { border-radius: 12px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04); }
+.pk-btn-outline { border-radius: 8px; }
+#pk-ai-body::-webkit-scrollbar { width: 8px; }
+#pk-ai-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
