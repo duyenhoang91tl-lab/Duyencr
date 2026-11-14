@@ -1,6 +1,21 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Viết tắt: ĐÍNH KÈM TỆP GHI ÂM có sẵn, không cần bấm ghi âm tay) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** "app Viết tắt của Duyên CRM thêm được TỆP ghi âm, không cần mục tự bấm ghi âm tay". Duyên chọn phạm vi **CRM + app Android** (không đụng extension).
+**Hiện trạng tìm được:** mục Viết tắt trên CRM/server chỉ đính kèm được ẢNH (cột `images`; nhập zip bỏ `[[aud:…]]` "chưa hỗ trợ"). App Android đã có "● Ghi âm" + "+ File âm thanh" nhưng CHỈ cho mục tự tạo trên máy (không lên CRM; mục CRM bị ghi đè khi ☁ CRM).
+**Thiết kế:** y hệt ảnh — cột mới `audios` (JSON `[{id,name}]` = tham chiếu file Drive); tệp tải từ máy lên thư mục Drive `VietTat`; mỗi mục ≤10 tệp, mỗi tệp ≤10MB. Mục vẫn BẮT BUỘC có chữ (không có mục chỉ-ghi-âm).
+Kế hoạch: **A** GAS · **B** CRM `js/57-viettat.js` (form "+ Tệp ghi âm") · **C** Android (☁ CRM tải tệp về dùng như 🎤).
+
+### ✅ A — GAS (`gas_v13.js`, `gas/*.gs` sinh lại, `split-gas --check` OK)
+- Cột `audios` (cột 10) trong `VIETTAT_HEADERS` (sheet cũ tự thêm cột); `_vtRowToObj_` trả `audios` (hàng cũ → `[]`); `saveVietTat_` nhận `data.audios` (kiểm Drive là audio + ≤10MB; **tệp đã có trên mục thì không kiểm lại**; >10 tệp → báo lỗi; client cũ KHÔNG gửi `audios` → GIỮ NGUYÊN tệp đang có, gửi `[]` = gỡ hết).
+- Action mới: POST `vietTatUploadAudio` ({name,mimeType,base64}; nhận `audio/*` hoặc mime lạ `video/3gpp|mp4|webm`, `octet-stream`, trống → đoán theo đuôi mp3/m4a/aac/wav/ogg/opus/amr/3gp/webm/flac; từ chối ảnh/exe/phim .mp4) · GET `vietTatAudio&id=` (trả base64 + mime + tên; **chỉ cho tệp thuộc mục người gọi được thấy**, mục RIÊNG người khác bị chặn).
+- Mục từ Mẫu tin (`fromTpl`) có `audios: []`.
+- Test mới `node tools/test-viettat-audio-gas.js` (40 ca, đã thử đột biến bỏ kiểm quyền → FAIL); 4 test Viết tắt cũ (`-gas/-same/-tpl/-tree`) cập nhật danh sách hàm + PASS.
+- GAS tự deploy (Actions `deploy-gas.yml`). **Chưa có client nào dùng** cho tới khi xong B/C.
+### ⏭ B — CRM `js/57-viettat.js`: nút "+ Tệp ghi âm" trong form Viết tắt (chọn nhiều tệp, tải từng tệp, nghe thử, gỡ), hiện 🎤 N ở danh sách; bump `?v=`. Rồi C — Android.
+
 ## 2026-11-14 (phiên Claude — Viết tắt: THƯ MỤC MẸ/CON dạng dropdown cây) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên (kèm ảnh menu "BÁO CÁO" có nhóm mẹ + mục con thụt lề):** app Viết tắt chọn thư mục bằng dropdown, bấm xổ thư mục mẹ → thư mục con hiện theo hàng dọc; khi TẠO mẫu viết tắt cũng chọn/tạo được thư mục mẹ-con; có thể tìm các mẫu có sẵn theo thư mục.
