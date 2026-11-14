@@ -8,7 +8,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 ### ✅ B1 — Khôi phục 3 route POST trong `doPost` (`gas_v13.js`, `gas/*.gs` sinh lại, `--check` OK)
 Nguyên nhân gốc: merge `f06722e` (03/11, "Merge origin/main (Báo cáo E bước 1-3, Thưởng T10) vào nhánh Đơn kết") làm rơi đúng 3 dòng `if (action === 'saveVietTat' | 'deleteVietTat' | 'vietTatUploadImage')` (so sánh danh sách action của `e82d053` với HEAD: chỉ thiếu 3 cái này). Hậu quả: từ 03/11 CRM bấm Lưu/Xoá/Tải ảnh Viết tắt không được (server không nhận action) dù `saveVietTat_` vẫn còn nên test hàm vẫn xanh. Đã thêm 3 dòng sau `approveMessageTemplate` + test `tools/test-viettat-gas.js` kiểm 3 route còn trong `doPost`. BÀI HỌC cho mọi phiên: sau khi merge `gas_v13.js`, so `grep -o "action === '[A-Za-z0-9_]*'"` trước/sau để bắt route bị rơi.
-### ⏭ B2 — (ĐANG LÀM) cột `abbr` + lưu/đọc/dùng trong Viết tắt.
+### ✅ B2 — Cột `abbr` cho mẫu tin + kiểm tra + dùng trong Viết tắt (`gas_v13.js`, `gas/*.gs` sinh lại, `--check` OK)
+- `MSG_TPL_HEADERS` thêm cột 16 `abbr` (`getSheet_` tự bổ sung cột vào sheet cũ; hàng cũ 15 cột đọc ra `abbr=''`). `_tplRowToObj_` trả `abbr`; `readMessageTemplates_` nên client nhận được `abbr` ở mỗi mẫu.
+- `saveMessageTemplate_`: nhận `data.abbr` (cắt khoảng trắng). KHÔNG gửi trường này (extension cũ) → giữ nguyên; gửi chuỗi rỗng → xoá (về tự suy ra từ tiêu đề). Kiểm bằng `_tplCheckAbbr_`: 1 từ, ≤30 ký tự, có chữ/số, không trùng (so bằng `_vtKey_`: bỏ dấu/hoa thường) với viết tắt của MẪU KHÁC hay mục CHUNG trong sheet `VietTat` (mục riêng của người khác không tranh); lỗi trả `{error, code:'ABBR'}` và KHÔNG ghi gì.
+- `_vtFromTemplates_`: mẫu có `abbr` hợp lệ dùng đúng viết tắt đó và được xếp TRƯỚC mẫu tự suy ra (giữ chỗ tên đã chọn; mẫu tự suy ra trùng thì thành `ckm2`…); `abbr` hỏng trong sheet (sửa tay) → quay về tự suy ra, không làm hỏng Viết tắt. `used[]` giờ theo `_vtKey_`.
+- Mẫu CHỜ DUYỆT vẫn chưa vào Viết tắt (vào khi admin duyệt). Mẫu đã duyệt do nhân viên: nhân viên không sửa được (FORBIDDEN cũ) → viết tắt sửa qua B3.
+- Test mới `tools/test-tpl-abbr.js` (20 ca) ALL OK; `test-viettat-tpl/gas/same`, `test-msgtpl`, `test-tpl-notify-gas` PASS; `test-msgtpl-group` sửa 1 assertion cũ đòi `images` là cột cuối (nay `abbr` cuối).
+### ⏭ B3 — (ĐANG LÀM) action `setTemplateAbbr` (sửa RIÊNG viết tắt của 1 mẫu, không đổi trạng thái duyệt): quyền = admin/manager (priv) hoặc người tạo mẫu; route trong `doPost` (nhớ so danh sách action sau khi merge).
 
 
 ## 2026-11-14 (phiên Claude — Mẫu tin dùng được trong ứng dụng Viết tắt, MỞ RỘNG cho mọi mẫu đã duyệt) — ĐANG LÀM, mỗi bước 1 push

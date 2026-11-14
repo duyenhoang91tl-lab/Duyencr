@@ -13718,7 +13718,7 @@ var SH_MSG_TPL = 'MessageTemplates';
 // 2026-10-12: them product (san pham, nhieu san pham cach nhau dau phay/;), topic (noi dung hoi thoai / tinh huong), status
 // (approved | pending | rejected) + nguoi duyet. Hang CU (khong co status) coi la 'approved' de mau dang dung khong bi mat.
 // getSheet_ tu bo sung cac cot header con thieu o cuoi sheet cu, KHONG dung toi du lieu san co.
-var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom', 'images'];
+var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom', 'images', 'abbr'];
 // images: chuoi JSON mang URL anh (toi da 4), vd '["https://drive.google.com/uc?...","..."]'. Cot nay them sau (getSheet_ tu bo sung).
 // nhom = NHOM SAN PHAM (cot 'Nhom SP' bang gia DANH_MUC) — Duyen 21/10/2026 "tao mau luu san": CS chon nhom/ten SP roi them mau tu van de AI hoc.
 // Nhom do nguoi soan CHON tay -> ghi vao cot; de TRONG = he thong TU PHAN LOAI khi doc (khong ghi vao sheet: doi danh muc thi mau tu nhay theo nhom moi). Xem _tplClassify_.
@@ -13752,7 +13752,8 @@ function _tplRowToObj_(row) {
     product: String(row[7] || ''), topic: String(row[8] || ''), status: st,
     approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || ''),
     nhom: String(row[13] || '').trim(),   // nhom do nguoi soan chon ('' = chua chon; readMessageTemplates_ se dien nhom tu phan loai)
-    images: (function(){ try { return JSON.parse(String(row[14] || '[]')); } catch(e){ return []; } })()
+    images: (function(){ try { return JSON.parse(String(row[14] || '[]')); } catch(e){ return []; } })(),
+    abbr: String(row[15] || '').trim()   // viet tat do nguoi soan dat (2026-11-14): '' = tu suy ra tu tieu de; co gia tri = dung lam viet tat trong ung dung Viet tat
   };
 }
 // ── Nhom san pham cua mau tin (2026-10-16) ──
@@ -13847,6 +13848,30 @@ function readMessageTemplates_(caller) {
   return out;
 }
 
+// Kiem tra viet tat cua MAU TIN (2026-11-14): '' = de trong (tu suy ra). Co gia tri: 1 tu (khong khoang trang, <= 30 ky tu) va KHONG trung
+// (so theo _vtKey_: bo dau/hoa thuong/ky tu la) voi viet tat cua mau khac HOAC muc CHUNG trong sheet VietTat. excludeId = mau dang sua. Tra '' neu hop le, nguoc lai chuoi loi.
+function _tplCheckAbbr_(abbr, excludeId) {
+  abbr = String(abbr == null ? '' : abbr).trim();
+  if (!abbr) return '';
+  if (/\s/.test(abbr) || abbr.length > 30) return 'Viet tat phai la 1 tu (khong co khoang trang, toi da 30 ky tu).';
+  var k = _vtKey_(abbr);
+  if (!k) return 'Viet tat phai co it nhat 1 chu cai hoac chu so.';
+  var tv = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS).getDataRange().getValues();
+  for (var i = 1; i < tv.length; i++) {
+    if (!tv[i][0] || String(tv[i][0]) === String(excludeId || '')) continue;
+    var o = String(tv[i][15] || '').trim();
+    if (o && _vtKey_(o) === k) return 'Viet tat \"' + abbr + '\" da duoc mau tin khac dung.';
+  }
+  var vsh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), vl = vsh.getLastRow();
+  if (vl >= 2) {
+    var vv = vsh.getRange(2, 1, vl - 1, VIETTAT_HEADERS.length).getValues();
+    for (var j = 0; j < vv.length; j++) {
+      if (!vv[j][0] || String(vv[j][5] || '').trim()) continue;   // chi muc CHUNG (owner rong) moi tranh nhau voi mau chung
+      if (_vtKey_(vv[j][2]) === k) return 'Viet tat \"' + abbr + '\" da co trong muc Viet tat chung.';
+    }
+  }
+  return '';
+}
 // data: {id, title, content, tags, product, topic, createdBy}. Admin/manager: luu la 'approved' (admin cai san mau); nhan vien: tao moi -> 'pending',
 // chi sua duoc mau CUA MINH chua duoc duyet (sua xong quay lai 'pending'); mau da duyet chi admin/manager sua.
 function saveMessageTemplate_(data, caller) {
@@ -13863,6 +13888,10 @@ function saveMessageTemplate_(data, caller) {
   var nhomSet = (data.nhom !== undefined && data.nhom !== null);
   var nhom = nhomSet ? String(data.nhom).trim().slice(0, 200) : '';
   // images: mang URL anh da upload truoc (toi da 4). Neu truyen mang thi ghi de; neu khong truyen (undefined) thi giu nguyen.
+  // abbr: chuoi (ke ca rong = ve 'tu suy ra') -> ghi; KHONG gui truong nay (extension cu) -> giu nguyen.
+  var abbrSet = (data.abbr !== undefined && data.abbr !== null);
+  var abbr = abbrSet ? String(data.abbr).trim() : '';
+  if (abbrSet) { var abbrErr = _tplCheckAbbr_(abbr, data.id); if (abbrErr) return jsonOut_({ error: abbrErr, code: 'ABBR' }); }
   var imagesSet = Array.isArray(data.images);
   var images = imagesSet ? JSON.stringify(data.images.slice(0, 4).map(function(u){ return String(u).trim(); }).filter(Boolean)) : '';
   // Tai khoan web: nguoi tao = ten that trong token (khong tin client). Extension: ten tu khai.
@@ -13881,6 +13910,7 @@ function saveMessageTemplate_(data, caller) {
         sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, cur.status]]);
         if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
         if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
+        if (abbrSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(abbr);
         return jsonOut_({ ok: true, id: cur.id, status: cur.status });
       }
       if (cur.status === 'approved' || !_tplOwns_(cur, caller)) {
@@ -13891,6 +13921,7 @@ function saveMessageTemplate_(data, caller) {
       sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
       if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
       if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
+      if (abbrSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(abbr);
       _tplNotifyPending_(cur.id, title, author);   // mau da sua -> cho duyet lai: bao admin
       return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
@@ -13898,7 +13929,7 @@ function saveMessageTemplate_(data, caller) {
   // Tao moi. Chi admin/quan ly moi duoc tu dat id (dong bo cu); nguoi khac luon nhan id moi (khong chiem id).
   var newId = (caller.priv && data.id) ? String(data.id) : 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   var status = caller.priv ? 'approved' : 'pending';
-  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom, images]);
+  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom, images, abbr]);
   if (status === 'pending') _tplNotifyPending_(newId, title, author);   // de xuat mau moi -> bao admin duyet
   return jsonOut_({ ok: true, id: newId, status: status });
 }
@@ -14092,15 +14123,18 @@ function _vtFromTemplates_(existing) {
     t._ms = isNaN(ms) ? 0 : ms;
     items.push(t);
   }
-  items.sort(function (a, b) { return b._ms - a._ms; });
+  // Mau co viet tat do nguoi soan dat dung truoc: giu cho ten da chon, mau tu suy ra tu tieu de khong chiem mat (con lai: moi nhat truoc).
+  items.sort(function (a, b) { var ea = a.abbr ? 0 : 1, eb = b.abbr ? 0 : 1; return ea !== eb ? ea - eb : b._ms - a._ms; });
   var used = {}, out = [];
-  (existing || []).forEach(function (o) { var k = _vtKey_(o.abbr); if (k) used[k] = 1; });
+  (existing || []).forEach(function (o) { var k = _vtKey_(o.abbr); if (k) used[k] = 1; });   // used[] theo _vtKey_ (bo dau/hoa thuong) de 'BaoHanh' va 'baohanh' khong trung
   items.slice(0, VIETTAT_TPL_MAX).forEach(function (t) {
-    var base = _vtKey_(t.title).slice(0, 30) || ('mau' + String(t.id).replace(/\D/g, '').slice(-6));
+    var own = String(t.abbr || '').trim();
+    if (own && (/\s/.test(own) || own.length > 30 || used[_vtKey_(own)] || !_vtKey_(own))) own = '';   // viet tat tu dat khong hop le / bi chiem -> quay ve tu suy ra (mau van dung duoc)
+    var base = own || _vtKey_(t.title).slice(0, 30) || ('mau' + String(t.id).replace(/\D/g, '').slice(-6));
     var abbr = base;
-    for (var n = 2; used[abbr] && n < 100; n++) abbr = base.slice(0, 30 - String(n).length) + n;
-    if (used[abbr]) return;   // qua nhieu mau trung ten: bo qua mau nay (khong de lam vo Viet tat)
-    used[abbr] = 1;
+    for (var n = 2; used[_vtKey_(abbr)] && n < 100; n++) abbr = base.slice(0, 30 - String(n).length) + n;
+    if (used[_vtKey_(abbr)]) return;   // qua nhieu mau trung ten: bo qua mau nay (khong de lam vo Viet tat)
+    used[_vtKey_(abbr)] = 1;
     var imgs = [];
     (Array.isArray(t.images) ? t.images : []).forEach(function (u, k) { var id = _vtTplImgId_(u); if (id && imgs.length < VIETTAT_MAX_IMAGES) imgs.push({ id: id, name: 'anh' + (k + 1) }); });
     out.push({ id: 'tpl_' + t.id, nhom: _vtNhom_(VIETTAT_TPL_NHOM + (t.nhom ? '/' + t.nhom : '')), abbr: abbr, keyword: _vtTplKeyword_(t),
