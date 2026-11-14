@@ -22,6 +22,9 @@ NGUYÊN NHÂN GỐC "chán": panel cũ phẳng — header xanh trơn, mọi nhó
 - `tools/test-pancake-chips.js` (mới, 9 ca jsdom) PASS; `test-viettat-ext.js` PASS; `node -c` OK.
 - Quay về giao diện cũ: xoá khối "GIAO DIỆN V2" cuối CSS + đoạn "Giao diện v2" trong JS (ghi sẵn trong comment CSS).
 - ⚠ CHƯA nhìn được bằng mắt trên Pancake thật (chat không có trình duyệt có đăng nhập) → Duyên reload extension (chrome://extensions) + F5 Pancake, xem panel; chê chỗ nào (màu, cỡ chữ, thứ tự) nói để chỉnh tiếp. Không đổi GAS.
+### ✅ Sửa lỗi "Từng đoạn" bị bẻ mỗi ký tự 1 dòng (manifest 2026.11.14.5) — Duyên quay video 16:44
+Triệu chứng: Mẫu tư vấn → bấm "📑 Từng đoạn (n)" → chữ của đoạn hiện dọc 1 ký tự/dòng, nút "Copy đoạn" tràn ra ngoài panel, không đọc được nội dung để cắt đoạn. (Video là giao diện CŨ → lỗi có từ trước giao diện v2, không phải do v2.)
+NGUYÊN NHÂN GỐC: `.pk-tpl-line` là flex 1 hàng gồm chữ (`flex:1; min-width:0`) + 2 nút (`flex:none`, nowrap); panel 340px bị 2 nút chiếm gần hết → chữ còn ~0px. Sửa `pancake-content.css`: `flex-wrap:wrap`, chữ `flex:1 1 100%` (hàng riêng), nút xuống hàng dưới. KHÔNG đổi JS. Chưa xem layout bằng mắt (chat không có trình duyệt) → Duyên reload extension + F5 kiểm lại.
 - [ ] VIỆC KẾ TIẾP: bước 3 — chỉnh theo phản hồi của Duyên sau khi xem thật; có thể làm tiếp thẻ khách (`.pk-ai-cust-card`: nhóm trạng thái/lịch hẹn/ghi chú), khối gợi ý AI và giỏ hàng; cập nhật `docs/crm-kb/04-extension-pancake.md` (ghi nút gõ tắt + lưới nút) khi giao diện chốt.
 
 ## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử

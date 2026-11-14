@@ -1406,9 +1406,11 @@
 /* Them/sua/xoa mau tin tren Pancake (thu vien mau chung voi CRM) */
 .pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
 .pk-tpl-lines { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
-.pk-tpl-line { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
-.pk-tpl-line-txt { flex: 1; min-width: 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
-.pk-tpl-line .pk-btn-outline { font-size: 11px; padding: 2px 6px; flex: none; }
+/* 2026-11-14: chữ đoạn chiếm HẾT 1 hàng, 2 nút (Copy đoạn / Chèn) xuống hàng dưới. Bản cũ xếp chữ + 2 nút trên cùng 1 hàng ngang (nút flex:none, nowrap)
+   → panel 340px bị 2 nút chiếm gần hết, chữ còn ~0px nên bị bẻ MỖI KÝ TỰ 1 DÒNG và nút tràn ra ngoài (không đọc được nội dung để cắt đoạn). */
+.pk-tpl-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+.pk-tpl-line-txt { flex: 1 1 100%; min-width: 0; font-size: 12px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pk-tpl-line .pk-btn-outline { font-size: 11px; padding: 2px 8px; flex: 0 1 auto; width: auto; max-width: 100%; }
 .pk-tpl-acts button { font-size: 11px; padding: 2px 8px; }
 .pk-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
 .pk-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
