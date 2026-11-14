@@ -25,6 +25,11 @@ NGUYÊN NHÂN GỐC "chán": panel cũ phẳng — header xanh trơn, mọi nhó
 ### ✅ Sửa lỗi "Từng đoạn" bị bẻ mỗi ký tự 1 dòng (manifest 2026.11.14.5) — Duyên quay video 16:44
 Triệu chứng: Mẫu tư vấn → bấm "📑 Từng đoạn (n)" → chữ của đoạn hiện dọc 1 ký tự/dòng, nút "Copy đoạn" tràn ra ngoài panel, không đọc được nội dung để cắt đoạn. (Video là giao diện CŨ → lỗi có từ trước giao diện v2, không phải do v2.)
 NGUYÊN NHÂN GỐC: `.pk-tpl-line` là flex 1 hàng gồm chữ (`flex:1; min-width:0`) + 2 nút (`flex:none`, nowrap); panel 340px bị 2 nút chiếm gần hết → chữ còn ~0px. Sửa `pancake-content.css`: `flex-wrap:wrap`, chữ `flex:1 1 100%` (hàng riêng), nút xuống hàng dưới. KHÔNG đổi JS. Chưa xem layout bằng mắt (chat không có trình duyệt) → Duyên reload extension + F5 kiểm lại.
+### 🔎 "Từng đoạn" Duyên báo VẪN LỖI sau bản .5 — đã dựng lại bằng Chromium thật (manifest 2026.11.14.6)
+Dựng đúng cấu trúc thẻ mẫu trong Chromium (playwright): CSS CŨ cho chữ rộng 0px/cao 1528px (đúng video); CSS MỚI (bản .5) cho chữ rộng 300px, nút trong panel → code ĐÃ ĐÚNG. Nhiều khả năng trình duyệt Duyên vẫn chạy bản cũ (chưa reload extension, hoặc nạp từ thư mục local chưa `git pull`).
+- Thêm số phiên bản vào header panel (`· v2026.11.14.6` dưới tên "Pancake AI") để nhìn là biết đang chạy bản nào; nếu KHÔNG thấy "· v…" nghĩa là đang chạy bản cũ.
+- Test mới `tools/test-pancake-tpl-lines-layout.py` (layout thật, cần playwright): chữ đoạn rộng >100px và nút không tràn panel.
+- [ ] VIỆC KẾ TIẾP: Duyên pull repo → reload extension → F5 Pancake → xem header có "· v2026.11.14.6"; nếu CÓ số đó mà "Từng đoạn" vẫn bẻ dọc thì gửi lại ảnh/video mới (có thể do CSS của trang Pancake đè) để dò tiếp.
 - [ ] VIỆC KẾ TIẾP: bước 3 — chỉnh theo phản hồi của Duyên sau khi xem thật; có thể làm tiếp thẻ khách (`.pk-ai-cust-card`: nhóm trạng thái/lịch hẹn/ghi chú), khối gợi ý AI và giỏ hàng; cập nhật `docs/crm-kb/04-extension-pancake.md` (ghi nút gõ tắt + lưới nút) khi giao diện chốt.
 
 ## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử

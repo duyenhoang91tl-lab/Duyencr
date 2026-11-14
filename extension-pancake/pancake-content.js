@@ -387,7 +387,7 @@
       <div id="pk-ai-header">
         <div id="pk-ai-header-title" style="flex:1">
           <div style="font-weight:700">🤖 Pancake AI</div>
-          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
+          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách${(() => { try { return " · v" + chrome.runtime.getManifest().version; } catch (e) { return ""; } })()}</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
         <button id="pk-vt-toggle" type="button" class="pk-vt-off" title="Gõ tắt trong ô chat — đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)">⌨ Gõ tắt: Tắt</button>
