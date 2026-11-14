@@ -1338,15 +1338,22 @@ async function _postGas_(body) {
   if (data.error) throw new Error(data.error);
   return data;
 }
+// NGUYEN NHAN GOC mau cua admin (duyenht) van "Cho duyet" khi tao tren Pancake AI: request KHONG kem token/khoa nen server coi la extension an danh
+// (ten CS tu khai) => luon 'pending'. KHONG the tin "ten = duyenht" de tu duyet (ai cung go duoc ten do trong Cai dat extension).
+// Cach dung: admin da dang nhap o Cai dat extension (pkApprover, token phien that) -> gui kem token de server nhan ra VAI TRO THAT 'admin' => luu 'approved' ngay.
+// Chua dang nhap / token het han -> khong kem token, mau van vao 'Cho duyet' nhu truoc (khong loi).
+async function _apprTokenField_() {
+  try { const a = await _apprGet_(); return a && a.token ? { token: a.token } : {}; } catch (_) { return {}; }
+}
 async function handleSaveMessageTemplate(t) {
-  return _postGas_({ action: "saveMessageTemplate", template: {
+  return _postGas_({ action: "saveMessageTemplate", ...(await _apprTokenField_()), template: {
     id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "",
     product: t?.product || "", nhom: t?.nhom || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
   } });
 }
 async function handleDeleteMessageTemplate(p) {
-  // createdBy: server chi cho xoa mau CHUA DUYET cua chinh nguoi do (mau da duyet chi admin/quan ly xoa tren CRM).
-  return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "", createdBy: p?.createdBy || "" });
+  // createdBy: server chi cho xoa mau CHUA DUYET cua chinh nguoi do; admin da dang nhap (kem token) xoa duoc ca mau da duyet.
+  return _postGas_({ action: "deleteMessageTemplate", ...(await _apprTokenField_()), id: p?.id || "", createdBy: p?.createdBy || "" });
 }
 
 // Viet tat — action:'vietTat' (GET, chi doc). Them/sua/xoa o CRM (tab Zalo AI). by=<ten CS> de lay them cac muc RIENG cua nguoi dung nay (server chi tra muc chung + muc cua chinh ten do).

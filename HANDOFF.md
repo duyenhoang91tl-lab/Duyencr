@@ -1,6 +1,17 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — mẫu tin của duyenht dùng luôn không cần duyệt + dùng được trong Viết tắt) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** "để duyenht tạo mẫu tin nhắn thì không cần duyệt, dùng được luôn; mẫu đó dùng được trong ứng dụng Viết tắt tương ứng". Quy tắc phiên: chia bước nhỏ, mỗi bước 1 file hoàn chỉnh → push main → cập nhật mục này.
+
+**Đã tìm ra (nguyên nhân gốc):** trên **CRM web** admin (duyenht) đã được duyệt luôn (`js/06` tự chèn token → `_tplCaller_` đọc vai trò thật `admin` → `saveMessageTemplate_` lưu `approved`). Chỉ **extension** bị: `pancake-background.js` / `zalo-content.js` gửi `saveMessageTemplate` KHÔNG kèm token/khoá → server coi là extension ẩn danh (tên CS tự khai) → luôn `pending`.
+**Quyết định (có lý do):** KHÔNG tự duyệt theo "tên = duyenht" ở server — ai cũng gõ được tên đó trong Cài đặt extension ⇒ nhân viên qua mặt khâu duyệt, và mẫu đã duyệt được AI học (`_tplPromptBlock_`). Thay vào đó extension gửi **token phiên admin thật**.
+
+### ✅ Bước 1 — Pancake AI (ext `2026.11.14.1`): `pancake-background.js` `_apprTokenField_` + `handleSave/DeleteMessageTemplate` kèm token admin nếu đã đăng nhập ở Cài đặt → server lưu `approved` ngay; `pancake-content.js` báo "dùng được ngay" thay vì "chờ duyệt" khi server trả `status:'approved'`. Test mới `node tools/test-pk-tpl-token.js` (6 ca, đã thử đột biến: bỏ token → 3 ca FAIL); `test-pk-approver-ext.js` vẫn PASS. **Duyên: reload extension Pancake AI + vào Cài đặt đăng nhập admin (mục 📝 Duyệt mẫu tin).**
+### ⏭ Bước 2 — Zalo AI (song song): thêm đăng nhập admin ở `zalo-options` + `_zaiTplCall_` (zalo-content.js ~2322) kèm token. Bước 3 — GAS: mẫu admin tạo (đã duyệt) hiện thành mục Viết tắt CHUNG (`readVietTat_`) → dùng được ở CRM/Pancake/Zalo/Android không cần sửa client.
+- ⚠ Phát hiện sẵn (không phải do phiên này): `node tools/check-ext-parity.js` đang FAIL vì action `chatCoach` chỉ có ở Pancake AI chưa ghi vào `tools/ext-parity-allow.json`.
+
 
 
 

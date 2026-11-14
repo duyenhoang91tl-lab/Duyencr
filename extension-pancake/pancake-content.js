@@ -3220,7 +3220,8 @@
         id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(),
         product, nhom, topic, createdBy: settings.csName || ''
       } }, (resp) => {
-        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplates_(); }
+        // Server tra status: 'approved' khi admin da dang nhap o Cai dat extension (kem token) -> dung duoc ngay; con lai 'pending' (cho admin duyet).
+        if (resp?.ok) { host.innerHTML = ''; setStatus(resp.data && resp.data.status === 'approved' ? 'Đã lưu mẫu — dùng được ngay (admin không cần duyệt).' : 'Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplates_(); }
         else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
