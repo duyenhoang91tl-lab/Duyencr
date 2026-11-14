@@ -1,12 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
-## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — ĐANG LÀM, mỗi bước 1 push
+## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử
 
 **Yêu cầu Duyên:** đã yêu cầu thư mục mẹ/con dạng dropdown nhưng app Android chưa hiển thị (HANDOFF B3b trước đó ghi "Android chưa làm").
 NGUYÊN NHÂN GỐC: app lưu thư mục PHẲNG (`Folder.name` = "CRM · Túi tiền › Cổ") và vẽ thành chip độc lập (`MainActivity.kt` LazyRow + chip trong `SnippetDialog`), không có cấp mẹ/con. KHÔNG đổi dữ liệu/đồng bộ (Data.kt, Sync.kt giữ nguyên) — chỉ dựng cây từ tên thư mục.
 - [x] Bước 1: file mới `FolderTree.kt` — `FolderTree.build/flatten/index/ancestors` (tách tên theo " › " và phần đầu theo " · " → CRM / Của tôi / Túi tiền / Cổ) + composable `FolderTreeDialog` (▸/▾ xổ thu, thụt lề, chọn mẹ = gồm cả con cháu qua `FNode.ids`). Chưa có chỗ nào gọi.
-- [ ] Bước 2 (kế tiếp): `MainActivity.kt` — thay LazyRow chip bằng nút dropdown mở `FolderTreeDialog` (bộ lọc, showAll=true); ô chọn thư mục trong `SnippetDialog` cũng dùng cây (canPick = nút có folderId); "+ Thư mục" cho tạo thư mục con (gõ "Mẹ › Con"). Rồi tăng versionCode 23 / 1.22.
+- [x] Bước 2: `MainActivity.kt` — màn chính: nút `📁 <thư mục> ▾` mở `FolderTreeDialog` (lọc; chọn mẹ gồm con cháu; `selKey` thay `sel`); `SnippetDialog`: ô thư mục = nút mở cây (chỉ thư mục tự tạo, vì thư mục CRM bị xoá mỗi lần ☁ CRM); "+ Thư mục" gõ `Mẹ › Con` (điền sẵn mẹ). Sửa kèm lỗi: nút "+" khi đang đứng trong thư mục CRM giờ tạo mục mới ở "default" (trước đây mục mới rơi vào thư mục CRM và mất khi ☁ CRM). versionCode 23 / 1.22. Đã mô phỏng logic dựng cây bằng Python với tên thật (CRM · Túi tiền › Cổ, CRM · Của tôi · …, Bán hàng › Nhẫn): đúng.
+- [ ] VIỆC KẾ TIẾP: chờ CI "Build Android VietTat" (Kotlin chưa biên dịch được ở chat; nếu đỏ sửa `FolderTree.kt`/`MainActivity.kt`) → Duyên cài VietTat.apk 1.22 (Release `viettat-latest`), bấm ☁ CRM, bấm nút 📁 xem cây CRM → Túi tiền → Cổ; thử "+ Thư mục" gõ `Bán hàng › Nhẫn`. Không đổi GAS/extension/CRM web.
 - ⚠ Kotlin CHƯA biên dịch được ở chat (không có Android SDK) → chờ CI "Build Android VietTat".
 
 ## 2026-11-14 (phiên Claude — Android Viết tắt 1.21: "+ Hình ảnh" chọn được NHIỀU ảnh 1 lúc) — XONG phần code; CHỜ CI build + Duyên thử

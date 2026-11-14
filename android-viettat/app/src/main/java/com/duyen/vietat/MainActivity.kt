@@ -90,7 +90,8 @@ fun DiagCard() {
 @Composable
 fun App(crm: CrmWeb) {
     val ctx = LocalContext.current
-    var sel by remember { mutableStateOf<String?>(null) }
+    var selKey by remember { mutableStateOf<String?>(null) }   // khoá nút cây thư mục đang lọc (null = Tất cả)
+    var pickFolder by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Snippet?>(null) }
     var newFolder by remember { mutableStateOf(false) }
     var q by remember { mutableStateOf("") }
@@ -110,8 +111,15 @@ fun App(crm: CrmWeb) {
         }
     }
 
+    // Thư mục mẹ/con dạng cây (xem FolderTree.kt): chọn mẹ = lọc cả con cháu.
+    val node = selKey?.let { FolderTree.index(FolderTree.build(Store.folders))[it] }
+    val selIds = node?.ids?.toSet()
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { editing = Snippet("", sel ?: Store.folders.first().id, "", "", listOf("")) }) { Text("+") }
+        FloatingActionButton(onClick = {
+            // Mục mới KHÔNG được rơi vào thư mục CRM (bị xoá mỗi lần ☁ CRM) → về "default" nếu đang đứng trong thư mục CRM.
+            val fid = (node?.folderId ?: node?.ids?.firstOrNull() ?: Store.folders.first().id).let { if (Store.isCrm(it)) "default" else it }
+            editing = Snippet("", fid, "", "", listOf(""))
+        }) { Text("+") }
     }) { pad ->
         Column(Modifier.padding(pad).padding(12.dp)) {
             Button(onClick = { ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, Modifier.fillMaxWidth()) {
@@ -127,17 +135,19 @@ fun App(crm: CrmWeb) {
             OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
                 label = { Text("Tìm viết tắt, từ khoá, nội dung") })
             Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { FilterChip(sel == null, { sel = null }, { Text("Tất cả") }) }
-                items(Store.folders) { f -> FilterChip(sel == f.id, { sel = f.id }, { Text(f.name) }) }
-                item { AssistChip({ newFolder = true }, { Text("+ Thư mục") }) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                OutlinedButton({ pickFolder = true }, Modifier.weight(1f)) {
+                    Text("📁 " + (node?.key ?: "Tất cả") + "  ▾", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                AssistChip({ newFolder = true }, { Text("+ Thư mục") })
             }
-            if (sel != null && sel != "default" && !Store.isCrm(sel!!)) TextButton({
-                sel?.let { Store.deleteFolder(it) }; sel = null; doSync()
+            val delId = node?.folderId
+            if (delId != null && delId != "default" && !Store.isCrm(delId)) TextButton({
+                Store.deleteFolder(delId); selKey = null; doSync()
             }) { Text("Xoá thư mục này") }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                 items(Store.snippets.filter { x ->
-                    (sel == null || x.folderId == sel) && (q.isBlank() || listOf(x.abbr, x.keyword).plus(x.options).any { it.contains(q, true) })
+                    (selIds == null || x.folderId in selIds) && (q.isBlank() || listOf(x.abbr, x.keyword).plus(x.options).any { it.contains(q, true) })
                 }) { s ->
                     Card(onClick = {
                         if (Store.isCrm(s.id)) Toast.makeText(ctx, "Mục lấy từ CRM — sửa trên CRM (tab Zalo AI → Viết tắt), rồi bấm ☁ CRM để cập nhật", Toast.LENGTH_LONG).show()
@@ -154,12 +164,20 @@ fun App(crm: CrmWeb) {
         }
     }
     editing?.let { SnippetDialog(it) { editing = null; doSync() } }
+    if (pickFolder) FolderTreeDialog("Chọn thư mục", Store.folders, selKey, true,
+        count = { n -> Store.snippets.count { it.folderId in n.ids } },
+        canPick = { true },
+        onPick = { n -> selKey = n?.key; pickFolder = false },
+        onDismiss = { pickFolder = false })
     if (newFolder) {
-        var name by remember { mutableStateOf("") }
+        // Thư mục con: gõ "Mẹ › Con" (đang đứng trong 1 thư mục tự tạo thì điền sẵn tên mẹ). Cây dựng từ tên nên không đổi dữ liệu/đồng bộ.
+        var name by remember { mutableStateOf(if (node != null && !node.key.startsWith("CRM")) node.key + " › " else "") }
         AlertDialog(onDismissRequest = { newFolder = false }, title = { Text("Thư mục mới") },
-            text = { OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên thư mục") }) },
+            text = { OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên thư mục") },
+                supportingText = { Text("Thư mục con: gõ  Mẹ › Con  (vd: Túi tiền › Cổ)") }) },
             confirmButton = { TextButton({
-                if (name.isNotBlank()) { Store.folders += Folder(UUID.randomUUID().toString(), name.trim(), System.currentTimeMillis()); Store.save() }
+                val nm = name.trim().trimEnd('›', ' ')
+                if (nm.isNotBlank()) { Store.folders += Folder(UUID.randomUUID().toString(), nm, System.currentTimeMillis()); Store.save() }
                 newFolder = false; doSync()
             }) { Text("Tạo") } })
     }
@@ -172,6 +190,7 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     var abbr by remember { mutableStateOf(s.abbr) }
     var kw by remember { mutableStateOf(s.keyword) }
     var folder by remember { mutableStateOf(s.folderId) }
+    var pickFolderDlg by remember { mutableStateOf(false) }
     val opts = remember { s.options.toMutableStateList() }
     var rec by remember { mutableStateOf<MediaRecorder?>(null) }
     var recName by remember { mutableStateOf("") }
@@ -220,8 +239,8 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(abbr, { abbr = it }, singleLine = true, label = { Text("Viết tắt (vd: stk)") })
                 OutlinedTextField(kw, { kw = it }, singleLine = true, label = { Text("Từ khoá (cách nhau dấu phẩy)") })
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Store.folders.forEach { f -> FilterChip(folder == f.id, { folder = f.id }, { Text(f.name) }) }
+                OutlinedButton({ pickFolderDlg = true }, Modifier.fillMaxWidth()) {
+                    Text("📁 " + (Store.folders.firstOrNull { it.id == folder }?.name ?: "Chung") + "  ▾", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 opts.forEachIndexed { i, o ->
                     if (kindOf(o) != null) {
@@ -263,6 +282,15 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
                 TextButton(onDone) { Text("Huỷ") }
             }
         })
+    if (pickFolderDlg) {
+        val own = Store.folders.filter { !Store.isCrm(it.id) }   // mục tự tạo không được lưu vào thư mục CRM (bị ghi đè khi ☁ CRM)
+        val curName = own.firstOrNull { it.id == folder }?.name
+        FolderTreeDialog("Lưu vào thư mục", own, curName?.let { FolderTree.segs(it).joinToString(FolderTree.SEP) }, false,
+            count = { n -> Store.snippets.count { it.folderId in n.ids } },
+            canPick = { it.folderId != null },
+            onPick = { n -> n?.folderId?.let { folder = it }; pickFolderDlg = false },
+            onDismiss = { pickFolderDlg = false })
+    }
 }
 
 @Composable
