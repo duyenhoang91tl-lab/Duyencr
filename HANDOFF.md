@@ -14,7 +14,9 @@ Nguyên nhân gốc: merge `f06722e` (03/11, "Merge origin/main (Báo cáo E bư
 - `_vtFromTemplates_`: mẫu có `abbr` hợp lệ dùng đúng viết tắt đó và được xếp TRƯỚC mẫu tự suy ra (giữ chỗ tên đã chọn; mẫu tự suy ra trùng thì thành `ckm2`…); `abbr` hỏng trong sheet (sửa tay) → quay về tự suy ra, không làm hỏng Viết tắt. `used[]` giờ theo `_vtKey_`.
 - Mẫu CHỜ DUYỆT vẫn chưa vào Viết tắt (vào khi admin duyệt). Mẫu đã duyệt do nhân viên: nhân viên không sửa được (FORBIDDEN cũ) → viết tắt sửa qua B3.
 - Test mới `tools/test-tpl-abbr.js` (20 ca) ALL OK; `test-viettat-tpl/gas/same`, `test-msgtpl`, `test-tpl-notify-gas` PASS; `test-msgtpl-group` sửa 1 assertion cũ đòi `images` là cột cuối (nay `abbr` cuối).
-### ⏭ B3 — (ĐANG LÀM) action `setTemplateAbbr` (sửa RIÊNG viết tắt của 1 mẫu, không đổi trạng thái duyệt): quyền = admin/manager (priv) hoặc người tạo mẫu; route trong `doPost` (nhớ so danh sách action sau khi merge).
+### ✅ B3 — Action `setTemplateAbbr` (sửa RIÊNG viết tắt 1 mẫu) (`gas_v13.js`; `gas/*.gs` sinh lại, `--check` OK)
+`setTemplateAbbr_(id, abbr, caller)` + route POST `setTemplateAbbr` (body `{action:'setTemplateAbbr', id, abbr, token|ek, by}`): chỉ ghi ô `abbr`, KHÔNG đổi nội dung/trạng thái duyệt/`updatedAt`. Quyền: admin/manager (`caller.priv`) hoặc NGƯỜI TẠO mẫu (`_tplOwns_`, so tên không phân biệt hoa/thường); khác → `FORBIDDEN`. Kiểm trùng như lúc lưu mẫu (`code:'ABBR'`); `abbr` rỗng = xoá. Trả `{ok, id, abbr}`. Test thêm vào `tools/test-tpl-abbr.js` (31 ca) ALL OK; so danh sách action trước/sau: chỉ thêm `setTemplateAbbr`, không mất route nào.
+### ⏭ B4 — (ĐANG LÀM) CRM form mẫu tin: thêm ô "Viết tắt" (`index.html` quanh `mt-f-save-btn` dòng ~827 + `js/20-loadaiexamples.js` `saveMsgTemplateUI` ~389 + chỗ đổ dữ liệu khi sửa mẫu); hiện lỗi `code:'ABBR'` ngay dưới ô; sau lưu nhớ tải lại danh sách Viết tắt nếu đang mở.
 
 
 ## 2026-11-14 (phiên Claude — Mẫu tin dùng được trong ứng dụng Viết tắt, MỞ RỘNG cho mọi mẫu đã duyệt) — ĐANG LÀM, mỗi bước 1 push

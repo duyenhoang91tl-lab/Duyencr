@@ -12,7 +12,7 @@ const consts = [
   line(/var VIETTAT_TPL_MAX = [^\n]*;/), line(/var VIETTAT_TPL_ONLY_ADMIN = [^\n]*;/), 'var SH_MSG_TPL="MessageTemplates",SH_USER="Users";'
 ].join('\n');
 const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_',
-  '_tplRowToObj_', '_tplOwns_', '_tplCheckAbbr_', 'saveMessageTemplate_'].map(fn).join('\n');
+  '_tplRowToObj_', '_tplOwns_', '_tplCheckAbbr_', 'saveMessageTemplate_', 'setTemplateAbbr_'].map(fn).join('\n');
 // sheet gia theo ten (dung chung cho MessageTemplates va VietTat)
 const mk = (name) => { const s = { rows: [], hdr: name === 'VietTat' ? ['id'] : null };
   return { rows: s.rows,
@@ -83,4 +83,28 @@ ok(vt.find(s => s.tplId === idA).abbr === 'ckm' && vt.find(s => s.tplId === c.id
 tplRows[0][15] = 'co khoang';
 vt = ctx.readVietTat_({ priv: false, name: 'Lan' });
 ok(vt.find(s => s.tplId === idA) && !/\s/.test(vt.find(s => s.tplId === idA).abbr), 'abbr sai dinh dang trong sheet -> quay ve tu suy ra, khong co khoang trang');
+// ── setTemplateAbbr_: sua RIENG viet tat (tab Viet tat) ──
+tplRows[0][15] = 'ckm';
+const before = tplRows[0].slice(0, 15).map(String).join('|');
+const set = (id, a, c) => ctx.setTemplateAbbr_(id, a, c);
+r = set(idA, 'xinchao', admin);
+ok(r.ok && tplRows[0][15] === 'xinchao' && tplRows[0].slice(0, 15).map(String).join('|') === before, 'admin doi viet tat; noi dung/trang thai/ngay sua KHONG doi');
+r = set(idA, 'ckm', { priv: false, name: 'Hoa', via: 'web' });
+ok(r.code === 'FORBIDDEN' && tplRows[0][15] === 'xinchao', 'nhan vien KHONG phai nguoi tao -> FORBIDDEN, khong ghi');
+const hid = tplRows.find(x => x[1] === 'Mau cua Hoa')[0];
+r = set(hid, 'hoa2', { priv: false, name: 'hoa', via: 'web' });
+ok(r.ok && tplRows.find(x => x[0] === hid)[15] === 'hoa2', 'NGUOI TAO (khong phai admin) doi duoc viet tat mau cua minh (ke ca khi mau dang cho duyet)');
+ok(tplRows.find(x => x[0] === hid)[9] === 'pending', 'doi viet tat KHONG doi trang thai duyet (van pending)');
+r = set(hid, 'XINCHAO', admin);
+ok(r.code === 'ABBR' && /mau tin khac/.test(r.error), 'doi sang viet tat da co (khac hoa thuong) -> bao loi ABBR');
+r = set(hid, 'khac khoang', admin);
+ok(r.code === 'ABBR', 'viet tat co khoang trang -> bao loi');
+r = set(hid, '', admin);
+ok(r.ok && tplRows.find(x => x[0] === hid)[15] === '', 'viet tat rong -> xoa (ve tu suy ra)');
+r = set('mt_khong_co', 'abc', admin);
+ok(r.error && !r.ok, 'id khong ton tai -> bao loi');
+r = set(idA, 'xinchao', admin);
+ok(r.ok, 'dat lai chinh viet tat dang co -> khong tu bao trung');
+const g = src.indexOf("if (action === 'setTemplateAbbr')");
+ok(g > 0 && /setTemplateAbbr_\(data\.id, data\.abbr, _tplCaller_\(/.test(src.slice(g, g + 200)), 'doPost co route action=setTemplateAbbr');
 console.log(bad ? '\n' + bad + ' FAIL' : '\nALL OK'); process.exit(bad ? 1 : 0);

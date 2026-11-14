@@ -388,6 +388,7 @@ function doPostCore_(e) {
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
+    if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)

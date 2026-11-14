@@ -970,6 +970,24 @@ function _tplCheckAbbr_(abbr, excludeId) {
   }
   return '';
 }
+// Sua RIENG viet tat cua 1 mau tin (2026-11-14, tu tab Viet tat — khong phai mo form soan mau): KHONG doi noi dung / trang thai duyet / updatedAt.
+// Quyen: admin/manager (caller.priv) hoac NGUOI TAO mau. abbr rong = xoa viet tat tu dat (ve tu suy ra tu tieu de). Kiem tra trung nhu luc luu mau.
+function setTemplateAbbr_(id, abbr, caller) {
+  caller = caller || { priv: false, name: '' };
+  if (!id) return jsonOut_({ error: 'Thieu id mau tin' });
+  var abbrErr = _tplCheckAbbr_(abbr, id);
+  if (abbrErr) return jsonOut_({ error: abbrErr, code: 'ABBR' });
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS), vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) !== String(id)) continue;
+    var cur = _tplRowToObj_(vals[i]);
+    if (!caller.priv && !_tplOwns_(cur, caller)) return jsonOut_({ error: 'Chi admin/quan ly hoac nguoi tao mau moi duoc doi viet tat cua mau nay.', code: 'FORBIDDEN' });
+    var v = String(abbr == null ? '' : abbr).trim();
+    sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(v);
+    return jsonOut_({ ok: true, id: cur.id, abbr: v });
+  }
+  return jsonOut_({ error: 'Khong tim thay mau tin (co the da bi xoa).' });
+}
 // data: {id, title, content, tags, product, topic, createdBy}. Admin/manager: luu la 'approved' (admin cai san mau); nhan vien: tao moi -> 'pending',
 // chi sua duoc mau CUA MINH chua duoc duyet (sua xong quay lai 'pending'); mau da duyet chi admin/manager sua.
 function saveMessageTemplate_(data, caller) {
