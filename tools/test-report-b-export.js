@@ -130,4 +130,18 @@ ok(JSON.stringify(SH(true, '').sheets.find(x => x.name === 'Đối chiếu tổn
 // exportSalesReport nhanh B: van dung ten file + canh bao thieu bsx/bcx va chi truyen admin cho sheet san pham
 ok(/_srBuildExportBSheets_\(dB, \{ dateFrom: _srState\.dateFrom[^\n]*'', _srIsAdmin\(\)\)/.test(js13) && /BaoCaoDoanhSo_B_DoiChieu_/.test(js13) && /xb\.missing/.test(js13), 'exportSalesReport nhanh B goi _srBuildExportBSheets_ (truyen _srIsAdmin) + giu ten file + canh bao thieu bsx/bcx');
 
+// ===== Sale (khong phai admin) TAI DUOC file doi soat B (Duyen 2026-11-06: "sale co the tai file doi soat") =====
+const SHs = cctx._srBuildExportBSheets_(Badj, { dateFrom: '2026-10-01', dateTo: '2026-10-31', at: 'luc test' }, '', false).sheets.map(s => s.name);
+const SHa = cctx._srBuildExportBSheets_(Badj, { dateFrom: '2026-10-01', dateTo: '2026-10-31', at: 'luc test' }, '', true).sheets.map(s => s.name);
+ok(!SHs.includes('Báo cáo sản phẩm') && SHa.includes('Báo cáo sản phẩm') && SHs.length === SHa.length - 1, 'Sale (khong admin): file B co du sheet, CHI thieu "Bao cao san pham" (rieng admin)');
+ok(['Tổng quan', 'Theo Sale', 'Chi tiết đơn', 'Chia theo Sale', 'Đối chiếu tổng', 'Hoàn hủy tháng trước'].every(n => SHs.includes(n)), 'Sale nhan duoc ca sheet "Hoan huy thang truoc" (khi da chot) va cac sheet doi chieu');
+{ // nut "Xuat Excel" cua Bao cao B khong nam trong nhanh admin
+  const src13 = fs.readFileSync(path.join(__dirname, '..', 'js', '13-fn-bpseedofficialonlinetemplate.js'), 'utf8');
+  const a0 = src13.indexOf("if (sub === 'A' || sub === 'B'){"), blk = src13.slice(a0, src13.indexOf("} else if (sub === 'C'){", a0));
+  const lines = blk.split('\n'), xl = lines.find(l => l.includes("t('📊 Xuất Excel', 'exportSalesReport()')"));
+  ok(!!xl && !/admin/.test(xl), 'nut "📊 Xuat Excel" cua Bao cao B hien cho MOI vai tro (khong dieu kien admin)');
+  const adminOnly = lines.filter(l => /if \(admin\)/.test(l)).join('\n');
+  ok(!/exportSalesReport\(\)/.test(adminOnly) && /exportSalesReportToSheet/.test(adminOnly), 'chi "Xuat ra Sheet" / An-Hien Page&Sale la rieng admin');
+}
+
 console.log(fails ? '\nFAILED ' + fails : '\nALL REPORT-B-EXPORT (GAS) TESTS PASSED'); process.exit(fails ? 1 : 0);
