@@ -1,6 +1,15 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Android Viết tắt 1.21: "+ Hình ảnh" chọn được NHIỀU ảnh 1 lúc) — XONG phần code; CHỜ CI build + Duyên thử
+
+**Yêu cầu Duyên:** app Viết tắt, khi thêm ảnh để add vào mẫu tin nhắn có sẵn thì không chọn được nhiều ảnh cùng lúc.
+- [x] `MainActivity.kt` (`SnippetDialog`): NGUYÊN NHÂN GỐC — `pickImg`/`pickAud` dùng `ActivityResultContracts.GetContent()` (bộ chọn đúng 1 tệp/lần). Đổi sang `GetMultipleContents()`: mỗi ảnh/tệp thành 1 lựa chọn `[[img:..]]`/`[[aud:..]]` riêng theo thứ tự chọn; 1 tệp lỗi chỉ bỏ qua tệp đó + Toast số tệp lỗi (`copyIn` giờ báo lỗi khi không mở được tệp thay vì trả tên file không tồn tại). Đã grep: chỉ 2 chỗ này dùng GetContent ngoài `CrmWeb.kt` (CrmWeb đã chọn nhiều qua EXTRA_ALLOW_MULTIPLE, không đổi).
+- [x] `build.gradle.kts`: versionCode 22 / versionName 1.21 (để cài đè được bản 1.20).
+- GAS/extension/CRM web KHÔNG đổi → không cần deploy GAS, không cần reload extension.
+- ⚠ Kotlin CHƯA biên dịch được ở môi trường chat (không có Android SDK) → chờ GitHub Actions "Build Android VietTat"; nếu CI đỏ, đọc log và sửa `MainActivity.kt` dòng ~185-195.
+- [ ] VIỆC KẾ TIẾP: Duyên tải VietTat.apk (Release `viettat-latest`) cài đè bản 1.21 → mở "+ Thêm viết tắt" → "+ Hình ảnh" → chọn nhiều ảnh cùng lúc (giữ ảnh đầu để vào chế độ chọn nhiều) → kiểm mỗi ảnh hiện thành 1 dòng "N. Hình ảnh" và lưu/chèn đúng.
+
 ## 2026-11-14 (phiên Claude — kiểm Viết tắt Android qua video/ảnh Duyên) — XONG; CHỜ Duyên cài APK 1.20
 - Kết luận: luồng gõ tắt → chọn nhiều → Chèn/chia sẻ → Zalo chạy đúng (video 14:00). Cảnh báo "riêng 0" chỉ là nhắc; "ô mật khẩu…" là do ô trống hiện chữ gợi ý.
 - [x] 1.20 (`ExpanderService.kt`): `cleanOldMedia` xoá bản sao `vt_*` quá 24h trong Pictures/VietTat + Download/VietTat (NGUYÊN NHÂN GỐC: `saveMedia` chỉ thêm, không xoá → album phình); thông báo ô trống rõ hơn. CI Build Android VietTat xanh.

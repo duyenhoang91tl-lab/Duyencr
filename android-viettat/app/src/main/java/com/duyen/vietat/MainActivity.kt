@@ -179,14 +179,21 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     fun copyIn(u: android.net.Uri, def: String): String {
         val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(ctx.contentResolver.getType(u)) ?: def
         val name = "${UUID.randomUUID()}.$ext"
-        ctx.contentResolver.openInputStream(u)?.use { i -> File(Store.mediaDir, name).outputStream().use { i.copyTo(it) } }
+        (ctx.contentResolver.openInputStream(u) ?: error("không mở được tệp")).use { i -> File(Store.mediaDir, name).outputStream().use { i.copyTo(it) } }
         return name
     }
-    val pickImg = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { u ->
-        if (u != null) opts.add("[[img:${copyIn(u, "jpg")}]]")
+    // NGUYÊN NHÂN GỐC (14/11/2026): trước đây dùng GetContent() = bộ chọn đúng 1 tệp/lần nên "+ Hình ảnh" không chọn được nhiều ảnh cùng lúc
+    // (phải bấm lại từng ảnh một). GetMultipleContents() cho chọn nhiều; mỗi ảnh thành 1 lựa chọn [[img:..]] riêng, giữ đúng thứ tự đã chọn.
+    // Một tệp lỗi (không đọc được) chỉ bỏ qua tệp đó, không làm mất các tệp còn lại.
+    val pickImg = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
+        var bad = 0
+        us.forEach { u -> runCatching { opts.add("[[img:${copyIn(u, "jpg")}]]") }.onFailure { bad++ } }
+        if (bad > 0) Toast.makeText(ctx, "$bad ảnh không đọc được, đã bỏ qua", Toast.LENGTH_SHORT).show()
     }
-    val pickAud = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { u ->
-        if (u != null) opts.add("[[aud:${copyIn(u, "m4a")}]]")
+    val pickAud = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
+        var bad = 0
+        us.forEach { u -> runCatching { opts.add("[[aud:${copyIn(u, "m4a")}]]") }.onFailure { bad++ } }
+        if (bad > 0) Toast.makeText(ctx, "$bad tệp âm thanh không đọc được, đã bỏ qua", Toast.LENGTH_SHORT).show()
     }
     fun startRec() {
         val name = "${UUID.randomUUID()}.m4a"
