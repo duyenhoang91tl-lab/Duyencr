@@ -44,6 +44,19 @@
   .pic-wait { height:170px; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:13px; }
   #toast { position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:10px; max-width:88vw; z-index:9; display:none; }
   #setup { padding:24px 16px; }
+  /* Cây thư mục (dropdown): thư mục mẹ ▸/▾ xổ thư mục con theo hàng dọc, thụt lề theo cấp */
+  #nhomWrap { position:relative; flex:1; min-width:0; }
+  #nhomBtn { font:inherit; width:100%; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #nhomBtn:after { content:"▾"; float:right; color:var(--muted); }
+  #nhomPanel { position:absolute; left:0; right:-40px; top:calc(100% + 4px); z-index:20; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.18); max-height:60vh; overflow:auto; padding:6px; min-width:260px; }
+  #nhomPanel .tools { display:flex; gap:12px; padding:2px 8px 6px; font-size:13px; color:var(--blue); }
+  #nhomPanel .tools a { color:var(--blue); text-decoration:none; }
+  .tn { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:8px; }
+  .tn.on { background:#e8f0fe; font-weight:600; }
+  .tn .tg { flex:0 0 30px; height:34px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:15px; }
+  .tn .tl { flex:1; min-width:0; padding:8px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tn .tc { flex:0 0 auto; font-size:12px; color:var(--muted); padding-right:6px; }
+  .tkids { border-left:2px solid #e3e6ea; margin-left:19px; }
   #inst { display:none; margin:8px 10px 0; padding:10px 12px; background:#fff8e1; border:1px solid #f1d98a; border-radius:10px; font-size:14px; }
   #inst b { font-weight:700; } #inst .x { float:right; border:0; background:none; font-size:18px; color:#888; }
 </style>
@@ -53,7 +66,7 @@
   <div id="setup" style="display:none"></div>
   <div id="top" style="display:none">
     <div class="row"><input id="q" type="text" placeholder="Gõ viết tắt hoặc từ khoá…" autocomplete="off" autocapitalize="off" autocorrect="off"><button class="btn" id="reload" title="Tải lại từ CRM">🔄</button></div>
-    <div class="row" style="margin-top:8px"><select id="nhom"></select><input id="cust" type="text" placeholder="Tên khách (cho {tên})" autocomplete="off"></div>
+    <div class="row" style="margin-top:8px"><div id="nhomWrap"><button type="button" id="nhomBtn">🗂 Tất cả thư mục</button><div id="nhomPanel" hidden></div></div><input id="cust" type="text" placeholder="Tên khách (cho {tên})" autocomplete="off"></div>
     <div class="hint" id="who"></div>
   </div>
 </header>
@@ -70,7 +83,7 @@
 // Trang "Viết tắt" cho ĐIỆN THOẠI (iPhone + Android, mở bằng trình duyệt / thêm vào màn hình chính). Cùng kho với CRM (sheet VietTat qua GAS action=vietTat).
 // Khác app Android: không tự hiện khi gõ trong Zalo/Messenger (iPhone không cho) — bạn mở trang này, chọn nội dung rồi Sao chép/Chia sẻ và dán vào ô chat.
 var GAS = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
-var S = { name: '', snaps: [], sel: new Set(), zoom: new Set(), q: '', nhom: '', items: [] };
+var S = { name: '', snaps: [], sel: new Set(), zoom: new Set(), q: '', nhom: '', open: {}, items: [] };
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
@@ -91,7 +104,48 @@ function resolve(t, name, now) {
 }
 
 // ── dữ liệu ──
-function nhomLabel(n) { return String(n || '').split('/').map(function (x) { return x.trim(); }).filter(Boolean).join(' › '); }
+// Thư mục: nhom dạng "Mẹ/Con/Cháu". S.nhom: '' = tất cả · '*chung' = mục không thuộc thư mục · "Mẹ/Con" = thư mục đó + mọi thư mục con.
+var CHUNG = '*chung';
+function nPath(n) { return String(n || '').split('/').map(function (x) { return x.trim(); }).filter(Boolean).join('/'); }
+function nhomLabel(n) { return nPath(n).split('/').join(' › '); }
+function inNhom(sn, sel) {
+  if (sel === '') return true;
+  var p = nPath(sn);
+  if (sel === CHUNG) return p === '';
+  return p === sel || p.indexOf(sel + '/') === 0;
+}
+function buildTree() {
+  var root = { kids: {}, order: [] }, chung = 0;
+  S.snaps.forEach(function (s) {
+    var parts = nPath(s.nhom).split('/').filter(Boolean);
+    if (!parts.length) { chung++; return; }
+    var cur = root;
+    parts.forEach(function (nm, i) {
+      if (!cur.kids[nm]) { cur.kids[nm] = { name: nm, path: parts.slice(0, i + 1).join('/'), kids: {}, count: 0 }; }
+      cur = cur.kids[nm]; cur.count++;
+    });
+  });
+  return { root: root, chung: chung };
+}
+function sortedKids(n) { return Object.keys(n.kids).sort(function (a, b) { return a.localeCompare(b, 'vi'); }).map(function (k) { return n.kids[k]; }); }
+function treeRows(n, depth) {
+  return sortedKids(n).map(function (c) {
+    var has = sortedKids(c).length > 0, open = !!S.open[c.path];
+    return '<div class="tn' + (S.nhom === c.path ? ' on' : '') + '"><span class="tg" data-tg="' + esc(c.path) + '">' + (has ? (open ? '▾' : '▸') : '·') + '</span><span class="tl" data-pick="' + esc(c.path) + '">📁 ' + esc(c.name) + '</span><span class="tc">' + c.count + '</span></div>' +
+      (has && open ? '<div class="tkids">' + treeRows(c, depth + 1) + '</div>' : '');
+  }).join('');
+}
+function expandPath(p) { var parts = p.split('/'); for (var i = 1; i <= parts.length; i++) S.open[parts.slice(0, i).join('/')] = true; }
+function allPaths(n, out) { sortedKids(n).forEach(function (c) { out.push(c.path); allPaths(c, out); }); return out; }
+function fillNhom() {
+  var t = buildTree();
+  var lab = S.nhom === '' ? '🗂 Tất cả thư mục' : (S.nhom === CHUNG ? 'Chung' : '📁 ' + nhomLabel(S.nhom));
+  $('nhomBtn').textContent = lab;
+  $('nhomPanel').innerHTML = '<div class="tools"><a href="#" data-all="1">Mở hết</a><a href="#" data-all="0">Thu hết</a></div>' +
+    '<div class="tn' + (S.nhom === '' ? ' on' : '') + '"><span class="tg"></span><span class="tl" data-pick="">🗂 Tất cả thư mục</span><span class="tc">' + S.snaps.length + '</span></div>' +
+    (t.chung ? '<div class="tn' + (S.nhom === CHUNG ? ' on' : '') + '"><span class="tg"></span><span class="tl" data-pick="' + CHUNG + '">Chung (chưa vào thư mục)</span><span class="tc">' + t.chung + '</span></div>' : '') +
+    treeRows(t.root, 0);
+}
 async function loadData(force) {
   var cached = ls('vt_cache');
   if (cached && !force) { try { S.snaps = JSON.parse(cached); } catch (e) { S.snaps = []; } }
@@ -106,14 +160,8 @@ async function loadData(force) {
   }
   fillNhom(); render();
 }
-function fillNhom() {
-  var set = {}; S.snaps.forEach(function (s) { set[s.nhom || ''] = 1; });
-  var keys = Object.keys(set).sort();
-  $('nhom').innerHTML = '<option value="">🗂 Tất cả thư mục</option>' + keys.map(function (k) { return '<option value="' + esc(k) + '">' + esc(k ? nhomLabel(k) : 'Chung') + '</option>'; }).join('');
-  $('nhom').value = S.nhom;
-}
 function matches(s, q) {
-  if (S.nhom !== '' && (s.nhom || '') !== S.nhom) return false;
+  if (!inNhom(s.nhom, S.nhom)) return false;
   if (!q) return true;
   var f = fold(q);
   if (fold(s.abbr).indexOf(f) === 0) return true;
@@ -126,9 +174,10 @@ function render() {
   var list = $('list'), q = S.q.trim();
   S.items = [];
   if (!q && S.nhom === '') {
-    var cs = {}; S.snaps.forEach(function (s) { cs[s.nhom || ''] = 1; });
+    var t = buildTree();
     list.innerHTML = '<div class="hint">Gõ viết tắt hoặc từ khoá ở ô trên, hoặc chọn thư mục:</div><div class="chips">' +
-      Object.keys(cs).sort().map(function (k) { return '<span class="chip" data-nhom="' + esc(k) + '">' + esc(k ? nhomLabel(k) : 'Chung') + '</span>'; }).join('') + '</div>' +
+      sortedKids(t.root).map(function (c) { return '<span class="chip" data-nhom="' + esc(c.path) + '">📁 ' + esc(c.name) + ' (' + c.count + ')</span>'; }).join('') +
+      (t.chung ? '<span class="chip" data-nhom="' + CHUNG + '">Chung (' + t.chung + ')</span>' : '') + '</div>' +
       (S.snaps.length ? '' : '<div class="hint">Chưa có dữ liệu — bấm 🔄 để tải từ CRM.</div>');
     bar(); return;
   }
@@ -266,14 +315,23 @@ function start() {
   loadData(false);
 }
 $('q').addEventListener('input', function () { S.q = this.value; render(); });
-$('nhom').addEventListener('change', function () { S.nhom = this.value; render(); });
+function setNhom(v) { S.nhom = v; if (v && v !== CHUNG) expandPath(v); fillNhom(); render(); }
+$('nhomBtn').addEventListener('click', function (e) { e.stopPropagation(); var p = $('nhomPanel'); if (p.hidden) { if (S.nhom && S.nhom !== CHUNG) expandPath(S.nhom); fillNhom(); } p.hidden = !p.hidden; });
+$('nhomPanel').addEventListener('click', function (e) {
+  e.stopPropagation();
+  var al = e.target.closest('[data-all]');
+  if (al) { e.preventDefault(); S.open = {}; if (al.getAttribute('data-all') === '1') allPaths(buildTree().root, []).forEach(function (p) { S.open[p] = true; }); fillNhom(); return; }
+  var tg = e.target.closest('[data-tg]'); if (tg) { var p = tg.getAttribute('data-tg'); S.open[p] = !S.open[p]; fillNhom(); return; }
+  var pk = e.target.closest('[data-pick]'); if (pk) { $('nhomPanel').hidden = true; setNhom(pk.getAttribute('data-pick')); }
+});
+document.addEventListener('click', function () { $('nhomPanel').hidden = true; });
 $('cust').addEventListener('input', function () { ls('vt_cust', this.value); render(); });
 $('reload').onclick = function () { loadData(true); };
 $('clear').onclick = function () { S.sel.clear(); render(); };
 $('copy').onclick = doCopy;
 $('share').onclick = doShare;
 $('list').addEventListener('click', function (e) {
-  var ch = e.target.closest('[data-nhom]'); if (ch) { S.nhom = ch.getAttribute('data-nhom'); $('nhom').value = S.nhom; render(); return; }
+  var ch = e.target.closest('[data-nhom]'); if (ch) { setNhom(ch.getAttribute('data-nhom')); return; }
   var c = e.target.closest('.card'); if (!c) return;
   var k = c.getAttribute('data-k');
   if (!c.classList.contains('img')) { toggle(k); return; }

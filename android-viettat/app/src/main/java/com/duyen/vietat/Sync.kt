@@ -77,11 +77,12 @@ object Crm {
     // Địa chỉ web CRM + địa chỉ dữ liệu đều có mặc định sẵn → luôn sẵn sàng; Tên CS tự lấy từ tài khoản đang đăng nhập trong tab CRM (CrmWeb.detectName), chưa có thì chỉ lấy mục CHUNG của team.
     fun configured(c: Context) = url(c).isNotEmpty()
 
-    /** Tải 1 ảnh CRM (Drive) về thư mục media dưới tên crm_<id>.<đuôi>; đã có thì dùng lại, không tải lại. Trả về tên file hoặc null nếu lỗi. */
-    private fun fetchImage(base: String, c: Context, id: String): String? {
+    /** Tải 1 tệp CRM (Drive) về thư mục media dưới tên crm_<id>.<đuôi>; đã có thì dùng lại, không tải lại. Trả về tên file hoặc null nếu lỗi.
+     *  action = vietTatImage (ảnh) hoặc vietTatAudio (tệp ghi âm đính kèm, 2026-11-14); khác nhau ở cách chọn đuôi file. */
+    private fun fetchMedia(base: String, c: Context, id: String, action: String): String? {
         Store.mediaDir.listFiles()?.firstOrNull { it.name.startsWith("crm_$id.") && it.length() > 0 }?.let { return it.name }
         return try {
-            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTatImage&id=" + URLEncoder.encode(id, "UTF-8") + "&by=" + URLEncoder.encode(name(c), "UTF-8")
+            val full = base + (if (base.contains('?')) "&" else "?") + "action=$action&id=" + URLEncoder.encode(id, "UTF-8") + "&by=" + URLEncoder.encode(name(c), "UTF-8")
             val con = URL(full).openConnection() as HttpURLConnection
             con.requestMethod = "GET"; con.connectTimeout = 15000; con.readTimeout = 60000; con.instanceFollowRedirects = true
             val code = con.responseCode
@@ -90,11 +91,26 @@ object Crm {
             if (code != 200) return null
             val j = JSONObject(body)
             if (!j.optBoolean("ok")) return null
-            val ext = when (j.optString("mimeType")) { "image/png" -> "png"; "image/webp" -> "webp"; "image/gif" -> "gif"; else -> "jpg" }
+            val ext = if (action == "vietTatAudio") audioExt(j.optString("name"), j.optString("mimeType"))
+                else when (j.optString("mimeType")) { "image/png" -> "png"; "image/webp" -> "webp"; "image/gif" -> "gif"; else -> "jpg" }
             val fname = "crm_$id.$ext"
             File(Store.mediaDir, fname).writeBytes(Base64.decode(j.getString("base64"), Base64.DEFAULT))
             fname
         } catch (e: Exception) { null }
+    }
+    private fun fetchImage(base: String, c: Context, id: String) = fetchMedia(base, c, id, "vietTatImage")
+    private fun fetchAudio(base: String, c: Context, id: String) = fetchMedia(base, c, id, "vietTatAudio")
+
+    /** Đuôi tệp ghi âm: ưu tiên đuôi trong tên gốc (m4a/mp3/…), không có thì đoán theo mime; mặc định m4a. Đuôi quyết định kiểu MIME khi chia sẻ sang Zalo (ExpanderService). */
+    internal fun audioExt(name: String, mime: String): String {
+        val known = setOf("m4a", "mp3", "aac", "wav", "ogg", "opus", "amr", "3gp", "webm", "flac")
+        val e = name.substringAfterLast('.', "").lowercase()
+        if (e in known) return e
+        return when (mime.lowercase().substringBefore(';').trim()) {
+            "audio/mpeg", "audio/mp3" -> "mp3"; "audio/aac" -> "aac"; "audio/wav", "audio/x-wav" -> "wav"; "audio/ogg" -> "ogg"
+            "audio/opus" -> "opus"; "audio/amr" -> "amr"; "audio/3gpp", "video/3gpp" -> "3gp"; "audio/webm", "video/webm" -> "webm"; "audio/flac" -> "flac"
+            else -> "m4a"
+        }
     }
 
     /** Chạy trên luồng nền. Trả về thông báo trạng thái ("" nếu đang chạy dở). */
@@ -122,9 +138,17 @@ object Crm {
             }
             val files = HashMap<String, String>(); var failed = 0
             for (id in ids) { val f = fetchImage(base, c, id); if (f != null) files[id] = f else failed++ }
-            val n = Store.replaceCrm(arr, files)
+            // Tệp ghi âm đính kèm (2026-11-14): cùng cách với ảnh, tải về crm_<id>.<đuôi> → hiện như 🎤 Ghi âm
+            val audIds = LinkedHashSet<String>()
+            for (i in 0 until arr.length()) arr.getJSONObject(i).optJSONArray("audios")?.let { aa ->
+                for (k in 0 until aa.length()) aa.optJSONObject(k)?.optString("id")?.takeIf { it.isNotEmpty() }?.let { audIds += it }
+            }
+            val audFiles = HashMap<String, String>(); var audFailed = 0
+            for (id in audIds) { val f = fetchAudio(base, c, id); if (f != null) audFiles[id] = f else audFailed++ }
+            val n = Store.replaceCrm(arr, files, audFiles)
             // Báo rõ chung/riêng: nếu đã lưu mục RIÊNG trên CRM mà riêng = 0 thì Tên CS trong app chưa khớp tên tài khoản CRM (mục riêng chỉ gửi cho đúng chủ).
-            "Đã cập nhật từ CRM ($n mục: chung $teamN, riêng $mineN" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") + ")" +
+            "Đã cập nhật từ CRM ($n mục: chung $teamN, riêng $mineN" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") +
+                (if (audIds.isNotEmpty()) ", ${audFiles.size} ghi âm" else "") + (if (audFailed > 0) ", $audFailed ghi âm lỗi" else "") + ")" +
                 (if (n == 0) " ⚠ CRM chưa có mục viết tắt nào cho bạn (tạo ở CRM → Zalo AI → ⌨️ Viết tắt)" else "") +
                 (if (n > 0 && mineN == 0) " ⚠ Chưa thấy mục RIÊNG của \"${name(c)}\": nếu bạn đã lưu mục riêng trên CRM thì Tên CS (☁ CRM) chưa giống tên tài khoản CRM" else "")
         } catch (e: Exception) {

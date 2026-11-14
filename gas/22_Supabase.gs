@@ -1769,21 +1769,28 @@ function _storeCaseShare_() {
 
 // Tach cot "Ngay KH hen qua CH" thanh cac NGAY (yyyy-MM-dd). Thang lay o cot Thang; nam suy ra:
 // nam hien tai, neu ngay do con xa hon 45 ngay trong TUONG LAI thi lui 1 nam. Ngay khong ton tai (31/9) bo qua.
-// QUY TAC (Duyen chinh 2026-10-31): dau GACH NOI giua 2 so = KHOANG lien tuc ("25-27" = 25,26,27; "10-11" = 10,11; "25-26-27" = 25..27);
-// dau / , ; & hoac khoang trang = LIET KE tung ngay ("28/29" = 28 va 29; "3,4"). Khoang nguoc/qua 30 ngay -> coi la liet ke.
+// QUY TAC (Duyen chinh 2026-10-31, chot them 2026-11-04): dau GACH NOI giua DUNG 2 so = KHOANG lien tuc ("25-27" = 25,26,27; "10-11" = 10,11; "1-31" = ca 31 ngay);
+// dau noi gom: - (gach ngang, gach dai) -> => ~ "den". Chuoi tu 3 so tro len noi bang gach noi ("25-26-27", "25-27-29") = LIET KE tung ngay dung nhu da ghi
+// (25-27-29 chi la 25, 27, 29 — KHONG tu hieu la 25..29). Dau / , ; & hoac khoang trang = LIET KE ("28/29" = 28 va 29; "3,4"; "5-10, 20-22" = 5..10 va 20..22).
+// Khoang nguoc ("27-25", "31-1") hoac dai hon 31 ngay -> coi la liet ke.
 function _storeCaseDayList_(dayStr) {
-  var s = String(dayStr == null ? '' : dayStr).replace(/[\u2013\u2014\u2212]/g, '-').replace(/->|\u2192|\u0111\u1ebfn|den/gi, '-');
+  var s = String(dayStr == null ? '' : dayStr).replace(/[\u2013\u2014\u2212]/g, '-').replace(/->|\u2192|\u0111\u1ebfn|den|~/gi, '-');
   var re = /\d{1,2}/g, m, nums = [], seps = [], last = -1;
   while ((m = re.exec(s)) !== null) {
     if (last >= 0) seps.push(s.slice(last, m.index));
     nums.push(parseInt(m[0], 10)); last = m.index + m[0].length;
   }
-  var out = [];
-  nums.forEach(function(n, i) {
-    if (i > 0 && /^\s*-+\s*$/.test(seps[i - 1]) && nums[i - 1] <= n && n - nums[i - 1] <= 30) {
-      for (var d = nums[i - 1] + 1; d <= n; d++) out.push(d);
-    } else out.push(n);
-  });
+  var out = [], i = 0;
+  while (i < nums.length) {
+    var j = i;                                              // chuoi cac so noi nhau bang dau gach noi: nums[i..j]
+    while (j + 1 < nums.length && /^\s*-+\s*$/.test(seps[j])) j++;
+    if (j - i === 1 && nums[i] <= nums[j] && nums[j] - nums[i] <= 30) {   // dung 2 so, xuoi -> KHOANG
+      for (var d = nums[i]; d <= nums[j]; d++) out.push(d);
+    } else {                                                // 1 so, chuoi >= 3 so, hoac khoang nguoc -> liet ke tung ngay
+      for (var q = i; q <= j; q++) out.push(nums[q]);
+    }
+    i = j + 1;
+  }
   return out;
 }
 function _storeCaseDaysToYmd_(mo, days, todayYmd) {

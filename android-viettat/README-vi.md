@@ -15,7 +15,7 @@ Gõ từ viết tắt/từ khoá trong bất kỳ ô chat nào (Zalo, Messenger,
 
 ## Mục tự tạo trên máy
 Vẫn tạo được (nút **+**), lưu riêng trong điện thoại, KHÔNG lên CRM. Mục lấy từ CRM có thư mục tên "CRM · …" và bị ghi đè mỗi lần cập nhật.
-Thư mục con trên CRM (vd `Túi tiền/Cổ`, `Túi tiền/Lắc`) hiện thành các thư mục riêng "CRM · Túi tiền › Cổ", "CRM · Túi tiền › Lắc"… xếp cạnh nhau. Ảnh kèm của mục CRM được tải về khi bấm **☁ CRM** (lần đầu có thể lâu tuỳ số hình) và hiện cùng các lựa chọn chữ.
+Thư mục con trên CRM (vd `Túi tiền/Cổ`, `Túi tiền/Lắc`) hiện thành các thư mục riêng "CRM · Túi tiền › Cổ", "CRM · Túi tiền › Lắc"… xếp cạnh nhau. Ảnh kèm của mục CRM được tải về khi bấm **☁ CRM** (lần đầu có thể lâu tuỳ số hình) và hiện cùng các lựa chọn chữ. **Tệp ghi âm** đính kèm ở CRM (form Viết tắt → "Chọn tệp ghi âm", ≤10 tệp, mỗi tệp ≤10MB) cũng được tải về cùng lúc và hiện như 🎤 Ghi âm (chèn/chia sẻ giống ghi âm tự tạo); tệp chưa tải được thì bỏ qua, bấm ☁ CRM lần nữa để thử lại.
 
 ## Build
 Tự động bằng GitHub Actions (`.github/workflows/build-android.yml`). Tự build trên máy: Android Studio mở thư mục này (hoặc `gradle assembleDebug` với Gradle 8.7 + JDK 17).

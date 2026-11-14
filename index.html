@@ -838,6 +838,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         </div>
         <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="vt-tree-wrap"><button type="button" class="assign-input" id="vt-nf-btn" onclick="vtToggleTree('f')" style="font-size:12px;padding:4px 8px;cursor:pointer;text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lọc theo thư mục — chọn thư mục mẹ sẽ gồm cả thư mục con">🗂 Tất cả thư mục ▾</button><div id="vt-nf-panel" class="vt-tree-panel" hidden></div></span>
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
           <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
@@ -860,6 +861,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
+            <span class="vt-tree-wrap"><button type="button" class="btn sm" id="vt-np-btn" onclick="vtToggleTree('p')" title="Chọn thư mục có sẵn (mẹ/con) hoặc tạo thư mục mới">📂 Chọn / tạo thư mục ▾</button><div id="vt-np-panel" class="vt-tree-panel" hidden></div></span>
             <select id="vt-f-scope" class="assign-input" style="min-width:170px" title="Chung: cả team dùng (chỉ admin tạo). Của tôi: chỉ mình bạn thấy"><option value="me">🙋 Của tôi (chỉ mình tôi)</option><option value="team">👥 Chung (cả team)</option></select>
           </div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
@@ -873,6 +875,14 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px"><textarea id="vt-f-imglinks" class="zai-textarea" rows="2" data-vt="off" placeholder="https://drive.google.com/drive/folders/... hoặc https://drive.google.com/file/d/..." style="flex:1;min-width:0"></textarea><button type="button" class="btn sm" id="vt-f-imgbtn" onclick="vtFetchImgs()">➕ Lấy ảnh từ link</button></div>
           <div id="vt-f-imgmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
           <div id="vt-f-imgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
+          <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🎤 Tệp ghi âm kèm theo</b> <span id="vt-f-audcount"></span> — thêm <b>tệp ghi âm CÓ SẴN</b> trong máy / điện thoại (mp3, m4a, wav, ogg, aac, amr…), <b>không cần bấm ghi âm</b>. Tối đa <b>10 tệp</b>/mục, mỗi tệp tối đa <b>10 MB</b>. Bấm ▶ để nghe thử. Nhớ bấm <b>Lưu</b> sau khi thêm. (Mục vẫn cần có chữ ở phần Nội dung chèn.)</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="file" id="vt-f-audfiles" accept="audio/*,.m4a,.mp3,.aac,.wav,.ogg,.opus,.amr,.3gp,.flac" multiple data-vt="off" style="display:none" onchange="vtUploadAudios(this.files); this.value=''">
+            <button type="button" class="btn sm" id="vt-f-audbtn" onclick="document.getElementById('vt-f-audfiles').click()">🎵 Chọn tệp ghi âm từ máy / điện thoại</button>
+            <span style="font-size:11px;color:var(--muted)">chọn được nhiều tệp cùng lúc</span>
+          </div>
+          <div id="vt-f-audmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
+          <div id="vt-f-auds" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
             <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
             <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
@@ -1785,7 +1795,7 @@ function openBcLogModal(phone){
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
 <script src="js/59-fn-mobilefit.js"></script>
-<script src="js/57-viettat.js?v=20261114a"></script>
+<script src="js/57-viettat.js?v=20261114b"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-conn-diag.js"></script>
 <script src="js/59-report-drill.js?v=20261111a"></script>
