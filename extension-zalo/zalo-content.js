@@ -2315,12 +2315,28 @@
   // fillZaloInput_ phan hoi qua "nut": o day phan hoi di vao dong trang thai thay vi doi chu tren nut
   const _zaiTplFlashProxy_ = { getAttribute: () => null, setAttribute() {}, get textContent() { return ''; }, set textContent(v) { _zaiTplStatus_(v); } };
   // Tuong duong 2 handler SAVE/DELETE_MESSAGE_TEMPLATE o pancake-background.js: POST text/plain len GAS, loi -> {ok:false,error}
+  // Token phien ADMIN (neu admin da dang nhap o trang Cai dat extension -> chrome.storage.local 'ome_admin_auth'). Giong pancake-background.js _apprTokenField_:
+  // KHONG tin "ten CS = duyenht" de tu duyet (ai cung go duoc ten) — chi token phien that moi cho server biet day la admin => mau luu 'approved' ngay.
+  // Chua dang nhap / het han -> {} (mau vao 'Cho duyet' nhu cu, khong loi).
+  function _zaiAdminTokenField_() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['ome_admin_auth'], (r) => {
+          const a = r && r.ome_admin_auth;
+          if (!a || !a.token) return resolve({});
+          if (a.expiresAt && Date.now() > a.expiresAt) { try { chrome.storage.local.remove('ome_admin_auth'); } catch (_) {} return resolve({}); }
+          resolve({ token: a.token });
+        });
+      } catch (_) { resolve({}); }
+    });
+  }
   async function _zaiTplCall_(type, p) {
     try {
       if (!GAS_URL) throw new Error('Chưa cài đặt URL GAS. Nhấn ⚙.');
+      const tk = await _zaiAdminTokenField_();
       const body = type === 'SAVE_MESSAGE_TEMPLATE'
-        ? { action: 'saveMessageTemplate', template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', nhom: p?.nhom, topic: p?.topic || '', createdBy: p?.createdBy || '' } }
-        : { action: 'deleteMessageTemplate', id: p?.id || '', createdBy: p?.createdBy || '' };
+        ? { action: 'saveMessageTemplate', ...tk, template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', nhom: p?.nhom, topic: p?.topic || '', createdBy: p?.createdBy || '' } }
+        : { action: 'deleteMessageTemplate', ...tk, id: p?.id || '', createdBy: p?.createdBy || '' };
       const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain' } });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -2526,7 +2542,8 @@
       _zaiTplCall_('SAVE_MESSAGE_TEMPLATE', {
         id: t ? t.id : '', title, content, tags: $('#zai-tpl-f-tags').value.trim(), product, nhom, topic, createdBy: _currentCS || ''
       }).then((resp) => {
-        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
+        // Server tra status: 'approved' khi admin da dang nhap o Cai dat extension (kem token) -> dung duoc ngay; con lai 'pending' (cho admin duyet).
+        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_(resp.data && resp.data.status === 'approved' ? 'Đã lưu mẫu — dùng được ngay (admin không cần duyệt).' : 'Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
         else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
