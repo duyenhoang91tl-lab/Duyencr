@@ -18,7 +18,10 @@ Kế hoạch: **A** GAS · **B** CRM `js/57-viettat.js` (form "+ Tệp ghi âm")
 - Tải TUẦN TỰ từng tệp qua `vietTatUploadAudio`; bỏ tệp không phải âm thanh (nhận theo đuôi khi Android báo mime lạ), >10MB, vượt 10 tệp/mục; 1 tệp lỗi không làm hỏng các tệp còn lại.
 - Nghe thử: tệp vừa chọn dùng bản cục bộ; tệp đã lưu tải qua GET `vietTatAudio` rồi cache. Gỡ từng tệp. Lưu gửi `audios:[{id,name}]` (gỡ hết → `[]`). Bấm Lưu khi đang tải bị chặn; đóng/mở mục khác giữa lúc tải không làm tệp chui sang mục mới. Danh sách hiện "🎤 N tệp ghi âm: tên…".
 - Test mới `NODE_PATH=<jsdom> node tools/test-viettat-crm-audio.js` ALL OK; `test-viettat-crm/-crm-tpl/-tree` PASS; inline script OK; build-dist + test-dist-equivalence OK. Chưa thử trên trình duyệt thật. Cần Ctrl+F5.
-### ⏭ C — Android (☁ CRM tải tệp `audios` về dùng như 🎤) — chưa làm; không build được ở môi trường chat.
+### ✅ C — Android (`Sync.kt`, `Data.kt`, README-vi.md): ☁ CRM tải tệp `audios` về dùng như 🎤
+- `Crm.fetchImage` tổng quát thành `fetchMedia(action)`; thêm `fetchAudio` (GET `vietTatAudio`) lưu `crm_<id>.<đuôi>` (đuôi theo tên gốc, không có thì theo mime, mặc định m4a — đuôi quyết định MIME khi chia sẻ). `Store.replaceCrm(a, imgFiles, audFiles)` nối `[[aud:tên_file]]` sau ảnh. Thông báo cuối: ", N ghi âm" / ", N ghi âm lỗi". `cleanup()` giữ file vì đã nằm trong options.
+- **CHƯA build/chạy được** ở môi trường chat (không có Android SDK) — chờ GitHub Actions build APK; cần cài lại APK mới rồi bấm ☁ CRM kiểm tra 🎤 hiện ở mục có tệp ghi âm. Cần kiểm trên máy thật: ghi âm lớn (~10MB → chuỗi base64 ~13MB trong RAM) có tải ổn không.
+### ⏭ Tiếp theo: kiểm thực tế cả chuỗi (CRM đính tệp → ☁ CRM trên app → Chèn/Chia sẻ sang Zalo); nếu OOM với tệp lớn thì đổi sang tải dạng stream.
 
 ## 2026-11-14 (phiên Claude — Viết tắt: THƯ MỤC MẸ/CON dạng dropdown cây) — ĐANG LÀM, mỗi bước 1 push
 
