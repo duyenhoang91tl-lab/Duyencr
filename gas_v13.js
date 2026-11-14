@@ -14038,11 +14038,14 @@ function readVietTat_(caller) {
   return out;
 }
 // ── MAU TIN (MessageTemplates) -> MUC VIET TAT (chi doc, khong ghi vao sheet VietTat) ──
-// Chi lay mau DA DUYET do ADMIN tao (createdBy khop ten / tai khoan cua 1 admin dang hoat dong) — nhan vien de xuat da duoc admin duyet thi KHONG tu vao viet tat
-// (giu pham vi dung nhu yeu cau: mau cua duyenht). Moi mau thanh 1 muc CHUNG (scope 'team'), thu muc 'Mau tin[/Nhom SP]', noi dung = noi dung mau, anh = anh dinh kem mau.
+// Lay MOI mau DA DUYET (VIETTAT_TPL_ONLY_ADMIN=false, mac dinh tu 2026-11-14). Neu bat true: chi mau do ADMIN tao (createdBy khop ten / tai khoan 1 admin dang hoat dong).
+// Mau cho duyet / tu choi / rong KHONG vao viet tat. Moi mau thanh 1 muc CHUNG (scope 'team'), thu muc 'Mau tin[/Nhom SP]', noi dung = noi dung mau, anh = anh dinh kem mau.
 // Muc co fromTpl:true: client KHONG sua/xoa tai Viet tat (sua o Quan ly mau). Viet tat tu sheet VietTat luon THANG khi trung (khong bi mau de len).
 // Viet tat = tieu de mau bo dau/khoang trang (toi da 30 ky tu); tu khoa gom tieu de, chu cai dau, san pham, chu de, tag, tung tu — go mot phan dau cung ra (client khop theo tien to).
 var VIETTAT_TPL_MAX = 300, VIETTAT_TPL_NHOM = 'Mẫu tin';
+// 2026-11-14 (Duyen: "dua muc tin nhan mau dung duoc tai ung dung viet tat"): MAC DINH lay MOI mau DA DUYET (cua bat ky ai).
+// Dat true de quay lai pham vi cu: chi mau do ADMIN dang hoat dong tao.
+var VIETTAT_TPL_ONLY_ADMIN = false;
 function _vtAdminKeys_() {
   var keys = {}, users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [];
   users.forEach(function (u) {
@@ -14072,8 +14075,8 @@ function _vtTplKeyword_(t) {
   return out.join(',');
 }
 function _vtFromTemplates_(existing) {
-  var admins = _vtAdminKeys_();
-  if (!Object.keys(admins).length) return [];
+  var admins = VIETTAT_TPL_ONLY_ADMIN ? _vtAdminKeys_() : null;
+  if (admins && !Object.keys(admins).length) return [];
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS), last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, MSG_TPL_HEADERS.length).getValues(), items = [];
@@ -14081,7 +14084,7 @@ function _vtFromTemplates_(existing) {
     if (!vals[i][0]) continue;
     var t = _tplRowToObj_(vals[i]);
     if (t.status !== 'approved' || !String(t.content || '').trim()) continue;
-    if (!admins[_vtKey_(t.createdBy)]) continue;
+    if (admins && !admins[_vtKey_(t.createdBy)]) continue;
     var d = t.updatedAt || t.createdAt, ms = d ? new Date(d).getTime() : 0;
     t._ms = isNaN(ms) ? 0 : ms;
     items.push(t);

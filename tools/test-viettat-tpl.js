@@ -9,7 +9,7 @@ let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } e
 const consts = [
   'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100;',
   line(/var MSG_TPL_HEADERS = \[[^\]]*\];/), line(/var MSG_TPL_APPROVER_ROLES_ = \[[^\]]*\];/), line(/var MSG_TPL_STATUS_ = \{[^}]*\};/),
-  line(/var VIETTAT_TPL_MAX = [^\n]*;/), 'var SH_MSG_TPL="MessageTemplates",SH_USER="Users";'
+  line(/var VIETTAT_TPL_MAX = [^\n]*;/), line(/var VIETTAT_TPL_ONLY_ADMIN = [^\n]*;/), 'var SH_MSG_TPL="MessageTemplates",SH_USER="Users";'
 ].join('\n');
 const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_', '_tplRowToObj_', 'vietTatImage_'].map(fn).join('\n');
 
@@ -46,12 +46,18 @@ sheets.MessageTemplates = [
 sheets.VietTat = [['vt_1', 'Chào hỏi', 'chao', 'chao', JSON.stringify(['Chào chị ạ']), '', 'Duyen', Date.now(), '[]'],
                   ['vt_2', 'Riêng', 'baohanh', 'bh', JSON.stringify(['Của Hoa']), 'Hoa', 'Hoa', Date.now(), '[]']];
 
+// ── CHE DO MAC DINH (2026-11-14): MOI mau DA DUYET vao Viet tat, ke ca nhan vien ──
 const list = ctx.readVietTat_({ priv: false, name: 'Lan' });
 const tpl = list.filter(s => s.fromTpl), bytitle = (t) => tpl.find(s => s.tplId === t);
 ok(list.filter(s => !s.fromTpl).length === 1 && list.find(s => s.id === 'vt_1'), 'muc tu sheet VietTat van con nguyen (+ muc rieng cua nguoi khac van bi an)');
-ok(tpl.length === 4, 'chi lay mau DA DUYET cua ADMIN dang hoat dong (mt_1, mt_2, mt_8, mt_9), got ' + tpl.map(s => s.tplId).join(','));
-ok(!bytitle('mt_3') && !bytitle('mt_4') && !bytitle('mt_5') && !bytitle('mt_6') && !bytitle('mt_7'), 'KHONG lay: mau nhan vien / cho duyet / tu choi / rong / admin da khoa');
-ok(bytitle('mt_9'), 'hang cu (status trong) cua admin coi la da duyet');
+ok(tpl.map(s => s.tplId).sort().join(',') === 'mt_1,mt_2,mt_3,mt_7,mt_8,mt_9', 'mac dinh lay MOI mau da duyet (ke ca nhan vien mt_3, admin khoa mt_7), got ' + tpl.map(s => s.tplId).sort().join(','));
+ok(!bytitle('mt_4') && !bytitle('mt_5') && !bytitle('mt_6'), 'KHONG lay: cho duyet / tu choi / rong');
+ok(bytitle('mt_9'), 'hang cu (status trong) coi la da duyet');
+// ── CHE DO CU (cong tac ONLY_ADMIN=true): chi mau admin dang hoat dong ──
+ctx.VIETTAT_TPL_ONLY_ADMIN = true;
+const tplA = ctx.readVietTat_({ priv: false, name: 'Lan' }).filter(s => s.fromTpl);
+ok(tplA.map(s => s.tplId).sort().join(',') === 'mt_1,mt_2,mt_8,mt_9', 'cong tac ONLY_ADMIN=true: chi mau DA DUYET cua ADMIN dang hoat dong, got ' + tplA.map(s => s.tplId).sort().join(','));
+ctx.VIETTAT_TPL_ONLY_ADMIN = false;
 const m1 = bytitle('mt_1');
 ok(m1.id === 'tpl_mt_1' && m1.scope === 'team' && m1.owner === '' && m1.options.length === 1 && m1.options[0] === 'Noi dung mt_1', 'mau -> muc CHUNG, 1 lua chon = noi dung mau');
 ok(m1.abbr === 'chaokhachmoi' && !/\s/.test(m1.abbr), 'viet tat = tieu de bo dau + bo khoang trang: ' + m1.abbr);
@@ -70,16 +76,22 @@ sheets.VietTat.push(['vt_3', 'Chung', 'baohanh', '', JSON.stringify(['Bao hanh c
 const list2 = ctx.readVietTat_({ priv: false, name: 'Lan' });
 ok(list2.filter(s => s.abbr === 'baohanh').length === 1 && list2.find(s => s.abbr === 'baohanh').id === 'vt_3', 'viet tat trong sheet THANG khi trung tieu de mau (mau doi sang baohanh2...)');
 ok(list2.filter(s => s.fromTpl).every(s => !(s.abbr === 'baohanh')), 'mau khong chiem viet tat da co');
-// Phan quyen anh qua vietTatImage_ (mau cua admin => ai dung viet tat cung lay duoc anh dinh kem cua mau)
+// Phan quyen anh qua vietTatImage_ (mau da duyet => ai dung viet tat cung lay duoc anh dinh kem cua mau)
 const okImg = ctx.vietTatImage_(IMGA, { priv: false, name: 'Hoa' });
 ok(okImg.ok && okImg.base64 === 'QUJD', 'nhan vien lay duoc anh dinh kem cua mau admin qua vietTatImage_');
 ok(ctx.vietTatImage_('NOTINTEMPLATEAAAAAAA', { priv: false, name: 'Hoa' }).code === 'FORBIDDEN', 'anh khong thuoc muc nao: van bi chan');
 // Admin khoa / khong co admin / loi doc Users: Viet tat KHONG hong
 users = [{ username: 'hoa', name: 'Hoa', role: 'cs', active: true }];
-ok(ctx.readVietTat_({ priv: false, name: 'Lan' }).filter(s => s.fromTpl).length === 0, 'khong co admin nao hoat dong -> khong co muc tu mau');
+ok(ctx.readVietTat_({ priv: false, name: 'Lan' }).filter(s => s.fromTpl).length > 0, 'mac dinh: mau van vao Viet tat du khong co admin nao hoat dong');
+ctx.VIETTAT_TPL_ONLY_ADMIN = true;
+ok(ctx.readVietTat_({ priv: false, name: 'Lan' }).filter(s => s.fromTpl).length === 0, 'ONLY_ADMIN=true + khong co admin hoat dong -> khong co muc tu mau');
+ctx.VIETTAT_TPL_ONLY_ADMIN = false;
 users = []; usersThrow = true;
+ctx.VIETTAT_TPL_ONLY_ADMIN = true;
 const l3 = ctx.readVietTat_({ priv: false, name: 'Lan' });
-ok(l3.length >= 2 && l3.every(s => !s.fromTpl), 'doc Users loi -> Viet tat tu sheet van tra binh thuong');
+ok(l3.length >= 2 && l3.every(s => !s.fromTpl), 'ONLY_ADMIN=true + doc Users loi -> Viet tat tu sheet van tra binh thuong');
+ctx.VIETTAT_TPL_ONLY_ADMIN = false;
+ok(ctx.readVietTat_({ priv: false, name: 'Lan' }).filter(s => s.fromTpl).length > 0, 'mac dinh: doc Users loi cung khong anh huong (khong doc Users)');
 usersThrow = false;
 // Gioi han 300 mau + bo trong sheet mau
 users = [{ username: 'duyenht', name: 'Duyên HT', role: 'admin', active: true }];

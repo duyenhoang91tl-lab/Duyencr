@@ -1,6 +1,17 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Mẫu tin dùng được trong ứng dụng Viết tắt, MỞ RỘNG cho mọi mẫu đã duyệt) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** "đưa mục tin nhắn mẫu có thể dùng được tại ứng dụng Viết tắt". Hiểu là: MỌI mẫu tin đã duyệt (không chỉ mẫu của admin duyenht như phiên trước) hiện thành mục Viết tắt. (Nếu Duyên chỉ muốn giữ mẫu admin → đặt `VIETTAT_TPL_ONLY_ADMIN = true` trong `gas_v13.js`, chạy lại `split-gas`.)
+
+### ✅ Bước 1 — GAS (`gas_v13.js` `_vtFromTemplates_`, `gas/18_*.gs` + `INDEX.md` đã sinh lại, `split-gas --check` OK)
+Nguyên nhân gốc: phiên trước CỐ Ý lọc `admins[_vtKey_(t.createdBy)]` nên mẫu của nhân viên (dù đã duyệt) không vào Viết tắt → Android/PWA/CRM/extension không thấy. Giờ có công tắc `VIETTAT_TPL_ONLY_ADMIN` (mặc định `false`): lấy mọi mẫu `approved`/status trống, nội dung không rỗng; vẫn bỏ mẫu chờ duyệt/từ chối/rỗng; vẫn tối đa 300 mẫu (mới nhất trước); viết tắt trong sheet `VietTat` luôn THẮNG khi trùng. Quyền xem ảnh đính kèm mẫu (`vietTatImage_`) tự theo vì đi qua `readVietTat_`. Mặc định không còn đọc sheet Users nên lỗi Users không ảnh hưởng.
+Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2,3,7,8,9; công tắc true → lại chỉ mt_1,2,8,9) ALL OK; `test-viettat-gas`, `test-viettat-same`, `test-msgtpl`, `test-tpl-notify-gas` vẫn PASS. Deploy GAS tự động (Actions `deploy-gas.yml`).
+### ⏭ Bước 2 — (ĐANG LÀM) kiểm client: CRM `js/57-viettat.js` đã ẩn Sửa/Xoá + nhãn "📝 Từ Mẫu tin" cho `fromTpl` (không đổi); kiểm `viettat.html` (PWA điện thoại) + Android (`Data.kt`/`Picker.kt`) hiển thị mục `fromTpl` đúng và không cho sửa/xoá nhầm (id `tpl_…` sẽ báo "không tìm thấy" nếu gọi server).
+### 🧪 Duyên làm tay: chờ Actions "Deploy GAS" xanh → trong app Viết tắt (Android: ☁ CRM cập nhật) gõ tiêu đề/chữ cái đầu mẫu của nhân viên (vd `ckm`) → phải ra gợi ý; CRM → ⌨️ Viết tắt thấy thư mục "Mẫu tin".
+
+
 ## 2026-11-14 (phiên Claude — Pancake AI: UI gọn panel) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên (kèm 2 ảnh chụp panel Pancake AI):** (1) khối hướng dẫn xanh "Không tự nhận ra SĐT…" phải có **nút mắt**: mặc định ẨN, bấm mới hiện, bấm lại ẩn được. (2) Dropdown **"— Chọn mục —"** luôn nằm TRÊN CÙNG, ngay dưới hàng tra SĐT (ô SĐT / Tra cứu / 🔗 / ＋ Thêm KH); chọn mục nào xổ ra mục đó; có **nút tắt** để đóng mục sau khi xong.
