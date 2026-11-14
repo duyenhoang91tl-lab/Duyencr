@@ -8,7 +8,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 ### ✅ Bước 1 — GAS (`gas_v13.js` `_vtFromTemplates_`, `gas/18_*.gs` + `INDEX.md` đã sinh lại, `split-gas --check` OK)
 Nguyên nhân gốc: phiên trước CỐ Ý lọc `admins[_vtKey_(t.createdBy)]` nên mẫu của nhân viên (dù đã duyệt) không vào Viết tắt → Android/PWA/CRM/extension không thấy. Giờ có công tắc `VIETTAT_TPL_ONLY_ADMIN` (mặc định `false`): lấy mọi mẫu `approved`/status trống, nội dung không rỗng; vẫn bỏ mẫu chờ duyệt/từ chối/rỗng; vẫn tối đa 300 mẫu (mới nhất trước); viết tắt trong sheet `VietTat` luôn THẮNG khi trùng. Quyền xem ảnh đính kèm mẫu (`vietTatImage_`) tự theo vì đi qua `readVietTat_`. Mặc định không còn đọc sheet Users nên lỗi Users không ảnh hưởng.
 Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2,3,7,8,9; công tắc true → lại chỉ mt_1,2,8,9) ALL OK; `test-viettat-gas`, `test-viettat-same`, `test-msgtpl`, `test-tpl-notify-gas` vẫn PASS. Deploy GAS tự động (Actions `deploy-gas.yml`).
-### ⏭ Bước 2 — (ĐANG LÀM) kiểm client: CRM `js/57-viettat.js` đã ẩn Sửa/Xoá + nhãn "📝 Từ Mẫu tin" cho `fromTpl` (không đổi); kiểm `viettat.html` (PWA điện thoại) + Android (`Data.kt`/`Picker.kt`) hiển thị mục `fromTpl` đúng và không cho sửa/xoá nhầm (id `tpl_…` sẽ báo "không tìm thấy" nếu gọi server).
+### ✅ Bước 2 — Kiểm client, KHÔNG cần sửa code client
+- `viettat.html` (PWA điện thoại) chỉ ĐỌC: `loadData` lấy `j.snippets` từ `action=vietTat`, không có Sửa/Xoá → mục `tpl_…` hiện bình thường, khớp theo viết tắt/từ khoá (tiền tố) như mục khác.
+- Android (`Data.kt` ~dòng 105-114): nhập mục CRM thành snippet id `crm_<id>` (thư mục từ `nhom`, ảnh qua `images`), không ghi ngược lên CRM → mẫu tin vào được mà không đụng gì; mục này đồng bộ khi bấm ☁ CRM cập nhật.
+- CRM `js/57-viettat.js` đã ẩn Sửa/Xoá + nhãn "📝 Từ Mẫu tin" cho `fromTpl` (phiên trước); `pancake-viettat.js`/Zalo dùng cùng action nên tự có.
+### ⏭ CÒN LẠI: không còn bước code. Tuỳ chọn nếu Duyên muốn: (a) cho mẫu CHỜ DUYỆT của chính người tạo hiện trong Viết tắt riêng của họ (hiện cố ý chỉ mẫu đã duyệt, vì AI học từ mẫu đã duyệt); (b) lọc theo nhóm sản phẩm; (c) đổi `VIETTAT_TPL_MAX` (300).
 ### 🧪 Duyên làm tay: chờ Actions "Deploy GAS" xanh → trong app Viết tắt (Android: ☁ CRM cập nhật) gõ tiêu đề/chữ cái đầu mẫu của nhân viên (vd `ckm`) → phải ra gợi ý; CRM → ⌨️ Viết tắt thấy thư mục "Mẫu tin".
 
 
