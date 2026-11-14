@@ -1,6 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — kiểm Viết tắt Android qua video/ảnh Duyên) — XONG; CHỜ Duyên cài APK 1.20
+- Kết luận: luồng gõ tắt → chọn nhiều → Chèn/chia sẻ → Zalo chạy đúng (video 14:00). Cảnh báo "riêng 0" chỉ là nhắc; "ô mật khẩu…" là do ô trống hiện chữ gợi ý.
+- [x] 1.20 (`ExpanderService.kt`): `cleanOldMedia` xoá bản sao `vt_*` quá 24h trong Pictures/VietTat + Download/VietTat (NGUYÊN NHÂN GỐC: `saveMedia` chỉ thêm, không xoá → album phình); thông báo ô trống rõ hơn. CI Build Android VietTat xanh.
+- [ ] VIỆC KẾ TIẾP: Duyên tải VietTat.apk (Release `viettat-latest`) cài đè, dùng thử Chèn nhiều hình 2 lần cách nhau >1 ngày xem album có tự gọn không. Không sửa GAS/extension. Chưa làm: tự tick ảnh cho Zalo (hiện chỉ Pancake); `vietTat` tin `by=<tên>` không cần token nên ai biết tên CS đọc được mục riêng của người đó (thiết kế cũ, cần Duyên quyết có siết không).
+
 ## 2026-11-14 (phiên Claude — Viết tắt: ĐÍNH KÈM TỆP GHI ÂM có sẵn, không cần bấm ghi âm tay) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** "app Viết tắt của Duyên CRM thêm được TỆP ghi âm, không cần mục tự bấm ghi âm tay". Duyên chọn phạm vi **CRM + app Android** (không đụng extension).
