@@ -1,6 +1,16 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Viết tắt riêng cho từng MẪU TIN: nhập khi tạo mẫu ở CRM + sửa ở tab Viết tắt) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** "cho mình quyền thêm từ viết tắt khi tạo mẫu tin ở CRM và sửa được ở app Viết tắt".
+**Kế hoạch:** (B1) khôi phục route POST bị mất · (B2) GAS: cột `abbr` cho mẫu + `saveMessageTemplate_` nhận/kiểm tra `abbr` + `_vtFromTemplates_` dùng `abbr` · (B3) GAS: action `setTemplateAbbr` để sửa riêng viết tắt (không đổi trạng thái duyệt) · (B4) CRM form mẫu tin: ô "Viết tắt" (`index.html` + `js/20-loadaiexamples.js` `saveMsgTemplateUI`) · (B5) CRM tab Viết tắt (`js/57-viettat.js`): mục `fromTpl` sửa được viết tắt (hiện đang chặn bằng alert ở `vtOpenForm`). Android/PWA điện thoại: mục `tpl_` chỉ đọc (Android nhập lại `crm_*` mỗi lần đồng bộ) → sửa ở CRM, bấm ☁ cập nhật là thấy.
+
+### ✅ B1 — Khôi phục 3 route POST trong `doPost` (`gas_v13.js`, `gas/*.gs` sinh lại, `--check` OK)
+Nguyên nhân gốc: merge `f06722e` (03/11, "Merge origin/main (Báo cáo E bước 1-3, Thưởng T10) vào nhánh Đơn kết") làm rơi đúng 3 dòng `if (action === 'saveVietTat' | 'deleteVietTat' | 'vietTatUploadImage')` (so sánh danh sách action của `e82d053` với HEAD: chỉ thiếu 3 cái này). Hậu quả: từ 03/11 CRM bấm Lưu/Xoá/Tải ảnh Viết tắt không được (server không nhận action) dù `saveVietTat_` vẫn còn nên test hàm vẫn xanh. Đã thêm 3 dòng sau `approveMessageTemplate` + test `tools/test-viettat-gas.js` kiểm 3 route còn trong `doPost`. BÀI HỌC cho mọi phiên: sau khi merge `gas_v13.js`, so `grep -o "action === '[A-Za-z0-9_]*'"` trước/sau để bắt route bị rơi.
+### ⏭ B2 — (ĐANG LÀM) cột `abbr` + lưu/đọc/dùng trong Viết tắt.
+
+
 ## 2026-11-14 (phiên Claude — Mẫu tin dùng được trong ứng dụng Viết tắt, MỞ RỘNG cho mọi mẫu đã duyệt) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** "đưa mục tin nhắn mẫu có thể dùng được tại ứng dụng Viết tắt". Hiểu là: MỌI mẫu tin đã duyệt (không chỉ mẫu của admin duyenht như phiên trước) hiện thành mục Viết tắt. (Nếu Duyên chỉ muốn giữ mẫu admin → đặt `VIETTAT_TPL_ONLY_ADMIN = true` trong `gas_v13.js`, chạy lại `split-gas`.)

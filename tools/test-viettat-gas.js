@@ -137,4 +137,8 @@ ok(up.ok && !/[\/\\\n]/.test(up.name) && created[created.length - 1].getMimeType
 // anh vua tai len luu duoc vao muc (qua kiem tra _vtCheckImage_)
 rows.length = 0; r = save({ abbr: 'up', options: ['a'], scope: 'me', images: [{ id: up.id, name: up.name }] }, hoa);
 ok(r.ok && list(hoa)[0].images[0].id === up.id, 'anh vua tai len gan duoc vao muc');
+
+// ── Route POST con trong doPost (2026-11-14): merge f06722e (03/11) tung lam MAT 3 route nay -> CRM khong luu/xoa/tai anh Viet tat duoc ma test ham van xanh ──
+{ const gsrc = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
+  ['saveVietTat', 'deleteVietTat', 'vietTatUploadImage'].forEach(a => ok(gsrc.indexOf("if (action === '" + a + "')") >= 0, 'doPost co route action=' + a)); }
 console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-GAS TESTS PASSED'); process.exit(bad ? 1 : 0);
