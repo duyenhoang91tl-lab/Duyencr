@@ -14022,15 +14022,85 @@ function _vtRowToObj_(r) {
 }
 function readVietTat_(caller) {
   var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), last = sh.getLastRow(), out = [];
-  if (last < 2) return out;
-  var vals = sh.getRange(2, 1, last - 1, VIETTAT_HEADERS.length).getValues();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, VIETTAT_HEADERS.length).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (!vals[i][0]) continue;
+      var o = _vtRowToObj_(vals[i]);
+      if (!o.abbr || !o.options.length) continue;
+      if (o.scope === 'me' && !_vtSame_(o.owner, caller && caller.name)) continue;   // muc rieng nguoi khac: khong tra ve
+      out.push(o);
+    }
+  }
+  // Mau tin cua ADMIN (da duyet) cung dung duoc nhu muc Viet tat CHUNG (2026-11-14, Duyen: "mau tin cua duyenht dung duoc trong ung dung viet tat").
+  // Loi doc mau KHONG duoc lam hong Viet tat -> bo qua im lang.
+  try { Array.prototype.push.apply(out, _vtFromTemplates_(out)); } catch (eTpl) {}
+  return out;
+}
+// ── MAU TIN (MessageTemplates) -> MUC VIET TAT (chi doc, khong ghi vao sheet VietTat) ──
+// Chi lay mau DA DUYET do ADMIN tao (createdBy khop ten / tai khoan cua 1 admin dang hoat dong) — nhan vien de xuat da duoc admin duyet thi KHONG tu vao viet tat
+// (giu pham vi dung nhu yeu cau: mau cua duyenht). Moi mau thanh 1 muc CHUNG (scope 'team'), thu muc 'Mau tin[/Nhom SP]', noi dung = noi dung mau, anh = anh dinh kem mau.
+// Muc co fromTpl:true: client KHONG sua/xoa tai Viet tat (sua o Quan ly mau). Viet tat tu sheet VietTat luon THANG khi trung (khong bi mau de len).
+// Viet tat = tieu de mau bo dau/khoang trang (toi da 30 ky tu); tu khoa gom tieu de, chu cai dau, san pham, chu de, tag, tung tu — go mot phan dau cung ra (client khop theo tien to).
+var VIETTAT_TPL_MAX = 300, VIETTAT_TPL_NHOM = 'Mẫu tin';
+function _vtAdminKeys_() {
+  var keys = {}, users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [];
+  users.forEach(function (u) {
+    if (!u || u.active === false || MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) < 0) return;
+    [u.username, u.name].concat(Array.isArray(u.names) ? u.names : []).forEach(function (x) { var k = _vtKey_(x); if (k) keys[k] = 1; });
+  });
+  return keys;
+}
+function _vtTplImgId_(url) { var m = /[?&]id=([A-Za-z0-9_-]{15,})/.exec(String(url || '')); return m ? m[1] : ''; }
+function _vtTplKeyword_(t) {
+  var title = String(t.title || '').replace(/\s+/g, ' ').trim();
+  var words = title.split(' ').filter(function (w) { return w.length >= 2; });
+  var initials = _vtKey_(title.split(' ').filter(Boolean).map(function (w) { return w.charAt(0); }).join(''));   // 'Chào khách mới' -> 'ckm' (bo dau, chu thuong)
+  var parts = [title];
+  if (initials.length >= 2) parts.push(initials);
+  String(t.product || '').split(/[,;|\n]/).forEach(function (p) { parts.push(p); });
+  parts.push(t.topic);
+  String(t.tags || '').split(',').forEach(function (p) { parts.push(p); });
+  parts = parts.concat(words);
+  var out = [], len = 0, seen = {};
+  parts.forEach(function (p) {
+    p = String(p || '').replace(/[,\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    var k = p.toLowerCase();
+    if (!p || seen[k] || len + p.length + 1 > 200) return;
+    seen[k] = 1; out.push(p); len += p.length + 1;
+  });
+  return out.join(',');
+}
+function _vtFromTemplates_(existing) {
+  var admins = _vtAdminKeys_();
+  if (!Object.keys(admins).length) return [];
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS), last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, MSG_TPL_HEADERS.length).getValues(), items = [];
   for (var i = 0; i < vals.length; i++) {
     if (!vals[i][0]) continue;
-    var o = _vtRowToObj_(vals[i]);
-    if (!o.abbr || !o.options.length) continue;
-    if (o.scope === 'me' && !_vtSame_(o.owner, caller && caller.name)) continue;   // muc rieng nguoi khac: khong tra ve
-    out.push(o);
+    var t = _tplRowToObj_(vals[i]);
+    if (t.status !== 'approved' || !String(t.content || '').trim()) continue;
+    if (!admins[_vtKey_(t.createdBy)]) continue;
+    var d = t.updatedAt || t.createdAt, ms = d ? new Date(d).getTime() : 0;
+    t._ms = isNaN(ms) ? 0 : ms;
+    items.push(t);
   }
+  items.sort(function (a, b) { return b._ms - a._ms; });
+  var used = {}, out = [];
+  (existing || []).forEach(function (o) { var k = _vtKey_(o.abbr); if (k) used[k] = 1; });
+  items.slice(0, VIETTAT_TPL_MAX).forEach(function (t) {
+    var base = _vtKey_(t.title).slice(0, 30) || ('mau' + String(t.id).replace(/\D/g, '').slice(-6));
+    var abbr = base;
+    for (var n = 2; used[abbr] && n < 100; n++) abbr = base.slice(0, 30 - String(n).length) + n;
+    if (used[abbr]) return;   // qua nhieu mau trung ten: bo qua mau nay (khong de lam vo Viet tat)
+    used[abbr] = 1;
+    var imgs = [];
+    (Array.isArray(t.images) ? t.images : []).forEach(function (u, k) { var id = _vtTplImgId_(u); if (id && imgs.length < VIETTAT_MAX_IMAGES) imgs.push({ id: id, name: 'anh' + (k + 1) }); });
+    out.push({ id: 'tpl_' + t.id, nhom: _vtNhom_(VIETTAT_TPL_NHOM + (t.nhom ? '/' + t.nhom : '')), abbr: abbr, keyword: _vtTplKeyword_(t),
+               options: [String(t.content).trim().slice(0, 4000)], images: imgs, scope: 'team', owner: '', createdBy: String(t.createdBy || ''), updatedAt: t._ms,
+               fromTpl: true, tplId: String(t.id) });
+  });
   return out;
 }
 // data: {id?, nhom, abbr, keyword, options[], scope:'team'|'me'}
