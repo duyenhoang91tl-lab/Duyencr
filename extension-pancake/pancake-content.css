@@ -627,7 +627,28 @@
   margin-bottom: 8px;
 }
 
+#pk-menu-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+#pk-menu-close {
+  flex: 0 0 auto;
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #dc2626;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#pk-menu-close:hover { background: #fef2f2; }
+
 #pk-menu-sel {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   box-sizing: border-box;
   padding: 6px 8px;

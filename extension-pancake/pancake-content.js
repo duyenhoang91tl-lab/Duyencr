@@ -409,6 +409,7 @@
           <button id="pk-add-new-btn" title="Mở ngay form thêm khách mới — không cần tra cứu trước, dán SĐT vào form rồi điền và lưu">＋ Thêm KH</button>
         </div>
         <div id="pk-menu-wrap">
+          <div id="pk-menu-row">
           <select id="pk-menu-sel">
             <option value="">— Chọn mục —</option>
             <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
@@ -419,6 +420,8 @@
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
             <option value="assign">📋 Data được chia (0)</option>
           </select>
+          <button type="button" id="pk-menu-close" title="Tắt mục đang mở" style="display:none">✕ Tắt</button>
+          </div>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
               <div id="pk-rem-toolbar"><button id="pk-rem-refresh" title="Tải lại">🔄 Tải lại</button></div>
@@ -749,6 +752,13 @@
       if (v === "stats") initStats_();
       if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
       if (v === "assign") initAssignTab_();
+      panelEl.querySelector("#pk-menu-close").style.display = v ? "" : "none"; // chỉ hiện nút Tắt khi đang mở 1 mục
+    });
+    // Nút Tắt: về "— Chọn mục —" qua CHÍNH handler change ở trên (1 đường duy nhất → không lệch với chỗ khác tự mở mục)
+    panelEl.querySelector("#pk-menu-close").addEventListener("click", () => {
+      const sel = panelEl.querySelector("#pk-menu-sel");
+      sel.value = "";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
