@@ -390,6 +390,7 @@
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
+        <button id="pk-vt-toggle" type="button" class="pk-vt-off" title="Gõ tắt trong ô chat — đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)">⌨ Gõ tắt: Tắt</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
@@ -710,6 +711,14 @@
       _setCollapseBtnIcon_(collapsed);
       try { chrome.storage.local.set({ pkPanelCollapsed: collapsed }); } catch (e) {}
     });
+    // Nút bật/tắt GÕ TẮT (mặc định tắt) — lưu vtOn ở storage.local, pancake-viettat.js nghe storage.onChanged nên có hiệu lực ngay, không cần tải lại trang
+    (function () {
+      const b = panelEl.querySelector("#pk-vt-toggle"); if (!b) return;
+      const paint = (on) => { b.classList.toggle("pk-vt-on", !!on); b.classList.toggle("pk-vt-off", !on); b.textContent = on ? "⌨ Gõ tắt: Bật" : "⌨ Gõ tắt: Tắt"; b.title = on ? "Gõ tắt đang BẬT. Bấm để tắt" : "Gõ tắt đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)"; };
+      try { chrome.storage.local.get({ vtOn: false }, (v) => paint(v && v.vtOn === true)); } catch (e) {}
+      b.addEventListener("click", (e) => { e.stopPropagation(); const on = !b.classList.contains("pk-vt-on"); paint(on); try { chrome.storage.local.set({ vtOn: on }); } catch (er) {} });
+      try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.vtOn) paint(ch.vtOn.newValue === true); }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
       // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
       chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });

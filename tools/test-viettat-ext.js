@@ -24,7 +24,8 @@ async function boot(opts) {
     if (cmd === 'insertLineBreak') { r.deleteContents(); const n = w.document.createTextNode('\n'); r.insertNode(n); r.setStartAfter(n); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); return true; }
     return false;
   };
-  const store = { local: Object.assign({ vtData: opts.noData ? [] : SN, vtAt: opts.stale ? 0 : Date.now(), vtBy: opts.by === undefined ? '' : opts.by }, opts.local || {}), sync: Object.assign({ csName: '' }, opts.sync || {}) };
+  const store = { local: Object.assign({ vtData: opts.noData ? [] : SN, vtOn: true, vtAt: opts.stale ? 0 : Date.now(), vtBy: opts.by === undefined ? '' : opts.by }, opts.local || {}), sync: Object.assign({ csName: '' }, opts.sync || {}) };
+  if (opts.noVtOn) delete store.local.vtOn;   // 2026-11-14: chua tung bat/tat -> phai coi la TAT (mac dinh)
   const listeners = [];
   const area = (k) => ({ get: (keys, cb) => { const o = {}; if (typeof keys === 'string') keys = [keys]; if (Array.isArray(keys)) keys.forEach((x) => { if (x in store[k]) o[x] = store[k][x]; }); else Object.keys(keys).forEach((x) => { o[x] = x in store[k] ? store[k][x] : keys[x]; }); cb(o); },
     set: (o, cb) => { calls.sets.push(o); const ch = {}; Object.keys(o).forEach((x) => { ch[x] = { newValue: o[x] }; store[k][x] = o[x]; }); listeners.forEach((l) => l(ch, k)); cb && cb(); } });
@@ -87,6 +88,8 @@ async function boot(opts) {
 
   // tat / bat
   E = await boot({ local: { vtOn: false } }); E.typeTA(E.w.document.getElementById('t'), 'ch'); ok(E.popup() === null, 'tat trong Cai dat -> khong goi y');
+  E = await boot({ noVtOn: true }); E.typeTA(E.w.document.getElementById('t'), 'ch'); ok(E.popup() === null, 'MAC DINH (chua tung bat) -> TAT, khong goi y');
+  E = await boot({ noVtOn: true, stale: true }); ok(E.calls.msgs.length === 0, 'MAC DINH TAT -> khong goi GAS (GET_VIETTAT)');
   E = await boot({ noData: true, stale: true }); E.typeTA(E.w.document.getElementById('t'), 'ch'); ok(E.popup() === null, 'chua co du lieu -> khong goi y, khong loi');
 
   // dong bo

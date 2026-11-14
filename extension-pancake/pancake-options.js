@@ -226,8 +226,8 @@ document.getElementById("saveCrmExtKey").addEventListener("click", () => {
   const on = document.getElementById("vtOn"), btn = document.getElementById("vtSync"), st = document.getElementById("vtStatus");
   if (!on || !btn) return;
   const say = (t, bad) => { st.textContent = t; st.style.color = bad ? "#b91c1c" : "#166534"; };
-  chrome.storage.local.get({ vtOn: true, vtData: [], vtAt: 0 }, (v) => {
-    on.checked = v.vtOn !== false;
+  chrome.storage.local.get({ vtOn: false, vtData: [], vtAt: 0 }, (v) => {
+    on.checked = v.vtOn === true;
     if (v.vtAt) say("Đã có " + (v.vtData || []).length + " mục (cập nhật " + new Date(v.vtAt).toLocaleString("vi-VN") + ")");
   });
   on.addEventListener("change", () => chrome.storage.local.set({ vtOn: on.checked }));

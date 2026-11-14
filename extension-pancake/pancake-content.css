@@ -1512,3 +1512,9 @@
   padding: 3px 7px 0;
 }
 .pk-cart-vang-row .pk-cl-multi-label { margin: 0 8px 4px 0; color: #92400e; }
+
+/* Nút bật/tắt GÕ TẮT trên header panel (mặc định Tắt) */
+#pk-ai-header #pk-vt-toggle { border: none; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 600; cursor: pointer; margin-right: 6px; white-space: nowrap; }
+#pk-ai-header #pk-vt-toggle.pk-vt-off { background: rgba(255,255,255,.2); color: #fff; }
+#pk-ai-header #pk-vt-toggle.pk-vt-on { background: #22c55e; color: #fff; }
+#pk-ai-panel.pk-ai-collapsed #pk-vt-toggle { display: none; }

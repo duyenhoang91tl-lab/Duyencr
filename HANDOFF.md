@@ -1,6 +1,22 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Pancake AI: GÕ TẮT mặc định TẮT + nút bật/tắt, rồi TRÌNH BÀY LẠI panel) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** Pancake AI có nút bật/tắt gõ tắt, ai muốn bật mới bật; và trình bày lại panel Pancake AI cho thông minh, khoa học, đẹp hơn (bản hiện tại bị chê "chán").
+**Kế hoạch:** (1) gõ tắt mặc định tắt + nút trên panel · (2) trình bày lại panel (header, nhóm chức năng, thẻ khách, giỏ hàng) bằng `pancake-content.css` + markup `injectPanel()` · (3) kiểm + tài liệu.
+
+### ✅ Bước 1 — gõ tắt mặc định TẮT (extension-pancake, manifest 2026.11.14.3)
+NGUYÊN NHÂN GỐC: `pancake-viettat.js` đọc `enabled = v.vtOn !== false` (khuyết = BẬT) nên ai cài extension cũng bị bật gõ tắt dù không cần, và luôn gọi GAS `vietTat` mỗi 5 phút. Nay `enabled = v.vtOn === true` (khuyết = TẮT); khi tắt thì KHÔNG gọi GAS và ẩn popup gợi ý; bật lên thì nạp ngay (`storage.onChanged` → `loadLocal` → `refresh`).
+- `pancake-viettat.js`: mặc định tắt, tắt thì không fetch.
+- `pancake-content.js` + `.css`: nút `⌨ Gõ tắt: Tắt/Bật` (`#pk-vt-toggle`) ở header panel, ghi `vtOn` vào storage.local, đồng bộ 2 chiều với Options.
+- `pancake-options.js/.html`: checkbox mặc định bỏ tick + ghi chú.
+- `tools/test-viettat-ext.js`: boot mặc định vtOn:true; thêm 2 ca "chưa từng bật → tắt, không gọi GAS". PASS (jsdom).
+- ⚠ Người đang dùng gõ tắt sẽ thấy nó TẮT sau khi cập nhật (vì chưa từng lưu vtOn) → bấm nút ⌨ trên panel để bật lại.
+- ⚠ KHÔNG đụng Zalo AI (`zalo-viettat.js` vẫn mặc định bật như cũ). `tools/derive-zalo-viettat.js` ĐÃ HỎNG SẴN trước phiên này ("Khong thay doan const resp = await new Promise…" vì dòng đó trong pancake-viettat.js đã được sửa thêm comment lastError) → chưa sinh lại được; việc riêng cần sửa trước khi đồng bộ Zalo.
+- Không đổi GAS → không cần deploy GAS. Cần reload extension Pancake trong chrome://extensions.
+- [ ] VIỆC KẾ TIẾP: bước 2 — trình bày lại panel Pancake AI.
+
 ## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử
 
 **Yêu cầu Duyên:** đã yêu cầu thư mục mẹ/con dạng dropdown nhưng app Android chưa hiển thị (HANDOFF B3b trước đó ghi "Android chưa làm").
