@@ -1,6 +1,18 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Pancake AI: UI gọn panel) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên (kèm 2 ảnh chụp panel Pancake AI):** (1) khối hướng dẫn xanh "Không tự nhận ra SĐT…" phải có **nút mắt**: mặc định ẨN, bấm mới hiện, bấm lại ẩn được. (2) Dropdown **"— Chọn mục —"** luôn nằm TRÊN CÙNG, ngay dưới hàng tra SĐT (ô SĐT / Tra cứu / 🔗 / ＋ Thêm KH); chọn mục nào xổ ra mục đó; có **nút tắt** để đóng mục sau khi xong.
+**Chỗ code:** `extension-pancake/pancake-content.js` (`injectPanel` ~dòng 380-470: HTML panel; `requestCustomerLookup` ~1390: khối hướng dẫn; handler `#pk-menu-sel` change ~737), `pancake-content.css` (`#pk-menu-wrap`, `.pk-ai-no-phone-hint`). KHÔNG đụng thư mục `extension/` cũ.
+
+### ✅ Bước 1 — Hướng dẫn ẩn/hiện bằng nút 👁 (ext `2026.11.14.2`)
+`requestCustomerLookup`: thay khối hướng dẫn luôn hiện bằng nút `.pk-ai-hint-toggle` ("👁 Hướng dẫn tra cứu" ↔ "🙈 Ẩn hướng dẫn") + khối `.pk-ai-no-phone-hint` mặc định `display:none`. Nguyên nhân gốc: khối hướng dẫn chiếm ~1/3 chiều cao panel mỗi lần không nhận ra SĐT, đẩy mọi mục bên dưới xuống. Đã test mô phỏng jsdom (ẩn → hiện → ẩn: PASS). Chưa lưu trạng thái giữa các lần tra cứu (mỗi lần render lại mặc định ẩn — cố ý).
+### ⏭ Bước 2 — (ĐANG LÀM) chuyển `#pk-menu-wrap` lên ngay dưới `#pk-ai-phone-row`, trước `#pk-ai-customer`.
+### ⏭ Bước 3 — nút tắt (✕) trong `#pk-menu-wrap`: đặt `#pk-menu-sel` về "" + ẩn mọi `*-body` (dùng chung 1 hàm với handler change để không lệch). Lưu ý các chỗ khác set `#pk-menu-sel.value` rồi dispatch `change` (vd ~4334 "Mở mẫu tin nhắn") vẫn phải chạy.
+### 🧪 Duyên làm tay: reload extension Pancake AI ở `chrome://extensions` rồi mở panel kiểm chứng (máy chat không có Pancake thật).
+
+
 ## 2026-11-14 (phiên Claude — mẫu tin của duyenht dùng luôn không cần duyệt + dùng được trong Viết tắt) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** "để duyenht tạo mẫu tin nhắn thì không cần duyệt, dùng được luôn; mẫu đó dùng được trong ứng dụng Viết tắt tương ứng". Quy tắc phiên: chia bước nhỏ, mỗi bước 1 file hoàn chỉnh → push main → cập nhật mục này.

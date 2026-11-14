@@ -1391,13 +1391,26 @@
       // TRƯỚC ĐÂY: để trống trơn im lặng khi không tự nhận ra SĐT — trông như panel bị lỗi/không
       // dùng được, dù thật ra form vẫn hoạt động đầy đủ (tên/trạng thái/ghi chú...), chỉ là nó
       // CHỈ hiện SAU KHI tra cứu được 1 khách. Giờ luôn hiện rõ hướng dẫn thay vì im lặng.
-      panelEl.querySelector("#pk-ai-customer").innerHTML =
-        `<div class="pk-ai-no-phone-hint">
-          📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
-          • Khách <b>đã có</b> trong CRM: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
-          • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
-          rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
+      // Hướng dẫn mặc định ẨN (chỉ còn 1 nút nhỏ 👁); bấm để hiện, bấm lại để ẩn — khỏi chiếm chỗ panel.
+      const custBox = panelEl.querySelector("#pk-ai-customer");
+      custBox.innerHTML =
+        `<div class="pk-ai-hint-wrap">
+          <button type="button" class="pk-ai-hint-toggle" aria-expanded="false" title="Hiện / ẩn hướng dẫn">👁 Hướng dẫn tra cứu</button>
+          <div class="pk-ai-no-phone-hint" style="display:none">
+            📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
+            • Khách <b>đã có</b> trong CRM: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
+            • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
+            rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
+          </div>
         </div>`;
+      const hintBtn = custBox.querySelector(".pk-ai-hint-toggle");
+      const hintEl = custBox.querySelector(".pk-ai-no-phone-hint");
+      hintBtn.addEventListener("click", () => {
+        const show = hintEl.style.display === "none";
+        hintEl.style.display = show ? "block" : "none";
+        hintBtn.setAttribute("aria-expanded", show ? "true" : "false");
+        hintBtn.textContent = show ? "🙈 Ẩn hướng dẫn" : "👁 Hướng dẫn tra cứu";
+      });
       return;
     }
     lookupByPhone(phone);

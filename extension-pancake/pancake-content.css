@@ -178,6 +178,19 @@
   font-size: 12px;
 }
 
+.pk-ai-hint-toggle {
+  background: transparent;
+  border: 1px dashed #93c5fd;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pk-ai-hint-toggle:hover { background: #eff6ff; }
+.pk-ai-no-phone-hint + .pk-ai-hint-toggle { margin-top: 6px; }
+.pk-ai-hint-wrap .pk-ai-no-phone-hint { margin-top: 6px; }
+
 .pk-ai-no-phone-hint {
   background: #f0f7ff;
   border: 1px solid #dbeafe;
