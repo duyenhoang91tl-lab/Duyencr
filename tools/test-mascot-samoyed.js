@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+// 🐶 Linh vật Samoyed (js/79-mascot-samoyed.js): chạy file THẬT trong sandbox vm với DOM giả tối thiểu.
+// Kiểm: bật/tắt + lưu localStorage, nhãn, điểm đến luôn trong biên, canvas không chặn chuột/z-index đúng, vẽ không lỗi,
+// đi dạo thật sự di chuyển rồi ngồi nghỉ, giảm chuyển động = 1 khung tĩnh (không rAF), nối đúng vào menu Settings + index.html.
+const fs = require('fs'), path = require('path'), vm = require('vm'), root = path.join(__dirname, '..');
+let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
+const SPEED_MAX_STEP = 4;   // 34px/s * 0.1s (dt tối đa) = 3.4px < 4
+const SRC = fs.readFileSync(path.join(root, 'js/79-mascot-samoyed.js'), 'utf8');
+
+function makeEnv(opts) {
+  opts = opts || {};
+  const store = Object.assign({}, opts.ls || {});
+  const calls = { draw: 0, clear: 0, raf: 0, text: 0 };
+  const ctx = new Proxy({}, { get(t, k) {
+    if (k === 'clearRect') return () => { calls.clear++; };
+    if (k === 'fillText') return () => { calls.text++; };
+    if (k === 'fill') return () => { calls.draw++; };
+    return t[k] !== undefined ? t[k] : () => {};
+  }, set(t, k, v) { t[k] = v; return true; } });
+  const mkEl = () => ({ style: {}, setAttribute() {}, appendChild() {}, getContext: () => ctx, id: '', width: 0, height: 0, textContent: '' });
+  const els = []; let rafCb = null;
+  const win = {
+    innerWidth: opts.w || 1200, devicePixelRatio: 1, __handlers: {},
+    addEventListener(n, f) { (win.__handlers[n] = win.__handlers[n] || []).push(f); },
+    matchMedia: () => ({ matches: !!opts.reduced, addEventListener() {} }),
+    getComputedStyle: () => ({ display: opts.tabbar ? 'flex' : 'none', position: 'fixed' }),
+    localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+    requestAnimationFrame: f => { calls.raf++; rafCb = f; return calls.raf; }, cancelAnimationFrame() {},
+    toast: m => { win.__toast = m; },
+  };
+  const doc = {
+    hidden: false, body: { appendChild: e => els.push(e) }, head: { appendChild() {} }, documentElement: { clientWidth: opts.w || 1200 },
+    createElement: () => mkEl(), addEventListener() {},
+    getElementById: id => (id === 'pro-tabbar' && opts.tabbar ? { offsetHeight: 38 } : null),
+  };
+  win.window = win; win.document = doc;
+  const sandbox = Object.assign(win, { localStorage: win.localStorage, document: doc, toast: win.toast, console, Math, Date, setTimeout: () => 0, clearTimeout() {} });
+  vm.createContext(sandbox);
+  vm.runInContext(SRC, sandbox);
+  return { win: sandbox, store, calls, els, step: ts => { const f = rafCb; rafCb = null; if (f) f(ts); return !!f; } };
+}
+
+// 1) Mặc định bật: tạo đúng 1 canvas, không bắt chuột, z-index 249 (dưới cánh đào 250, dưới thanh tab 310)
+let e = makeEnv();
+ok(e.els.length === 1, 'tạo đúng 1 canvas, có ' + e.els.length);
+const cv = e.els[0];
+ok(cv.id === 'mascot-fx', 'id mascot-fx');
+ok(/pointer-events:none/.test(cv.style.cssText), 'canvas không bắt chuột');
+ok(/z-index:249/.test(cv.style.cssText), 'z-index 249');
+ok(cv.style.bottom === 'env(safe-area-inset-bottom,0px)', 'không có thanh tab → sát đáy theo vùng an toàn, có ' + cv.style.bottom);
+ok(e.win._mascotIsOn() === true && e.win._mascotLabel() === '🐶 Tắt linh vật Samoyed', 'nhãn khi đang bật');
+
+// 2) Có thanh tab → nằm ngay trên thanh tab
+e = makeEnv({ tabbar: true });
+ok(e.els[0].style.bottom === '38px', 'đặt trên thanh tab 38px, có ' + e.els[0].style.bottom);
+
+// 3) Chạy vòng lặp: vẽ được, không lỗi; ngồi nghỉ xong thì đi dạo và x thật sự thay đổi trong biên
+e = makeEnv({ w: 1000 });
+let t = 1000, maxX = 0, minX = 1e9, sawWalk = false, drew = 0;
+for (let i = 0; i < 4000; i++) { t += 40; if (!e.step(t)) break; }
+ok(e.calls.draw > 500, 'vẽ nhiều khung không lỗi (fill=' + e.calls.draw + ')');
+ok(e.calls.clear > 50, 'xoá canvas mỗi khung (' + e.calls.clear + ')');
+ok(e.calls.text > 0, 'có nổi trái tim (fillText=' + e.calls.text + ')');
+
+// 3b) Đi dạo THẬT: mô phỏng 160 giây — x phải đổi, luôn trong [44, w-140], có cả hướng trái lẫn phải, và có cả lúc đi lẫn lúc nghỉ
+e = makeEnv({ w: 1000 });
+t = 1000; const xs = [], modes = new Set(), faces = new Set(); let outOfRange = 0, tiny = 0, prevX = null;
+for (let i = 0; i < 4000; i++) {
+  t += 40; if (!e.step(t)) break;
+  const st = e.win._mascotState_(); xs.push(st.x); modes.add(st.mode); faces.add(st.facing);
+  if (st.x < 44 - 1e-6 || st.x > 1000 - 140 + 1e-6) outOfRange++;
+  if (prevX !== null && Math.abs(st.x - prevX) > SPEED_MAX_STEP) tiny++;   // bước nhảy bất thường (> ~2px/khung) = dịch chuyển tức thời
+  prevX = st.x;
+}
+ok(outOfRange === 0, 'vị trí vượt biên ' + outOfRange + ' khung');
+ok(Math.max.apply(null, xs) - Math.min.apply(null, xs) > 100, 'đi dạo thật: biên độ x = ' + (Math.max.apply(null, xs) - Math.min.apply(null, xs)).toFixed(0) + 'px');
+ok(modes.has('walk') && modes.has('idle'), 'có cả lúc đi lẫn lúc nghỉ: ' + Array.from(modes).join(','));
+ok(faces.has(1) && faces.has(-1), 'đổi hướng mặt trái/phải');
+ok(tiny === 0, 'không có bước nhảy tức thời (' + tiny + ' khung)');
+
+// 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
+let badRange = 0, badIdle = 0, moved = 0;
+[320, 390, 800, 1200, 1920].forEach(w => {
+  for (let i = 0; i < 4000; i++) {
+    const x = 44 + Math.random() * Math.max(40, w - 184);
+    const p = e.win._mascotPlan_(w, x, Math.random);
+    const hi = Math.max(84, w - 140);
+    if (!(p.target >= 44 && p.target <= hi)) badRange++;
+    if (!(p.idle >= 5 && p.idle <= 12)) badIdle++;
+    if (Math.abs(p.target - x) >= 1) moved++;
+  }
+});
+ok(badRange === 0, 'điểm đến vượt biên ' + badRange + ' lần');
+ok(badIdle === 0, 'thời gian nghỉ ngoài 5–12s ' + badIdle + ' lần');
+ok(moved > 19000, 'hầu như luôn đi sang chỗ khác (' + moved + '/20000)');
+// sát mép trái: dù r() chọn đi trái vẫn phải quay sang phải
+const pl = e.win._mascotPlan_(1000, 44, (() => { const v = [0.0, 0.5, 0.5]; let i = 0; return () => v[i++ % 3]; })());
+ok(pl.target > 44, 'sát mép trái chọn trái → quay sang phải, target=' + pl.target);
+
+// 5) Tắt/bật: lưu '0'/'1', nhãn đổi, canvas ẩn rồi hiện lại, có toast
+e = makeEnv();
+e.win.toggleMascot();
+ok(e.store.ome_mascot === '0' && e.win._mascotIsOn() === false, 'tắt → ome_mascot=0');
+ok(e.win._mascotLabel() === '🐶 Bật linh vật Samoyed', 'nhãn khi đang tắt');
+ok(e.els[0].style.display === 'none', 'tắt → ẩn canvas');
+ok(/Đã tắt/.test(e.win.__toast), 'toast khi tắt');
+e.win.toggleMascot();
+ok(e.store.ome_mascot === '1' && e.els[0].style.display === '', 'bật lại → hiện canvas');
+ok(/Đã bật/.test(e.win.__toast), 'toast khi bật');
+
+// 6) Đã tắt từ trước (ome_mascot=0): không tạo canvas, không chạy rAF
+e = makeEnv({ ls: { ome_mascot: '0' } });
+ok(e.els.length === 0 && e.calls.raf === 0, 'đã tắt → không canvas, không rAF');
+
+// 7) Giảm chuyển động: có canvas + vẽ 1 khung tĩnh, KHÔNG chạy rAF
+e = makeEnv({ reduced: true });
+ok(e.els.length === 1 && e.calls.raf === 0, 'giảm chuyển động → không rAF (raf=' + e.calls.raf + ')');
+ok(e.calls.draw >= 40 && e.calls.draw < 80, 'giảm chuyển động → vẽ đúng 1 khung tĩnh (fill=' + e.calls.draw + ')');
+
+// 8) Nạp 2 lần không tạo 2 canvas (guard __mascotLoaded)
+vm.runInContext(SRC, e.win);
+ok(e.els.length === 1, 'nạp lại không nhân đôi canvas');
+
+// 9) Nối đúng vào menu / trang cấu hình / index.html
+const sn = fs.readFileSync(path.join(root, 'js/29-sidenav.js'), 'utf8');
+ok(/'act:sakura','act:mascot','act:errlog'/.test(sn), 'menu Settings có act:mascot');
+const mLine = sn.split('\n').find(l => /^\s*mascot:\s*\{/.test(l)) || '';
+ok(/f:'toggleMascot'/.test(mLine) && /open:true/.test(mLine) && !/admin:true/.test(mLine), 'ACTS.mascot gọi toggleMascot, mọi vai trò (không admin-only)');
+const cf = fs.readFileSync(path.join(root, 'js/37-fn-configpage.js'), 'utf8');
+ok(/it\('mascot', '🐶 Linh vật Samoyed'\)/.test(cf) && /k === 'mascot'/.test(cf), 'trang Cấu hình có nút + cập nhật nhãn tại chỗ');
+const ix = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+ok((ix.match(/js\/79-mascot-samoyed\.js/g) || []).length === 1, 'index.html nạp js/79 đúng 1 lần');
+ok(ix.indexOf('js/66-sakura-petals.js') < ix.indexOf('js/79-mascot-samoyed.js') && ix.indexOf('js/79-mascot-samoyed.js') < ix.indexOf('js/68-ui-kit.js'), 'js/79 nằm ngay sau js/66, không đổi thứ tự thẻ cũ');
+console.log('PASS', pass, 'FAIL', fail); process.exit(fail ? 1 : 0);
