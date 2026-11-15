@@ -3,6 +3,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-15 (phiên làm việc — 🐱 ICON AI = MÈO MÁY ANH LÔNG DÀI) — XONG
+Duyên: đổi icon AI thành "mèo máy" dễ thương bông bông, phong cách giống chó Samoyed, mèo Anh lông dài. (Yêu cầu đầu là Doraemon → KHÔNG làm vì nhân vật có bản quyền; chốt dùng mèo máy NGUYÊN TÁC tự thiết kế, không chuông/vòng cổ đỏ/túi thần kỳ.)
+- ✅ `js/38-pro-dock.js`: `proCatIconSvg_(px, blink)` + `proCatIcon_(px)` — SVG nội tuyến 64x64 (không file ảnh): lông xù xanh-xám có viền nhạt (vẽ 2 lượt như chó), tai hồng, mắt đồng to + highlight, má hồng, ria, ăng-ten bi vàng + vòng cổ bạc hà có chip tròn (chi tiết "máy"). Chớp mắt bằng SMIL, tắt khi `prefers-reduced-motion`. Dùng ở 2 chỗ: nút nổi `#pro-dock-ai` (32px) và tiêu đề khung "Trợ lý AI" (24px). Các 🤖 khác trong app (tab Zalo AI, AI phân tích team…) KHÔNG đụng (quy tắc 14).
+- Test `node tools/test-ai-cat-icon.js` (SVG parse hợp lệ, không id/script, chớp mắt bật/tắt theo giảm chuyển động, nối đúng 2 chỗ); `test-pro-dock-drag` vẫn đạt. Bump `?v=` js/38 → 20261115g. Chỉ cần Ctrl+F5.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 xem nút AI. Nếu muốn: đổi màu lông/mắt, thêm mèo ở các 🤖 khác, hoặc cho mèo vẫy đuôi/nhảy khi AI đang trả lời.
+
 ## 2026-11-15 (phiên làm việc — 🌼🦋🐝 VƯỜN NHỎ + ONG TRONG LINH VẬT CHÓ) — XONG (đã push)
 Duyên: "cho thêm bươm bướm, hoa, ong như màn chó chạy trốn ong vào CRM". Mở rộng ngay `js/79-mascot-samoyed.js` (CÙNG nút bật/tắt `ome_mascot`, không thêm file/menu mới); vẽ lại hoa/bướm/ong từ `maps/map04.js` + `js/saga-map.js` của game Chromblast.
 - ✅ Hoa (8–28 bông theo bề rộng, cúc màu + hướng dương, đung đưa), bướm (4 desktop / 2 điện thoại), ong (2 / 1) bay lang thang trong dải canvas (`flyStep`: đổi hướng nhẹ, dội trần/sàn, vòng mép). Canvas cao 96→112px.
