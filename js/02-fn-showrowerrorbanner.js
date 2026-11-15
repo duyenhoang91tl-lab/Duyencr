@@ -1231,7 +1231,7 @@ function renderOverdueTab() {
       const c = _customerByPhone(it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
-      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
+      html += `<div class="sched-item sched-overdue" data-id="${esc(it.id)}" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
         <div class="sched-dot" style="background:${st.color}"></div>
         <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
         <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>

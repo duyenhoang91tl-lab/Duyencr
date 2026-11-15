@@ -1281,6 +1281,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/20-kit.css?v=20261115a"><!-- R2: bộ thành phần ui-* (khung Hoàng hôn + màu đổ nhẹ); nạp SAU theme hoàng hôn, TRƯỚC 99-dark-auto -->
 <link rel="stylesheet" href="css/21-task-board.css?v=20261115a"><!-- R6a: bảng công việc dạng cột (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/22-sched-calendar.css?v=20261115a"><!-- R6b: lịch tuần/ngày (chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/23-overdue-bulk.css?v=20261115a"><!-- R6c-1: Quá hạn chọn nhiều + dời hàng loạt (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/99-dark-auto.css?v=20261113a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
@@ -1829,6 +1830,7 @@ function openBcLogModal(phone){
 <script src="js/69-pro-smart-search.js?v=20261115a"></script>
 <script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
 <script src="js/71-sched-calendar.js?v=20261115a"></script><!-- R6b: lịch chăm sóc dạng Tuần/Ngày, kéo thẻ để dời lịch -->
+<script src="js/72-overdue-bulk.js?v=20261115a"></script><!-- R6c-1: màn Quá hạn chọn nhiều + dời hàng loạt + tồn theo CS -->
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
