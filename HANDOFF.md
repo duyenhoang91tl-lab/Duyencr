@@ -1,6 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — CHỐT HANDOFF: tệp ghi âm Viết tắt) — XONG (chỉ sửa tài liệu)
+NGUYÊN NHÂN GỐC: mục "ĐÍNH KÈM TỆP GHI ÂM" (14/11) còn ghi tiêu đề "ĐANG LÀM" dù A/B/C đã push → phiên sau tưởng còn việc. Đã đổi thành XONG. Kiểm lại ở HEAD: cả bộ `tools/test-*.js` **329/329 đạt**, `split-gas --check` khớp; gồm `test-viettat-audio-gas` (40 ca) + `test-viettat-crm-audio`.
+- [ ] **CÒN LẠI (chỉ Duyên làm được):** (1) tab Actions: "Deploy GAS" + "Build Android VietTat" xanh (Kotlin `Sync.kt`/`Data.kt` chưa từng biên dịch ở môi trường chat — nếu CI đỏ, đọc log lỗi rồi sửa); (2) Ctrl+F5 CRM → Viết tắt → "Chọn tệp ghi âm" → Lưu; (3) cài APK mới → ☁ CRM → thấy 🎤 → Chèn/Chia sẻ sang Zalo; thử 1 tệp ~10MB (nếu OOM → đổi tải sang dạng stream). Phần khác (R10a/R12a cần ảnh; R11a/R11b cần Duyên cho phép; "⚠ 2 lỗi") vẫn như mục phía dưới.
+
 ## 2026-11-15 (phiên Claude — KB: GHI QUY ƯỚC R13/R14) — XONG (đã push)
 NGUYÊN NHÂN GỐC: R13 (`--vh`) và R14 (thanh giai đoạn bấm được, 2 đường lưu) tạo quy ước mới nhưng chưa có trong `docs/crm-kb`, nên phiên sau có thể lại viết `NNvh` trần hoặc đổi `saveCare` mà quên nhánh ghi thẳng ở `proStageSet_`. Đã thêm vào `10-ui-redesign-notes.md` (2 mục) và `06-bug-history.md` (+ quy ước test: đừng ghim `?v=`). CHỈ sửa tài liệu, không đổi code chạy (không cần deploy/reload/Ctrl+F5).
 - [ ] **VIỆC KẾ TIẾP:** không còn việc nào làm được khi chưa có Duyên: xác nhận R13/R14 trên máy thật; R10a/R12a (ảnh); R11a/R11b (nói rõ phạm vi); nội dung "⚠ 2 lỗi" + dòng "Đang gom số liệu" (Duyên gửi chi tiết).
@@ -316,7 +320,7 @@ NGUYÊN NHÂN GỐC: app lưu thư mục PHẲNG (`Folder.name` = "CRM · Túi t
 - [x] 1.20 (`ExpanderService.kt`): `cleanOldMedia` xoá bản sao `vt_*` quá 24h trong Pictures/VietTat + Download/VietTat (NGUYÊN NHÂN GỐC: `saveMedia` chỉ thêm, không xoá → album phình); thông báo ô trống rõ hơn. CI Build Android VietTat xanh.
 - [ ] VIỆC KẾ TIẾP: Duyên tải VietTat.apk (Release `viettat-latest`) cài đè, dùng thử Chèn nhiều hình 2 lần cách nhau >1 ngày xem album có tự gọn không. Không sửa GAS/extension. Chưa làm: tự tick ảnh cho Zalo (hiện chỉ Pancake); `vietTat` tin `by=<tên>` không cần token nên ai biết tên CS đọc được mục riêng của người đó (thiết kế cũ, cần Duyên quyết có siết không).
 
-## 2026-11-14 (phiên Claude — Viết tắt: ĐÍNH KÈM TỆP GHI ÂM có sẵn, không cần bấm ghi âm tay) — ĐANG LÀM, mỗi bước 1 push
+## 2026-11-14 (phiên Claude — Viết tắt: ĐÍNH KÈM TỆP GHI ÂM có sẵn, không cần bấm ghi âm tay) — XONG A+B+C (đã push 4ea6fc6, 3ebd1b6); CHỜ CI build APK + Duyên thử
 
 **Yêu cầu Duyên:** "app Viết tắt của Duyên CRM thêm được TỆP ghi âm, không cần mục tự bấm ghi âm tay". Duyên chọn phạm vi **CRM + app Android** (không đụng extension).
 **Hiện trạng tìm được:** mục Viết tắt trên CRM/server chỉ đính kèm được ẢNH (cột `images`; nhập zip bỏ `[[aud:…]]` "chưa hỗ trợ"). App Android đã có "● Ghi âm" + "+ File âm thanh" nhưng CHỈ cho mục tự tạo trên máy (không lên CRM; mục CRM bị ghi đè khi ☁ CRM).
@@ -336,7 +340,7 @@ Kế hoạch: **A** GAS · **B** CRM `js/57-viettat.js` (form "+ Tệp ghi âm")
 ### ✅ C — Android (`Sync.kt`, `Data.kt`, README-vi.md): ☁ CRM tải tệp `audios` về dùng như 🎤
 - `Crm.fetchImage` tổng quát thành `fetchMedia(action)`; thêm `fetchAudio` (GET `vietTatAudio`) lưu `crm_<id>.<đuôi>` (đuôi theo tên gốc, không có thì theo mime, mặc định m4a — đuôi quyết định MIME khi chia sẻ). `Store.replaceCrm(a, imgFiles, audFiles)` nối `[[aud:tên_file]]` sau ảnh. Thông báo cuối: ", N ghi âm" / ", N ghi âm lỗi". `cleanup()` giữ file vì đã nằm trong options.
 - **CHƯA build/chạy được** ở môi trường chat (không có Android SDK) — chờ GitHub Actions build APK; cần cài lại APK mới rồi bấm ☁ CRM kiểm tra 🎤 hiện ở mục có tệp ghi âm. Cần kiểm trên máy thật: ghi âm lớn (~10MB → chuỗi base64 ~13MB trong RAM) có tải ổn không.
-### ⏭ Tiếp theo: kiểm thực tế cả chuỗi (CRM đính tệp → ☁ CRM trên app → Chèn/Chia sẻ sang Zalo); nếu OOM với tệp lớn thì đổi sang tải dạng stream.
+### ⏭ (còn lại, chỉ Duyên làm được) Tiếp theo: kiểm thực tế cả chuỗi (CRM đính tệp → ☁ CRM trên app → Chèn/Chia sẻ sang Zalo); nếu OOM với tệp lớn thì đổi sang tải dạng stream.
 
 ## 2026-11-14 (phiên Claude — Viết tắt: THƯ MỤC MẸ/CON dạng dropdown cây) — ĐANG LÀM, mỗi bước 1 push
 
