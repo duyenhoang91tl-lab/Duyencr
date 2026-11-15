@@ -12,7 +12,7 @@ function run(src, kit, kho, q, lvl) {
   const ctx = { console, esc: s => String(s == null ? '' : s), _tkNum: n => String(n), _tk: { items, q: q || '', low: false, shown: 200 }, document: { readyState: 'complete', addEventListener() {}, getElementById: id => el[id] },
     location: { search: '' }, _tkCurKho: () => kho, _tkLevel: () => lvl, _tkCanEdit: () => true, _tkCanManage: () => true, _tkNorm: s => String(s).toLowerCase(), _tkIsLow: it => it.minTon > 0 && it.ton <= it.minTon };
   ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext((kit ? fs.readFileSync(path.join(root, 'js/68-ui-kit.js'), 'utf8') + '\n' : '') + fn(src, '_tkFiltered') + '\n' + fn(src, '_tkRenderList'), ctx);
+  vm.runInContext((kit ? fs.readFileSync(path.join(root, 'js/68-ui-kit.js'), 'utf8') + '\n' : '') + fn(src, '_tkFiltered') + '\n' + (src.indexOf('function _tkFilterItems_(') >= 0 ? fn(src, '_tkFilterItems_') : '') + '\n' + fn(src, '_tkRenderList'), ctx);
   ctx._tkRenderList(); return el;
 }
 const text = h => h.replace(/<[^>]+>/g, '|').split('|').map(x => x.trim()).filter(Boolean).join(' ');

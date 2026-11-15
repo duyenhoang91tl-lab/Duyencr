@@ -14,7 +14,7 @@ function run(src, kit, o) {
     document: { readyState: 'complete', addEventListener() {}, getElementById: id => el[id] }, location: { search: '' }, _tkCurKho: () => ({ name: 'K', active: true, note: '' }), _tkLevel: () => 'admin', _tkCanEdit: () => o.can !== false, _tkCanManage: () => true,
     _tkNorm: s => String(s).toLowerCase(), _tkIsLow: it => it.minTon > 0 && it.ton <= it.minTon };
   ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext((kit ? fs.readFileSync(path.join(root, 'js/68-ui-kit.js'), 'utf8') + '\n' : '') + fn(src, '_tkFiltered') + '\n' + fn(src, '_tkRenderList'), ctx);
+  vm.runInContext((kit ? fs.readFileSync(path.join(root, 'js/68-ui-kit.js'), 'utf8') + '\n' : '') + fn(src, '_tkFiltered') + '\n' + (src.indexOf('function _tkFilterItems_(') >= 0 ? fn(src, '_tkFilterItems_') : '') + '\n' + fn(src, '_tkRenderList'), ctx);
   ctx._tkRenderList(); return el['tk-list'].innerHTML;
 }
 for (const [nm, o] of [['3 mặt hàng', {}], ['không quyền sửa', { can: false }], ['có nút Hiện thêm', { shown: 2 }], ['kho trống', { items: [] }]]) {
