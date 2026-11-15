@@ -159,6 +159,25 @@ function loadVietTat(force) {
 // ---------- quản lý (tab Zalo AI) ----------
 // Muc fromTpl = mau tin da duyet cua admin do SERVER them vao danh sach (khong nam trong sheet VietTat): sua/xoa o "Quan ly mau", khong o day (gui saveVietTat/deleteVietTat se bao 'khong tim thay').
 function _vtCanEdit(s) { return s.fromTpl ? false : (s.scope === 'team' ? _vtSt.canTeam : true); }
+// Muc fromTpl: KHONG sua noi dung o day, nhung duoc sua RIENG viet tat (action setTemplateAbbr) neu la admin/quan ly hoac NGUOI TAO mau (server van kiem lai quyen).
+function _vtCanEditAbbr(s) { var a = _vtFold(s.createdBy), b = _vtFold(_vtSt.me); return !!(s.fromTpl && s.tplId && (_vtSt.canTeam || (a && a === b))); }
+async function vtEditTplAbbr(id) {
+  var s = _vtSt.list.find(function (x) { return x.id === id; });
+  if (!s || !s.tplId) return;
+  var v = prompt('Viết tắt cho mẫu "' + (s.keyword || '').split(',')[0] + '" (1 từ, không khoảng trắng, tối đa 30 ký tự).\nĐể TRỐNG = tự lấy theo tiêu đề mẫu:', s.abbr || '');
+  if (v === null) return;
+  v = String(v).trim();
+  if (/\s/.test(v) || v.length > 30) { alert('Viết tắt phải là 1 từ, không có khoảng trắng, tối đa 30 ký tự.'); return; }
+  var d = null;
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'setTemplateAbbr', id: s.tplId, abbr: v }) });
+    d = await r.json();
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  if (d && d.error) { alert((d.code === 'ABBR' ? '⚠ ' : 'Lỗi: ') + d.error); return; }
+  if (typeof toast === 'function') toast(v ? '✓ Đã đổi viết tắt thành "' + v + '"' : '✓ Đã xoá viết tắt tự đặt (dùng theo tiêu đề)');
+  loadVietTat(true);
+  if (typeof loadMsgTemplates === 'function') { try { loadMsgTemplates(true); } catch (e) {} }   // danh sach mau (chip ⌨️) cung doi theo
+}
 function vtRender() {
   var el = document.getElementById('vt-list'); if (!el) return;
   var q = _vtFold((document.getElementById('vt-search') || {}).value || '');
@@ -195,9 +214,10 @@ function vtRender() {
         s.images.slice(0, 12).map(function (im) { return '<img src="' + _vtEsc(_vtThumb(im.id)) + '" alt="' + _vtEsc(im.name) + '" title="' + _vtEsc(im.name) + '" loading="lazy" referrerpolicy="no-referrer" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'; }).join('') + (s.images.length > 12 ? '<span style="font-size:11px;color:var(--muted)">+' + (s.images.length - 12) + ' ảnh nữa</span>' : '') + '</div>' : '';
       var auds = (s.audios || []).length ? '<div class="vt-auds" style="margin-top:4px;font-size:11px;color:var(--muted)" title="' + _vtEsc(s.audios.map(function (a) { return a.name; }).join('\n')) + '">🎤 ' + s.audios.length + ' tệp ghi âm: ' + s.audios.slice(0, 3).map(function (a) { return _vtEsc(a.name || 'ghi âm'); }).join(', ') + (s.audios.length > 3 ? ' …' : '') + '</div>' : '';
       return '<div style="margin-left:' + (depth * 16) + 'px;border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);display:flex;gap:10px;align-items:flex-start;margin-bottom:4px">' +
-        '<div style="min-width:70px"><code style="font-size:13px;font-weight:700">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt của admin — sửa/xoá ở 📚 Quản lý mẫu"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
+        '<div style="min-width:70px"><code style="font-size:13px;font-weight:700">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt — sửa nội dung/xoá ở 📚 Quản lý mẫu; viết tắt đổi bằng nút ⌨️"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
         '<div style="flex:1;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
         s.options.map(function (o, i) { return '<div style="font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + auds + '</div>' +
+        (!can && _vtCanEditAbbr(s) ? '<div style="display:flex;gap:4px;flex-shrink:0"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtEditTplAbbr(this.dataset.vtId)" title="Sửa viết tắt của mẫu này (nội dung sửa ở 📚 Quản lý mẫu)">⌨️ Sửa viết tắt</button></div>' : '') +
         (can ? '<div style="display:flex;gap:4px;flex-shrink:0"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtOpenForm(this.dataset.vtId)" title="Sửa">✏️</button><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtDelete(this.dataset.vtId)" title="Xoá">🗑</button></div>' : '') +
         '</div>';
     }).join('');
@@ -216,7 +236,7 @@ function _vtOptRow(v) {
 function vtAddOpt(v) { var w = document.getElementById('vt-f-opts'); if (w && w.children.length < 10) { var r = _vtOptRow(v); w.appendChild(r); r.querySelector('textarea').focus(); } }
 function vtOpenForm(id) {
   var s = id ? _vtSt.list.find(function (x) { return x.id === id; }) : null;
-  if (s && s.fromTpl) { alert('Mục này lấy từ Mẫu tin đã duyệt — sửa ở 📚 Quản lý mẫu (tab Zalo AI).'); return; }
+  if (s && s.fromTpl) { if (_vtCanEditAbbr(s)) { vtEditTplAbbr(id); return; } alert('Mục này lấy từ Mẫu tin đã duyệt — sửa ở 📚 Quản lý mẫu (tab Zalo AI). Chỉ admin hoặc người tạo mẫu mới đổi được viết tắt.'); return; }
   var pp0 = document.getElementById('vt-np-panel'); if (pp0) pp0.hidden = true;
   document.getElementById('vt-f-id').value = s ? s.id : '';
   document.getElementById('vt-f-abbr').value = s ? s.abbr : '';
