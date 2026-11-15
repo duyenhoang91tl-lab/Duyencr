@@ -326,7 +326,7 @@ function splitFixList_(p, user) {
   (rb.orders || []).forEach(function (o) {
     var gb = o.ghepBase || [];
     if (!gb.length) return;
-    var posVal = Number(o.giaTriPos) || Number(o.giaTriSauGiam) || 0, baseSum = 0, baseNames = {}, base = [];
+    var posVal = (Number(o.giaTriPos) || Number(o.giaTriSauGiam) || 0) + (Number(o.giaTriPosPhu) || 0), baseSum = 0, baseNames = {}, base = [];
     gb.forEach(function (b) {
       var gt = Number(b.giaTri) || 0, names = _saleNamesClean_(b.saleBan).filter(function (x) { return !_isNumericTag_(x); });
       if (b.tinh) { baseSum += gt; names.forEach(function (n) { baseNames[_normTxt_(n)] = n; }); }

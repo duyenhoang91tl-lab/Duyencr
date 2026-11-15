@@ -1390,18 +1390,17 @@ function _srBuildExportB_(dB, info){
   info = info || {};
   var orders = dB.orders || [], r2 = function(n){ return Math.round((Number(n) || 0) * 100) / 100; };
   var bsxOf = function(o){ return o.bsx || []; }, bcxOf = function(o){ return o.bcx || []; };
-  // Chốt tháng Pos (Duyên 2026-11-05): bảng Theo Sale / thẻ Tổng giá trị trên web LUÔN là doanh thu CHUẨN (GAS không trừ trực tiếp); cuối tháng đã chốt tháng trước thì có THÊM khối
-  // "Chốt tháng — trừ hoàn/hủy" (dB.posAdjust.applied). Excel giữ doanh thu chuẩn ở các cột cũ (Đối chiếu tổng vẫn so thẳng với chi tiết đơn) và chỉ THÊM cột/dòng trừ hoàn/hủy + sau trừ.
-  var adj = (dB.posAdjust && dB.posAdjust.applied) ? dB.posAdjust : null;
-  var adjDed = adj ? r2(adj.totalDeduction || 0) : 0;
-  var adjSau = adj ? r2(dB.totalGiaTriSauTru != null ? dB.totalGiaTriSauTru : (Number(dB.totalGiaTri) || 0) - adjDed) : 0;
+  // Doanh thu CHUẨN luôn đầy đủ (GAS không trừ gì). Đã chốt tháng trước (dB.posAdjust.applied + refund) thì THÊM sheet "Hoàn hủy tháng trước" — danh sách ĐƠN tháng trước đang hoàn/hủy,
+  // chỉ để đối chiếu, KHÔNG trừ vào bất kỳ số nào (Duyên 2026-11-06: "báo cáo đơn hoàn hủy tháng trước, không trừ doanh thu").
+  var adj = (dB.posAdjust && dB.posAdjust.applied && dB.posAdjust.refund) ? dB.posAdjust : null;
+  var rf = adj ? adj.refund : null;
   var missing = orders.length && !orders.every(function(o){ return Array.isArray(o.bsx) && Array.isArray(o.bcx); });
   var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null;
   var summary = [['Báo cáo B — Pos: Excel đối chiếu với kế toán'], ['Xuất lúc', info.at || ''], ['Khoảng ngày (theo ngày tạo đơn)', (info.dateFrom || '...') + ' → ' + (info.dateTo || '...')],
     ['Bộ lọc', (info.filters && info.filters.length) ? info.filters.join(' | ') : '(không lọc thêm)'], [],
     ['Chỉ số', 'Giá trị'], ['Số lượng đơn', dB.totalOrders], ['Tổng giá trị sau giảm giá (tính báo cáo)', dB.totalGiaTri], ['Tổng COD', dB.totalCod], ['Trung bình đơn', dB.trungBinhDon]];
   if (dB.bhPrepaid && dB.bhPrepaid.count) summary.push(['  ↳ Đã trừ tiền trả trước đơn Bảo hành có thẻ sale (' + dB.bhPrepaid.count + ' đơn)', -(Number(dB.bhPrepaid.total) || 0)]);
-  if (adj) summary.push(['  ↳ Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ') — khối "Chốt tháng" trên web; doanh thu ở trên KHÔNG bị trừ', -adjDed], ['  ↳ Sau trừ hoàn/hủy tháng ' + adj.prevMonth, adjSau]);
+  if (rf) summary.push(['Đơn hoàn/hủy tháng ' + adj.prevMonth + ' (đã chốt ' + adj.closedAt + ') — xem sheet "Hoàn hủy tháng trước"; KHÔNG trừ vào số trên', rf.soDon + ' đơn · ' + r2(rf.tongGiaTri)]);
   if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]);
   summary.push([], ['Cách đọc file'], ['• "Chi tiết đơn": mỗi đơn 1 dòng; cột "Dòng trong sheet Pos" + "Ghi chú" để dò lại file Pancake gốc; "Giá trị Pos gốc" so với "Giá trị tính báo cáo" (đơn ghép Base/file kế toán/gộp tách có thể khác nhau).'],
     ['• "Chia theo Sale": mỗi đơn × mỗi sale 1 dòng — số CHÍNH XÁC (2 chữ số thập phân) cộng lại đúng bảng "Theo Sale" của web.'],
@@ -1410,18 +1409,9 @@ function _srBuildExportB_(dB, info){
 
   // Theo Sale (đúng bảng web) + dòng Tổng
   var bySaleRows = [['Sale', 'Số đơn', 'Giá trị sau giảm giá', 'COD']];
-  if (adj) bySaleRows[0].push('Trừ hoàn/hủy tháng ' + adj.prevMonth, 'Sau trừ hoàn/hủy');   // 4 cột đầu giữ nguyên (doanh thu chuẩn); 2 cột thêm ở cuối
-  var tOrd = 0, tVal = 0, tCod = 0, tTru = 0, seenSale = {};
-  (dB.bySale || []).forEach(function(x){ var tru = x.truHoanHuy || 0, row = [x.name, x.orders, r2(x.giaTri), r2(x.cod)]; seenSale[x.name] = 1; if (adj) row.push(r2(tru), r2(x.giaTriSauTru != null ? x.giaTriSauTru : x.giaTri - tru)); bySaleRows.push(row); tOrd += x.orders; tVal += x.giaTri; tCod += x.cod; tTru += tru; });
-  var totRowS = ['TỔNG (các sale trong bảng — chưa gồm "(chưa gán sale)")', tOrd, r2(tVal), r2(tCod)]; if (adj) totRowS.push(r2(tTru), r2(tVal - tTru));
-  bySaleRows.push(totRowS);
-  if (adj){   // sale chỉ có hoàn/hủy tháng trước mà tháng này không có đơn: không nằm trong bảng chính → liệt kê riêng để cộng đủ tổng trừ hoàn/hủy
-    var onlyRefund = (adj.rows || []).filter(function(r){ return !seenSale[r.name] && r.truHoanHuy; });
-    if (onlyRefund.length){
-      bySaleRows.push([], ['Sale chỉ có hoàn/hủy tháng ' + adj.prevMonth + ' (tháng này không có đơn) — không nằm trong bảng trên', '', '', '', 'Trừ hoàn/hủy', 'Sau trừ hoàn/hủy']);
-      onlyRefund.forEach(function(r){ bySaleRows.push([r.name, 0, 0, 0, r2(r.truHoanHuy), r2(-r.truHoanHuy)]); });
-    }
-  }
+  var tOrd = 0, tVal = 0, tCod = 0;
+  (dB.bySale || []).forEach(function(x){ bySaleRows.push([x.name, x.orders, r2(x.giaTri), r2(x.cod)]); tOrd += x.orders; tVal += x.giaTri; tCod += x.cod; });
+  bySaleRows.push(['TỔNG (các sale trong bảng — chưa gồm \"(chưa gán sale)\")', tOrd, r2(tVal), r2(tCod)]);
 
   // Chi tiết đơn
   var detailRows = [['STT', 'Ngày tạo đơn', 'Dòng trong sheet Pos', 'Ghi chú đơn (mã bộ đếm / mã đơn Pos)', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale (gốc)', 'Sale tính doanh thu', 'Trạng thái',
@@ -1469,16 +1459,18 @@ function _srBuildExportB_(dB, info){
     r2(dB.totalCod), { t: 'n', v: r2(grandC), f: 'SUM(F2:F' + last + ')' }, { t: 'n', v: r2(r2(dB.totalCod) - r2(grandC)), f: 'ROUND(E' + totRow + '-F' + totRow + ',2)' }, { t: 'n', v: allocRows.length - 1, f: 'SUM(H2:H' + last + ')' }]);
   var diffs = Math.abs(r2(dB.totalGiaTri) - r2(grandV)) + Math.abs(r2(dB.totalCod) - r2(grandC));
   checkRows.push([diffs < 1 ? '✅ KHỚP: tổng báo cáo = tổng cộng lại từ chi tiết (sai số < 1đ)' : '⚠ LỆCH ' + r2(diffs) + 'đ giữa tổng báo cáo và tổng chi tiết — kiểm tra "Chia theo Sale"']);
-  if (adj){   // nối doanh thu chuẩn → số SAU TRỪ ở khối "Chốt tháng" trên web
-    var tru = adjDed;
-    checkRows.push([], ['Nối với khối "Chốt tháng" trên web (trừ hoàn/hủy tháng trước)', 'Giá trị'],
-      ['Tổng cộng lại từ chi tiết (doanh thu chuẩn, KHÔNG bị trừ)', r2(grandV)],
-      ['Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ') — đơn tháng ' + adj.prevMonth + ' bị hoàn/hủy SAU khi chốt', -tru],
-      ['= Tổng sau trừ (dòng Tổng cột "Sau trừ" ở khối Chốt tháng; chưa gồm Sale 30% đơn quầy)', adjSau],
-      [Math.abs(r2(grandV) - tru - adjSau) < 1 ? '✅ KHỚP: chi tiết − trừ hoàn/hủy = số sau trừ trên web' : '⚠ LỆCH ' + r2(Math.abs(r2(grandV) - tru - adjSau)) + 'đ giữa (chi tiết − trừ) và số sau trừ trên web']);
-  }
   checkRows.push(['Ghi chú: bảng "Theo Sale" của web ẩn dòng "(chưa gán sale)" nên tổng các sale trong bảng có thể nhỏ hơn Tổng giá trị; phần chênh = đơn không có sale (xem dòng "(chưa gán sale)" ở trên).']);
-  return { summary: summary, bySaleRows: bySaleRows, detailRows: detailRows, allocRows: allocRows, checkRows: checkRows, grandV: grandV, grandC: grandC, missing: !!missing };
+  // Sheet "Hoàn hủy tháng trước": từng ĐƠN tháng trước đang hoàn/hủy (chỉ khi đã chốt tháng); cuối có dòng Tổng (công thức SUM) để kế toán đối chiếu
+  var refundRows = null;
+  if (rf){
+    refundRows = [['Đơn hoàn/hủy tháng ' + adj.prevMonth + ' (đã chốt ' + adj.closedAt + ') — chỉ để đối chiếu, KHÔNG trừ vào doanh thu'], ['Số đơn', rf.soDon, 'Tổng giá trị', r2(rf.tongGiaTri)].concat(rf.truncated ? ['⚠ Danh sách cắt còn 3.000 đơn đầu (tổng ở đây tính đủ)'] : []), [],
+      ['Ngày đơn', 'Dòng trong sheet Pos', 'Nguồn đơn', 'Sale (thẻ)', 'Giá trị', 'Trạng thái', 'Khách', 'SĐT', 'Sản phẩm', 'Ghi chú']];
+    var hdrAt = refundRows.length, sumV = 0;
+    (rf.orders || []).forEach(function(o){ refundRows.push([o.ngay, o.posRow, o.nguonDon, o.theSale, r2(o.giaTri), o.trangThai, o.khachHang, o.soDienThoai, o.sanPham, o.ghiChu]); sumV += Number(o.giaTri) || 0; });
+    var last = refundRows.length;
+    if (last > hdrAt) refundRows.push(['TỔNG (' + (rf.orders || []).length + ' đơn trong danh sách)', '', '', '', { t: 'n', v: r2(sumV), f: 'SUM(E' + (hdrAt + 1) + ':E' + last + ')' }]);
+  }
+  return { summary: summary, bySaleRows: bySaleRows, detailRows: detailRows, allocRows: allocRows, checkRows: checkRows, refundRows: refundRows, grandV: grandV, grandC: grandC, missing: !!missing };
 }
 // Danh sách sheet của Excel đối chiếu Báo cáo B: [{name, rows, widths}] — DÙNG CHUNG cho nút "Xuất Excel" của B và file gộp "Excel đối soát" (B+E+G+L+N, js/61-recon-export.js).
 // prefix = tiền tố tên sheet khi gộp (vd 'B '); công thức SUMIF của "Đối chiếu tổng" tự trỏ đúng tên sheet "Chia theo Sale" đã gắn tiền tố. admin = có sheet "Báo cáo sản phẩm".
@@ -1492,6 +1484,7 @@ function _srBuildExportBSheets_(dB, info, prefix, admin){
   sheets.push({ name: prefix + 'Chi tiết đơn', rows: xb.detailRows, widths: [6, 12, 10, 30, 22, 14, 28, 26, 26, 14, 34, 18, 10, 16, 18, 16, 14, 16, 30, 40] },
     { name: prefix + 'Chia theo Sale', rows: xb.allocRows, widths: [12, 10, 28, 22, 14, 26, 22, 10, 18, 16, 20, 30] },
     { name: prefix + 'Đối chiếu tổng', rows: xb.checkRows, widths: [46, 20, 24, 18, 18, 22, 16, 12] });
+  if (xb.refundRows) sheets.push({ name: prefix + 'Hoàn hủy tháng trước', rows: xb.refundRows, widths: [12, 14, 20, 28, 16, 16, 24, 14, 34, 30] });   // chỉ khi đã chốt tháng trước
   return { sheets: sheets, xb: xb };
 }
 // Mô tả bộ lọc Báo cáo B đang dùng (ghi vào sheet Tổng quan/Mục lục). DÙNG CHUNG cho nút "Xuất Excel" của B và "Excel đối soát" gộp (js/61).

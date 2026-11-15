@@ -157,7 +157,7 @@
     // Config
     const cfg = document.createElement('div');
     cfg.className = 'zai-cfg'; cfg.id = 'zai-cfg'; cfg.style.display = 'none';
-    addEl(cfg, 'label', {textContent:'URL Web App GAS (appweb Sasum)'});
+    addEl(cfg, 'label', {textContent:'URL Web App GAS (appweb CRM)'});
     const inpGas = addEl(cfg, 'input', {id:'zai-gas-url', type:'text', placeholder:'https://script.google.com/macros/s/...'});
     addEl(cfg, 'label', {textContent:'🔑 Groq API Key (chính — lưu 1 lần dùng chung cả team)'});
     addEl(cfg, 'input', {id:'zai-gemini-key', type:'text', placeholder:'gsk_... (console.groq.com) — để trống nếu giữ key cũ'});
@@ -259,7 +259,7 @@
       '<div style="font-size:10px;color:#6b7280;margin-bottom:6px">' +
       'Quét các số điện thoại đang thấy trên màn hình (danh bạ/tin nhắn Zalo) và tự đoán trạng thái ' +
       'kết bạn tương ứng (Đã kết bạn / Chưa kết bạn / Chặn / Zalo ngừng hd...). ' +
-      'Bạn xem lại và sửa trạng thái nếu cần trước khi đồng bộ về Sasum — nick Zalo đang chọn ở trên (mục 💬 Nick) ' +
+      'Bạn xem lại và sửa trạng thái nếu cần trước khi đồng bộ về CRM — nick Zalo đang chọn ở trên (mục 💬 Nick) ' +
       'sẽ được ghi kèm vào danh sách nick của từng khách.</div>' +
       '<button class="zai-btn zai-btn-secondary zai-btn-sm" id="zai-zs-scan-btn">🔍 Quét màn hình hiện tại</button>' +
       '<div id="zai-zs-preview" style="margin-top:8px"></div>';
@@ -2315,12 +2315,28 @@
   // fillZaloInput_ phan hoi qua "nut": o day phan hoi di vao dong trang thai thay vi doi chu tren nut
   const _zaiTplFlashProxy_ = { getAttribute: () => null, setAttribute() {}, get textContent() { return ''; }, set textContent(v) { _zaiTplStatus_(v); } };
   // Tuong duong 2 handler SAVE/DELETE_MESSAGE_TEMPLATE o pancake-background.js: POST text/plain len GAS, loi -> {ok:false,error}
+  // Token phien ADMIN (neu admin da dang nhap o trang Cai dat extension -> chrome.storage.local 'ome_admin_auth'). Giong pancake-background.js _apprTokenField_:
+  // KHONG tin "ten CS = duyenht" de tu duyet (ai cung go duoc ten) — chi token phien that moi cho server biet day la admin => mau luu 'approved' ngay.
+  // Chua dang nhap / het han -> {} (mau vao 'Cho duyet' nhu cu, khong loi).
+  function _zaiAdminTokenField_() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['ome_admin_auth'], (r) => {
+          const a = r && r.ome_admin_auth;
+          if (!a || !a.token) return resolve({});
+          if (a.expiresAt && Date.now() > a.expiresAt) { try { chrome.storage.local.remove('ome_admin_auth'); } catch (_) {} return resolve({}); }
+          resolve({ token: a.token });
+        });
+      } catch (_) { resolve({}); }
+    });
+  }
   async function _zaiTplCall_(type, p) {
     try {
       if (!GAS_URL) throw new Error('Chưa cài đặt URL GAS. Nhấn ⚙.');
+      const tk = await _zaiAdminTokenField_();
       const body = type === 'SAVE_MESSAGE_TEMPLATE'
-        ? { action: 'saveMessageTemplate', template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', nhom: p?.nhom, topic: p?.topic || '', createdBy: p?.createdBy || '' } }
-        : { action: 'deleteMessageTemplate', id: p?.id || '', createdBy: p?.createdBy || '' };
+        ? { action: 'saveMessageTemplate', ...tk, template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', nhom: p?.nhom, topic: p?.topic || '', createdBy: p?.createdBy || '' } }
+        : { action: 'deleteMessageTemplate', ...tk, id: p?.id || '', createdBy: p?.createdBy || '' };
       const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain' } });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -2526,7 +2542,8 @@
       _zaiTplCall_('SAVE_MESSAGE_TEMPLATE', {
         id: t ? t.id : '', title, content, tags: $('#zai-tpl-f-tags').value.trim(), product, nhom, topic, createdBy: _currentCS || ''
       }).then((resp) => {
-        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
+        // Server tra status: 'approved' khi admin da dang nhap o Cai dat extension (kem token) -> dung duoc ngay; con lai 'pending' (cho admin duyet).
+        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_(resp.data && resp.data.status === 'approved' ? 'Đã lưu mẫu — dùng được ngay (admin không cần duyệt).' : 'Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
         else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
@@ -3194,7 +3211,7 @@
     _currentCustData.orders = newOrders;
     _lastServerCare = c;
     _lookupCache[phone] = {care: c, orders: newOrders, ts: Date.now()};
-    showMsg('zai-save-status', '🔄 Vừa đồng bộ dữ liệu mới từ Sasum', 2500);
+    showMsg('zai-save-status', '🔄 Vừa đồng bộ dữ liệu mới từ CRM', 2500);
   }
 
   function startCarePoll_() {
@@ -3738,7 +3755,7 @@
       // Zalo AI extension may nay chua tra cuu lai nen con hien cache cu.
       const cachedCare = _lookupCache[rem.phone] && _lookupCache[rem.phone].care;
       const staleZalo = cachedCare && rem.zalo && cachedCare.zalo && cachedCare.zalo !== rem.zalo;
-      const staleTag = staleZalo ? '<span title="Sasum vừa đổi Kết bạn Zalo thành \''+escHtml(rem.zalo)+'\' — bấm Mở KH để cập nhật lại cache" style="background:#facc15;color:#7c2d12;border-radius:2px;padding:0 3px;font-size:9px;margin-right:3px;">⚠ lệch Zalo</span>' : '';
+      const staleTag = staleZalo ? '<span title="CRM vừa đổi Kết bạn Zalo thành \''+escHtml(rem.zalo)+'\' — bấm Mở KH để cập nhật lại cache" style="background:#facc15;color:#7c2d12;border-radius:2px;padding:0 3px;font-size:9px;margin-right:3px;">⚠ lệch Zalo</span>' : '';
       note.innerHTML = '<span style="background:'+tagColor+';color:#fff;border-radius:2px;padding:0 3px;font-size:9px;margin-right:3px;">'+tagText+'</span>' + staleTag + escHtml(rem.schedHenNote || '—');
       // Mở KH → tra cứu ngay trong panel Zalo AI (điền SDT + lookup, đồng bộ về Sasum khi lưu)
       const openBtn = document.createElement('button');
@@ -4392,7 +4409,7 @@ async function startReminderPoll_() {
           startBtn.className = 'zai-btn zai-btn-primary zai-btn-sm';
           startBtn.textContent = '▶ Bắt đầu';
           startBtn.disabled = _bcRunning || !isActive || locked;
-          startBtn.title = serverOff ? 'Admin đã tắt chiến dịch này trên Sasum' : (!isActive ? 'Bấm "⏻ Kích hoạt" trước — chỉ áp dụng trên máy của bạn' : (locked ? 'Đã đạt ' + BC_DAILY_LIMIT + ' khách hôm nay — bấm "🔓 Kích hoạt lại" ở trên trước' : (_bcRunning ? 'Đang có chiến dịch khác chạy' : '')));
+          startBtn.title = serverOff ? 'Admin đã tắt chiến dịch này trên CRM' : (!isActive ? 'Bấm "⏻ Kích hoạt" trước — chỉ áp dụng trên máy của bạn' : (locked ? 'Đã đạt ' + BC_DAILY_LIMIT + ' khách hôm nay — bấm "🔓 Kích hoạt lại" ở trên trước' : (_bcRunning ? 'Đang có chiến dịch khác chạy' : '')));
           startBtn.addEventListener('click', () => startBroadcast_(camp));
           btnRow.appendChild(startBtn);
         }
@@ -4643,13 +4660,13 @@ async function startReminderPoll_() {
         body: JSON.stringify({ action: 'syncZaloFriendStatus', rows: [{ phone: phone, zalo: st, scannedBy: _currentCS || '', nick: _currentZaloNick || '' }] }),
         headers: { 'Content-Type': 'text/plain' }
       });
-      bcLog_('🔗 Cập nhật Zalo "' + st + '" → Sasum: ' + phone);
+      bcLog_('🔗 Cập nhật Zalo "' + st + '" → CRM: ' + phone);
     } catch (e) {}
   }
 
   async function startBroadcast_(camp) {
     if (_bcRunning) { bcLog_('Đang có chiến dịch chạy, vui lòng dừng trước khi bắt đầu chiến dịch khác.'); return; }
-    if ((camp.status || 'active') === 'paused') { alert('Chiến dịch "' + (camp.label || camp.id) + '" đã bị Admin tắt trên Sasum.'); return; }
+    if ((camp.status || 'active') === 'paused') { alert('Chiến dịch "' + (camp.label || camp.id) + '" đã bị Admin tắt trên CRM.'); return; }
     if (!_bcActive[camp.id]) { alert('Chiến dịch "' + (camp.label || camp.id) + '" chưa được kích hoạt trên máy này. Bấm "⏻ Kích hoạt" trước khi gửi.'); return; }
     if (_bcDailyLocked_()) { alert('Đã đạt ' + BC_DAILY_LIMIT + ' khách hôm nay trên máy này. Bấm "🔓 Kích hoạt lại để gửi tiếp hôm nay" ở phía trên trước khi bắt đầu.'); return; }
 
@@ -4869,7 +4886,7 @@ async function startReminderPoll_() {
         '</div>'
       ).join('') +
       '</div>' +
-      '<button class="zai-btn zai-btn-primary zai-btn-sm" id="zai-zs-sync-btn" style="margin-top:6px;width:100%">☁ Đồng bộ trạng thái kết bạn lên Sasum</button>' +
+      '<button class="zai-btn zai-btn-primary zai-btn-sm" id="zai-zs-sync-btn" style="margin-top:6px;width:100%">☁ Đồng bộ trạng thái kết bạn lên CRM</button>' +
       '<div id="zai-zs-sync-status" style="font-size:11px;color:#00b14f;margin-top:4px"></div>';
     document.getElementById('zai-zs-sync-btn').addEventListener('click', () => syncZsRows_(rows));
     box.querySelectorAll('.zai-zs-copy').forEach(btn => {
@@ -4952,13 +4969,13 @@ async function startReminderPoll_() {
       const d = await res.json();
       if (d.ok) {
         const skipped = conflicts.length && selected.length < checks.length ? (checks.length - selected.length) : 0;
-        showMsg('zai-zs-sync-status', '✓ Đã đồng bộ ' + ((d.updated||0) + (d.appended||0)) + ' khách lên Sasum' + (skipped ? ' (bỏ qua ' + skipped + ' SĐT xung đột)' : ''), 4500);
+        showMsg('zai-zs-sync-status', '✓ Đã đồng bộ ' + ((d.updated||0) + (d.appended||0)) + ' khách lên CRM' + (skipped ? ' (bỏ qua ' + skipped + ' SĐT xung đột)' : ''), 4500);
       }
       else showMsg('zai-zs-sync-status', 'Lỗi: ' + (d.error || 'không rõ'), 4000);
     } catch (e) {
       showMsg('zai-zs-sync-status', 'Lỗi kết nối: ' + e.message, 4000);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '☁ Đồng bộ trạng thái kết bạn lên Sasum'; }
+      if (btn) { btn.disabled = false; btn.textContent = '☁ Đồng bộ trạng thái kết bạn lên CRM'; }
     }
   }
 

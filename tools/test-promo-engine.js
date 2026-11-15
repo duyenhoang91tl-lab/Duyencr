@@ -81,7 +81,7 @@ ok('giỏ rỗng / qty 0', () => { const r = calcPromo_([{ name: 'a', qty: 0, pr
 console.log('\nOK', n, 'ca');
 // Bản sao trong extension phải GIỐNG HỆT nguồn (quy tắc: sửa js/53 thì chép lại sang các extension)
 const src = fs.readFileSync(__dirname + '/../js/53-fn-promo-engine.js', 'utf8');
-for (const f of ['extension-pancake/pancake-promo.js']) {
+for (const f of ['extension-pancake/pancake-promo.js', 'extension-zalo/zalo-promo.js']) {
   const p = __dirname + '/../' + f;
   if (fs.existsSync(p)) { assert.strictEqual(fs.readFileSync(p, 'utf8'), src, f + ' lệch khỏi js/53-fn-promo-engine.js — chạy: cp js/53-fn-promo-engine.js ' + f); console.log('✓ bản sao ' + f + ' khớp'); }
 }

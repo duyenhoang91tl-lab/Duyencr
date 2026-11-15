@@ -731,7 +731,7 @@ var _bootstrapAdmin = false;
 // chưa đăng nhập thì form đăng nhập vẫn hiện như thường, đăng nhập xong báo cáo tự hiện ra.
 if (typeof _dbStandalone !== 'undefined' && _dbStandalone){
   document.documentElement.classList.add('db-standalone');
-  document.title = 'Báo cáo ngày — Sasum';
+  document.title = 'Báo cáo ngày — CRM';
   var _dbOrigAuthGate = _authGate;
   _authGate = async function(){
     try { return await _dbOrigAuthGate.apply(this, arguments); }

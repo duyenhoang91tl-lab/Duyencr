@@ -33,6 +33,24 @@
   <button id="save">Lưu cài đặt</button>
   <span id="saved"></span>
 
+  <h2>📝 Mẫu tin của admin — dùng ngay, không cần duyệt (chỉ admin)</h2>
+  <div class="hint">
+    Mẫu tin nhân viên đề xuất phải chờ admin duyệt. Nếu bạn là <b>admin</b> (vd <code>duyenht</code>), đăng nhập <b>tài khoản + mật khẩu CRM</b> ở đây thì mẫu bạn tạo trong panel Zalo AI được <b>duyệt luôn, dùng được ngay</b>.
+    Mật khẩu <b>không được lưu</b>; extension chỉ giữ phiên đăng nhập (khoảng 7 ngày, trên máy này) rồi hỏi lại. Tài khoản không phải admin sẽ bị từ chối. Chỉ gõ tên CS là <b>không</b> đủ để được duyệt luôn.
+  </div>
+  <div id="apprLoggedOut">
+    <label>Tài khoản CRM (admin)</label>
+    <input type="text" id="apprUser" placeholder="vd: duyenht" autocomplete="username" />
+    <label>Mật khẩu CRM</label>
+    <input type="password" id="apprPass" autocomplete="current-password" style="width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box" />
+    <button id="apprLogin" type="button">Đăng nhập admin</button>
+  </div>
+  <div id="apprLoggedIn" style="display:none">
+    <div>✅ Đang đăng nhập admin: <b id="apprName"></b> <span id="apprExp" style="color:#6b7280;font-size:12px"></span></div>
+    <button id="apprLogout" type="button" style="background:#6b7280;margin-top:8px">Đăng xuất</button>
+  </div>
+  <span id="apprMsg" style="display:block;margin-top:8px;font-size:13px"></span>
+
   <h2>⌨️ Viết tắt (gõ tắt trong ô chat)</h2>
   <div class="hint">
     Gõ <b>viết tắt</b> (hoặc từ khoá) trong ô chat → hiện gợi ý → <b>Tab</b> để chèn, <b>↑ ↓</b> đổi lựa chọn, <b>Alt+1…8</b> chọn nhanh, <b>Esc</b> đóng. Chỉ <b>chèn chữ</b>, không tự gửi.

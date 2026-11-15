@@ -12,7 +12,7 @@ w.fetch = async () => ({ json: async () => ({}), text: async () => '' });
 w.addEventListener('error', e => errs.push('ERR ' + e.message));
 w.console.error = (...a) => errs.push('console.error ' + a.join(' '));
 process.on('unhandledRejection', e => errs.push('REJ ' + (e && e.message)));
-try { w.eval(src); } catch (e) { errs.push('EVAL ' + e.message); }
+try { w.eval(fs.readFileSync(path.join(__dirname, '..', 'extension-zalo', 'zalo-promo.js'), 'utf8')); w.eval(src); } catch (e) { errs.push('EVAL ' + e.message); }   // dung thu tu manifest: zalo-promo.js truoc zalo-content.js
 const fail = m => { console.error('FAIL: ' + m + (errs.length ? '\n' + errs.slice(0, 5).join('\n') : '')); process.exit(1); };
 setTimeout(() => {
   const d = w.document, byId = id => d.getElementById(id);
