@@ -263,3 +263,13 @@ html.ui-pro .pro-qa-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
 html.ui-pro .pro-qa{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:1 1 auto;min-height:36px;padding:6px 12px;border:1px solid var(--border-md);border-radius:999px;background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap;}
 html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color:var(--ui-brand,var(--green));}
 @media (max-width:640px){html.ui-pro .pro-qa{min-height:44px;}}
+
+/* FIX 15/11 (ảnh/video Duyên: hồ sơ khách "c Trang" không kéo xuống để nhập/chỉnh thông tin, "khoá cứng").
+   NGUYÊN NHÂN GỐC: .dp là cột flex cao đúng bằng màn hình + overflow:hidden (css/01) và CHỈ .dp-body cuộn; khối #dp-pro phía trên (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Việc tiếp theo)
+   không co được nên trên điện thoại .dp-body chỉ còn ~100px (form nằm trong khung tí hon) và phần trên không cuộn được. Màn hẹp: cả ngăn #dp cuộn dọc, .dp-body hết cuộn riêng (cao theo nội dung),
+   thanh tiêu đề (tên + nút ✕) dính trên cùng để luôn đóng được, chừa đáy cho thanh tab hồ sơ (pro-has-tabs, 44px) khỏi che ô cuối. Ngưỡng 640 = MOBILE_FIT_MAX_W (js/59). */
+@media (max-width:640px){
+  html.ui-pro #dp{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  html.ui-pro #dp .dp-hdr{position:sticky;top:0;z-index:3;background:var(--surface)}
+  html.ui-pro #dp .dp-body{flex:none;overflow:visible;padding-bottom:72px}
+}
