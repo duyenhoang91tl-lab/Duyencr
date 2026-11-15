@@ -295,9 +295,9 @@ function renderMsgTemplateList() {
       (t.status === 'approved' && t.approvedBy ? ' · Duyệt bởi: ' + esc(t.approvedBy) : '') + '</div>' +
       (t.status === 'rejected' && t.rejectReason ? '<div style="font-size:11px;color:#991b1b;margin-top:2px">Lý do từ chối: ' + esc(t.rejectReason) + ' — sửa lại rồi lưu để gửi duyệt lại.</div>' : '');
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
-        '<div style="font-weight:700;font-size:13px">' + esc(t.title) + ' ' + (_MT_STATUS[t.status] || '') + '</div>' +
-        '<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">' + acts + '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;flex-wrap:wrap">' +
+        '<div style="font-weight:700;font-size:13px;flex:1 1 200px;min-width:0;overflow-wrap:anywhere">' + esc(t.title) + ' ' + (_MT_STATUS[t.status] || '') + '</div>' +
+        '<div style="display:flex;gap:4px;flex:0 1 auto;max-width:100%;flex-wrap:wrap;justify-content:flex-end">' + acts + '</div>' +
       '</div>' +
       '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
       (lines.length > 1 ? '<div class="mt-lines" data-lbox="' + esc(t.id) + '" style="display:none;margin:0 0 8px;border-top:1px dashed var(--border);padding-top:4px">' + lines.map(function (ln, k) {
