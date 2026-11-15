@@ -25,6 +25,26 @@
 .tk-qty b{font-size:15px;}
 .tk-low{font-size:10px;color:#d93025;}
 .tk-act{display:flex;gap:6px;}
+.tk-table{width:100%;border-collapse:collapse;}
+.tk-table .tk-c-qty{text-align:right;white-space:nowrap;}
+.tk-table .tk-c-qty b{font-size:15px;}
+.tk-table .tk-c-code{font-weight:600;white-space:nowrap;}
+.tk-table .tk-c-name{color:var(--muted);}
+.tk-table .tk-c-act{white-space:nowrap;text-align:right;}
+.tk-table .tk-c-act .btn{margin-left:6px;}
+.tk-table .tk-trow.low{background:rgba(217,48,37,.06);}
+@media (max-width:640px){
+  .tk-table thead{display:none;}
+  .tk-table,.tk-table tbody{display:block;}
+  .tk-table .tk-trow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"code qty act" "name st act";align-items:center;gap:2px 10px;padding:9px 14px;border-bottom:1px solid var(--border);}
+  .tk-table td{display:block;padding:0;border:0;}
+  .tk-table .tk-c-code{grid-area:code;}
+  .tk-table .tk-c-name{grid-area:name;font-size:12px;overflow:hidden;text-overflow:ellipsis;}
+  .tk-table .tk-c-qty{grid-area:qty;}
+  .tk-table .tk-c-st{grid-area:st;text-align:right;}
+  .tk-table .tk-c-ok{display:none;}
+  .tk-table .tk-c-act{grid-area:act;grid-row:1 / 3;}
+}
 .tk-more{padding:10px;text-align:center;}
 .tk-muted{color:var(--muted);font-size:12px;}
 .tk-form{padding:12px 14px;display:flex;flex-direction:column;gap:6px;}

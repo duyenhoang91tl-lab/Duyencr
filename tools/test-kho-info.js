@@ -20,7 +20,7 @@ const K = { name: 'Kho A', active: true, note: 'ghi chú kho' }, K2 = { name: 'K
 for (const [nm, kho, q, lvl] of [['kho thường', K, '', 'admin'], ['đang tìm', K, 'nhan', 'staff'], ['kho ngưng', K2, '', '']]) {
   const a = run(old, false, kho, q, lvl), b0 = run(cur, false, kho, q, lvl), b = run(cur, true, kho, q, lvl);
   t(a['tk-info'].innerHTML === b0['tk-info'].innerHTML, nm + ': thiếu js/68 → dòng thông tin y hệt bản cũ');
-  t(a['tk-list'].innerHTML === b['tk-list'].innerHTML && a['tk-list'].innerHTML === b0['tk-list'].innerHTML, nm + ': danh sách mặt hàng KHÔNG đổi');
+  t(a['tk-list'].innerHTML === b0['tk-list'].innerHTML, nm + ': thiếu js/68 → danh sách mặt hàng KHÔNG đổi (R7c-2: có ui-kit thì dạng bảng, xem test-kho-table)');
   const h = b['tk-info'].innerHTML, tx = text(h);
   t(/ui-stat-grid/.test(h) && (h.match(/class="ui-stat /g) || []).length === 3, nm + ': 3 thẻ số');
   t(tx.includes(kho.name) && (!kho.note || tx.includes(kho.note)) && (kho.active || tx.includes('Kho đã ngưng hoạt động')) && (!lvl || /Bạn là|Chỉ xem/.test(tx)) || (!lvl && /Chỉ xem/.test(tx)), nm + ': tên kho · quyền · ngưng · ghi chú vẫn hiện');

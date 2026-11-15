@@ -141,12 +141,24 @@ function _tkRenderList(){
   }
   if (!rows.length) { list.innerHTML = '<div class="tk-empty">' + (_tk.items.length ? 'Không có mặt hàng khớp.' : 'Kho chưa có mặt hàng. ' + (_tkCanManage(k) ? 'Thêm từng mặt hàng hoặc bấm “📥 Nhập Excel” (file Pos “Tổng hợp tồn kho”).' : '')) + '</div>'; return; }
   var can = _tkCanEdit(k) && k.active;
-  list.innerHTML = rows.slice(0, _tk.shown).map(function(it){
+  var shownRows = rows.slice(0, _tk.shown), moreHtml = (rows.length > _tk.shown ? '<div class="tk-more"><button type="button" class="btn secondary sm" data-tk-more="1">Hiện thêm (' + (rows.length - _tk.shown) + ')</button></div>' : '');
+  if (typeof uiChip_ === 'function'){   // R7c-2: BẢNG trên máy tính (mã · tên · tồn · tình trạng · thao tác); CSS tự xếp lại thành dòng trên điện thoại (≤640px). data-tk-edit / data-tk-hist / data-tk-more GIỮ NGUYÊN cho bộ bắt click ở _tkEnsure.
+    list.innerHTML = '<table class="dash-table tk-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="tk-c-qty">Tồn</th><th>Tình trạng</th><th></th></tr></thead><tbody>' + shownRows.map(function(it){
+      var low = _tkIsLow(it);
+      return '<tr class="tk-trow' + (low ? ' low' : '') + '"><td class="tk-c-code">' + esc(it.maHang) + '</td><td class="tk-c-name">' + esc(it.tenHang || '—') + '</td>' +
+        '<td class="tk-c-qty"><b>' + _tkNum(it.ton) + '</b></td>' +
+        '<td class="tk-c-st' + (low ? '' : ' tk-c-ok') + '">' + (low ? uiChip_('sắp hết (≤ ' + _tkNum(it.minTon) + ')', { tone: 'danger', dot: true }) : uiChip_('Còn hàng', { tone: 'success' })) + '</td>' +
+        '<td class="tk-c-act">' + (can ? '<button type="button" class="btn sm" data-tk-edit="' + esc(it.maHang) + '">Sửa</button>' : '') +
+        '<button type="button" class="btn secondary sm" data-tk-hist="' + esc(it.maHang) + '" title="Lịch sử">📜</button></td></tr>';
+    }).join('') + '</tbody></table>' + moreHtml;
+    return;
+  }
+  list.innerHTML = shownRows.map(function(it){
     return '<div class="tk-row' + (_tkIsLow(it) ? ' low' : '') + '"><div class="tk-main"><div class="tk-code">' + esc(it.maHang) + '</div><div class="tk-name">' + esc(it.tenHang || '—') + '</div></div>' +
       '<div class="tk-qty"><b>' + _tkNum(it.ton) + '</b>' + (_tkIsLow(it) ? '<span class="tk-low">sắp hết (≤ ' + _tkNum(it.minTon) + ')</span>' : '') + '</div>' +
       '<div class="tk-act">' + (can ? '<button type="button" class="btn sm" data-tk-edit="' + esc(it.maHang) + '">Sửa</button>' : '') +
       '<button type="button" class="btn secondary sm" data-tk-hist="' + esc(it.maHang) + '" title="Lịch sử">📜</button></div></div>';
-  }).join('') + (rows.length > _tk.shown ? '<div class="tk-more"><button type="button" class="btn secondary sm" data-tk-more="1">Hiện thêm (' + (rows.length - _tk.shown) + ')</button></div>' : '');
+  }).join('') + moreHtml;
 }
 function _tkFind(code){ return _tk.items.find(function(x){ return x.maHang === code; }) || null; }
 function _tkReplace(item){ if (!item) return; var i = _tk.items.findIndex(function(x){ return x.maHang === item.maHang; }); if (i >= 0) _tk.items[i] = item; else _tk.items.push(item); }
