@@ -100,7 +100,8 @@ const body = S => S.box.innerHTML;
     // huy form
     S.form(null); await sleep(5); F('cancel').click(); ok(S.host.innerHTML === '', N + ': Huy dong form');
     // chua chon CS
-    const S0 = mk(''); S0.form(null); ok(/Chọn tên CS của bạn trước/.test(S0.status()) && S0.host.innerHTML === '', N + ': chua chon CS -> nhac, khong mo form');
+    const S0 = mk(''); S0.form(null); ok(/Chọn tên CS của bạn trước/.test(S0.status()) && !/-f-save|-f-content/.test(S0.host.innerHTML), N + ': chua chon CS -> nhac, khong mo form');   // 15/11: Pancake nay con hien khung vang "Chưa chọn CS" ngay trong khung mau (phien 66) -> chi kiem KHONG co form nhap
+    if (N === 'Pancake') ok(/Chưa chọn CS/.test(S0.host.innerHTML), N + ': chua chon CS -> khung nhac hien ngay trong khung mau');
     S0.setTpls(TPLS); S0.render(); ok(S0.box.querySelectorAll('[data-eid]').length === 0, N + ': chua chon CS -> khong co mau "cua minh"');
   }
   // ── so khop 2 ben ──

@@ -9,7 +9,7 @@ const a = j06.indexOf('let COMMISSION_THRESHOLD'), b = j06.indexOf('setTimeout(_
 ok(a > 0 && b > a, 'tim thay khoi bizRules trong js/06');
 const fa = j01.indexOf('function _computeCommissionData_('), fb = j01.indexOf('// Build <option> cho 1 trường tự tạo');
 ok(fa > 0 && fb > fa, 'tim thay _computeCommissionData_ trong js/01');
-const ctx = { loadLS: () => null, saveLS() {}, gsUrl: '', fetch: async () => ({}), _channelCommissionRate_: () => null,
+const ctx = { loadLS: () => null, saveLS() {}, gsUrl: '', fetch: async () => ({}), _channelCommissionRate_: () => null, _goldChannelRule_: () => null,   /* 15/11: luat vang khong lien quan nguong -> gia null */
   _resolveCommissionRate_: () => ({ above15: 2, below15: 1, sourceAbove15: 'x', sourceBelow15: 'x' }), splitMulti_: (s) => String(s || '').split(',').map(x => x.trim()).filter(Boolean) };
 vm.createContext(ctx);
 vm.runInContext(j06.slice(a, b) + '\n' + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\n' + j01.slice(fa, fb), ctx);   // isNumTagSale_: loai STT Pancake
