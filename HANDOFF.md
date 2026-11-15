@@ -1,6 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — KB: GHI QUY ƯỚC R13/R14) — XONG (đã push)
+NGUYÊN NHÂN GỐC: R13 (`--vh`) và R14 (thanh giai đoạn bấm được, 2 đường lưu) tạo quy ước mới nhưng chưa có trong `docs/crm-kb`, nên phiên sau có thể lại viết `NNvh` trần hoặc đổi `saveCare` mà quên nhánh ghi thẳng ở `proStageSet_`. Đã thêm vào `10-ui-redesign-notes.md` (2 mục) và `06-bug-history.md` (+ quy ước test: đừng ghim `?v=`). CHỈ sửa tài liệu, không đổi code chạy (không cần deploy/reload/Ctrl+F5).
+- [ ] **VIỆC KẾ TIẾP:** không còn việc nào làm được khi chưa có Duyên: xác nhận R13/R14 trên máy thật; R10a/R12a (ảnh); R11a/R11b (nói rõ phạm vi); nội dung "⚠ 2 lỗi" + dòng "Đang gom số liệu" (Duyên gửi chi tiết).
+
 ## 2026-11-15 (phiên Claude — R14: BẤM Ô GIAI ĐOẠN ĐỂ ĐỔI TÌNH TRẠNG CS) — XONG (đã push `242b67f`)
 Duyên (ảnh thanh mũi tên "1. Chốt › 2. Phân vân › 3. Đang liên hệ › 4. Khô…"): "cho CS tích vào một trong các mục này để chuyển trạng thái". NGUYÊN NHÂN GỐC: `proStageHtml_` (js/33) chỉ vẽ `<li>` để XEM; muốn đổi Tình trạng CS phải mở tab Chăm sóc → ô "Tình trạng CS" → Lưu (nhiều bước, khó trên điện thoại) dù thanh mũi tên luôn hiện ngay đầu hồ sơ.
 - ✅ Ô LÁ (Chốt, Phân vân…) bấm = đổi ngay; ô NHÓM (có mũi tên ▾, vd "Đang liên hệ") bấm = mở hàng mục con bên dưới rồi chọn; bấm mục đang chọn = không làm gì. Dùng được ở hồ sơ khách (js/33) VÀ panel thông tin trong Social › Chat (js/48); bàn phím Enter/Space.

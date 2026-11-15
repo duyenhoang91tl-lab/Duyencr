@@ -17,3 +17,12 @@ R0b ảnh "trước"; R10a rà 380px (cần ảnh điện thoại); R11a gộp C
 - Điểm/mức/lý do/ngưỡng CHỈ tính ở `js/77` (`lsScore_`); cột "Mức" (R8e), hồ sơ 360° (R8c), trợ lý quy tắc (R8d) và AI thật (R8f, `lsAiBlock_`) đều đọc cùng 1 nguồn để không bao giờ lệch nhau. Đổi ngưỡng ở hằng đầu `js/77`, không sao chép số sang chỗ khác.
 - AI thật (`PRO_AI_ENGINE='ai'`, js/38) nhận điểm khách như DỮ LIỆU trong NGỮ CẢNH (prompt hệ thống GAS vốn đã ép "chỉ dùng số liệu trong NGỮ CẢNH") nên KHÔNG cần đổi GAS. Mặc định vẫn là `'rule'`.
 - Mọi bộ lọc/kiểu xếp mới của Danh sách KH phải thêm vào `_filterSignature` (js/08).
+
+## Chiều cao hộp/modal — dùng `--vh`, KHÔNG dùng `NNvh` trần (R13)
+- WebView app Android có lúc kẹt đơn vị `vh` = 0 → hộp `max-height:NNvh` thành dải trắng mỏng. `js/59-fn-mobilefit.js` đặt biến CSS `--vh` (= innerHeight/100 px; hàm thuần `mobileFitVhPx_`, cập nhật mỗi `mobileFitApply`). Viết `max-height:calc(var(--vh,1vh)*NN)` (chưa đo được thì rơi về 1vh như cũ); modal toàn màn đổi cả `height:100vh`.
+- `tools/test-vh-var.js` quét js/css/index.html (trừ `css/99` tự sinh) và ĐỎ nếu còn `max-height:NNvh` trần. Cố ý không đổi: `padding-top:Nvh`, `min-height`, `calc(100vh - Npx)` (vh=0 thì vô hại), `.app` (js/59 đã ép px), hộp chip Tổng quan (`hmModalMaxH_`, js/36).
+
+## Thanh giai đoạn bấm được (R14)
+- `proStageHtml_(model,{phone})` (js/33) vẽ ô bấm được; không truyền `phone` thì chỉ xem (HTML như cũ). Bộ bắt sự kiện đặt 1 lần ở `document` (`window._proStageBound_`), dùng chung hồ sơ khách + panel Chat (js/48).
+- Đổi tình trạng đi 2 đường: có `#cs-status` → `saveCare` (đường chuẩn); không có form → `proStageSet_` ghi thẳng `careData` theo đúng các bước `saveCare`. **Đổi `saveCare` (js/03) thì phải sửa nhánh ghi thẳng trong `proStageSet_` cho khớp.** Test: `tools/test-stage-click.js`.
+
