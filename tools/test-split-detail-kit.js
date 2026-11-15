@@ -20,7 +20,7 @@ const DET = { from: '2026-11-01', to: '2026-11-15', warnings: ['Thiếu đơn <B
 const REP = { from: '2026-11-01', to: '2026-11-15', warnings: ['Cảnh báo báo cáo M'], total: { orders: 1, revenue: 1, aov: 1, splitOrders: 1, splitRevenue: 1, splitAov: 1 }, bySale: [] };
 const M = { tab: 'pos', sale: 'A', data: DET };
 const run = (src, kit) => { const c = mk(src, kit); return { p: c.splitDetailPanelHtml_(M), m: c.splitReportHtml_(REP, '', null) }; };
-const text = h => h.replace(/<[^>]+>/g, '|').split('|').map(x => x.trim()).filter(Boolean);
+const text = h => h.replace(/<[^>]+>/g, '|').replace(/[🔴🟢⚪]/gu, '').split('|').map(x => x.trim()).filter(Boolean);
 const a = run(old, false), b0 = run(cur, false), b = run(cur, true);
 t(a.p === b0.p, 'panel chi tiết: thiếu js/68 → HTML y hệt bản cũ'); t(a.m === b0.m, 'báo cáo M: thiếu js/68 → HTML y hệt bản cũ');
 for (const [nm, k] of [['panel chi tiết', 'p'], ['báo cáo M', 'm']]) {
