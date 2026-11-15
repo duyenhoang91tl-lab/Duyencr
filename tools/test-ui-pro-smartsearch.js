@@ -52,6 +52,7 @@ if (JSDOM) {
   const dom = new JSDOM('<body><div class="search-wrap"><input id="search-input"><div id="ord-search-res" style="display:none"></div></div></body>', { runScripts: 'outside-only', pretendToBeVisual: true }), w = dom.window;
   w.allCustomers = C; w.opened = []; w.openDp = p => w.opened.push(p);
   w.eval(fs.readFileSync(path.join(__dirname, '..', 'js/69-pro-smart-search.js'), 'utf8').replace(/if \(typeof module[^\n]*\n?$/, ''));
+  if (w.ssInit_) w.ssInit_();   // js/69 chi tu khoi tao khi readyState != 'loading'; jsdom dang 'loading' ngay sau new JSDOM => goi tay (ssInit_ co chot inp._ssInit nen an toan)
   const inp = w.document.getElementById('search-input'), box = () => w.document.getElementById('cust-suggest');
   ok(!!box() && box().style.display === 'none', 'DOM: tạo #cust-suggest, ban đầu ẩn');
   w.ssInit_ && 0; inp.value = 'nguyen van'; w.ssRender_();
