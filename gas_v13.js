@@ -8238,6 +8238,33 @@ function syncZaloFriendStatus_(rows, dryRun) {
       if (phoneCol[i][0]) index[normPhone_(String(phoneCol[i][0]))] = i + 2;
     }
   }
+  // Toi uu (2026-11-15): truoc day moi dong quet doc 2-3 o rieng (getRange(..).getValue()) va ghi 3-4 o rieng -> 100 dong = 500+ lan goi Sheet, de qua
+  // thoi gian Apps Script ("Failed to fetch"). Nay doc 3 cot C (zalo), Q (nickZalos), S (zaloSetBy) DUNG 1 LAN moi cot, kiem tra tren bo nho,
+  // roi chi ghi cac o thay doi, gom cac dong LIEN NHAU thanh 1 lan setValues (khong bao gio nhieu lan goi hon cach cu).
+  var colZalo = null, colNick = null, colSetBy = null;
+  if (lastRow >= 2) {
+    var _rd = function (c) { return sh.getRange(2, c, lastRow - 1, 1).getValues(); };
+    colZalo = _rd(3); colSetBy = _rd(19);
+    if (!dryRun && rows.some(function (r) { return r && String(r.nick || '').trim(); })) colNick = _rd(17); // chi doc cot Q khi co dong gui kem nick
+  }
+  var pend = {}; // cot -> { so dong: gia tri moi }
+  var _put = function (col, rowNum, val, cache) {
+    (pend[col] = pend[col] || {})[rowNum] = val;
+    if (cache && rowNum - 2 < cache.length) cache[rowNum - 2][0] = val; // cung 1 SDT lap lai trong 1 lan gui: dong sau thay gia tri moi
+  };
+  var _flush = function () {
+    Object.keys(pend).forEach(function (c) {
+      var rowsN = Object.keys(pend[c]).map(Number).sort(function (a, b) { return a - b; });
+      var i = 0;
+      while (i < rowsN.length) {
+        var j = i;
+        while (j + 1 < rowsN.length && rowsN[j + 1] === rowsN[j] + 1) j++;
+        var vals = []; for (var k = i; k <= j; k++) vals.push([pend[c][rowsN[k]]]);
+        sh.getRange(rowsN[i], Number(c), vals.length, 1).setValues(vals);
+        i = j + 1;
+      }
+    });
+  };
 
   if (dryRun) {
     var conflicts = [];
@@ -8247,9 +8274,9 @@ function syncZaloFriendStatus_(rows, dryRun) {
       var rn = phoneC ? index[phoneC] : undefined;
       if (!phoneC || rn === undefined) continue;
       // Chi doc 2 o can thiet (zalo + zaloSetBy) cho dong nay, khong doc ca dong/ca sheet
-      var oldZalo = sh.getRange(rn, 3).getValue() || '';
+      var oldZalo = (colZalo && colZalo[rn - 2] ? colZalo[rn - 2][0] : '') || '';
       if (!oldZalo || oldZalo === (rc.zalo || '')) continue; // chua tung ghi, hoac gia tri khong doi -> khong tinh la xung dot
-      var oldSetByRaw = sh.getRange(rn, 19).getValue();
+      var oldSetByRaw = colSetBy && colSetBy[rn - 2] ? colSetBy[rn - 2][0] : '';
       var oldSetBy = null;
       try { oldSetBy = JSON.parse(oldSetByRaw || 'null'); } catch (e) { oldSetBy = null; }
       var oldCs = oldSetBy ? (oldSetBy.cs || '') : '';
@@ -8281,11 +8308,11 @@ function syncZaloFriendStatus_(rows, dryRun) {
       // Truoc day ham nay luon ghi lai cot 'updated' (O) cho MOI dong duoc quet, ke ca khi
       // trang thai zalo khong doi gi ca -> Sasum tuong lam la "khach vua co cap nhat moi"
       // moi lan CS chi don gian mo lai doan chat / bam quet man hinh, gay bao dong gia.
-      var curZalo = sh.getRange(rowNum, 3).getValue() || '';
+      var curZalo = (colZalo && colZalo[rowNum - 2] ? colZalo[rowNum - 2][0] : '') || '';
       var nickAlreadyThere = true;
       var curNzRaw = '';
       if (nick) {
-        curNzRaw = sh.getRange(rowNum, 17).getValue();
+        curNzRaw = colNick && colNick[rowNum - 2] ? colNick[rowNum - 2][0] : '';
         var nzChk = [];
         try { nzChk = JSON.parse(curNzRaw || '[]'); } catch (e) { nzChk = []; }
         if (!Array.isArray(nzChk)) nzChk = [];
@@ -8296,16 +8323,16 @@ function syncZaloFriendStatus_(rows, dryRun) {
         continue;
       }
       // Chi ghi dung 3 vung o thay doi cua dong nay: zalo(C), updated(O), zaloSetBy(S) [+ nickZalos(Q) neu co nick moi]
-      if (curZalo !== zaloStatus) sh.getRange(rowNum, 3).setValue(zaloStatus);
-      sh.getRange(rowNum, 15).setValue(now);
+      if (curZalo !== zaloStatus) _put(3, rowNum, zaloStatus, colZalo);
+      _put(15, rowNum, now, null);
       if (nick && !nickAlreadyThere) {
         var nz = [];
         try { nz = JSON.parse(curNzRaw || '[]'); } catch (e) { nz = []; }
         if (!Array.isArray(nz)) nz = [];
         nz.push(nick);
-        sh.getRange(rowNum, 17).setValue(JSON.stringify(nz));
+        _put(17, rowNum, JSON.stringify(nz), colNick);
       }
-      sh.getRange(rowNum, 19).setValue(setBy);
+      _put(19, rowNum, setBy, colSetBy);
       updated++; touchedRows.push(rowNum);
     } else {
       var newRow = careRow_({ phone: phone, zalo: zaloStatus, nickZalos: nick ? [nick] : [], zaloSetBy: setBy });
@@ -8317,6 +8344,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
     }
   }
 
+  _flush();
   if (newRows.length) {
     sh.getRange(lastRow + 1, 1, newRows.length, W).setValues(newRows);
   }
@@ -8587,9 +8615,17 @@ function _autoDedupExactRowsInSheet_(sh, width) {
   if (!toDelete.length) return { deleted: 0, groupCount: 0 };
   toDelete.sort(function (a, b) { return b - a; }); // xoa tu duoi len tren, tranh lech chi so
   var deleted = 0;
-  toDelete.forEach(function (rowIdx) {
-    try { sh.deleteRow(rowIdx); deleted++; } catch (e) {}
-  });
+  // Toi uu (2026-11-15): truoc day deleteRow tung dong (hang tram dong trung = hang tram lan goi Sheet, de qua thoi gian); nay gom cac dong LIEN NHAU
+  // thanh 1 lan deleteRows (van xoa tu duoi len; loi cum nao thi thu xoa tung dong trong cum do nhu cu).
+  var ri2 = 0;
+  while (ri2 < toDelete.length) {
+    var rj2 = ri2;
+    while (rj2 + 1 < toDelete.length && toDelete[rj2 + 1] === toDelete[rj2] - 1) rj2++;
+    var cnt2 = rj2 - ri2 + 1, first2 = toDelete[rj2];
+    try { sh.deleteRows(first2, cnt2); deleted += cnt2; }
+    catch (e0) { for (var q2 = ri2; q2 <= rj2; q2++) { try { sh.deleteRow(toDelete[q2]); deleted++; } catch (e) {} } }
+    ri2 = rj2 + 1;
+  }
   return { deleted: deleted, groupCount: groupCount };
 }
 var SH_AUTO_DEDUP_LOG = 'Nhật ký xoá trùng tự động';
@@ -13154,12 +13190,14 @@ function readNotifications_(username) {
 function markNotifRead_(username, ids, all) {
   var sh = getCrmSS_().getSheetByName(SH_NOTIF);
   if (!sh || sh.getLastRow() < 2) return { ok: true, marked: 0 };
-  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, now = new Date().toISOString();
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, hit = [], now = new Date().toISOString();
   (ids || []).forEach(function (x) { want[String(x)] = 1; });
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0] || v[i][9] || String(v[i][1]).toLowerCase() !== un) continue;
-    if (all || want[String(v[i][0])]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    if (all || want[String(v[i][0])]) { hit.push(i + 1); n++; }
   }
+  // Toi uu (2026-11-15): truoc day setValue tung dong (bam "doc tat ca" voi 200 thong bao = 200 lan goi Sheet); nay 1 lan RangeList cho moi dong can danh dau.
+  if (hit.length) sh.getRangeList(hit.map(function (r) { return 'J' + r; })).setValue(now);
   return { ok: true, marked: n };
 }
 function saveTaskComment_(c) {

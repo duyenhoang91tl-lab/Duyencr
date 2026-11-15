@@ -1,6 +1,15 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — TỐI ƯU GAS: GOM LẦN GỌI SHEET Ở 3 HÀM HAY CHẠY) — XONG (đã push); GAS tự deploy
+NGUYÊN NHÂN GỐC (mẹo chẩn đoán trong Project): vòng lặp gọi API Sheet từng dòng/từng ô làm Apps Script quá thời gian → trình duyệt báo CORS/"Failed to fetch". Quét `gas_v13.js` tìm `getRange/getValue/setValue/deleteRow` trong vòng lặp; phần lớn là "tìm 1 dòng rồi sửa rồi return" (OK), chỉ 3 chỗ thật sự lặp theo số dòng:
+- ✅ `syncZaloFriendStatus_` (extension quét bạn Zalo — nóng nhất): trước mỗi dòng đọc 2–3 ô + ghi 3–4 ô riêng (20 dòng = 114 lần gọi). Nay đọc 3 cột C/S (+Q chỉ khi có nick) ĐÚNG 1 LẦN, kiểm trên bộ nhớ, ghi gom các dòng liền nhau thành 1 `setValues` (20 dòng = 14 lần; dry-run luôn 3 lần). SĐT lặp trong 1 lần gửi vẫn thấy giá trị mới (cập nhật bộ nhớ đệm).
+- ✅ `markNotifRead_` ("đọc tất cả" N thông báo = N lần `setValue`) → 1 `getRangeList(...).setValue`.
+- ✅ `_autoDedupExactRowsInSheet_` (tự xoá dòng trùng Base/Pos) từng `deleteRow` → `deleteRows` theo cụm liền nhau (lỗi cụm → thử từng dòng như cũ).
+- Test mới `node tools/test-batch-writes.js` (so KẾT QUẢ với bản cũ `git show 6dcfa0d:gas_v13.js` trên 6 kịch bản zalo + dry-run + 3 kịch bản thông báo + dedup, và đếm số lần gọi); `test-notify` thêm `getRangeList` vào mock. Cả bộ 330/330.
+- ℹ KHÔNG đổi `getSettingsMulti_`: cột B Settings chứa chunk mã GAS 45.000 ký tự nên cố ý chỉ đọc đúng ô cần (xem `test-settings-fast`).
+- [ ] **VIỆC KẾ TIẾP:** Actions "Deploy GAS" xanh; Duyên thử quét Zalo hàng loạt bằng extension + "đọc tất cả" thông báo. Còn vài vòng lặp ghi theo dòng ít nóng hơn (`_impApplyUpdPlan_` đã gom; `savePancakeNameMap_`/`saveVietTat_` chỉ 1 dòng) — chưa đụng.
+
 ## 2026-11-15 (phiên Claude — R11a/R11b: Duyên nói "dọn", mình ĐO rồi QUYẾT ĐỊNH KHÔNG LÀM) — XONG phần đo (chỉ sửa tài liệu)
 NGUYÊN NHÂN GỐC của quyết định: lợi ích đo được quá nhỏ so với rủi ro hỏng tính năng mà không có ảnh máy thật để kiểm.
 - **R11a (CSS):** quét bảo thủ (selector có class/id không xuất hiện ở BẤT KỲ đâu trong index.html + js/* + CrmWeb.kt) chỉ ra **68/2338 luật ≈ 5,9 KB / 264 KB (2%)**, phần lớn là kiểu cũ của nickzalo/bday/cs-status-drag/fp-* và bộ `ui-tone-*` của khung kit (cố ý để sẵn). Gzip tiết kiệm ≈ 1,5 KB → không đáng. 96 `!important` ngoài `99-dark-auto.css` là luật thắng nhau với tối/Android (`vhFixJs`), gỡ không đo được lợi hiệu năng, chỉ thêm rủi ro.
