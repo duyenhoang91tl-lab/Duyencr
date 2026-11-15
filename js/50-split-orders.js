@@ -379,7 +379,14 @@ function renderSalesReportTabM_(wrap, subTabs){
     +splitRatioBtnHtml_(_srIsAdmin_(), !!_srState.ghepRatio)
     +(_srIsAdmin_() ? '<button type="button" id="sr-fix-btn" class="btn sm'+(_srState.fixOpen?' primary':'')+'" onclick="splitFixToggle_()" title="Xem thẻ Pos + đơn gốc Base của các đơn ghép lệch nhau và chỉnh chia tay doanh thu từng đơn">🛠 Đơn lệch Pos–Base</button>' : '')
     +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">⬇ Excel đối soát TẤT CẢ sale</button></div>';
-  wrap.innerHTML = bar + tools + '<div id="sr-m-fix">' + splitFixPanelHtml_() + '</div><div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
+  var fixHtml = '<div id="sr-m-fix">' + splitFixPanelHtml_() + '</div>';
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = bar + tools + fixHtml + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
+  } else {
+    // thanh lọc + công cụ (tìm/ghép/xuất) + bảng "Sửa lệch" → nội dung. GIỮ id sr-m-fix / sr-m-body: code khác cập nhật từng phần bằng id này (_splitFixRerender_, _srMRerender_, onclick/onchange gắn bên dưới).
+    wrap.innerHTML = uiReportFrame_({ id: 'M', barHtml: bar + tools + fixHtml, loading: !!_srState.loading,
+      bodyHtml: _srState.loading ? '' : '<div id="sr-m-body">' + splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel) + '</div>' });
+  }
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
 function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel); }
