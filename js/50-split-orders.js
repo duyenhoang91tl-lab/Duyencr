@@ -56,6 +56,7 @@ function splitStateChip_(text, tone, fbStyle, fbText){   // fbStyle/fbText = HTM
   return splitKitOn_() ? uiChip_(text, { tone: tone, dot: true }) : '<span style="'+fbStyle+'">'+(fbText==null?splitEsc_(text):fbText)+'</span>';
 }
 function splitErrColor_(){ return splitKitOn_() ? 'var(--ui-danger)' : '#c0392b'; }
+function splitToneColor_(tone, fb){ return splitKitOn_() ? 'var(--ui-' + tone + ')' : fb; }   // R7d-4: tone = warning | success | danger; fb = màu cứng cũ khi thiếu ui-kit
 function splitDetailHtml_(items, max, all){
   if (!items.length) return '<div class="split-msg">Không có đơn chia nào trong kỳ này.</div>';
   var rows = items.slice(0,max).map(function(it){
@@ -308,9 +309,9 @@ function splitFixToggle_(){
 function splitFixEdit_(i, v){ var f = _srState.fix; f.edits[i] = v; var el = document.getElementById('sr-fix-sum-'+i); if (el) el.innerHTML = splitFixSumHtml_(i); }
 function splitFixSumHtml_(i){
   var f = _srState.fix, o = f.data.rows[i], t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o), p = splitFixParseLines_(t);
-  if (p.errors.length) return '<span style="color:#c0392b">' + splitEsc_(p.errors[0]) + '</span>';
+  if (p.errors.length) return '<span style="color:' + splitErrColor_() + '">' + splitEsc_(p.errors[0]) + '</span>';
   var d = p.total - o.posVal;
-  return 'Tổng chia tay: <b>' + splitMoney_(p.total) + '</b> · giá Pos ' + splitMoney_(o.posVal) + (d ? ' · <span style="color:#b9770e">chênh ' + (d>0?'+':'') + splitMoney_(d) + ' (đơn sẽ tính theo tổng chia tay)</span>' : ' · khớp');
+  return 'Tổng chia tay: <b>' + splitMoney_(p.total) + '</b> · giá Pos ' + splitMoney_(o.posVal) + (d ? ' · <span style="color:' + splitToneColor_('warning', '#b9770e') + '">chênh ' + (d>0?'+':'') + splitMoney_(d) + ' (đơn sẽ tính theo tổng chia tay)</span>' : ' · khớp');
 }
 async function splitFixSave_(i){
   var f = _srState.fix, o = f.data.rows[i], t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o), p = splitFixParseLines_(t);
@@ -494,16 +495,16 @@ async function _srMFbChange_(e){
   var t = e && e.target; if (!t || !t.classList || !t.classList.contains('split-fb')) return;
   var m = _srState.mSel, d = m && m.data; if (!d) return;
   var key = t.getAttribute('data-fb-key'), text = t.value, item = (d.pos||[]).filter(function(x){ return x.fbKey===key; })[0];
-  t.style.outline = '2px solid #f59e0b';
+  t.style.outline = '2px solid ' + splitToneColor_('warning', '#f59e0b');
   try{
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'splitFeedbackSave', key:key, sale:m.sale, text:text }) });
     var j = await r.json();
     if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
     if (item){ item.feedback = j.text; item.feedbackBy = j.by; item.feedbackAt = j.at; }
-    t.value = j.text; t.style.outline = '2px solid #16a34a'; t.title = 'Đã lưu bởi '+(j.by||'')+' lúc '+(j.at||'');
+    t.value = j.text; t.style.outline = '2px solid ' + splitToneColor_('success', '#16a34a'); t.title = 'Đã lưu bởi '+(j.by||'')+' lúc '+(j.at||'');
     setTimeout(function(){ if (t.style) t.style.outline = ''; }, 1500);
   }catch(err){
-    t.style.outline = '2px solid #dc2626';
+    t.style.outline = '2px solid ' + splitToneColor_('danger', '#dc2626');
     if (typeof toast==='function') toast('⚠ Chưa lưu được phản hồi: '+(err && err.message || err));
   }
 }
