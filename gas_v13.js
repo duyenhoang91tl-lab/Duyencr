@@ -1188,6 +1188,23 @@ function _auditDiffRows_(what, oldMap, newMap) {
   Object.keys(oldMap).forEach(function (k) { if (!(k in newMap)) out.push([what, k + ': ' + oldMap[k], '(đã xóa)']); });
   return out;
 }
+// R9c (2026-11-15): doc AuditLog LOC THEO TIEN TO hanh dong tren TOAN BO sheet (quet tu cuoi len, theo khoi 1000 dong, toi da 30000 dong cuoi, dung khi du `limit` dong khop).
+// NGUYEN NHAN GOC can lam: action=audit chi tra 200 dong moi nhat cua MOI loai thao tac (status/cs/assign...) nen dong "config:setting:roleConfig" (doi phan quyen) bi day ra ngoai
+// ngay khi CRM co nhieu thao tac khach -> trang Phan quyen muc "Thay doi gan day" rong du da co nguoi doi. Tra ve mang moi nhat truoc, cung dang {timestamp,user,action,phone,oldValue,newValue}.
+function _auditReadByPrefix_(sh, prefix, limit) {
+  var out = [];
+  if (!sh || !prefix) return out;
+  var last = sh.getLastRow(), lim = Math.max(1, Math.min(200, Number(limit) || 20)), BLK = 1000, MAXSCAN = 30000, scanned = 0, end = last;
+  while (end > 1 && out.length < lim && scanned < MAXSCAN) {
+    var n = Math.min(BLK, end - 1), start = end - n + 1;
+    var v = sh.getRange(start, 1, n, 6).getValues();
+    for (var i = v.length - 1; i >= 0 && out.length < lim; i--) {
+      if (String(v[i][2]).indexOf(prefix) === 0) out.push({ timestamp: v[i][0], user: v[i][1], action: v[i][2], phone: v[i][3], oldValue: v[i][4], newValue: v[i][5] });
+    }
+    end = start - 1; scanned += n;
+  }
+  return out;
+}
 function _auditUserSig_(u) {
   return 'vai trò ' + (u.role || 'cs') + ', ' + (u.active === false ? 'KHÓA' : 'hoạt động') + ', team ' + (u.team || '-') +
     ', tên [' + ((u.names && u.names.length) ? u.names : (u.name ? [u.name] : [])).join('/') + ']' +
@@ -2751,7 +2768,9 @@ function doGetCore_(e) {
 
     if (action === 'audit') {
       var shA = ss.getSheetByName(SH_AUDIT); var auditRows = [];
-      if (shA && shA.getLastRow() > 1) {
+      var _apAu = String((e.parameter || {}).actionPrefix || '');   // R9c: co tien to -> loc tren toan sheet (xem _auditReadByPrefix_); khong co -> 200 dong moi nhat nhu cu
+      if (_apAu) { auditRows = _auditReadByPrefix_(shA, _apAu, (e.parameter || {}).limit); }
+      else if (shA && shA.getLastRow() > 1) {
         var lastA = shA.getLastRow();
         var nA = Math.min(200, lastA - 1);
         var vA = shA.getRange(lastA - nA + 1, 1, nA, 6).getValues();

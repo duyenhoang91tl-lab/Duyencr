@@ -263,7 +263,9 @@ function doGetCore_(e) {
 
     if (action === 'audit') {
       var shA = ss.getSheetByName(SH_AUDIT); var auditRows = [];
-      if (shA && shA.getLastRow() > 1) {
+      var _apAu = String((e.parameter || {}).actionPrefix || '');   // R9c: co tien to -> loc tren toan sheet (xem _auditReadByPrefix_); khong co -> 200 dong moi nhat nhu cu
+      if (_apAu) { auditRows = _auditReadByPrefix_(shA, _apAu, (e.parameter || {}).limit); }
+      else if (shA && shA.getLastRow() > 1) {
         var lastA = shA.getLastRow();
         var nA = Math.min(200, lastA - 1);
         var vA = shA.getRange(lastA - nA + 1, 1, nA, 6).getValues();

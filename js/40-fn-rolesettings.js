@@ -256,8 +256,8 @@ async function _rsLoadRecent(){
   var el = document.getElementById('rl-recent-body'); if (!el) return;
   try {
     var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
-    var j = await (await fetch(gsUrl + sep + 'action=audit', { redirect:'follow' })).json();
-    var rows = ((j && j.audit) || []).filter(function(r){ return String(r.action || '') === 'config:roleConfig'; }).slice(0, 5);
+    var j = await (await fetch(gsUrl + sep + 'action=audit&actionPrefix=' + encodeURIComponent('config:setting:roleConfig') + '&limit=5', { redirect:'follow' })).json();   // R9c: GAS lọc trên TOÀN sheet (bản GAS cũ bỏ qua tham số → vẫn lọc phía dưới)
+    var rows = ((j && j.audit) || []).filter(function(r){ var a = String(r.action || ''); return a === 'config:setting:roleConfig' || a === 'config:roleConfig'; }).slice(0, 5);   // GAS ghi 'config:setting:<khóa>' (setSetting_); 'config:roleConfig' giữ cho dữ liệu/test cũ
     _rs.recent = rows; _rsRecentPaint();
   } catch (e) { el.textContent = 'Không tải được lịch sử thay đổi.'; }
 }
