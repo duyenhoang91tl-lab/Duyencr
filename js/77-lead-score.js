@@ -62,19 +62,62 @@ function lsScore_(c, schedules, nowTs){
   return { score: score, level: level, label: LS_LEVEL_LABEL[level], days: since, reasons: reasons, over: up.over, soon: up.soon, risk: risk };
 }
 // Xếp ưu tiên gọi: nóng trước (điểm cao trước) → ấm → nguội; cùng điểm: doanh thu cao trước. Trả [{c, s}] (tối đa limit).
-function lsRank_(customers, schedules, nowTs, limit, filter){
+function lsRank_(customers, schedules, nowTs, limit, filter, byPhone){
   var out = [];
-  (customers || []).forEach(function(c){ if (filter && !filter(c)) return; out.push({ c: c, s: lsScore_(c, schedules, nowTs) }); });
+  (customers || []).forEach(function(c){ if (filter && !filter(c)) return; out.push({ c: c, s: lsScore_(c, byPhone ? (byPhone[c.phone] || []) : schedules, nowTs) }); });
   var ord = { hot: 0, warm: 1, cold: 2 };
   out.sort(function(a, b){ return (ord[a.s.level] - ord[b.s.level]) || (b.s.score - a.s.score) || ((b.c.totalRevenue || 0) - (a.c.totalRevenue || 0)); });
   return limit ? out.slice(0, limit) : out;
 }
 // Khách "sắp mất": nguội + từng mua + hạng ≥ Tiềm năng → cứu theo doanh thu cao trước. Trả { n, items:[{c,s}] (≤limit) }
-function lsAtRisk_(customers, schedules, nowTs, limit, filter){
+// byPhone (tuỳ chọn) = { sđt: [lịch chưa xong] } để KHÔNG phải lọc cả mảng lịch cho từng khách khi quét hàng trăm nghìn khách.
+function lsAtRisk_(customers, schedules, nowTs, limit, filter, byPhone){
   var all = [];
-  (customers || []).forEach(function(c){ if (filter && !filter(c)) return; var s = lsScore_(c, schedules, nowTs); if (s.risk) all.push({ c: c, s: s }); });
+  (customers || []).forEach(function(c){ if (filter && !filter(c)) return; var s = lsScore_(c, byPhone ? (byPhone[c.phone] || []) : schedules, nowTs); if (s.risk) all.push({ c: c, s: s }); });
   all.sort(function(a, b){ return ((b.c.totalRevenue || 0) - (a.c.totalRevenue || 0)) || ((b.s.days || 0) - (a.s.days || 0)); });
   return { n: all.length, items: limit ? all.slice(0, limit) : all };
 }
 
-if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, LS_COLD_DAYS: LS_COLD_DAYS }; }
+// ════════════════════════════════════════════════════════════════════
+//  R8b (GIAO DIỆN) — LỌC DANH SÁCH THEO MỨC + THANH BÁO "ĐANG LỌC". Cần trình duyệt (các hàm dưới đều tự thoát nếu thiếu DOM/dữ liệu).
+//  _lsListFilter: '' (tắt) | 'risk' (sắp mất) | 'cold' | 'warm' | 'hot'. applyFilters (js/02) gọi lsFilterPass_(c); _filterSignature (js/08) có _lsListFilter
+//  để cache lọc không trả danh sách cũ. Tính điểm cả allCustomers MỘT lần rồi cache theo (số khách, _dataVersion, ngày, số lịch, mức).
+// ════════════════════════════════════════════════════════════════════
+var _lsListFilter = '';
+var _lsSetCache = { key: '', set: null };
+var LS_FILTER_LABEL = { risk: 'khách SẮP MẤT (nguội >' + LS_COLD_DAYS + ' ngày chưa chăm, đã từng mua)', cold: 'khách NGUỘI (>' + LS_COLD_DAYS + ' ngày chưa chăm)', warm: 'khách ẤM', hot: 'khách NÓNG' };
+function lsTodayKey_(nowTs){ var d = new Date(nowTs || Date.now()); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function lsFilterSet_(mode){
+  if (!mode || typeof allCustomers === 'undefined' || !allCustomers) return null;
+  var sch = (typeof schedules !== 'undefined' && schedules) ? schedules : [];
+  var key = [allCustomers.length, (typeof _dataVersion !== 'undefined' ? _dataVersion : 0), lsTodayKey_(), sch.length, mode].join('#');
+  if (_lsSetCache.key === key && _lsSetCache.set) return _lsSetCache.set;
+  var now = Date.now(), set = new Set();
+  // 1 lần quét: gom lịch theo SĐT để không lọc lại toàn bộ lịch cho từng khách (136k × lịch).
+  var by = {}; sch.forEach(function(s){ if (s && !s.done && s.phone) (by[s.phone] = by[s.phone] || []).push(s); });
+  allCustomers.forEach(function(c){
+    var r = lsScore_(c, by[c.phone] || [], now);
+    if (mode === 'risk' ? r.risk : r.level === mode) set.add(c.phone);
+  });
+  _lsSetCache = { key: key, set: set };
+  return set;
+}
+function lsFilterPass_(c){ if (!_lsListFilter) return true; var s = lsFilterSet_(_lsListFilter); return !s || s.has(c.phone); }
+function lsBarSync_(count){
+  var host = (typeof document !== 'undefined') ? document.getElementById('tab-list') : null; if (!host) return;
+  var bar = document.getElementById('ls-filter-bar');
+  if (!_lsListFilter){ if (bar) bar.remove(); return; }
+  if (!bar){ bar = document.createElement('div'); bar.id = 'ls-filter-bar'; bar.className = 'ls-filter-bar'; host.insertBefore(bar, host.firstChild); }
+  bar.innerHTML = '<span>🧊 Đang lọc: ' + (LS_FILTER_LABEL[_lsListFilter] || '') + (count != null ? ' · <b>' + count + '</b> khách' : '') + '</span><button type="button" class="btn sm" data-ls-clear="1">✕ Bỏ lọc</button>';
+  bar.querySelector('[data-ls-clear]').onclick = lsClearListFilter_;
+}
+function lsOpenList_(mode){
+  _lsListFilter = mode || '';
+  var el = (typeof document !== 'undefined') ? document.querySelector('[data-bar-id="tab-kh"]') : null;
+  if (el && typeof switchTab === 'function') switchTab('list', el);
+  if (typeof applyFilters === 'function') applyFilters();
+  lsBarSync_(typeof _filterCache === 'object' && _filterCache && _filterCache.list ? _filterCache.list.length : null);
+}
+function lsClearListFilter_(){ _lsListFilter = ''; if (typeof applyFilters === 'function') applyFilters(); lsBarSync_(); }
+
+if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }

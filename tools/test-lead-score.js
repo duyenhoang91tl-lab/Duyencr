@@ -66,4 +66,34 @@ const big = []; for (let i = 0; i < 136000; i++) big.push(C({ phone: 'p' + i, _l
 const t0 = Date.now(); const rk = m.lsAtRisk_(big, [], NOW, 50); const ms = Date.now() - t0;
 ok(rk.n > 0 && rk.items.length === 50 && ms < 3000, '136.000 khách quét lần sắp mất trong ' + ms + 'ms (<3s)');
 
+// ── R8b: byPhone + cảnh báo Tổng quan + bộ lọc danh sách ──
+const byP = { A: [{ phone: 'A', date: '2026-11-16', done: false }] };
+ok(m.lsAtRisk_(list, null, NOW, 0, null, byP).items.map(x => x.c.phone).join('') === 'D', 'byPhone: A có lịch hẹn ngày mai → không còn sắp mất (chỉ D)');
+ok(m.lsRank_(list, null, NOW, 0, null, byP).find(x => x.c.phone === 'A').s.level !== 'cold', 'byPhone: lsRank_ cũng dùng lịch theo SĐT');
+const h = require('vm'), fs = require('fs');
+const src36 = fs.readFileSync(__dirname + '/../js/36-pro-home.js', 'utf8');
+const sb = {}; h.createContext(sb); h.runInContext('function proEsc_(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}', sb);
+const pick = (n) => { const i = src36.indexOf('function ' + n + '('); let d = 0, j = src36.indexOf('{', i); for (let k = j; k < src36.length; k++) { if (src36[k] === '{') d++; else if (src36[k] === '}') { d--; if (!d) return src36.slice(i, k + 1); } } };
+h.runInContext(pick('proRiskAlert_') + '\n' + pick('proRecoItems_') + '\nvar PRO_UNREPLIED_CAP=100;', sb);
+const al = sb.proRiskAlert_({ n: 5, items: [{ c: { name: 'Lan <b>' } }, { c: { name: 'Mai' } }, { c: { name: 'Hà' } }] }, 60);
+ok(al && al.n === 5 && al.go === 'atrisk' && al.tone === 'bad' && /SẮP MẤT/.test(al.text) && /hơn 60 ngày/.test(al.text), 'proRiskAlert_: n, go=atrisk, đỏ, nêu 60 ngày');
+ok(/Lan &lt;b&gt;, Mai, Hà…/.test(al.text), 'proRiskAlert_: tên escape, 3 tên + … khi còn nhiều hơn');
+ok(!/…/.test(sb.proRiskAlert_({ n: 2, items: [{ c: { name: 'A' } }, { c: { name: 'B' } }] }).text), 'proRiskAlert_: đủ tên thì không có …');
+ok(sb.proRiskAlert_({ n: 0, items: [] }) === null && sb.proRiskAlert_(null) === null, 'proRiskAlert_: 0/null → không hiện');
+ok(sb.proRecoItems_([], '2026-11-15', [], null, [al]).some(x => x.go === 'atrisk'), 'proRecoItems_ nhận mục sắp mất qua alerts (không đổi hàm)');
+
+// bộ lọc danh sách (chạy NGUYÊN js/77 trong sandbox có allCustomers/schedules)
+const sb2 = { Date, Set, console }; h.createContext(sb2);
+h.runInContext(fs.readFileSync(__dirname + '/../js/77-lead-score.js', 'utf8').replace(/if \(typeof module[\s\S]*$/, ''), sb2);
+h.runInContext('var _dataVersion=1; var allCustomers=[]; var schedules=[];', sb2);
+sb2.allCustomers = list; sb2.schedules = [];
+h.runInContext('_lsListFilter="risk"', sb2);
+const got = list.filter(c => sb2.lsFilterPass_(c)).map(c => c.phone).join('');
+ok(got === 'AD', 'lsFilterPass_(risk) trong sandbox: giữ A, D (cache theo mức)');
+h.runInContext('_lsListFilter=""', sb2); ok(list.every(c => sb2.lsFilterPass_(c)), 'tắt lọc → mọi khách đều qua');
+h.runInContext('_lsListFilter="hot"', sb2); ok(list.filter(c => sb2.lsFilterPass_(c)).map(c => c.phone).join('') === 'BC', 'lọc "nóng" → B, C');
+const src02 = fs.readFileSync(__dirname + '/../js/02-fn-showrowerrorbanner.js', 'utf8'), src08 = fs.readFileSync(__dirname + '/../js/08-fn-invalidatefiltercache.js', 'utf8');
+ok(/_lsListFilter[\s\S]{0,120}lsFilterPass_\(c\)\) return false/.test(src02), 'applyFilters (js/02) có dòng lọc R8b');
+ok(/_lsListFilter/.test(src08.slice(src08.indexOf('function _filterSignature'), src08.indexOf('function _filterSignature') + 1800)), 'chữ ký cache lọc (js/08) có _lsListFilter — nếu thiếu, đổi mức lọc sẽ trả danh sách cũ');
+
 console.log(bad ? `\n${bad} LỖI` : '\nTẤT CẢ ĐẠT'); process.exit(bad ? 1 : 0);

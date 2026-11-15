@@ -104,6 +104,12 @@ function proRecoItems_(due, today, tasks, unreplied, alerts){
   if (!out.length) out.push({ n:'✓', tone:'', text:'Không còn việc đến hạn — bạn đã xử lý xong hôm nay.', go:'', act:'' });
   return out;
 }
+// R8b: mục cảnh báo "khách SẮP MẤT" (nguội quá LS_COLD_DAYS ngày + từng mua + hạng ≥ Tiềm năng; js/77). rk = lsAtRisk_(...) → { n, items:[{c}] } (items đã xếp doanh thu cao trước). n=0/thiếu → null. Tên khách escape; tối đa 3 tên + "…".
+function proRiskAlert_(rk, cold){
+  if (!rk || !(rk.n > 0)) return null;
+  var names = (rk.items||[]).slice(0, 3).map(function(x){ return proEsc_((x && x.c && x.c.name) || ''); }).filter(Boolean);
+  return { n: rk.n, tone:'bad', text:'khách <b>SẮP MẤT</b> — đã từng mua nhưng hơn '+(cold||60)+' ngày chưa chăm'+(names.length ? ': '+names.join(', ')+(rk.n > names.length ? '…' : '') : ''), go:'atrisk', act:'Xem khách' };
+}
 function proRecoHtml_(items){
   return (items||[]).map(function(it){
     return '<div class="pro-next'+(it.tone==='bad'?' bad':'')+'"><span class="n-pct">'+proEsc_(it.n)+'</span><span>'+it.text+'</span>'
@@ -128,10 +134,12 @@ function proHomeHtml_(o){
 
 // ── Chèn vào màn Tổng quan (cần trình duyệt) ──
 function proHomeGo_(tab){
+  if (tab === 'atrisk'){ if (typeof lsOpenList_ === 'function') lsOpenList_('risk'); return; }   // R8b: mở Danh sách KH lọc khách sắp mất
   var el = document.querySelector('[data-bar-id="tab-'+tab+'"]');
   if (el && typeof switchTab==='function') switchTab(tab, el);
 }
 // Số liệu KỲ TRƯỚC (cùng số ngày): gọi lại orgOverview cho kỳ liền trước (KHÔNG đổi GAS; server có cache nên kỳ đã xem trước đó trả nhanh). Ưu tiên lấy từ _ov.mem nếu người dùng đã xem kỳ đó. Cache theo khoảng; lỗi → null (ẩn mũi tên, KHÔNG báo lỗi).
+var _proRisk = { key:'', val:null };   // R8b: cache cảnh báo khách sắp mất
 var _proPrev = {};   // key 'from|to' → { d: data|null, at, busy }
 function proPrevLoad_(range, cb){
   var key = range.from+'|'+range.to, e = _proPrev[key];
@@ -169,6 +177,15 @@ function proHomeRender_(){
   var today_ = typeof _remDateStr==='function' ? _remDateStr() : '';
   var range_ = proPrevRange_(d.from, d.to, today_), pe_ = range_ ? _proPrev[range_.from+'|'+range_.to] : null, pd_ = pe_ && pe_.d ? pe_.d : null, ps_ = null, alerts_ = [];
   if (pd_){ try { ps_ = _ovScope(pd_); if (s.mode !== 'self') alerts_ = proAlertItems_(s.people, ps_.people, typeof _ovN==='function' ? _ovN : null); } catch(e){ ps_ = null; alerts_ = []; } }
+  // R8b: khách sắp mất (cache theo số khách trong phạm vi + phiên bản dữ liệu + ngày + số lịch → đổi kỳ/vẽ lại Tổng quan không quét lại)
+  try {
+    if (typeof lsAtRisk_ === 'function'){
+      var sch_ = (typeof schedules !== 'undefined' && schedules) ? schedules : [], rkKey = [list.length, (typeof _dataVersion !== 'undefined' ? _dataVersion : 0), today_, sch_.length, s.mode||''].join('#');
+      if (_proRisk.key !== rkKey){ var by_ = {}; sch_.forEach(function(x){ if (x && !x.done && x.phone) (by_[x.phone] = by_[x.phone] || []).push(x); });
+        var rk_ = lsAtRisk_(list, null, Date.now(), 3, null, by_); _proRisk = { key: rkKey, val: proRiskAlert_(rk_, typeof LS_COLD_DAYS !== 'undefined' ? LS_COLD_DAYS : 60) }; }
+      if (_proRisk.val) alerts_ = alerts_.concat([_proRisk.val]);
+    }
+  } catch(e){}
   var html = proHomeHtml_({ label:s.label, from:d.from, to:d.to, c:s.company, money:(typeof _ovMoney==='function'?_ovMoney:String),
     ratingHtml:(typeof _ovRatingCounts==='function' ? _ovRatingCounts(s.company||{}) : ''),
     barsHtml:proStatusBarsHtml_(list, 8), prev:(ps_ ? ps_.company : null), recoHtml:proRecoHtml_(proRecoItems_(due, today_, tasks, _proUr.n, alerts_)) });

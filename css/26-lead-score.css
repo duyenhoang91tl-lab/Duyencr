@@ -1,0 +1,2 @@
+/* R8b — thanh "đang lọc theo mức nóng/ấm/nguội/sắp mất" trên Danh sách KH (js/77-lead-score.js). TOKEN-ONLY: chỉ var(--ui-*) / biến cũ, không màu cứng. */
+.ls-filter-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-sp-3);flex-wrap:wrap;margin:var(--ui-sp-2) var(--ui-sp-3);padding:var(--ui-sp-2) var(--ui-sp-3);background:var(--surface);border:1px solid var(--ui-warning);border-radius:var(--ui-r-lg);font-size:var(--ui-fs-sm);color:var(--text)}

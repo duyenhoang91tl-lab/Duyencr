@@ -620,6 +620,8 @@ function applyFilters() {
 
     // No-action filter: chưa có _lastActionDate
     if (noActionF && c._lastActionDate) return false;
+    // R8b: lọc theo mức nóng/ấm/nguội/sắp mất (js/77). _lsListFilter rỗng → bỏ qua, thiếu js/77 → bỏ qua.
+    if (typeof _lsListFilter !== 'undefined' && _lsListFilter && typeof lsFilterPass_ === 'function' && !lsFilterPass_(c)) return false;
 
     // Column filters
     if (colFilters.name.size > 0 && !colFilters.name.has(c.name)) return false;

@@ -25,7 +25,8 @@ function _filterSignature(){
     (document.querySelector('.srt') ? document.querySelector('.srt').value : ''),
     val('ymf-year'), val('ymf-month'), val('ymf-hour-from'), val('ymf-hour-to'),
     val('ymf-date-from'), val('ymf-date-to'),
-    val('campaign-filter'), chk('no-action-filter')
+    val('campaign-filter'), chk('no-action-filter'),
+    (typeof _lsListFilter !== 'undefined' ? _lsListFilter : '')   // R8b
   ];
   if (typeof colFilters === 'object') {
     parts.push('cf', _setSig(colFilters.name), _setSig(colFilters.tier), _setSig(colFilters.hang), _setSig(colFilters.care),
