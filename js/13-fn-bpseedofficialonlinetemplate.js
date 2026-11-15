@@ -1011,6 +1011,7 @@ function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srI
 function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
 function _srbMenuCats_(){
   var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'BD') ? 'G' : _srState.sub;
+  if (sub === 'K') return cats;   // K = Chốt tháng: CHỈ chọn tháng (posMonthK), không có bộ lọc Sale/Team/Nguồn... (3263f71 bỏ ánh xạ K→G nên K rơi vào menu mặc định 9 mục vô tác dụng)
   function flat(key, label, icon, ph, stateKey, optFn){
     cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:stateKey, ph:ph, opts:optFn });
   }
