@@ -2296,13 +2296,9 @@ function _srLOrderHtml_(o){
     (o.note ? '<br><span style="color:var(--hint)">'+esc(o.note)+'</span>' : '')+
   '</div>';
 }
-function _srRenderL_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:40px">'+esc(_srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".')+'</div>';
-  if (d.ok === false || d.error) return '<div style="color:var(--red);padding:20px">⚠️ '+esc(d.error || 'Lỗi tải báo cáo')+'</div>';
-  var t = d.totals || {}, dq = d.dataQuality || {};
-  var q = String(_srState.lSearch||'').trim().toLowerCase();
-  var rows = (d.rows||[]).filter(function(r){ return _srLRowMatchesSearch_(r, q); });
-  var h = '';
+// ── Báo cáo L tách thành các phần để khuôn chung (js/76 uiReportFrame_) xếp lại; HTML từng phần giữ nguyên như cũ ──
+function _srLCardsHtml_(d){   // 6-7 thẻ kpi-card (bản cũ, dùng khi chưa nạp js/76)
+  var t = d.totals || {}, h = '';
   h += '<div class="kpi-grid" style="margin-bottom:12px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(t.dongHen)+'</div><div class="kpi-label">Lượt KH hẹn qua cửa hàng</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(t.dongCoDon)+'</div><div class="kpi-label">KH có đơn Pos khớp</div></div>'+
@@ -2312,16 +2308,39 @@ function _srRenderL_(d){
     '<div class="kpi-card"><div class="kpi-val" style="color:#92400e">'+_srMoney(t.trungBoQua)+'</div><div class="kpi-label">Đã có thẻ trên Pos (bỏ qua, tránh trùng)</div></div>'+
     (d.acctCheck && d.acctCheck.ok ? '<div class="kpi-card" style="border-color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'"><div class="kpi-val" style="color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'">'+fmt(d.acctCheck.summary.chuaGhi)+'</div><div class="kpi-label">Đơn KT chưa ghi</div></div>' : '')+
   '</div>';
+  return h;
+}
+function _srLStats_(d){   // cùng số liệu với _srLCardsHtml_, cho uiStat_
+  var t = d.totals || {}, a = d.acctCheck;
+  var s = [
+    { label: 'Lượt KH hẹn qua cửa hàng', value: fmt(t.dongHen) },
+    { label: 'KH có đơn Pos khớp', value: fmt(t.dongCoDon) },
+    { label: 'Số đơn Pos khớp', value: fmt(t.soDon) },
+    { label: 'Doanh thu bán được khi khách qua', value: _srMoney(t.doanhThuDon) },
+    { label: 'Doanh thu chia thêm cho Sale (' + d.sharePct + '%)', value: _srMoney(t.daTinh), tone: 'success' },
+    { label: 'Đã có thẻ trên Pos (bỏ qua, tránh trùng)', value: _srMoney(t.trungBoQua), tone: 'warning' }
+  ];
+  if (a && a.ok) s.push({ label: 'Đơn KT chưa ghi', value: fmt(a.summary.chuaGhi), tone: a.summary.chuaGhi ? 'danger' : 'success' });
+  return s;
+}
+function _srLTopHtml_(d){   // khối đối chiếu kế toán + dòng nguồn
+  var h = '';
   h += _srLAcctHtml_(d);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+esc(d.note||'')+' · Nguồn: tab "'+esc(d.sheetName||'')+'" · <a href="https://docs.google.com/spreadsheets/d/'+esc(d.sheetId)+'" target="_blank" rel="noopener">mở trang tính</a></div>';
-
+  return h;
+}
+function _srLWarnHtml_(d){   // cảnh báo chất lượng dữ liệu (rỗng nếu không có)
+  var dq = d.dataQuality || {}, h = '';
   var warns = [];
   if (dq.thieuSdt) warns.push(dq.thieuSdt+' dòng thiếu SĐT (không khớp được đơn)');
   if (dq.thieuNgay) warns.push(dq.thieuNgay+' dòng thiếu/sai ngày hẹn');
   if (dq.thieuSale) warns.push(dq.thieuSale+' dòng chưa ghi tên Sale');
   if (d.unresolved && d.unresolved.length) warns.push('Chưa khớp được tên Sale: <b>'+d.unresolved.map(function(u){ return esc(u.raw)+' ('+u.count+')'; }).join(', ')+'</b> — vào "📥 Báo cáo Pancake → Khớp tên" hoặc bảng Danh sách Sale để khớp');
   if (warns.length) h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px">⚠️ '+warns.join('<br>⚠️ ')+'<div style="font-size:10.5px;color:#b45309;margin-top:3px">(thống kê trên toàn bộ trang tính, không phụ thuộc bộ lọc ngày)</div></div>';
-
+  return h;
+}
+function _srLTablesHtml_(d, rows){   // bảng Theo Sale + chú thích + chi tiết khách qua cửa hàng
+  var h = '';
   // Theo Sale
   h += '<div style="font-weight:700;font-size:13px;margin:6px 0">Theo Sale</div>';
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">KH hẹn</th><th style="text-align:right">KH có đơn</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Doanh thu đơn</th><th style="text-align:right">Doanh thu chia thêm ('+esc(d.sharePct)+'%)</th><th style="text-align:right">Đã trùng thẻ Pos</th></tr></thead><tbody>';
@@ -2340,6 +2359,13 @@ function _srRenderL_(d){
     '<input type="text" value="'+esc(_srState.lSearch||'')+'" placeholder="🔍 Tìm tên KH / SĐT / Sale..." oninput="_srState.lSearch=this.value;_srLRerenderDetail_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:220px;background:var(--surface)"></div>';
   h += '<div id="sr-l-detail">'+_srLDetailTable_(rows)+'</div>';
   return h;
+}
+function _srLRows_(d){ var q = String(_srState.lSearch||'').trim().toLowerCase(); return (d.rows||[]).filter(function(r){ return _srLRowMatchesSearch_(r, q); }); }
+function _srRenderL_(d){   // bản cũ (không khuôn): ghép đúng thứ tự thẻ → đối chiếu → cảnh báo → bảng
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:40px">'+esc(_srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".')+'</div>';
+  if (d.ok === false || d.error) return '<div style="color:var(--red);padding:20px">⚠️ '+esc(d.error || 'Lỗi tải báo cáo')+'</div>';
+  var rows = _srLRows_(d);
+  return _srLCardsHtml_(d) + _srLTopHtml_(d) + _srLWarnHtml_(d) + _srLTablesHtml_(d, rows);
 }
 function _srLDetailTable_(rows){
   var h = '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày qua CH</th><th>Khách</th><th>Sale (khớp tên)</th><th>Tình trạng ghi trên sheet</th><th style="min-width:330px">Đơn Pos khớp (SĐT + ngày)</th><th style="text-align:right">DT đơn</th><th style="text-align:right">DT chia Sale</th><th>Cảnh báo</th></tr></thead><tbody>';
@@ -2376,9 +2402,18 @@ async function _srLSavePct_(){
   } catch(e){ toast('❌ Lỗi lưu: '+e.message); }
 }
 function renderSalesReportTabL_(wrap, subTabs){
-  var filters = _srBarHtml_();
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(_srState.dataL);
-  wrap.innerHTML = filters + body;
+  var filters = _srBarHtml_(), d = _srState.dataL;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(d));
+    return;
+  }
+  var o = { id: 'L', barHtml: filters, loading: !!_srState.loading, retry: '_srApply()' };
+  if (!_srState.loading){
+    if (!d) o.empty = _srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".';
+    else if (d.ok === false || d.error) o.error = d.error || 'Lỗi tải báo cáo';
+    else { o.noticeHtml = _srLWarnHtml_(d); o.stats = _srLStats_(d); o.tableHtml = _srLTopHtml_(d) + _srLTablesHtml_(d, _srLRows_(d)); }
+  }
+  wrap.innerHTML = uiReportFrame_(o);
 }
 // Dựng bảng "tổng hợp theo Sale" (kind='summary') hoặc "chi tiết từng đơn" (mặc định) của Báo cáo L. Tách khỏi _srLExportCsv_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất CSV lẻ không đổi).
 function _srLBuildRows_(d, kind){
