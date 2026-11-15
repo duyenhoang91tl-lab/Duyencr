@@ -673,7 +673,13 @@ function renderSalesReportTab(){
   } else {
     body = _srRenderB(_srState.dataB);
   }
-  wrap.innerHTML = bar + hiddenPanelHtml + body;
+  _srPaintMain_(wrap, bar + hiddenPanelHtml, body, !!_srState.loading);
+}
+// Báo cáo A / B / N: vẽ qua khuôn uiReportFrame_ (js/76) — thanh lọc (+ bảng ẩn trang/sale của Admin) → nội dung; đang tải giữ thanh lọc.
+// Thiếu js/76 → ghép như cũ. `body` đã là HTML hoàn chỉnh của _srRenderA/_srRenderB/_srRenderPure_ (KHÔNG sửa các hàm đó nên số liệu không đổi).
+function _srPaintMain_(wrap, barHtml, body, loading){
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = barHtml + body; return; }
+  wrap.innerHTML = uiReportFrame_({ id: _srState.sub === 'A' ? 'A' : 'B', barHtml: barHtml, loading: loading, bodyHtml: loading ? '' : body });
 }
 
 // ── Tỷ lệ chốt (theo Sale / theo Kênh) ─────────────────────────────────────
