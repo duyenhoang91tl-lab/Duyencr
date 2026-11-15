@@ -4,7 +4,7 @@
 // đi dạo thật sự di chuyển rồi ngồi nghỉ, giảm chuyển động = 1 khung tĩnh (không rAF), nối đúng vào menu Settings + index.html.
 const fs = require('fs'), path = require('path'), vm = require('vm'), root = path.join(__dirname, '..');
 let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
-const SPEED_MAX_STEP = 4;   // 34px/s * 0.1s (dt tối đa) = 3.4px < 4
+const SPEED_MAX_STEP = 10;   // chạy trốn 96px/s * 0.1s (dt tối đa) = 9.6px < 10
 const SRC = fs.readFileSync(path.join(root, 'js/79-mascot-samoyed.js'), 'utf8');
 
 function makeEnv(opts) {
@@ -78,6 +78,47 @@ ok(modes.has('walk') && modes.has('idle'), 'có cả lúc đi lẫn lúc nghỉ:
 ok(faces.has(1) && faces.has(-1), 'đổi hướng mặt trái/phải');
 ok(tiny === 0, 'không có bước nhảy tức thời (' + tiny + ' khung)');
 
+// 3c) Vườn nhỏ: hoa theo bề rộng, bướm/ong bay trong biên suốt 160s, không toạ độ NaN
+e = makeEnv({ w: 1000 });
+let st0 = e.win._mascotState_();
+ok(st0.flowers >= 8 && st0.flowers <= 28, 'số hoa trong [8,28]: ' + st0.flowers);
+ok(st0.butterflies.length === 4 && st0.bees.length === 2, 'desktop: 4 bướm + 2 ong (' + st0.butterflies.length + '/' + st0.bees.length + ')');
+let bad = 0, flyMoved = 0; const b0 = { x: st0.bees[0].x, y: st0.bees[0].y }; t = 1000;
+for (let i = 0; i < 4000; i++) {
+  t += 40; if (!e.step(t)) break;
+  const g = e.win._mascotState_();
+  g.butterflies.concat(g.bees).forEach(f => { if (!isFinite(f.x) || !isFinite(f.y) || f.y < 0 || f.y > g.ch || f.x < -21 || f.x > 1021) bad++; });
+}
+ok(bad === 0, 'bướm/ong luôn trong khung, không NaN (' + bad + ' lần sai)');
+const g1 = e.win._mascotState_();
+ok(Math.hypot(g1.bees[0].x - b0.x, g1.bees[0].y - b0.y) > 5, 'ong thật sự bay (đổi vị trí)');
+e = makeEnv({ w: 390 }); st0 = e.win._mascotState_();
+ok(st0.butterflies.length === 2 && st0.bees.length === 1, 'điện thoại: 2 bướm + 1 ong, nhẹ hơn (' + st0.butterflies.length + '/' + st0.bees.length + ')');
+e = makeEnv({ w: 1000, reduced: true });
+ok(e.calls.raf === 0, 'giảm chuyển động: vườn cũng đứng yên, không rAF');
+
+// 3d) Chạy trốn ong: đặt ong sát chó lúc đang ngồi → chó chuyển sang chạy (run), tốc độ cao, chạy ngược hướng ong, tới nơi thì ngồi lại
+let g;
+e = makeEnv({ w: 1000 }); t = 1000; e.step(t); g = e.win._mascotState_();
+let fled = false, dirOk = false, startX = 0, speedMax = 0, prev = null;
+for (let i = 0; i < 3000 && !fled; i++) {
+  g = e.win._mascotState_();
+  if (g.dog.mode === 'idle') { g.dog.x = 500; g.dog.until = 1e9; g.bees.forEach((b, j) => { b.x = j ? 900 : 470; b.y = 66; b.v = 0; }); }
+  t += 40; e.step(t); g = e.win._mascotState_();
+  if (g.run) { fled = true; startX = 500; dirOk = g.dog.target > 500; }
+}
+ok(fled, 'ong sát chó → chó chạy trốn (run=true)');
+ok(dirOk, 'ong ở bên trái → chó chạy sang phải (target=' + g.dog.target.toFixed(0) + ')');
+let arrived = false;
+for (let i = 0; i < 400 && !arrived; i++) { prev = g.dog.x; t += 40; e.step(t); g = e.win._mascotState_(); speedMax = Math.max(speedMax, Math.abs(g.dog.x - prev) / 0.04); if (g.mode === 'idle') arrived = true; }
+ok(arrived && g.run === false, 'chạy tới nơi thì ngồi lại, hết run');
+ok(speedMax > 60, 'chạy nhanh hơn đi dạo (' + speedMax.toFixed(0) + 'px/s)');
+// mascotFlee_ thuần
+let fleeBad = 0;
+[320, 800, 1920].forEach(w => { for (let i = 0; i < 4000; i++) { const x = 44 + Math.random() * Math.max(40, w - 184), bx = Math.random() * w, f = e.win._mascotFlee_(w, x, bx, Math.random); if (!(f >= 44 && f <= Math.max(84, w - 140))) fleeBad++; } });
+ok(fleeBad === 0, 'mascotFlee_ luôn trong biên (' + fleeBad + ' sai)');
+ok(e.win._mascotFlee_(1000, 500, 450, () => 0.5) > 500 && e.win._mascotFlee_(1000, 500, 550, () => 0.5) < 500, 'chạy ngược hướng ong');
+
 // 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
 let badRange = 0, badIdle = 0, moved = 0;
 [320, 390, 800, 1200, 1920].forEach(w => {
@@ -115,7 +156,7 @@ ok(e.els.length === 0 && e.calls.raf === 0, 'đã tắt → không canvas, khôn
 // 7) Giảm chuyển động: có canvas + vẽ 1 khung tĩnh, KHÔNG chạy rAF
 e = makeEnv({ reduced: true });
 ok(e.els.length === 1 && e.calls.raf === 0, 'giảm chuyển động → không rAF (raf=' + e.calls.raf + ')');
-ok(e.calls.draw >= 40 && e.calls.draw < 80, 'giảm chuyển động → vẽ đúng 1 khung tĩnh (fill=' + e.calls.draw + ')');
+ok(e.calls.draw >= 150 && e.calls.draw < 600, 'giảm chuyển động → vẽ đúng 1 khung tĩnh gồm chó+hoa+bướm+ong (fill=' + e.calls.draw + ')');
 
 // 8) Nạp 2 lần không tạo 2 canvas (guard __mascotLoaded)
 vm.runInContext(SRC, e.win);

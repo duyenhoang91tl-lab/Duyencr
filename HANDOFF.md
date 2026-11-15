@@ -2,6 +2,14 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+
+## 2026-11-15 (phiên làm việc — 🌼🦋🐝 VƯỜN NHỎ + ONG TRONG LINH VẬT CHÓ) — XONG (đã push)
+Duyên: "cho thêm bươm bướm, hoa, ong như màn chó chạy trốn ong vào CRM". Mở rộng ngay `js/79-mascot-samoyed.js` (CÙNG nút bật/tắt `ome_mascot`, không thêm file/menu mới); vẽ lại hoa/bướm/ong từ `maps/map04.js` + `js/saga-map.js` của game Chromblast.
+- ✅ Hoa (8–28 bông theo bề rộng, cúc màu + hướng dương, đung đưa), bướm (4 desktop / 2 điện thoại), ong (2 / 1) bay lang thang trong dải canvas (`flyStep`: đổi hướng nhẹ, dội trần/sàn, vòng mép). Canvas cao 96→112px.
+- ✅ Chơi theo màn "chó chạy trốn ong": ong bay sát chó lúc đang ngồi → chó giật mình (dấu ! đỏ), CHẠY TRỐN 96px/s NGƯỢC hướng ong 150–260px (`mascotFlee_`, hàm thuần trong [44, rộng-140]), tới nơi ngồi lại; nghỉ 9s giữa 2 lần giật mình. Ong chỉ trang trí, không đuổi/không làm gì khác.
+- ✅ Giảm chuyển động → 1 khung tĩnh (có đủ hoa/bướm/ong). Test `tools/test-mascot-samoyed.js` 46 ca (thêm: số lượng theo màn, bướm/ong trong biên 160s không NaN, ong thật sự bay, chạy trốn đúng hướng/đủ nhanh/ngồi lại, `mascotFlee_` 12.000 lần trong biên). Đã chụp ảnh Chrome headless kiểm hình.
+- [ ] **VIỆC KẾ TIẾP:** Ctrl+F5 xem. Nếu muốn: tách nút bật/tắt riêng cho vườn (hiện chung 1 nút với chó), tăng/giảm số ong-bướm-hoa, cho ong đậu hoa, hoặc bấm chó cho nhảy (hiện không bấm được vì không chặn chuột). Không đổi GAS/extension/APK.
+
 ## 2026-11-15 (phiên làm việc — 🐶 LINH VẬT CHÓ SAMOYED TRONG CRM) — XONG (đã push)
 Duyên: "thêm hiệu ứng linh vật trong CRM là con chó Samoyed của game Chroma" (repo Chromblast). Con chó trong game là hình VẼ VECTOR bằng canvas (hàm `drawDog`, `maps/map04.js`), không có file ảnh → port thẳng sang CRM, không cần thêm tài nguyên (cùng chủ sở hữu, không dính giấy phép bên thứ ba).
 - ✅ File mới `js/79-mascot-samoyed.js` (theo đúng khuôn `js/66-sakura-petals.js`): 1 canvas `#mascot-fx` sát đáy, NGAY TRÊN thanh tab `#pro-tabbar` (đo chiều cao thật, không có thanh tab thì sát đáy + vùng an toàn điện thoại), `pointer-events:none`, z-index 249 (dưới cánh đào 250, dưới thanh tab/dock/hộp thoại/bong bóng chat ≥300 → không che thao tác). Ngồi nghỉ 5–12s (thở, vẫy đuôi, chớp mắt, đôi khi nổi ♥) rồi đi dạo sang chỗ khác trong [44, rộng-140] (chừa bong bóng chat bên phải). ~30 khung/giây, dừng khi tab ẩn, ẩn khi in. `prefers-reduced-motion` → chỉ vẽ 1 khung tĩnh. Thêm viền nâu nhạt 1.3px quanh thân vì lông trắng bị "chìm" trên nền sáng của CRM (lượt vẽ viền trước, lượt lông sau).
