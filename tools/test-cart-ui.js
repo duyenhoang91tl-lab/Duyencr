@@ -17,8 +17,8 @@ function declSpan(src, name) {   // function X(){...} | const X = ...; | let X =
 const dd = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return ' @' + i + '\nZALO    ...' + a.slice(Math.max(0, i - 100), i + 200) + '\nPANCAKE ...' + b.slice(Math.max(0, i - 100), i + 200); };
 const escA = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // ---- mã 2 bên ----
-const P_FUNCS = ['_applyPromo_', '_lineTotal_', '_cartKey_', 'loadCartForCurrentPhone_', 'saveCart_', 'addToCart_', '_updateCartItem_', '_cartTotals_', '_renderCartTotal_', 'sanitizeProductName_', '_sentenceCase_', '_buildCartSummaryText_', 'renderCart_', 'updateGoldUnitLabel_', '_parseNumberedList_', '_splitTopLevel_'];
-const pstate = ['_cartItems', '_cartExtra', '_cartLoadedFor', 'PK_SHIP_FEE', 'PRODUCT_NAME_OVERRIDES'].map(n => declSpan(psrc, n)).join('\n');
+const P_FUNCS = ['_stripVNlocal_', '_hasGoldPlating_', '_applyPromo_', '_lineTotal_', '_cartKey_', 'loadCartForCurrentPhone_', 'saveCart_', 'addToCart_', '_updateCartItem_', '_cartTotals_', '_renderCartTotal_', 'sanitizeProductName_', '_sentenceCase_', '_buildCartSummaryText_', 'renderCart_', 'updateGoldUnitLabel_', '_parseNumberedList_', '_splitTopLevel_'];
+const pstate = ['PK_GOLD_KARATS', '_cartItems', '_cartExtra', '_cartLoadedFor', 'PK_SHIP_FEE', 'PRODUCT_NAME_OVERRIDES'].map(n => declSpan(psrc, n)).join('\n');
 let pbind = psrc.slice(psrc.indexOf("panelEl.querySelector('#pk-cart-add-manual')"), psrc.indexOf('    if (IS_PHONGTHUY) {', psrc.indexOf("panelEl.querySelector('#pk-cart-add-manual')")));
 pbind = pbind.split('\n').filter(l => !/#pk-cart-promo-calc/.test(l)).join('\n');
 const pchunk = 'let _bannedWords = [], _goldUnitAmount = 350000, _currentPhone = "";\n' + pstate + '\n' + P_FUNCS.map(n => declSpan(psrc, n)).join('\n') + '\nfunction bindCart(){\n' + pbind + '\n}\n';
@@ -29,6 +29,7 @@ const zInner = zsrc.slice(zsrc.indexOf('cartSection.innerHTML = `') + 'cartSecti
 const zHtml = '<div id="zai-cart-section">' + zInner + '</div>';
 const normStyle = h => h.replace(/style="([^"]*)"/g, (m, v) => 'style="' + v.replace(/:\s+/g, ':').replace(/;\s*$/, '') + '"');   // jsdom in lai style sau khi JS doi -> chuan hoa cach viet
 const norm = h => normStyle(h).replace(/ci_\d+_\d+/g, 'ci_ID')   // id dong sinh theo thoi gian + ngau nhien
+  .replace(/\s*<div class="pk-cart-vang-row"[\s\S]*?<\/div>/g, '')   // 15/11: o tich vang 10K/14K/18K CHI co o Pancake (Duyen 10/11) -> bo khoi so sanh
   .replace(/\s*<div id="(?:pk|zai)-cart-msg">[^<]*<\/div>/g, '')   // dong thong bao rieng cua Zalo (Pancake dung thanh trang thai chung)
   .replace(' hoặc Options Pancake AI', '')   // CO Y khac: trang Options cai don gia vang chi co o Pancake AI
   .replace(/\b(?:pk|zai)-/g, 'X-').replace(/ data-ever-opened="1"/g, '').replace(/\s+/g, ' ').replace(/ id="X-cart-msg"><\/div>/g, '></div>');
@@ -75,7 +76,7 @@ const ITEMS = [
   // 2. them dong giong nhau
   for (const S of SIDES) ITEMS.forEach(it => S.add(JSON.parse(JSON.stringify(it))));
   ok(Z.items().length === 5 && Z.items().every((x, i) => x.checked === true && x.id), 'them 5 dong, mac dinh tick');
-  const strip = a => a.map(x => Object.assign({}, x, { id: 'ID' }));
+  const strip = a => a.map(x => { const y = Object.assign({}, x, { id: 'ID' }); delete y.vangTuoi; return y; })   /* 15/11: vangTuoi (o tich 10K/14K/18K) CHI co o Pancake theo y Duyen 10/11 -> khong so */;
   ok(JSON.stringify(strip(Z.items())) === JSON.stringify(strip(P.items())), 'du lieu dong giong het (ke ca tach chat lieu thanh danh sach tick)');
   ok(Z.items()[0].chatLieuOptions.length === 2 && Z.items()[0].chatLieu === '', 'chat lieu danh so -> tach thanh lua chon tick, chua chon gi');
   ok(Z.html() === P.html(), 'HTML sau khi them 5 dong GIONG HET:' + dd(Z.html(), P.html()));

@@ -92,7 +92,7 @@ async function boot(o) {
   ];
   const T = await boot({ admin: true, resp: { ok: true, snippets: TREE, canTeam: true, me: 'Duyen' } }); T.w.switchTab('zaloai'); await sleep(20);
   const lh = T.$('vt-list').textContent;
-  ok(/Túi tiền/.test(lh) && /└ 🗂 Cổ/.test(lh) && /└ 🗂 Lắc/.test(lh) && /Chưa phân nhóm/.test(lh), 'cay thu muc: cha "Túi tiền" + con Cổ/Lắc + nhom trong');
+  ok(/Túi tiền/.test(lh) && /🗂 Cổ/.test(lh) && /🗂 Lắc/.test(lh) && /Chưa phân nhóm/.test(lh), 'cay thu muc: cha "Túi tiền" + con Cổ/Lắc + nhom trong');
   ok((lh.match(/🗂 Túi tiền/g) || []).length === 1, 'thu muc cha chi hien 1 lan (khong lap theo tung con)');
   ok(T.$('vt-list').querySelectorAll('img').length === 2 && /2 ảnh/.test(lh), 'the muc hien 2 anh nho + so luong');
   ok(T.$('vt-list').querySelector('gia') === null && [...T.$('vt-list').querySelectorAll('img')].some((i) => i.alt === 'bang <gia>.png'), 'ten anh nam trong thuoc tinh da ESCAPE (khong sinh the HTML)');

@@ -30,7 +30,7 @@ function proChatInfoHtml_(conv, c, P){
   return head(c.name||conv.name, c.phone, chips)
     + proPkBlock_(conv)
     + '<button type="button" class="btn sm sc-open" data-sc-open="'+proEsc_(c.phone)+'">👤 Mở hồ sơ đầy đủ</button>'
-    + proStageHtml_(proStageModel_(P.tree||[], status))
+    + proStageHtml_(proStageModel_(P.tree||[], status), { phone: c.phone })
     + proKpiHtml_(P.days, D.nOrd, P.rev)
     + proNextHtml_(pend)
     + '<div class="pro-card-h" style="margin:10px 0 4px">Thông tin chăm sóc</div><div class="sc-irs">'
@@ -47,6 +47,7 @@ function proChatFindCustomer_(phone){
 var proScTab_ = 'info';   // tab đang chọn ở cột phải: 'info' | 'discuss' (giữ nguyên khi đổi hội thoại)
 function proChatInfoRender_(conv){
   var el = document.getElementById('sc-info'); if (!el) return;
+  window._proChatConv_ = conv || null;   // R14: để bấm giai đoạn xong vẽ lại đúng hội thoại này
   if (!conv){ if (typeof khdStop_==='function') khdStop_('sc'); el.innerHTML = '<div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div>'; return; }
   var c = proChatFindCustomer_(conv.phone), P = null, phone = proPhoneNorm_(conv.phone);
   if (c){ var D = proProfileData_(c); P = { D:D, days:proDaysSinceLastOrder_(c.orders,new Date()), rev:_custRev_(c), tree:(typeof CARE_STATUS_TREE!=='undefined'?CARE_STATUS_TREE:[]), now:new Date() }; }

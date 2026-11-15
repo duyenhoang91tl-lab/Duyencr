@@ -163,7 +163,7 @@ function _srDrillBodyHtml_(){
   var head = '<div style="font-size:12.5px;margin-bottom:8px"><b>' + fmt(Math.round(cnt * 100) / 100) + '</b> đơn · tính vào ô: <b>' + _srMoney(total) + '</b>' + chk + '</div>';
   var cols = _srDrillCols_(r);
   var shown = r.rows.slice(0, D.limit);
-  var html = head + '<div style="overflow:auto;max-height:62vh;border:1px solid var(--border);border-radius:8px"><table class="dash-table" style="margin:0;min-width:760px"><thead><tr>' +
+  var html = head + '<div style="overflow:auto;max-height:calc(var(--vh,1vh)*62);border:1px solid var(--border);border-radius:8px"><table class="dash-table" style="margin:0;min-width:760px"><thead><tr>' +
     cols.map(function(c, i){ return '<th style="position:sticky;top:0;background:var(--surface2,#f3f4f6);' + (/^(Giá|COD|Tính|SL|Doanh thu)/.test(c) ? 'text-align:right;' : '') + '">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
     (shown.length ? shown.map(function(x){ return _srDrillRowHtml_(r, x); }).join('') : '<tr><td colspan="' + cols.length + '" style="text-align:center;padding:16px;color:var(--muted)">Không có đơn nào</td></tr>') +
     '</tbody></table></div>';
@@ -184,7 +184,7 @@ function _srDrillOpen_(kind, key){
   m.style.cssText = 'position:fixed;inset:0;z-index:290;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) _srDrillClose_(); };
   var title = (kind.charAt(0) === 'n' ? 'Báo cáo N (Tính đơn thuần)' : kind.charAt(0) === 'b' ? 'Báo cáo B (Pos)' : 'Báo cáo A (Base)') + ' · ' + (r.label || 'Chi tiết');
-  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:1180px;width:100%;max-height:92vh;overflow:hidden;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.3);display:flex;flex-direction:column">' +
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:1180px;width:100%;max-height:calc(var(--vh,1vh)*92);overflow:hidden;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.3);display:flex;flex-direction:column">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:15px">📋 ' + esc(title) + '</b><span>' +
     (r.ok && r.rows.length ? '<button class="btn sm" onclick="_srDrillXlsx_()">📥 Xuất Excel</button> ' : '') + '<button class="btn sm" onclick="_srDrillClose_()">✕ Đóng</button></span></div>' +
     '<div id="srd-body" style="overflow:auto">' + _srDrillBodyHtml_() + '</div></div>';

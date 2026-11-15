@@ -673,7 +673,13 @@ function renderSalesReportTab(){
   } else {
     body = _srRenderB(_srState.dataB);
   }
-  wrap.innerHTML = bar + hiddenPanelHtml + body;
+  _srPaintMain_(wrap, bar + hiddenPanelHtml, body, !!_srState.loading);
+}
+// Báo cáo A / B / N: vẽ qua khuôn uiReportFrame_ (js/76) — thanh lọc (+ bảng ẩn trang/sale của Admin) → nội dung; đang tải giữ thanh lọc.
+// Thiếu js/76 → ghép như cũ. `body` đã là HTML hoàn chỉnh của _srRenderA/_srRenderB/_srRenderPure_ (KHÔNG sửa các hàm đó nên số liệu không đổi).
+function _srPaintMain_(wrap, barHtml, body, loading){
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = barHtml + body; return; }
+  wrap.innerHTML = uiReportFrame_({ id: _srState.sub === 'A' ? 'A' : 'B', barHtml: barHtml, loading: loading, bodyHtml: loading ? '' : body });
 }
 
 // ── Tỷ lệ chốt (theo Sale / theo Kênh) ─────────────────────────────────────
@@ -1868,8 +1874,12 @@ function renderSalesReportTabC_(wrap, subTabs){
   }
   filters = _srBarHtml_(filters);
 
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc C → nội dung C (KHÔNG sửa _srRenderC nên số liệu không đổi)
+  wrap.innerHTML = uiReportFrame_({ id: 'C', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderC(_srState.dataC) });
 }
 
 function _impParseFile(file, kind){ // kind: 'base' | 'pos'
@@ -1943,7 +1953,7 @@ function _impAsk_(title, body, okLabel){
     var ov = document.createElement('div');
     ov.id = 'imp-ask-ov';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px';
-    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;max-width:600px;width:100%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;max-width:600px;width:100%;max-height:calc(var(--vh,1vh)*88);overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
       + '<div style="font-weight:700;font-size:15px;margin-bottom:10px">' + esc(title) + '</div>'
       + '<div style="white-space:pre-wrap;font-size:13px;line-height:1.55;user-select:text">' + esc(body) + '</div>'
       + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
@@ -2137,43 +2147,41 @@ function _moreRowsShow_(key, total, rerenderFn){
   _moreRows_[key] = Math.min(total, _moreRowsLimit_(key) + _MORE_ROWS_PAGE_);
   if (typeof window[rerenderFn] === 'function') window[rerenderFn]();
 }
+// Báo cáo D: phần nội dung tách riêng (HTML GIỮ NGUYÊN so với bản cũ) để vẽ qua khuôn uiReportFrame_ (js/76).
+function _srRenderD_(d){
+  if (!d) return _srNoDataHtml_();
+  var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
+  html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
+  if (_srState.dCsView === 'table'){
+    html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
+    (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
+    if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+    else html += _srTotalRowHtml_(['Tổng', fmt((d.byCS||[]).reduce(function(s,r){return s+(r.count||0);},0))]);
+    html += '</tbody></table>';
+  } else {
+    html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
+  }
+  html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
+  html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
+  var dKey_ = 'dRows|'+(d.total||0), dAll_ = d.rows||[], dShow_ = Math.min(dAll_.length, _moreRowsLimit_(dKey_));
+  dAll_.slice(0, dShow_).forEach(function(r){
+    var latestNote = r.note || '';
+    try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
+    html += '<tr><td>'+_custLinkHtml_(r.phone, esc(r.phone))+'</td><td>'+_custLinkHtml_(r.phone, esc(r.name))+'</td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
+  });
+  if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+  else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
+  html += '</tbody></table>';
+  return html;
+}
 function renderSalesReportTabD_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body;
-  if (_srState.loading) {
-    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  } else {
-    var d = _srState.dataD;
-    if (!d) {
-      body = _srNoDataHtml_();
-    } else {
-      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
-      html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
-      if (_srState.dCsView === 'table'){
-        html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
-        (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
-        if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
-        else html += _srTotalRowHtml_(['Tổng', fmt((d.byCS||[]).reduce(function(s,r){return s+(r.count||0);},0))]);
-        html += '</tbody></table>';
-      } else {
-        html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
-      }
-      html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
-      html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
-      var dKey_ = 'dRows|'+(d.total||0), dAll_ = d.rows||[], dShow_ = Math.min(dAll_.length, _moreRowsLimit_(dKey_));
-      dAll_.slice(0, dShow_).forEach(function(r){
-        var latestNote = r.note || '';
-        try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
-        html += '<tr><td>'+_custLinkHtml_(r.phone, esc(r.phone))+'</td><td>'+_custLinkHtml_(r.phone, esc(r.name))+'</td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
-      });
-      if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
-      else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
-      html += '</tbody></table>';
-      body = html;
-    }
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderD_(_srState.dataD));
+    return;
   }
-  wrap.innerHTML = filters + body;
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn: thanh lọc → nội dung D
+  wrap.innerHTML = uiReportFrame_({ id: 'D', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderD_(_srState.dataD) });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2296,13 +2304,9 @@ function _srLOrderHtml_(o){
     (o.note ? '<br><span style="color:var(--hint)">'+esc(o.note)+'</span>' : '')+
   '</div>';
 }
-function _srRenderL_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:40px">'+esc(_srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".')+'</div>';
-  if (d.ok === false || d.error) return '<div style="color:var(--red);padding:20px">⚠️ '+esc(d.error || 'Lỗi tải báo cáo')+'</div>';
-  var t = d.totals || {}, dq = d.dataQuality || {};
-  var q = String(_srState.lSearch||'').trim().toLowerCase();
-  var rows = (d.rows||[]).filter(function(r){ return _srLRowMatchesSearch_(r, q); });
-  var h = '';
+// ── Báo cáo L tách thành các phần để khuôn chung (js/76 uiReportFrame_) xếp lại; HTML từng phần giữ nguyên như cũ ──
+function _srLCardsHtml_(d){   // 6-7 thẻ kpi-card (bản cũ, dùng khi chưa nạp js/76)
+  var t = d.totals || {}, h = '';
   h += '<div class="kpi-grid" style="margin-bottom:12px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(t.dongHen)+'</div><div class="kpi-label">Lượt KH hẹn qua cửa hàng</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(t.dongCoDon)+'</div><div class="kpi-label">KH có đơn Pos khớp</div></div>'+
@@ -2312,16 +2316,39 @@ function _srRenderL_(d){
     '<div class="kpi-card"><div class="kpi-val" style="color:#92400e">'+_srMoney(t.trungBoQua)+'</div><div class="kpi-label">Đã có thẻ trên Pos (bỏ qua, tránh trùng)</div></div>'+
     (d.acctCheck && d.acctCheck.ok ? '<div class="kpi-card" style="border-color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'"><div class="kpi-val" style="color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'">'+fmt(d.acctCheck.summary.chuaGhi)+'</div><div class="kpi-label">Đơn KT chưa ghi</div></div>' : '')+
   '</div>';
+  return h;
+}
+function _srLStats_(d){   // cùng số liệu với _srLCardsHtml_, cho uiStat_
+  var t = d.totals || {}, a = d.acctCheck;
+  var s = [
+    { label: 'Lượt KH hẹn qua cửa hàng', value: fmt(t.dongHen) },
+    { label: 'KH có đơn Pos khớp', value: fmt(t.dongCoDon) },
+    { label: 'Số đơn Pos khớp', value: fmt(t.soDon) },
+    { label: 'Doanh thu bán được khi khách qua', value: _srMoney(t.doanhThuDon) },
+    { label: 'Doanh thu chia thêm cho Sale (' + d.sharePct + '%)', value: _srMoney(t.daTinh), tone: 'success' },
+    { label: 'Đã có thẻ trên Pos (bỏ qua, tránh trùng)', value: _srMoney(t.trungBoQua), tone: 'warning' }
+  ];
+  if (a && a.ok) s.push({ label: 'Đơn KT chưa ghi', value: fmt(a.summary.chuaGhi), tone: a.summary.chuaGhi ? 'danger' : 'success' });
+  return s;
+}
+function _srLTopHtml_(d){   // khối đối chiếu kế toán + dòng nguồn
+  var h = '';
   h += _srLAcctHtml_(d);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+esc(d.note||'')+' · Nguồn: tab "'+esc(d.sheetName||'')+'" · <a href="https://docs.google.com/spreadsheets/d/'+esc(d.sheetId)+'" target="_blank" rel="noopener">mở trang tính</a></div>';
-
+  return h;
+}
+function _srLWarnHtml_(d){   // cảnh báo chất lượng dữ liệu (rỗng nếu không có)
+  var dq = d.dataQuality || {}, h = '';
   var warns = [];
   if (dq.thieuSdt) warns.push(dq.thieuSdt+' dòng thiếu SĐT (không khớp được đơn)');
   if (dq.thieuNgay) warns.push(dq.thieuNgay+' dòng thiếu/sai ngày hẹn');
   if (dq.thieuSale) warns.push(dq.thieuSale+' dòng chưa ghi tên Sale');
   if (d.unresolved && d.unresolved.length) warns.push('Chưa khớp được tên Sale: <b>'+d.unresolved.map(function(u){ return esc(u.raw)+' ('+u.count+')'; }).join(', ')+'</b> — vào "📥 Báo cáo Pancake → Khớp tên" hoặc bảng Danh sách Sale để khớp');
   if (warns.length) h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px">⚠️ '+warns.join('<br>⚠️ ')+'<div style="font-size:10.5px;color:#b45309;margin-top:3px">(thống kê trên toàn bộ trang tính, không phụ thuộc bộ lọc ngày)</div></div>';
-
+  return h;
+}
+function _srLTablesHtml_(d, rows){   // bảng Theo Sale + chú thích + chi tiết khách qua cửa hàng
+  var h = '';
   // Theo Sale
   h += '<div style="font-weight:700;font-size:13px;margin:6px 0">Theo Sale</div>';
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">KH hẹn</th><th style="text-align:right">KH có đơn</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Doanh thu đơn</th><th style="text-align:right">Doanh thu chia thêm ('+esc(d.sharePct)+'%)</th><th style="text-align:right">Đã trùng thẻ Pos</th></tr></thead><tbody>';
@@ -2340,6 +2367,13 @@ function _srRenderL_(d){
     '<input type="text" value="'+esc(_srState.lSearch||'')+'" placeholder="🔍 Tìm tên KH / SĐT / Sale..." oninput="_srState.lSearch=this.value;_srLRerenderDetail_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:220px;background:var(--surface)"></div>';
   h += '<div id="sr-l-detail">'+_srLDetailTable_(rows)+'</div>';
   return h;
+}
+function _srLRows_(d){ var q = String(_srState.lSearch||'').trim().toLowerCase(); return (d.rows||[]).filter(function(r){ return _srLRowMatchesSearch_(r, q); }); }
+function _srRenderL_(d){   // bản cũ (không khuôn): ghép đúng thứ tự thẻ → đối chiếu → cảnh báo → bảng
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:40px">'+esc(_srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".')+'</div>';
+  if (d.ok === false || d.error) return '<div style="color:var(--red);padding:20px">⚠️ '+esc(d.error || 'Lỗi tải báo cáo')+'</div>';
+  var rows = _srLRows_(d);
+  return _srLCardsHtml_(d) + _srLTopHtml_(d) + _srLWarnHtml_(d) + _srLTablesHtml_(d, rows);
 }
 function _srLDetailTable_(rows){
   var h = '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày qua CH</th><th>Khách</th><th>Sale (khớp tên)</th><th>Tình trạng ghi trên sheet</th><th style="min-width:330px">Đơn Pos khớp (SĐT + ngày)</th><th style="text-align:right">DT đơn</th><th style="text-align:right">DT chia Sale</th><th>Cảnh báo</th></tr></thead><tbody>';
@@ -2376,9 +2410,18 @@ async function _srLSavePct_(){
   } catch(e){ toast('❌ Lỗi lưu: '+e.message); }
 }
 function renderSalesReportTabL_(wrap, subTabs){
-  var filters = _srBarHtml_();
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(_srState.dataL);
-  wrap.innerHTML = filters + body;
+  var filters = _srBarHtml_(), d = _srState.dataL;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(d));
+    return;
+  }
+  var o = { id: 'L', barHtml: filters, loading: !!_srState.loading, retry: '_srApply()' };
+  if (!_srState.loading){
+    if (!d) o.empty = _srState.lastFetchError || 'Chưa có dữ liệu — bấm "Lọc".';
+    else if (d.ok === false || d.error) o.error = d.error || 'Lỗi tải báo cáo';
+    else { o.noticeHtml = _srLWarnHtml_(d); o.stats = _srLStats_(d); o.tableHtml = _srLTopHtml_(d) + _srLTablesHtml_(d, _srLRows_(d)); }
+  }
+  wrap.innerHTML = uiReportFrame_(o);
 }
 // Dựng bảng "tổng hợp theo Sale" (kind='summary') hoặc "chi tiết từng đơn" (mặc định) của Báo cáo L. Tách khỏi _srLExportCsv_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất CSV lẻ không đổi).
 function _srLBuildRows_(d, kind){

@@ -17,14 +17,14 @@ function declSpan(src, name) {
 const dd = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return ' @' + i + '\nZALO    ...' + a.slice(Math.max(0, i - 120), i + 220) + '\nPANCAKE ...' + b.slice(Math.max(0, i - 120), i + 220); };
 const escA = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const normStyle = h => h.replace(/style="([^"]*)"/g, (m, v) => 'style="' + v.replace(/:\s+/g, ':').replace(/;\s*$/, '') + '"');
-const norm = h => normStyle(h).replace(/ci_\d+_\d+/g, 'ci_ID').replace(' hoặc Options Pancake AI', '').replace(/\s*<div id="(?:pk|zai)-cart-msg">[^<]*<\/div>/g, '').replace(/\bpkb-/g, 'Xb-').replace(/\bzaib-/g, 'Xb-').replace(/\b(?:pk|zai)-/g, 'X-').replace(/ data-ever-opened="1"/g, '').replace(/\s+/g, ' ');
+const norm = h => normStyle(h).replace(/\s*<div class="pk-cart-vang-row"[\s\S]*?<\/div>/g, '') /* vang 10K/14K/18K chi o Pancake (Duyen 10/11) */.replace(/ci_\d+_\d+/g, 'ci_ID').replace(' hoặc Options Pancake AI', '').replace(/\s*<div id="(?:pk|zai)-cart-msg">[^<]*<\/div>/g, '').replace(/\bpkb-/g, 'Xb-').replace(/\bzaib-/g, 'Xb-').replace(/\b(?:pk|zai)-/g, 'X-').replace(/ data-ever-opened="1"/g, '').replace(/\s+/g, ' ');
 
 // ---- ma 2 ben ----
 const P_BLD_CONSTS = ['PK_CTKM_TTL_MS', '_bldBlank_', '_priceOfItem_', '_stoneLabel_'], P_BLD_LETS = ['_flatItems', '_flatMode', '_flatLoading', '_liveTimer', '_ctkmRows', '_ctkmLoading', '_bld', '_showCtkmInfo'];
 const P_BLD_FUNCS = ['_normPriceRow_', '_setBldMsg_', 'initBuilder_', 'loadFlat_', 'loadCtkm_', '_ctkmRowText_', '_ctkmForProduct_', '_liveSearch_', 'renderBuilderDyn_', '_refreshBldTotal_', '_bindBuilder_'];
 const P_CART_FUNCS = ['_applyPromo_', '_lineTotal_', '_cartKey_', 'loadCartForCurrentPhone_', 'saveCart_', 'addToCart_', '_updateCartItem_', '_cartTotals_', '_renderCartTotal_', 'sanitizeProductName_', '_sentenceCase_', '_buildCartSummaryText_', 'renderCart_', 'updateGoldUnitLabel_'];
-const P_HELP = ['_stripVNlocal_', '_fold_', '_vnSort_', '_itemNames_', '_parseNumberedList_', '_splitTopLevel_', '_parseMaterialTree_'];
-const pstate = ['_cartItems', '_cartExtra', '_cartLoadedFor', 'PK_SHIP_FEE', 'PRODUCT_NAME_OVERRIDES'].map(n => declSpan(psrc, n)).join('\n');
+const P_HELP = ['_hasGoldPlating_', '_stripVNlocal_', '_fold_', '_vnSort_', '_itemNames_', '_parseNumberedList_', '_splitTopLevel_', '_parseMaterialTree_'];
+const pstate = ['PK_GOLD_KARATS', '_cartItems', '_cartExtra', '_cartLoadedFor', 'PK_SHIP_FEE', 'PRODUCT_NAME_OVERRIDES'].map(n => declSpan(psrc, n)).join('\n');
 const tabsStart = psrc.indexOf("    panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {"), tabsEnd = psrc.indexOf("    panelEl.querySelector('#pk-cart-add-manual')");
 const pconsts = ['PK_FLAT_TTL_MS', 'PK_COLOR_OPTS', 'PK_SHADE_OPTS'].map(n => declSpan(psrc, n)).join('\n');
 const pchunk = pconsts + '\n' + 'let _stonePref = "", _bannedWords = [], _goldUnitAmount = 350000, _currentPhone = "";\n' + P_HELP.map(n => declSpan(psrc, n)).join('\n') + '\n' + pstate + '\n' + P_CART_FUNCS.map(n => declSpan(psrc, n)).join('\n') + '\n' +
@@ -119,7 +119,7 @@ if (require.main === module) (async () => {
   // ===== 5. them vao don =====
   for (const S of SIDES()) S.env.status.length = 0;
   await both(Z, P, S => setv(S, 'cl', 'Bạc 925')); await both(Z, P, S => { S.q('#Xb-add-btn').click(); return sleep(120); });
-  ok(Z.items().length === 1 && P.items().length === 1, 'them 1 dong vao gio'); const strip = a => a.map(x => Object.assign({}, x, { id: 'ID' }));
+  ok(Z.items().length === 1 && P.items().length === 1, 'them 1 dong vao gio'); const strip = a => a.map(x => { const y = Object.assign({}, x, { id: 'ID' }); delete y.vangTuoi; return y; })   /* 15/11: vangTuoi (o tich 10K/14K/18K) CHI co o Pancake theo y Duyen 10/11 -> khong so */;
   ok(JSON.stringify(strip(Z.items())) === JSON.stringify(strip(P.items())), 'dong gio GIONG HET:\n' + JSON.stringify(strip(Z.items())) + '\n' + JSON.stringify(strip(P.items())));
   const it = Z.items()[0]; ok(it.qty === 3 && it.price === 350000 && it.chatLieu === 'Bạc 925' && /Xanh rêu/.test(it.mauSac) && /Đậm/.test(it.mauSac + (it.note || '')) && it.promoType === 'percent' && it.promoValue === 10, 'noi dung dong: ' + JSON.stringify(it));
   same(Z, P, 'form ve trang sau khi them'); ok(Z.cartHtml() === P.cartHtml(), 'HTML GIO HANG sau khi them GIONG HET:' + dd(Z.cartHtml(), P.cartHtml()));

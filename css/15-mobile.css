@@ -10,10 +10,10 @@
   #qs-wrap{order:2;flex:0 0 42%;max-width:42%;}
   #qs-wrap input{width:100%;min-width:0;}
   header .mobile-menu-btn{order:3;flex:0 0 auto;}
-  header .logo{order:4;flex:0 1 auto;max-width:46%;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  header .logo{order:4;flex:0 1 auto;max-width:46%;font-size:var(--ui-fs-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   header .logo span{display:none;}
   header .hdr-r{order:5;flex:1 1 0;min-width:0;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
-  header .hdr-r>*{max-width:100%;font-size:12px;}
+  header .hdr-r>*{max-width:100%;font-size:var(--ui-fs-sm);}
   header .fstatus{display:none;}
   /* mọi thứ từng giả định thanh trên cao 50px → theo chiều cao thật (--hdr-h, mặc định 50px) */
   .app{height:calc(100vh - var(--hdr-h,50px));height:calc(100dvh - var(--hdr-h,50px));}

@@ -1,0 +1,16 @@
+/* ═════════════════════════════════════════════════════════════════
+   23-overdue-bulk.css — R6c-1 màn "⚠ Quá hạn": chọn nhiều + dời hàng loạt + tóm tắt theo CS (js/72-overdue-bulk.js). Chỉ var(--ui-*) (TOKEN_ONLY).
+   ═════════════════════════════════════════════════════════════════ */
+.ob-bar{position:sticky;top:0;z-index:var(--ui-z-header);display:flex;flex-direction:column;gap:var(--ui-sp-2);padding:var(--ui-sp-3) var(--ui-sp-4);font-family:var(--ui-font);background:var(--ui-surface);border-bottom:1px solid var(--ui-border-md);box-shadow:var(--ui-shadow-sm)}
+.ob-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2)}
+.ob-all{display:inline-flex;align-items:center;gap:var(--ui-sp-1);font-size:var(--ui-fs-sm);font-weight:var(--ui-fw-semibold);color:var(--ui-text);cursor:pointer}
+.ob-n{margin-right:auto;font-size:var(--ui-fs-sm);color:var(--ui-text-muted)}
+.ob-n b{color:var(--ui-brand)}
+.ob-date{padding:5px 8px;font-family:var(--ui-font);font-size:var(--ui-fs-sm);color:var(--ui-text);background:var(--ui-surface);border:1px solid var(--ui-border-md);border-radius:var(--ui-r-md)}
+.ob-bar .btn[disabled]{opacity:.5;cursor:not-allowed}
+.ob-cs{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-1)}
+.ob-cs-t{font-size:var(--ui-fs-xs);color:var(--ui-text-hint)}
+.ob-cs-b{padding:2px 9px;font-family:var(--ui-font);font-size:var(--ui-fs-xs);color:var(--ui-danger);background:var(--ui-danger-soft);border:1px solid var(--ui-danger-line);border-radius:var(--ui-r-pill);cursor:pointer}
+.ob-cs-b b{margin-left:2px}
+.ob-ck{flex:none;width:18px;height:18px;margin:0 var(--ui-sp-2) 0 0;accent-color:var(--ui-brand);cursor:pointer}
+@media (max-width:640px){.ob-ck{width:22px;height:22px}}

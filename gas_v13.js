@@ -1163,7 +1163,9 @@ function _saleGroupLabel_(key, groups) {
 // ═══════════════════════════════════════════════════════════════
 var _AUDIT_TOKEN_ = '';
 var AUDIT_SKIP_SETTING_ = /^(gasSource|ttLastTrackedMs$|demoToken$|chotOrders_|assignReportManual_|autoAssignState$)/;
-function _auditClip_(v) { v = String(v == null ? '' : v); return v.length > 1500 ? v.slice(0, 1500) + '…(+' + (v.length - 1500) + ' ký tự)' : v; }
+function _auditClip_(v, max) { v = String(v == null ? '' : v); max = max || 1500; return v.length > max ? v.slice(0, max) + '…(+' + (v.length - max) + ' ký tự)' : v; }
+// R9c: JSON roleConfig lớn hơn 1500 ký tự bị cắt hỏng → trang Phân quyền mất tóm tắt "Vai trò/Phòng". NGUYÊN NHÂN GỐC: ngưỡng chung 1500 cho mọi khóa. Riêng khóa này nâng lên 20000 (1 ô Sheet tối đa 50000); khóa khác giữ 1500.
+function _auditClipMax_(what) { return what === 'setting:roleConfig' ? 20000 : 1500; }
 function _auditActor_() {
   try { var p = _sessVerify_(_AUDIT_TOKEN_); if (p && p.u) return String(p.u); } catch (e) {}
   return _AUDIT_TOKEN_ ? '(token hết hạn)' : '(không token)';
@@ -1173,7 +1175,7 @@ function _auditCfg_(rows) {
   try {
     if (!rows || !rows.length) return;
     var who = _auditActor_(), now = new Date().toISOString();
-    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1]), _auditClip_(r[2])]; });
+    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1], _auditClipMax_(r[0])), _auditClip_(r[2], _auditClipMax_(r[0]))]; });
     var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS);
     sh.getRange(sh.getLastRow() + 1, 1, m.length, AUDIT_HEADERS.length).setValues(m);
   } catch (e) {}
@@ -1186,6 +1188,23 @@ function _auditDiffRows_(what, oldMap, newMap) {
     else if (oldMap[k] !== newMap[k]) out.push([what, k + ': ' + oldMap[k], k + ': ' + newMap[k]]);
   });
   Object.keys(oldMap).forEach(function (k) { if (!(k in newMap)) out.push([what, k + ': ' + oldMap[k], '(đã xóa)']); });
+  return out;
+}
+// R9c (2026-11-15): doc AuditLog LOC THEO TIEN TO hanh dong tren TOAN BO sheet (quet tu cuoi len, theo khoi 1000 dong, toi da 30000 dong cuoi, dung khi du `limit` dong khop).
+// NGUYEN NHAN GOC can lam: action=audit chi tra 200 dong moi nhat cua MOI loai thao tac (status/cs/assign...) nen dong "config:setting:roleConfig" (doi phan quyen) bi day ra ngoai
+// ngay khi CRM co nhieu thao tac khach -> trang Phan quyen muc "Thay doi gan day" rong du da co nguoi doi. Tra ve mang moi nhat truoc, cung dang {timestamp,user,action,phone,oldValue,newValue}.
+function _auditReadByPrefix_(sh, prefix, limit) {
+  var out = [];
+  if (!sh || !prefix) return out;
+  var last = sh.getLastRow(), lim = Math.max(1, Math.min(200, Number(limit) || 20)), BLK = 1000, MAXSCAN = 30000, scanned = 0, end = last;
+  while (end > 1 && out.length < lim && scanned < MAXSCAN) {
+    var n = Math.min(BLK, end - 1), start = end - n + 1;
+    var v = sh.getRange(start, 1, n, 6).getValues();
+    for (var i = v.length - 1; i >= 0 && out.length < lim; i--) {
+      if (String(v[i][2]).indexOf(prefix) === 0) out.push({ timestamp: v[i][0], user: v[i][1], action: v[i][2], phone: v[i][3], oldValue: v[i][4], newValue: v[i][5] });
+    }
+    end = start - 1; scanned += n;
+  }
   return out;
 }
 function _auditUserSig_(u) {
@@ -2751,7 +2770,9 @@ function doGetCore_(e) {
 
     if (action === 'audit') {
       var shA = ss.getSheetByName(SH_AUDIT); var auditRows = [];
-      if (shA && shA.getLastRow() > 1) {
+      var _apAu = String((e.parameter || {}).actionPrefix || '');   // R9c: co tien to -> loc tren toan sheet (xem _auditReadByPrefix_); khong co -> 200 dong moi nhat nhu cu
+      if (_apAu) { auditRows = _auditReadByPrefix_(shA, _apAu, (e.parameter || {}).limit); }
+      else if (shA && shA.getLastRow() > 1) {
         var lastA = shA.getLastRow();
         var nA = Math.min(200, lastA - 1);
         var vA = shA.getRange(lastA - nA + 1, 1, nA, 6).getValues();
@@ -3040,6 +3061,7 @@ function doGetCore_(e) {
       return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
     }
     if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
+    if (action === 'vietTatAudio') return jsonOut_(vietTatAudio_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // app/extension tai byte 1 tep ghi am cua muc Viet tat (base64)
     if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
       var _vr = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
       if (!String(_vr.name || '').trim()) return jsonOut_({ error: 'Can dang nhap CRM (hoac nhap ten CS) de chon anh.', code: 'FORBIDDEN' });
@@ -6198,7 +6220,7 @@ function _acctParseSheet_(sh) {
   return rowsRaw;
 }
 // QUY TAC (Duyen chot 2026-11-06): don can CHIA TAY ke toan ghi o cac tab "onl T10", "onl T11"... (ten bat dau "onl T" + thang; tab "quay ..." khong doc). Moi dong trong tab onl = DA XAC NHAN,
-// UU TIEN hon ghep Base (nhu bang bo sung CRM) va chi thua bang bo sung CRM (acctSplitExtra, admin sua trong CRM). Khong co tab onl nao => doc tab dau tien nhu cu.
+// UU TIEN hon ghep Base va THANG ca bang chia tay admin trong CRM (acctSplitExtra) khi cung ma (Duyen chot 2026-11-15: ke toan thang admin). Khong co tab onl nao => doc tab dau tien nhu cu.
 function _acctShName_(s) { try { return String(s.getName()); } catch (e) { return ''; } }
 function _acctIsOnlSheetName_(name) { return /^onl\s*t\s*\d{1,2}\b/.test(_stripVN_(String(name || '')).trim()); }
 function _loadAcctSplit_() {
@@ -6224,8 +6246,14 @@ function _loadAcctSplit_() {
     var sheetEx = pack.mode === 'onl' ? pack.rows.filter(function(rw) { return rw.code && rw.sales.length && rw.tong > 0; }).map(function(rw) {
       return { line: rw.sheet + '#' + rw.line, kenh: rw.kenh, sales: rw.sales, coc: rw.coc, tong: rw.tong, chenh: rw.chenh, code: rw.code, confirmed: true, extra: true, tyle: rw.tyle, sheet: rw.sheet };
     }) : [];
-    // Gop bang chia bo sung cua CRM: dong bo sung THAY cac dong cung ma trong file ke toan (khop ca khi khac nam /2026); bang CRM (Settings) thang tab onl neu cung ma.
-    var crmEx = _loadAcctExtra_(), crmNy = {};
+    // Gop bang chia bo sung cua CRM: CHI cho don ke toan CHUA ghi (xem QUY TAC MOI ben duoi); khop ma bo nam (17T10 ~ 17T10/2026).
+    // QUY TAC MOI (Duyen chot 2026-11-15, thay cho 2026-11-03/06): FILE KE TOAN (dong da xac nhan: moi dong tab onl, hoac dong co 'x' o che do cu) THANG bang chia tay admin trong CRM khi CUNG MA DON. Dong CRM (acctSplitExtra) chi co hieu luc voi don
+    // KE TOAN CHUA GHI; dong CRM trung ma voi dong ke toan bi BO QUA (ghi vao out.crmShadowed de giao dien bao 'dang bi file ke toan uu tien').
+    var ktNy = {};
+    sheetEx.forEach(function(rw) { ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    rowsRaw.forEach(function(rw) { if (rw.code && rw.confirmed) ktNy[_acctCodeNoYear_(rw.code)] = true; });   // che do cu (tab dau): CHI dong ke toan DA XAC NHAN (x) moi chan bang CRM; dong chua x van de admin chinh
+    var crmEx = [], crmNy = {}; out.crmShadowed = [];
+    _loadAcctExtra_().forEach(function(rw) { if (ktNy[_acctCodeNoYear_(rw.code)]) { if (out.crmShadowed.indexOf(rw.code) === -1) out.crmShadowed.push(rw.code); } else crmEx.push(rw); });
     crmEx.forEach(function(rw) { crmNy[_acctCodeNoYear_(rw.code)] = true; });
     var exRows = sheetEx.filter(function(rw) { return !crmNy[_acctCodeNoYear_(rw.code)]; }).concat(crmEx);
     out.exCount = exRows.length; out.exByCode = {}; out.exByCodeNoYear = {};
@@ -6279,8 +6307,8 @@ function _acctSharesOf_(rows) {
 // NGUYEN NHAN GOC Bao cao B lech ke toan (sheet HUYEN): ke toan chia tay / sua gia tri tung don (bao hanh, COD, don quay) bang tay;
 // file "THEO DOI DON CHIA SALE" cua ke toan la file Google rieng CRM khong ghi duoc, va don ghi chu chi co ma don Pos (vd "M44707") khong co ma bo dem.
 // => CRM giu 1 bang bo sung CUNG DANG DONG nhu file ke toan: [{code, sales:["a","b"], tong}] (moi phan tu = 1 dong; sales trong 1 dong chia deu; nhieu dong cung code = chia tay).
-// code = ma bo dem (17T10/2026) HOAC ma don Pos (M44707). Dong bo sung luon coi la DA XAC NHAN (dung tong ke toan ke ca khi khac gia Pos), UU TIEN hon file ke toan
-// va hon ghep Base. tong = 0 => don tinh 0 (bo khoi bao cao). KHONG gan cung so lieu thang nao vao code — du lieu nam o Settings.
+// code = ma bo dem (17T10/2026) HOAC ma don Pos (M44707). Dong bo sung luon coi la DA XAC NHAN (dung tong ke toan ke ca khi khac gia Pos), UU TIEN hon ghep Base
+// nhung THUA file ke toan neu file ke toan da co dong cung ma (2026-11-15). tong = 0 => don tinh 0 (bo khoi bao cao). KHONG gan cung so lieu thang nao vao code — du lieu nam o Settings.
 var ACCT_EXTRA_KEY_ = 'acctSplitExtra';
 var _acctExtraMemo_ = null;
 function _acctExtraRaw_() { try { return String(getSetting_(ACCT_EXTRA_KEY_) || '').trim(); } catch (e) { return ''; } }
@@ -8043,6 +8071,11 @@ function doPostCore_(e) {
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
+    if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
+    if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
+    if (action === 'vietTatUploadAudio')    return jsonOut_(vietTatUploadAudio_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 TEP ghi am co san tu may len Drive (khong can bam ghi am)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
     if (action === 'saveAIExample')         return saveAIExample_(data.id, data.content);
     if (action === 'deleteAIExample')       return deleteAIExample_(data.id);
@@ -8211,6 +8244,33 @@ function syncZaloFriendStatus_(rows, dryRun) {
       if (phoneCol[i][0]) index[normPhone_(String(phoneCol[i][0]))] = i + 2;
     }
   }
+  // Toi uu (2026-11-15): truoc day moi dong quet doc 2-3 o rieng (getRange(..).getValue()) va ghi 3-4 o rieng -> 100 dong = 500+ lan goi Sheet, de qua
+  // thoi gian Apps Script ("Failed to fetch"). Nay doc 3 cot C (zalo), Q (nickZalos), S (zaloSetBy) DUNG 1 LAN moi cot, kiem tra tren bo nho,
+  // roi chi ghi cac o thay doi, gom cac dong LIEN NHAU thanh 1 lan setValues (khong bao gio nhieu lan goi hon cach cu).
+  var colZalo = null, colNick = null, colSetBy = null;
+  if (lastRow >= 2) {
+    var _rd = function (c) { return sh.getRange(2, c, lastRow - 1, 1).getValues(); };
+    colZalo = _rd(3); colSetBy = _rd(19);
+    if (!dryRun && rows.some(function (r) { return r && String(r.nick || '').trim(); })) colNick = _rd(17); // chi doc cot Q khi co dong gui kem nick
+  }
+  var pend = {}; // cot -> { so dong: gia tri moi }
+  var _put = function (col, rowNum, val, cache) {
+    (pend[col] = pend[col] || {})[rowNum] = val;
+    if (cache && rowNum - 2 < cache.length) cache[rowNum - 2][0] = val; // cung 1 SDT lap lai trong 1 lan gui: dong sau thay gia tri moi
+  };
+  var _flush = function () {
+    Object.keys(pend).forEach(function (c) {
+      var rowsN = Object.keys(pend[c]).map(Number).sort(function (a, b) { return a - b; });
+      var i = 0;
+      while (i < rowsN.length) {
+        var j = i;
+        while (j + 1 < rowsN.length && rowsN[j + 1] === rowsN[j] + 1) j++;
+        var vals = []; for (var k = i; k <= j; k++) vals.push([pend[c][rowsN[k]]]);
+        sh.getRange(rowsN[i], Number(c), vals.length, 1).setValues(vals);
+        i = j + 1;
+      }
+    });
+  };
 
   if (dryRun) {
     var conflicts = [];
@@ -8220,9 +8280,9 @@ function syncZaloFriendStatus_(rows, dryRun) {
       var rn = phoneC ? index[phoneC] : undefined;
       if (!phoneC || rn === undefined) continue;
       // Chi doc 2 o can thiet (zalo + zaloSetBy) cho dong nay, khong doc ca dong/ca sheet
-      var oldZalo = sh.getRange(rn, 3).getValue() || '';
+      var oldZalo = (colZalo && colZalo[rn - 2] ? colZalo[rn - 2][0] : '') || '';
       if (!oldZalo || oldZalo === (rc.zalo || '')) continue; // chua tung ghi, hoac gia tri khong doi -> khong tinh la xung dot
-      var oldSetByRaw = sh.getRange(rn, 19).getValue();
+      var oldSetByRaw = colSetBy && colSetBy[rn - 2] ? colSetBy[rn - 2][0] : '';
       var oldSetBy = null;
       try { oldSetBy = JSON.parse(oldSetByRaw || 'null'); } catch (e) { oldSetBy = null; }
       var oldCs = oldSetBy ? (oldSetBy.cs || '') : '';
@@ -8254,11 +8314,11 @@ function syncZaloFriendStatus_(rows, dryRun) {
       // Truoc day ham nay luon ghi lai cot 'updated' (O) cho MOI dong duoc quet, ke ca khi
       // trang thai zalo khong doi gi ca -> Sasum tuong lam la "khach vua co cap nhat moi"
       // moi lan CS chi don gian mo lai doan chat / bam quet man hinh, gay bao dong gia.
-      var curZalo = sh.getRange(rowNum, 3).getValue() || '';
+      var curZalo = (colZalo && colZalo[rowNum - 2] ? colZalo[rowNum - 2][0] : '') || '';
       var nickAlreadyThere = true;
       var curNzRaw = '';
       if (nick) {
-        curNzRaw = sh.getRange(rowNum, 17).getValue();
+        curNzRaw = colNick && colNick[rowNum - 2] ? colNick[rowNum - 2][0] : '';
         var nzChk = [];
         try { nzChk = JSON.parse(curNzRaw || '[]'); } catch (e) { nzChk = []; }
         if (!Array.isArray(nzChk)) nzChk = [];
@@ -8269,16 +8329,16 @@ function syncZaloFriendStatus_(rows, dryRun) {
         continue;
       }
       // Chi ghi dung 3 vung o thay doi cua dong nay: zalo(C), updated(O), zaloSetBy(S) [+ nickZalos(Q) neu co nick moi]
-      if (curZalo !== zaloStatus) sh.getRange(rowNum, 3).setValue(zaloStatus);
-      sh.getRange(rowNum, 15).setValue(now);
+      if (curZalo !== zaloStatus) _put(3, rowNum, zaloStatus, colZalo);
+      _put(15, rowNum, now, null);
       if (nick && !nickAlreadyThere) {
         var nz = [];
         try { nz = JSON.parse(curNzRaw || '[]'); } catch (e) { nz = []; }
         if (!Array.isArray(nz)) nz = [];
         nz.push(nick);
-        sh.getRange(rowNum, 17).setValue(JSON.stringify(nz));
+        _put(17, rowNum, JSON.stringify(nz), colNick);
       }
-      sh.getRange(rowNum, 19).setValue(setBy);
+      _put(19, rowNum, setBy, colSetBy);
       updated++; touchedRows.push(rowNum);
     } else {
       var newRow = careRow_({ phone: phone, zalo: zaloStatus, nickZalos: nick ? [nick] : [], zaloSetBy: setBy });
@@ -8290,6 +8350,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
     }
   }
 
+  _flush();
   if (newRows.length) {
     sh.getRange(lastRow + 1, 1, newRows.length, W).setValues(newRows);
   }
@@ -8560,9 +8621,17 @@ function _autoDedupExactRowsInSheet_(sh, width) {
   if (!toDelete.length) return { deleted: 0, groupCount: 0 };
   toDelete.sort(function (a, b) { return b - a; }); // xoa tu duoi len tren, tranh lech chi so
   var deleted = 0;
-  toDelete.forEach(function (rowIdx) {
-    try { sh.deleteRow(rowIdx); deleted++; } catch (e) {}
-  });
+  // Toi uu (2026-11-15): truoc day deleteRow tung dong (hang tram dong trung = hang tram lan goi Sheet, de qua thoi gian); nay gom cac dong LIEN NHAU
+  // thanh 1 lan deleteRows (van xoa tu duoi len; loi cum nao thi thu xoa tung dong trong cum do nhu cu).
+  var ri2 = 0;
+  while (ri2 < toDelete.length) {
+    var rj2 = ri2;
+    while (rj2 + 1 < toDelete.length && toDelete[rj2 + 1] === toDelete[rj2] - 1) rj2++;
+    var cnt2 = rj2 - ri2 + 1, first2 = toDelete[rj2];
+    try { sh.deleteRows(first2, cnt2); deleted += cnt2; }
+    catch (e0) { for (var q2 = ri2; q2 <= rj2; q2++) { try { sh.deleteRow(toDelete[q2]); deleted++; } catch (e) {} } }
+    ri2 = rj2 + 1;
+  }
   return { deleted: deleted, groupCount: groupCount };
 }
 var SH_AUTO_DEDUP_LOG = 'Nhật ký xoá trùng tự động';
@@ -13127,12 +13196,14 @@ function readNotifications_(username) {
 function markNotifRead_(username, ids, all) {
   var sh = getCrmSS_().getSheetByName(SH_NOTIF);
   if (!sh || sh.getLastRow() < 2) return { ok: true, marked: 0 };
-  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, now = new Date().toISOString();
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, hit = [], now = new Date().toISOString();
   (ids || []).forEach(function (x) { want[String(x)] = 1; });
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0] || v[i][9] || String(v[i][1]).toLowerCase() !== un) continue;
-    if (all || want[String(v[i][0])]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    if (all || want[String(v[i][0])]) { hit.push(i + 1); n++; }
   }
+  // Toi uu (2026-11-15): truoc day setValue tung dong (bam "doc tat ca" voi 200 thong bao = 200 lan goi Sheet); nay 1 lan RangeList cho moi dong can danh dau.
+  if (hit.length) sh.getRangeList(hit.map(function (r) { return 'J' + r; })).setValue(now);
   return { ok: true, marked: n };
 }
 function saveTaskComment_(c) {
@@ -13715,7 +13786,7 @@ var SH_MSG_TPL = 'MessageTemplates';
 // 2026-10-12: them product (san pham, nhieu san pham cach nhau dau phay/;), topic (noi dung hoi thoai / tinh huong), status
 // (approved | pending | rejected) + nguoi duyet. Hang CU (khong co status) coi la 'approved' de mau dang dung khong bi mat.
 // getSheet_ tu bo sung cac cot header con thieu o cuoi sheet cu, KHONG dung toi du lieu san co.
-var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom', 'images'];
+var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom', 'images', 'abbr'];
 // images: chuoi JSON mang URL anh (toi da 4), vd '["https://drive.google.com/uc?...","..."]'. Cot nay them sau (getSheet_ tu bo sung).
 // nhom = NHOM SAN PHAM (cot 'Nhom SP' bang gia DANH_MUC) — Duyen 21/10/2026 "tao mau luu san": CS chon nhom/ten SP roi them mau tu van de AI hoc.
 // Nhom do nguoi soan CHON tay -> ghi vao cot; de TRONG = he thong TU PHAN LOAI khi doc (khong ghi vao sheet: doi danh muc thi mau tu nhay theo nhom moi). Xem _tplClassify_.
@@ -13749,7 +13820,8 @@ function _tplRowToObj_(row) {
     product: String(row[7] || ''), topic: String(row[8] || ''), status: st,
     approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || ''),
     nhom: String(row[13] || '').trim(),   // nhom do nguoi soan chon ('' = chua chon; readMessageTemplates_ se dien nhom tu phan loai)
-    images: (function(){ try { return JSON.parse(String(row[14] || '[]')); } catch(e){ return []; } })()
+    images: (function(){ try { return JSON.parse(String(row[14] || '[]')); } catch(e){ return []; } })(),
+    abbr: String(row[15] || '').trim()   // viet tat do nguoi soan dat (2026-11-14): '' = tu suy ra tu tieu de; co gia tri = dung lam viet tat trong ung dung Viet tat
   };
 }
 // ── Nhom san pham cua mau tin (2026-10-16) ──
@@ -13844,6 +13916,48 @@ function readMessageTemplates_(caller) {
   return out;
 }
 
+// Kiem tra viet tat cua MAU TIN (2026-11-14): '' = de trong (tu suy ra). Co gia tri: 1 tu (khong khoang trang, <= 30 ky tu) va KHONG trung
+// (so theo _vtKey_: bo dau/hoa thuong/ky tu la) voi viet tat cua mau khac HOAC muc CHUNG trong sheet VietTat. excludeId = mau dang sua. Tra '' neu hop le, nguoc lai chuoi loi.
+function _tplCheckAbbr_(abbr, excludeId) {
+  abbr = String(abbr == null ? '' : abbr).trim();
+  if (!abbr) return '';
+  if (/\s/.test(abbr) || abbr.length > 30) return 'Viet tat phai la 1 tu (khong co khoang trang, toi da 30 ky tu).';
+  var k = _vtKey_(abbr);
+  if (!k) return 'Viet tat phai co it nhat 1 chu cai hoac chu so.';
+  var tv = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS).getDataRange().getValues();
+  for (var i = 1; i < tv.length; i++) {
+    if (!tv[i][0] || String(tv[i][0]) === String(excludeId || '')) continue;
+    var o = String(tv[i][15] || '').trim();
+    if (o && _vtKey_(o) === k) return 'Viet tat \"' + abbr + '\" da duoc mau tin khac dung.';
+  }
+  var vsh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), vl = vsh.getLastRow();
+  if (vl >= 2) {
+    var vv = vsh.getRange(2, 1, vl - 1, VIETTAT_HEADERS.length).getValues();
+    for (var j = 0; j < vv.length; j++) {
+      if (!vv[j][0] || String(vv[j][5] || '').trim()) continue;   // chi muc CHUNG (owner rong) moi tranh nhau voi mau chung
+      if (_vtKey_(vv[j][2]) === k) return 'Viet tat \"' + abbr + '\" da co trong muc Viet tat chung.';
+    }
+  }
+  return '';
+}
+// Sua RIENG viet tat cua 1 mau tin (2026-11-14, tu tab Viet tat — khong phai mo form soan mau): KHONG doi noi dung / trang thai duyet / updatedAt.
+// Quyen: admin/manager (caller.priv) hoac NGUOI TAO mau. abbr rong = xoa viet tat tu dat (ve tu suy ra tu tieu de). Kiem tra trung nhu luc luu mau.
+function setTemplateAbbr_(id, abbr, caller) {
+  caller = caller || { priv: false, name: '' };
+  if (!id) return jsonOut_({ error: 'Thieu id mau tin' });
+  var abbrErr = _tplCheckAbbr_(abbr, id);
+  if (abbrErr) return jsonOut_({ error: abbrErr, code: 'ABBR' });
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS), vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) !== String(id)) continue;
+    var cur = _tplRowToObj_(vals[i]);
+    if (!caller.priv && !_tplOwns_(cur, caller)) return jsonOut_({ error: 'Chi admin/quan ly hoac nguoi tao mau moi duoc doi viet tat cua mau nay.', code: 'FORBIDDEN' });
+    var v = String(abbr == null ? '' : abbr).trim();
+    sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(v);
+    return jsonOut_({ ok: true, id: cur.id, abbr: v });
+  }
+  return jsonOut_({ error: 'Khong tim thay mau tin (co the da bi xoa).' });
+}
 // data: {id, title, content, tags, product, topic, createdBy}. Admin/manager: luu la 'approved' (admin cai san mau); nhan vien: tao moi -> 'pending',
 // chi sua duoc mau CUA MINH chua duoc duyet (sua xong quay lai 'pending'); mau da duyet chi admin/manager sua.
 function saveMessageTemplate_(data, caller) {
@@ -13860,6 +13974,10 @@ function saveMessageTemplate_(data, caller) {
   var nhomSet = (data.nhom !== undefined && data.nhom !== null);
   var nhom = nhomSet ? String(data.nhom).trim().slice(0, 200) : '';
   // images: mang URL anh da upload truoc (toi da 4). Neu truyen mang thi ghi de; neu khong truyen (undefined) thi giu nguyen.
+  // abbr: chuoi (ke ca rong = ve 'tu suy ra') -> ghi; KHONG gui truong nay (extension cu) -> giu nguyen.
+  var abbrSet = (data.abbr !== undefined && data.abbr !== null);
+  var abbr = abbrSet ? String(data.abbr).trim() : '';
+  if (abbrSet) { var abbrErr = _tplCheckAbbr_(abbr, data.id); if (abbrErr) return jsonOut_({ error: abbrErr, code: 'ABBR' }); }
   var imagesSet = Array.isArray(data.images);
   var images = imagesSet ? JSON.stringify(data.images.slice(0, 4).map(function(u){ return String(u).trim(); }).filter(Boolean)) : '';
   // Tai khoan web: nguoi tao = ten that trong token (khong tin client). Extension: ten tu khai.
@@ -13878,6 +13996,7 @@ function saveMessageTemplate_(data, caller) {
         sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, cur.status]]);
         if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
         if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
+        if (abbrSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(abbr);
         return jsonOut_({ ok: true, id: cur.id, status: cur.status });
       }
       if (cur.status === 'approved' || !_tplOwns_(cur, caller)) {
@@ -13888,6 +14007,7 @@ function saveMessageTemplate_(data, caller) {
       sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
       if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
       if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
+      if (abbrSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('abbr') + 1).setValue(abbr);
       _tplNotifyPending_(cur.id, title, author);   // mau da sua -> cho duyet lai: bao admin
       return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
@@ -13895,7 +14015,7 @@ function saveMessageTemplate_(data, caller) {
   // Tao moi. Chi admin/quan ly moi duoc tu dat id (dong bo cu); nguoi khac luon nhan id moi (khong chiem id).
   var newId = (caller.priv && data.id) ? String(data.id) : 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   var status = caller.priv ? 'approved' : 'pending';
-  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom, images]);
+  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom, images, abbr]);
   if (status === 'pending') _tplNotifyPending_(newId, title, author);   // de xuat mau moi -> bao admin duyet
   return jsonOut_({ ok: true, id: newId, status: status });
 }
@@ -13989,10 +14109,13 @@ function approveMessageTemplate_(id, decision, reason, caller) {
 //  NGUON DU LIEU DUY NHAT: sheet 'VietTat' (thay server dong bo rieng cua app Viet Tat). CRM quan ly (tab Zalo AI), extension Pancake AI doc qua action 'vietTat'.
 //  Moi dong = 1 muc: abbr (viet tat, khong khoang trang), keyword (tu khoa cach nhau dau phay), options (JSON mang noi dung; co the nhieu lua chon),
 //  nhom (thu muc), owner ('' = CHUNG cho ca team; khac rong = ten nguoi tao, chi nguoi do thay). Muc chung CHI admin tao/sua/xoa (cung vai tro duyet mau tin);
-//  nhan vien tao muc rieng cua minh. Bien trong noi dung ({ten}, {ngay}...) do client thay khi chen. Chua ho tro hinh/ghi am cua app goc.
+//  nhan vien tao muc rieng cua minh. Bien trong noi dung ({ten}, {ngay}...) do client thay khi chen. Hinh + tep ghi am: xem cot images / audios.
 // ═══════════════════════════════════════════════════════════════
 var SH_VIETTAT = 'VietTat';
-var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt', 'images'];
+var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt', 'images', 'audios'];
+// 2026-11-14 (Duyen: "app viet tat them duoc TEP ghi am chu khong can muc tu bam ghi am"): cot 'audios' = JSON [{id,name}] = tham chieu file Drive (giong 'images').
+// Tep ghi am tai len tu may toi da VIETTAT_AUDIO_MAX_BYTES (10MB, bang gioi han thu vien ghi am), moi muc toi da VIETTAT_MAX_AUDIOS tep.
+var VIETTAT_MAX_AUDIOS = 10, VIETTAT_AUDIO_MAX_BYTES = 10 * 1024 * 1024;
 // Thu muc con: nhom luu dang duong dan 'Tui tien/Co' (toi da 3 cap). Anh: cot 'images' = JSON [{id,name}] = THAM CHIEU file Drive co san (KHONG tai len lai).
 // 2026-10-25 (Duyen): moi muc (trong 1 thu muc con) toi da 50 anh (truoc day 10). Anh them theo 2 cach: (1) link Drive co san -> lay tu do (khong tai len lai);
 // (2) tai tu may/dien thoai (chon nhieu anh 1 lan) -> action vietTatUploadImage luu vao Drive roi cung chi luu ID tham chieu. Anh tai len toi da 3MB/anh
@@ -14007,6 +14130,7 @@ function _vtImgsFromCell_(v) {
   try { var a = JSON.parse(String(v || '[]')); if (Array.isArray(a)) a.forEach(function (x) { if (x && /^[A-Za-z0-9_-]{15,}$/.test(String(x.id || ''))) out.push({ id: String(x.id), name: String(x.name || '').slice(0, 120) }); }); } catch (e) { out = []; }
   return out.slice(0, VIETTAT_MAX_IMAGES);
 }
+function _vtAudsFromCell_(v) { return _vtImgsFromCell_(v).slice(0, VIETTAT_MAX_AUDIOS); }   // cung dang [{id,name}], chi khac tran so luong
 // So TEN nguoi dung (chu muc rieng) LINH HOAT: bo dau / khoang trang / ky tu la / hoa-thuong -> 'Duyên HT' == 'duyenht' == 'Duyen  HT'.
 // NGUYEN NHAN GOC (2026-10-27): app Android Viet Tat khong co token nen gui by=<Ten CS go tay> (vd 'duyenht') trong khi muc rieng luu owner = ten tai khoan CRM
 // (vd 'Duyên HT'); so sanh CHINH XAC khong khop -> server khong tra muc rieng nao -> go tat 'bam khong ra gi'. Dung chung cho doc / sua / xoa muc rieng.
@@ -14017,7 +14141,7 @@ function _vtRowToObj_(r) {
   try { var o = JSON.parse(String(r[4] || '[]')); if (Array.isArray(o)) opts = o.map(function (x) { return String(x == null ? '' : x); }).filter(function (x) { return x.trim(); }); } catch (e) { opts = []; }
   var owner = String(r[5] || '').trim();
   var up = r[7] instanceof Date ? r[7].getTime() : (Number(r[7]) || 0);
-  return { id: String(r[0] || ''), nhom: _vtNhom_(r[1]), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts, images: _vtImgsFromCell_(r[8]),
+  return { id: String(r[0] || ''), nhom: _vtNhom_(r[1]), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts, images: _vtImgsFromCell_(r[8]), audios: _vtAudsFromCell_(r[9]),
            scope: owner ? 'me' : 'team', owner: owner, createdBy: String(r[6] || ''), updatedAt: up };
 }
 function readVietTat_(caller) {
@@ -14038,11 +14162,14 @@ function readVietTat_(caller) {
   return out;
 }
 // ── MAU TIN (MessageTemplates) -> MUC VIET TAT (chi doc, khong ghi vao sheet VietTat) ──
-// Chi lay mau DA DUYET do ADMIN tao (createdBy khop ten / tai khoan cua 1 admin dang hoat dong) — nhan vien de xuat da duoc admin duyet thi KHONG tu vao viet tat
-// (giu pham vi dung nhu yeu cau: mau cua duyenht). Moi mau thanh 1 muc CHUNG (scope 'team'), thu muc 'Mau tin[/Nhom SP]', noi dung = noi dung mau, anh = anh dinh kem mau.
+// Lay MOI mau DA DUYET (VIETTAT_TPL_ONLY_ADMIN=false, mac dinh tu 2026-11-14). Neu bat true: chi mau do ADMIN tao (createdBy khop ten / tai khoan 1 admin dang hoat dong).
+// Mau cho duyet / tu choi / rong KHONG vao viet tat. Moi mau thanh 1 muc CHUNG (scope 'team'), thu muc 'Mau tin[/Nhom SP]', noi dung = noi dung mau, anh = anh dinh kem mau.
 // Muc co fromTpl:true: client KHONG sua/xoa tai Viet tat (sua o Quan ly mau). Viet tat tu sheet VietTat luon THANG khi trung (khong bi mau de len).
 // Viet tat = tieu de mau bo dau/khoang trang (toi da 30 ky tu); tu khoa gom tieu de, chu cai dau, san pham, chu de, tag, tung tu — go mot phan dau cung ra (client khop theo tien to).
 var VIETTAT_TPL_MAX = 300, VIETTAT_TPL_NHOM = 'Mẫu tin';
+// 2026-11-14 (Duyen: "dua muc tin nhan mau dung duoc tai ung dung viet tat"): MAC DINH lay MOI mau DA DUYET (cua bat ky ai).
+// Dat true de quay lai pham vi cu: chi mau do ADMIN dang hoat dong tao.
+var VIETTAT_TPL_ONLY_ADMIN = false;
 function _vtAdminKeys_() {
   var keys = {}, users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [];
   users.forEach(function (u) {
@@ -14072,8 +14199,8 @@ function _vtTplKeyword_(t) {
   return out.join(',');
 }
 function _vtFromTemplates_(existing) {
-  var admins = _vtAdminKeys_();
-  if (!Object.keys(admins).length) return [];
+  var admins = VIETTAT_TPL_ONLY_ADMIN ? _vtAdminKeys_() : null;
+  if (admins && !Object.keys(admins).length) return [];
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS), last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, MSG_TPL_HEADERS.length).getValues(), items = [];
@@ -14081,24 +14208,27 @@ function _vtFromTemplates_(existing) {
     if (!vals[i][0]) continue;
     var t = _tplRowToObj_(vals[i]);
     if (t.status !== 'approved' || !String(t.content || '').trim()) continue;
-    if (!admins[_vtKey_(t.createdBy)]) continue;
+    if (admins && !admins[_vtKey_(t.createdBy)]) continue;
     var d = t.updatedAt || t.createdAt, ms = d ? new Date(d).getTime() : 0;
     t._ms = isNaN(ms) ? 0 : ms;
     items.push(t);
   }
-  items.sort(function (a, b) { return b._ms - a._ms; });
+  // Mau co viet tat do nguoi soan dat dung truoc: giu cho ten da chon, mau tu suy ra tu tieu de khong chiem mat (con lai: moi nhat truoc).
+  items.sort(function (a, b) { var ea = a.abbr ? 0 : 1, eb = b.abbr ? 0 : 1; return ea !== eb ? ea - eb : b._ms - a._ms; });
   var used = {}, out = [];
-  (existing || []).forEach(function (o) { var k = _vtKey_(o.abbr); if (k) used[k] = 1; });
+  (existing || []).forEach(function (o) { var k = _vtKey_(o.abbr); if (k) used[k] = 1; });   // used[] theo _vtKey_ (bo dau/hoa thuong) de 'BaoHanh' va 'baohanh' khong trung
   items.slice(0, VIETTAT_TPL_MAX).forEach(function (t) {
-    var base = _vtKey_(t.title).slice(0, 30) || ('mau' + String(t.id).replace(/\D/g, '').slice(-6));
+    var own = String(t.abbr || '').trim();
+    if (own && (/\s/.test(own) || own.length > 30 || used[_vtKey_(own)] || !_vtKey_(own))) own = '';   // viet tat tu dat khong hop le / bi chiem -> quay ve tu suy ra (mau van dung duoc)
+    var base = own || _vtKey_(t.title).slice(0, 30) || ('mau' + String(t.id).replace(/\D/g, '').slice(-6));
     var abbr = base;
-    for (var n = 2; used[abbr] && n < 100; n++) abbr = base.slice(0, 30 - String(n).length) + n;
-    if (used[abbr]) return;   // qua nhieu mau trung ten: bo qua mau nay (khong de lam vo Viet tat)
-    used[abbr] = 1;
+    for (var n = 2; used[_vtKey_(abbr)] && n < 100; n++) abbr = base.slice(0, 30 - String(n).length) + n;
+    if (used[_vtKey_(abbr)]) return;   // qua nhieu mau trung ten: bo qua mau nay (khong de lam vo Viet tat)
+    used[_vtKey_(abbr)] = 1;
     var imgs = [];
     (Array.isArray(t.images) ? t.images : []).forEach(function (u, k) { var id = _vtTplImgId_(u); if (id && imgs.length < VIETTAT_MAX_IMAGES) imgs.push({ id: id, name: 'anh' + (k + 1) }); });
     out.push({ id: 'tpl_' + t.id, nhom: _vtNhom_(VIETTAT_TPL_NHOM + (t.nhom ? '/' + t.nhom : '')), abbr: abbr, keyword: _vtTplKeyword_(t),
-               options: [String(t.content).trim().slice(0, 4000)], images: imgs, scope: 'team', owner: '', createdBy: String(t.createdBy || ''), updatedAt: t._ms,
+               options: [String(t.content).trim().slice(0, 4000)], images: imgs, audios: [], scope: 'team', owner: '', createdBy: String(t.createdBy || ''), updatedAt: t._ms,
                fromTpl: true, tplId: String(t.id) });
   });
   return out;
@@ -14135,6 +14265,29 @@ function saveVietTat_(data, caller) {
     }
   }
   var imgsJson = JSON.stringify(imgs);
+  // TEP GHI AM (2026-11-14): cung cach voi anh — chi luu ID Drive; tep da co tren muc nay khong kiem tra lai Drive. Vuot tran -> BAO LOI (khong cat im lang).
+  var auds = [];
+  if (Array.isArray(data.audios)) {
+    var aseen = {}, acand = [];
+    for (var a1 = 0; a1 < data.audios.length; a1++) {
+      var au = data.audios[a1] || {}, aid = String(au.id || '').trim();
+      if (!/^[A-Za-z0-9_-]{15,}$/.test(aid) || aseen[aid]) continue;
+      aseen[aid] = 1; acand.push({ id: aid, name: String(au.name || '').slice(0, 120) });
+    }
+    if (acand.length > VIETTAT_MAX_AUDIOS) return jsonOut_({ error: 'Moi muc toi da ' + VIETTAT_MAX_AUDIOS + ' tep ghi am (ban dang gui ' + acand.length + ').' });
+    var aknown = acand.length ? _vtKnownIds_(data.id, 9) : {};
+    for (var a2 = 0; a2 < acand.length; a2++) {
+      var ac = acand[a2];
+      if (Object.prototype.hasOwnProperty.call(aknown, ac.id)) { auds.push({ id: ac.id, name: (ac.name || String(aknown[ac.id] || '')).slice(0, 120) }); continue; }
+      var achk = _vtCheckAudio_(ac.id);   // phai la tep am thanh that + GAS doc duoc (chong luu ID tuy y)
+      if (!achk.ok) return jsonOut_({ error: 'Tep ghi am "' + String(ac.name || ac.id) + '" khong dung duoc: ' + achk.error });
+      auds.push({ id: ac.id, name: String(ac.name || achk.name || '').slice(0, 120) });
+    }
+  } else if (data.id) {
+    var kk = _vtKnownIds_(data.id, 9);   // client cu khong gui truong audios -> GIU NGUYEN tep dang co, khong xoa nham
+    Object.keys(kk).forEach(function (k) { auds.push({ id: k, name: kk[k] }); });
+  }
+  var audsJson = JSON.stringify(auds);
   var scope = String(data.scope || 'me') === 'team' ? 'team' : 'me';
   if (scope === 'team' && !caller.priv) return jsonOut_({ error: 'Chi admin moi duoc tao/sua muc viet tat CHUNG cho ca team. Hay luu thanh muc rieng cua ban.', code: 'FORBIDDEN' });
   if (scope === 'me' && !String(caller.name || '').trim()) return jsonOut_({ error: 'Chua biet ban la ai — dang nhap CRM (hoac nhap ten CS trong Cai dat extension) de luu muc rieng.', code: 'FORBIDDEN' });
@@ -14149,13 +14302,13 @@ function saveVietTat_(data, caller) {
       if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen sua muc nay.', code: 'FORBIDDEN' });
       if (cur.scope !== scope) return jsonOut_({ error: 'Khong doi duoc muc rieng <-> chung: hay tao muc moi roi xoa muc cu.' });
       sh.getRange(i + 1, 2, 1, 4).setValues([[nhom, abbr, keyword, JSON.stringify(options)]]);
-      sh.getRange(i + 1, 8, 1, 2).setValues([[now, imgsJson]]);
+      sh.getRange(i + 1, 8, 1, 3).setValues([[now, imgsJson, audsJson]]);
       return jsonOut_({ ok: true, id: cur.id });
     }
     return jsonOut_({ error: 'Khong tim thay muc can sua (co the da bi xoa).' });
   }
   var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
-  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson]);
+  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson, audsJson]);
   return jsonOut_({ ok: true, id: id });
 }
 function deleteVietTat_(id, caller) {
@@ -14172,20 +14325,21 @@ function deleteVietTat_(id, caller) {
   }
   return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
 }
-// ID cac anh DANG luu tren 1 muc (de bo qua kiem tra Drive lai khi sua muc). Khong co id / khong thay -> {}.
-function _vtKnownImageIds_(id) {
+// ID cac anh (col 8) / tep ghi am (col 9) DANG luu tren 1 muc (de bo qua kiem tra Drive lai khi sua muc). Khong co id / khong thay -> {}.
+function _vtKnownIds_(id, col) {
   var known = {};
   if (!id) return known;
   try {
     var vals = getSheet_(SH_VIETTAT, VIETTAT_HEADERS).getDataRange().getValues();
     for (var i = 1; i < vals.length; i++) {
       if (String(vals[i][0]) !== String(id)) continue;
-      _vtImgsFromCell_(vals[i][8]).forEach(function (x) { known[x.id] = x.name; });
+      _vtImgsFromCell_(vals[i][col]).forEach(function (x) { known[x.id] = x.name; });
       break;
     }
   } catch (e) { known = {}; }
   return known;
 }
+function _vtKnownImageIds_(id) { return _vtKnownIds_(id, 8); }
 // Thu muc Drive chua anh TAI LEN tu may (folder con 'VietTat' trong folder thu vien CRM_ThuVien; tu tao, nho ID trong Script Property).
 function _vtFolder_() {
   var pr = PropertiesService.getScriptProperties(), id = pr.getProperty('VIETTAT_FOLDER_ID');
@@ -14211,6 +14365,52 @@ function vietTatUploadImage_(data, caller) {
   var file = _vtFolder_().createFile(Utilities.newBlob(bytes, mime, name));
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);   // de CRM hien anh xem truoc (drive.google.com/thumbnail) giong thu vien anh
   return { ok: true, id: file.getId(), name: name };
+}
+// Tai 1 TEP GHI AM co san tu may/dien thoai len Drive (khong can bam ghi am). data: {name, mimeType, base64}. Chi nhan audio/*, toi da VIETTAT_AUDIO_MAX_BYTES.
+// Trinh duyet / Android hay bao m4a la 'audio/x-m4a' hoac 'audio/mp4'; mot so may de trong mime -> doan theo duoi tep (mp3,m4a,aac,wav,ogg,opus,amr,3gp...).
+function _vtAudioMime_(mime, name) {
+  var m = String(mime || '').toLowerCase().split(';')[0].trim();
+  if (m.indexOf('audio/') === 0) return m;
+  var e = String(name || '').toLowerCase().replace(/^.*\./, '');
+  var map = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', amr: 'audio/amr', '3gp': 'audio/3gpp', webm: 'audio/webm', flac: 'audio/flac' };
+  return (m === '' || m === 'application/octet-stream' || m === 'application/ogg' || m === 'video/mp4' || m === 'video/webm' || m === 'video/3gpp') && map[e] ? map[e] : '';
+}
+function vietTatUploadAudio_(data, caller) {
+  data = data || {}; caller = caller || {};
+  if (!String(caller.name || '').trim()) return { ok: false, error: 'Can dang nhap CRM (hoac nhap ten CS) de tai tep ghi am len.', code: 'FORBIDDEN' };
+  var mime = _vtAudioMime_(data.mimeType, data.name);
+  if (!mime) return { ok: false, error: 'Chi nhan tep ghi am / am thanh (mp3, m4a, wav, ogg, aac, amr...).' };
+  if (!data.base64) return { ok: false, error: 'Thieu du lieu tep.' };
+  var bytes;
+  try { bytes = Utilities.base64Decode(String(data.base64)); } catch (e) { return { ok: false, error: 'Du lieu tep khong hop le.' }; }
+  if (!bytes || !bytes.length) return { ok: false, error: 'Tep rong.' };
+  if (bytes.length > VIETTAT_AUDIO_MAX_BYTES) return { ok: false, error: 'Tep qua lon (toi da ' + Math.round(VIETTAT_AUDIO_MAX_BYTES / 1048576) + 'MB).' };
+  var name = String(data.name || '').replace(/[\u0000-\u001F\/\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) || ('ghiam_' + Date.now());
+  var file = _vtFolder_().createFile(Utilities.newBlob(bytes, mime, name));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { ok: true, id: file.getId(), name: name, size: bytes.length };
+}
+// Kiem tra 1 file Drive la am thanh + GAS doc duoc + khong qua lon. Tra {ok,name} hoac {ok:false,error}.
+function _vtCheckAudio_(id) {
+  try {
+    var f = DriveApp.getFileById(id);
+    if (String(f.getMimeType() || '').toLowerCase().indexOf('audio/') !== 0) return { ok: false, error: 'khong phai tep am thanh' };
+    if (f.getSize() > VIETTAT_AUDIO_MAX_BYTES) return { ok: false, error: 'qua lon (toi da ' + Math.round(VIETTAT_AUDIO_MAX_BYTES / 1048576) + 'MB)' };
+    return { ok: true, name: f.getName() };
+  } catch (e) { return { ok: false, error: 'khong mo duoc tep (hay chia se cho tai khoan chay GAS hoac \"ai co link\")' }; }
+}
+// Tra byte 1 tep ghi am (base64) cho app Android / extension — CHI cho tep nam trong muc ma nguoi goi duoc phep thay (chong doc Drive tuy y qua ID).
+function vietTatAudio_(id, caller) {
+  id = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) return { ok: false, error: 'ID tep khong hop le' };
+  var list = readVietTat_(caller), allowed = false, name = '';
+  for (var i = 0; i < list.length && !allowed; i++) for (var j = 0; j < (list[i].audios || []).length; j++) if (list[i].audios[j].id === id) { allowed = true; name = list[i].audios[j].name; break; }
+  if (!allowed) return { ok: false, error: 'Tep ghi am nay khong thuoc muc viet tat nao ban duoc dung', code: 'FORBIDDEN' };
+  try {
+    var f = DriveApp.getFileById(id), mime = String(f.getMimeType() || 'audio/mp4');
+    if (f.getSize() > VIETTAT_AUDIO_MAX_BYTES) return { ok: false, error: 'Tep ghi am qua lon (toi da ' + Math.round(VIETTAT_AUDIO_MAX_BYTES / 1048576) + 'MB)' };
+    return { ok: true, id: id, name: name || f.getName(), base64: Utilities.base64Encode(f.getBlob().getBytes()), mimeType: mime };
+  } catch (e) { return { ok: false, error: 'Khong doc duoc tep ghi am (chua chia se cho tai khoan chay GAS?)' }; }
 }
 // Kiem tra 1 file Drive la anh + GAS doc duoc. Tra {ok,name} hoac {ok:false,error}.
 function _vtCheckImage_(id) {
@@ -17295,21 +17495,28 @@ function _storeCaseShare_() {
 
 // Tach cot "Ngay KH hen qua CH" thanh cac NGAY (yyyy-MM-dd). Thang lay o cot Thang; nam suy ra:
 // nam hien tai, neu ngay do con xa hon 45 ngay trong TUONG LAI thi lui 1 nam. Ngay khong ton tai (31/9) bo qua.
-// QUY TAC (Duyen chinh 2026-10-31): dau GACH NOI giua 2 so = KHOANG lien tuc ("25-27" = 25,26,27; "10-11" = 10,11; "25-26-27" = 25..27);
-// dau / , ; & hoac khoang trang = LIET KE tung ngay ("28/29" = 28 va 29; "3,4"). Khoang nguoc/qua 30 ngay -> coi la liet ke.
+// QUY TAC (Duyen chinh 2026-10-31, chot them 2026-11-04): dau GACH NOI giua DUNG 2 so = KHOANG lien tuc ("25-27" = 25,26,27; "10-11" = 10,11; "1-31" = ca 31 ngay);
+// dau noi gom: - (gach ngang, gach dai) -> => ~ "den". Chuoi tu 3 so tro len noi bang gach noi ("25-26-27", "25-27-29") = LIET KE tung ngay dung nhu da ghi
+// (25-27-29 chi la 25, 27, 29 — KHONG tu hieu la 25..29). Dau / , ; & hoac khoang trang = LIET KE ("28/29" = 28 va 29; "3,4"; "5-10, 20-22" = 5..10 va 20..22).
+// Khoang nguoc ("27-25", "31-1") hoac dai hon 31 ngay -> coi la liet ke.
 function _storeCaseDayList_(dayStr) {
-  var s = String(dayStr == null ? '' : dayStr).replace(/[\u2013\u2014\u2212]/g, '-').replace(/->|\u2192|\u0111\u1ebfn|den/gi, '-');
+  var s = String(dayStr == null ? '' : dayStr).replace(/[\u2013\u2014\u2212]/g, '-').replace(/->|\u2192|\u0111\u1ebfn|den|~/gi, '-');
   var re = /\d{1,2}/g, m, nums = [], seps = [], last = -1;
   while ((m = re.exec(s)) !== null) {
     if (last >= 0) seps.push(s.slice(last, m.index));
     nums.push(parseInt(m[0], 10)); last = m.index + m[0].length;
   }
-  var out = [];
-  nums.forEach(function(n, i) {
-    if (i > 0 && /^\s*-+\s*$/.test(seps[i - 1]) && nums[i - 1] <= n && n - nums[i - 1] <= 30) {
-      for (var d = nums[i - 1] + 1; d <= n; d++) out.push(d);
-    } else out.push(n);
-  });
+  var out = [], i = 0;
+  while (i < nums.length) {
+    var j = i;                                              // chuoi cac so noi nhau bang dau gach noi: nums[i..j]
+    while (j + 1 < nums.length && /^\s*-+\s*$/.test(seps[j])) j++;
+    if (j - i === 1 && nums[i] <= nums[j] && nums[j] - nums[i] <= 30) {   // dung 2 so, xuoi -> KHOANG
+      for (var d = nums[i]; d <= nums[j]; d++) out.push(d);
+    } else {                                                // 1 so, chuoi >= 3 so, hoac khoang nguoc -> liet ke tung ngay
+      for (var q = i; q <= j; q++) out.push(nums[q]);
+    }
+    i = j + 1;
+  }
   return out;
 }
 function _storeCaseDaysToYmd_(mo, days, todayYmd) {
@@ -21094,7 +21301,8 @@ function splitFixList_(p, user) {
       posVal: Math.round(posVal), the: theNames, base: base, baseSum: Math.round(baseSum), lechTien: lechTien, lechSale: lechSale, current: cur, tong: Math.round(tot) });
   });
   rows.sort(function (a, b) { return Math.abs(b.lechTien) - Math.abs(a.lechTien); });
-  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows };
+  var shadowed = []; try { shadowed = _loadAcctSplit_().crmShadowed || []; } catch (eSh) {}   // ma da luu chia tay trong CRM nhung file ke toan da co dong cung ma -> khong co hieu luc
+  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows, shadowed: shadowed };
 }
 function splitDoGet_(action, p) {
   try {

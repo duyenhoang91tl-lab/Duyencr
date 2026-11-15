@@ -453,8 +453,9 @@ function _srRenderH_(d){
   return html;
 }
 function renderSalesReportTabH_(wrap, subTabs){
-  var d = _hBuild_();
-  wrap.innerHTML = _srBarHtml_() + _srRenderH_(d);
+  var d = _hBuild_(), bar = _srBarHtml_();
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = bar + _srRenderH_(d); return; }   // dự phòng: js/76 chưa nạp → giao diện cũ
+  wrap.innerHTML = uiReportFrame_({ id: 'H', barHtml: bar, bodyHtml: _srRenderH_(d) });   // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn
 }
 function renderSalesReportTabI_(wrap, subTabs) {
   // ═══ Báo cáo I — Chia data Renew (nguồn CSKH-Duyên) ═══
@@ -642,7 +643,9 @@ function renderSalesReportTabI_(wrap, subTabs) {
     '<td style="text-align:right">'+(totalAssigned?Math.round(allChot.size/totalAssigned*100):0)+'%</td>' +
   '</tr></tbody></table></div></div>';
 
-  wrap.innerHTML = filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml;
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml; return; }   // dự phòng: js/76 chưa nạp → giao diện cũ
+  // nhiều khối có tiêu đề riêng (KPI, biểu đồ thanh, theo phân loại, bảng CS × tháng) → ô bodyHtml của khuôn; HTML từng khối GIỮ NGUYÊN
+  wrap.innerHTML = uiReportFrame_({ id: 'I', barHtml: filtersHtml, bodyHtml: kpiHtml + barHtml + tierHtml + tableHtml });
 }
 
 function exportRenewReport_() {
@@ -701,7 +704,7 @@ function openHKhMapModal_(){
   var old = document.getElementById('h-khmap-modal'); if (old) old.remove();
   var m = document.createElement('div'); m.id = 'h-khmap-modal';
   m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
-  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:86vh;overflow:auto">'+
+  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:calc(var(--vh,1vh)*86);overflow:auto">'+
     '<div style="font-weight:700;margin-bottom:6px">⚙ Trạng thái KH tự nhảy theo Tình trạng CS</div>'+
     '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
     groups.map(function(g, i){
@@ -1008,6 +1011,7 @@ function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srI
 function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
 function _srbMenuCats_(){
   var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'BD') ? 'G' : _srState.sub;
+  if (sub === 'K') return cats;   // K = Chốt tháng: CHỈ chọn tháng (posMonthK), không có bộ lọc Sale/Team/Nguồn... (3263f71 bỏ ánh xạ K→G nên K rơi vào menu mặc định 9 mục vô tác dụng)
   function flat(key, label, icon, ph, stateKey, optFn){
     cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:stateKey, ph:ph, opts:optFn });
   }

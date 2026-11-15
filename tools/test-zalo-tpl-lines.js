@@ -16,6 +16,7 @@ const TPLS = [
 ];
 (async () => {
   const dom = new JSDOM('<!doctype html><body><input id="zai-tpl-q"><div id="zai-tpl-status"></div><div id="zai-tpl-form"></div><div id="zai-tpl-result"></div></body>', { runScripts: 'outside-only' }), w = dom.window;
+  if (!w.CSS) w.CSS = { escape: s => String(s).replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, c => '\\' + c) };   // jsdom 24 khong co CSS.escape (trinh duyet that co); polyfill toi gian cho test
   const clip = [], filled = []; let status = '';
   w.navigator.clipboard = { writeText: async t => { clip.push(t); } };
   const f = new w.Function('escHtml', 'escAttrZai_', '_currentCS', 'fillZaloInput_', '_zaiTplStatus_', '_zaiTplFlashProxy_', 'navigator', 'confirm', 'openTplFormZai_', '_zaiTplCall_', 'loadMsgTemplatesZai_',

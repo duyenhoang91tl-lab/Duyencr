@@ -30,7 +30,7 @@ function boot(opts) {
     if (/action=roleConfig/.test(url)) return { json: async () => ({ ok: true, config: opts.config || CONFIG() }) };
     if (/key=deptList/.test(url)) return { json: async () => ({ value: JSON.stringify([{ key: 'online', label: 'Online' }, { key: 'vp', label: 'Văn phòng' }]) }) };
     if (/key=saleDepts/.test(url)) return { json: async () => ({ value: JSON.stringify({ 'Hà': 'online', 'Minh': 'vp' }) }) };
-    if (/action=audit/.test(url)) return { json: async () => ({ audit }) };
+    if (/action=audit/.test(url)) { (w.__auditUrls = w.__auditUrls || []).push(url); return { json: async () => ({ audit }) }; }
     return { json: async () => ({}) };
   };
   // ham cua hop thoai Tai khoan (luu NGAY) — gia lap de kiem tra trang goi dung
@@ -74,6 +74,12 @@ const cellBtn = (w, rowLabel, colIdx) => { const row = qa(w, '.rl-mx tbody tr').
   ok(/Chưa lưu/.test(w.document.getElementById('rs-dirty').textContent) && w.document.getElementById('rs-dirty').style.display === 'none' && q(w, '#rs-save').disabled && q(w, '#rs-discard').disabled, 'chua doi gi: Luu quyen + Bo thay doi deu mo');
   // thay doi gan day
   ok(/Cập nhật 13\/10\/2026/.test(q(w, '#rl-recent-time').textContent) && qa(w, '.rl-ev').length === 1 && /Vai trò: Nhân viên kinh doanh/.test(q(w, '.rl-ev-s').textContent) && /Admin1/.test(q(w, '.rl-ev-u').textContent), 'Thay doi gan day chi lay config:roleConfig + tom tat');
+  // R9c: GAS that ghi 'config:setting:roleConfig' (setSetting_) -> trang phai nhan ra; goi action=audit kem actionPrefix + limit de GAS loc tren TOAN sheet
+  ok(w.__auditUrls && /actionPrefix=config%3Asetting%3AroleConfig/.test(w.__auditUrls[0]) && /limit=5/.test(w.__auditUrls[0]), 'Thay doi gan day: goi action=audit kem actionPrefix=config:setting:roleConfig&limit=5');
+  const w9 = boot({ audit: [{ timestamp: '2026-11-14T08:00:00.000Z', user: 'Admin9', action: 'config:setting:roleConfig', oldValue: '{"roles":[],"deptPerms":{}}', newValue: '{"roles":[],"deptPerms":{"vp":["overview"]}}' },
+    { timestamp: '2026-11-14T07:00:00.000Z', user: 'Admin9', action: 'config:setting:hangKH', oldValue: '', newValue: '' }] });
+  await w9.openRoleSettings(); await wait(60);
+  ok(qa(w9, '.rl-ev').length === 1 && /Admin9/.test(q(w9, '.rl-ev-u').textContent) && /Phòng: vp/.test(q(w9, '.rl-ev-s').textContent), 'Thay doi gan day: nhan dung hanh dong THAT config:setting:roleConfig (bo config:setting:hangKH)');
 
   // ===== bat/tat o + chuan hoa =====
   const colIdx = 6;   // Nhan vien kinh doanh (cot 6 tinh ca cot Tinh nang = 0)

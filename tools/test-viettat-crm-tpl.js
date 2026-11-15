@@ -16,7 +16,7 @@ const SN = [
   for (const admin of [true, false]) {
     const dom = new JSDOM('<!doctype html><body>' + m[0] + '</body>', { runScripts: 'outside-only', url: 'https://crm.test/' });
     const w = dom.window, calls = [], alerts = [];
-    w.gsUrl = 'https://gas.test/exec'; w.toast = () => {}; w.alert = (t) => alerts.push(t); w.confirm = () => true;
+    w.gsUrl = 'https://gas.test/exec'; w.toast = () => {}; w.alert = (t) => alerts.push(t); w.confirm = () => true; let prompts = 0; w.prompt = () => { prompts++; return null; };   // 15/11: admin/nguoi tao mau nay DOI duoc viet tat qua prompt (tinh nang 14/11)
     w.fetch = async (u, init) => { calls.push({ u, body: init && init.body }); return { json: async () => ({ ok: true, snippets: SN, canTeam: admin, me: 'Hoa' }) }; };
     w.switchTab = () => {};
     w.eval('var currentPhone="";var allCustomers=[];'); w.eval(code); await sleep(10);
@@ -31,7 +31,8 @@ const SN = [
     // Goi thang ham (vd DOM cu / console) cung khong sua/xoa duoc, khong gui server
     calls.length = 0; alerts.length = 0;
     w.vtOpenForm('tpl_mt_1'); await w.vtDelete('tpl_mt_1'); await sleep(10);
-    ok(alerts.length === 2 && alerts.every((a) => /Quản lý mẫu/.test(a)), '[' + tag + '] mo form / xoa muc tu mau: bao "sua o Quan ly mau"');
+    // Nhan vien khong phai nguoi tao: mo form + xoa deu bi chan, bao "sua o Quan ly mau". Admin: mo form = hop thoai DOI VIET TAT (prompt, huy = khong luu); xoa van bi chan.
+    ok(admin ? (alerts.length === 1 && prompts === 1 && /Quản lý mẫu/.test(alerts[0])) : (alerts.length === 2 && prompts === 0 && alerts.every((a) => /Quản lý mẫu/.test(a))), '[' + tag + '] mo form / xoa muc tu mau: ' + (admin ? 'mo = hop doi viet tat, xoa bi chan va bao "sua o Quan ly mau"' : 'bao "sua o Quan ly mau"'));
     ok(!calls.some((c) => c.body && /VietTat/.test(c.body)), '[' + tag + '] KHONG goi saveVietTat/deleteVietTat cho muc tu mau');
     ok(w.document.getElementById('vt-form-wrap').style.display !== 'block', '[' + tag + '] form sua khong mo');
   }

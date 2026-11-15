@@ -32,6 +32,7 @@
 | addZaloNick | POST | Thêm nick Zalo mới vào danh sách chung |
 | count | GET | Trả field `ver` — đối chiếu bản backend đang chạy thật với code |
 | getGasSource / setGasSource | GET/POST | Đọc/ghi mã GAS (chunk trong Settings) cho nút Copy mã GAS |
+| audit | GET | Nhật ký (AuditLog): mặc định 200 dòng mới nhất; thêm `&actionPrefix=config:setting:roleConfig&limit=5` → lọc theo TIỀN TỐ hành động trên TOÀN sheet (quét từ cuối, tối đa 30.000 dòng, `limit` ≤ 200) — `_auditReadByPrefix_`. Cấu hình ghi `config:setting:<khóa>` (setSetting_), không phải `config:<khóa>` |
 | sbPing / sbCompareCare | GET | Supabase (cần adminKey): kiểm tra kết nối / đối chiếu CareData Sheet vs Supabase (`&sample=1..300`). Code ở cuối `gas_v13.js` = `gas/22_Supabase.gs`; kế hoạch + trạng thái: `docs/SUPABASE-PLAN.md` |
 | sbBackfillCare | POST | Supabase (cần adminKey): đẩy CareData lên theo lô 500, resume bằng con trỏ; `dryRun` mặc định true, `reset:true` chạy lại từ đầu |
 | (chạy tay) sbDonHang* | — | Supabase bước 4a, KHÔNG phải action web: chạy trong Apps Script Editor. `sbDonHangThuDT`/`DayDT`/`DayLaiTuDauDT`/`DoiChieuDT` cho `DT TỔNG ` → `dt_tong`; `...Don` cho `dữ liệu đơn` → `don_chi_tiet`. Chi tiết: `docs/SUPABASE-PLAN.md` |

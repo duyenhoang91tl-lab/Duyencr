@@ -26,7 +26,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.concurrent.thread
@@ -60,44 +62,56 @@ fun Root(crm: CrmWeb) {
     }
 }
 
+/** Dịch vụ Trợ năng "Viết Tắt" đang bật chưa (đọc từ cài đặt hệ thống) — để hiện trạng thái ngay đầu màn hình thay vì bắt Duyên mở Cài đặt xem. */
+fun serviceOn(ctx: android.content.Context): Boolean = runCatching {
+    Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty().contains(ctx.packageName)
+}.getOrDefault(false)
+
 /**
- * Thẻ "🩺 Kiểm tra gõ tắt": cho biết gõ tắt hỏng ở bước nào (dịch vụ Trợ năng chưa chạy / chưa có mục / Android không gửi sự kiện gõ /
- * không khớp mục / chèn chữ bị từ chối) bằng `Diag.report()`, và có ô GÕ THỬ viết tắt (`Diag.trial`) để biết app khớp mục nào mà không cần mở app chat.
+ * Hộp "🩺 Kiểm tra gõ tắt" (mở từ menu ⋮): cho biết gõ tắt hỏng ở bước nào bằng `Diag.report()` và có ô GÕ THỬ viết tắt (`Diag.trial`).
+ * NGUYÊN NHÂN GỐC báo cáo "❌ CHƯA gửi sự kiện gõ nào" dù gõ tắt ở Zalo đã hiện màn chọn (video Duyên 2026-10-27): báo cáo chỉ tính 1 LẦN lúc mở rồi đứng yên
+ * khi Duyên sang Zalo gõ và quay lại → hiện số liệu CŨ. Nay tự đọc lại mỗi giây khi hộp đang mở.
  */
 @Composable
-fun DiagCard() {
-    var open by remember { mutableStateOf(false) }
-    var report by remember { mutableStateOf("") }
+fun DiagDialog(onDone: () -> Unit) {
+    var report by remember { mutableStateOf(Diag.report()) }
     var test by remember { mutableStateOf("") }
-    OutlinedButton({ open = !open; if (open) report = Diag.report() }, Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Text(if (open) "🩺 Kiểm tra gõ tắt ▲" else "🩺 Kiểm tra gõ tắt ▼")
-    }
-    // NGUYÊN NHÂN GỐC báo cáo "❌ CHƯA gửi sự kiện gõ nào" dù gõ tắt ở Zalo đã hiện màn chọn (video Duyên 2026-10-27): `report` chỉ được tính 1 LẦN lúc mở thẻ,
-    // rồi đứng yên khi Duyên sang Zalo gõ và quay lại → hiện số liệu CŨ (0 sự kiện). Nay tự đọc lại mỗi giây khi thẻ đang mở.
-    if (open) LaunchedEffect(Unit) { while (true) { report = Diag.report(); kotlinx.coroutines.delay(1000) } }
-    if (open) Card(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        Column(Modifier.padding(12.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(report, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton({ report = Diag.report() }) { Text("Làm mới") }
-            OutlinedTextField(test, { test = it }, singleLine = true, label = { Text("Gõ thử viết tắt (vd: ch)") }, modifier = Modifier.fillMaxWidth())
-            Text(Diag.trial(test), style = MaterialTheme.typography.bodySmall)
-            Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây, báo cáo trên tự cập nhật mỗi giây.", style = MaterialTheme.typography.bodySmall)
-        }
-    }
+    LaunchedEffect(Unit) { while (true) { report = Diag.report(); kotlinx.coroutines.delay(1000) } }
+    AlertDialog(onDismissRequest = onDone, title = { Text("🩺 Kiểm tra gõ tắt") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(report, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(test, { test = it }, singleLine = true, label = { Text("Gõ thử viết tắt (vd: ch)") }, modifier = Modifier.fillMaxWidth())
+                Text(Diag.trial(test), style = MaterialTheme.typography.bodySmall)
+                Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây, báo cáo trên tự cập nhật mỗi giây.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onDone) { Text("Đóng") } })
 }
 
+/**
+ * Màn Viết tắt (thiết kế lại 14/11/2026): ĐẦU MÀN HÌNH là 1 thẻ trạng thái (xanh = dịch vụ đang bật, đỏ nhạt = chưa bật + nút Bật) kèm kết quả đồng bộ CRM;
+ * Xuất/Nhập/Cập nhật CRM/Kiểm tra gập vào menu ⋮ (trước đây 4 nút chiếm gần nửa màn hình); ô tìm kiếm bo tròn; mỗi mục là thẻ có viết tắt đậm,
+ * nhãn ☁ CRM (mục từ CRM, chỉ sửa trên CRM), từ khoá, xem trước nội dung, số nội dung/hình/ghi âm; có trạng thái trống và nút "+ Thêm viết tắt" không che mục cuối.
+ * Logic dữ liệu (Store/Crm/thư mục cây/hộp sửa) GIỮ NGUYÊN — chỉ đổi cách hiển thị.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(crm: CrmWeb) {
     val ctx = LocalContext.current
-    var sel by remember { mutableStateOf<String?>(null) }
+    var selKey by remember { mutableStateOf<String?>(null) }   // khoá nút cây thư mục đang lọc (null = Tất cả)
+    var pickFolder by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Snippet?>(null) }
     var newFolder by remember { mutableStateOf(false) }
     var q by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
+    var diag by remember { mutableStateOf(false) }
+    var on by remember { mutableStateOf(serviceOn(ctx)) }
     // Đọc kho Viết tắt của CRM (chung + của tôi) — kết nối mặc định, không còn hộp cài đặt; tên CS tự lấy từ tài khoản đăng nhập CRM.
     val doSync = { thread { status = Crm.pull(ctx) }; Unit }
     LaunchedEffect(Unit) { crm.detectName(); doSync() }
+    LaunchedEffect(Unit) { while (true) { on = serviceOn(ctx); kotlinx.coroutines.delay(1500) } }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { u ->
         if (u != null) runCatching { ctx.contentResolver.openOutputStream(u)?.use { Store.exportZip(it) } }
             .onSuccess { Toast.makeText(ctx, "Đã xuất file", Toast.LENGTH_SHORT).show() }
@@ -110,56 +124,99 @@ fun App(crm: CrmWeb) {
         }
     }
 
+    // Thư mục mẹ/con dạng cây (xem FolderTree.kt): chọn mẹ = lọc cả con cháu.
+    val node = selKey?.let { FolderTree.index(FolderTree.build(Store.folders))[it] }
+    val selIds = node?.ids?.toSet()
+    val shown = Store.snippets.filter { x ->
+        (selIds == null || x.folderId in selIds) && (q.isBlank() || listOf(x.abbr, x.keyword).plus(x.options).any { it.contains(q, true) })
+    }
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { editing = Snippet("", sel ?: Store.folders.first().id, "", "", listOf("")) }) { Text("+") }
+        ExtendedFloatingActionButton(onClick = {
+            // Mục mới KHÔNG được rơi vào thư mục CRM (bị xoá mỗi lần ☁ CRM) → về "default" nếu đang đứng trong thư mục CRM.
+            val fid = (node?.folderId ?: node?.ids?.firstOrNull() ?: Store.folders.first().id).let { if (Store.isCrm(it)) "default" else it }
+            editing = Snippet("", fid, "", "", listOf(""))
+        }) { Text("+ Thêm viết tắt") }
     }) { pad ->
-        Column(Modifier.padding(pad).padding(12.dp)) {
-            Button(onClick = { ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, Modifier.fillMaxWidth()) {
-                Text("Bật dịch vụ \"Viết Tắt\" trong Trợ năng")
+        Column(Modifier.padding(pad).padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+                containerColor = if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)) {
+                Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (on) "● Viết tắt đang bật" else "○ Chưa bật dịch vụ Viết Tắt", style = MaterialTheme.typography.titleSmall)
+                        Text(if (on) "Gõ viết tắt ở Zalo, Messenger, Pancake…" else "Bật trong Cài đặt › Trợ năng để gõ tắt hoạt động", style = MaterialTheme.typography.bodySmall)
+                        if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!on) Button({ ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("Bật") }
+                    Box {
+                        IconButton({ menu = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                        DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem({ Text("☁ Cập nhật từ CRM") }, { menu = false; crm.detectName(); doSync() })
+                            DropdownMenuItem({ Text("Xuất file") }, { menu = false; exporter.launch("viettat-backup.zip") })
+                            DropdownMenuItem({ Text("Nhập file") }, { menu = false; importer.launch(arrayOf("application/json", "text/*", "*/*")) })
+                            DropdownMenuItem({ Text("🩺 Kiểm tra gõ tắt") }, { menu = false; diag = true })
+                            if (on) DropdownMenuItem({ Text("Mở cài đặt Trợ năng") }, { menu = false; ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
+                        }
+                    }
+                }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton({ exporter.launch("viettat-backup.zip") }, Modifier.weight(1f)) { Text("Xuất file") }
-                OutlinedButton({ importer.launch(arrayOf("application/json", "text/*", "*/*")) }, Modifier.weight(1f)) { Text("Nhập file") }
-                OutlinedButton({ crm.detectName(); doSync() }, Modifier.weight(1f)) { Text("☁ CRM") }
+            OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(28.dp),
+                placeholder = { Text("Tìm viết tắt, từ khoá, nội dung") },
+                trailingIcon = { if (q.isNotEmpty()) TextButton({ q = "" }) { Text("✕") } })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                AssistChip({ pickFolder = true }, { Text("📁 " + (node?.key ?: "Tất cả") + " ▾", maxLines = 1, overflow = TextOverflow.Ellipsis) }, Modifier.weight(1f, fill = false))
+                AssistChip({ newFolder = true }, { Text("+ Thư mục") })
+                Spacer(Modifier.weight(1f))
+                Text("${shown.size} mục", style = MaterialTheme.typography.labelMedium)
             }
-            if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
-            DiagCard()
-            OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
-                label = { Text("Tìm viết tắt, từ khoá, nội dung") })
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { FilterChip(sel == null, { sel = null }, { Text("Tất cả") }) }
-                items(Store.folders) { f -> FilterChip(sel == f.id, { sel = f.id }, { Text(f.name) }) }
-                item { AssistChip({ newFolder = true }, { Text("+ Thư mục") }) }
-            }
-            if (sel != null && sel != "default" && !Store.isCrm(sel!!)) TextButton({
-                sel?.let { Store.deleteFolder(it) }; sel = null; doSync()
+            val delId = node?.folderId
+            if (delId != null && delId != "default" && !Store.isCrm(delId)) TextButton({
+                Store.deleteFolder(delId); selKey = null; doSync()
             }) { Text("Xoá thư mục này") }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                items(Store.snippets.filter { x ->
-                    (sel == null || x.folderId == sel) && (q.isBlank() || listOf(x.abbr, x.keyword).plus(x.options).any { it.contains(q, true) })
-                }) { s ->
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 88.dp)) {
+                if (shown.isEmpty()) item {
+                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Text(if (q.isBlank()) "Thư mục này chưa có viết tắt.\nBấm \"+ Thêm viết tắt\" hoặc chọn 📁 Tất cả." else "Không tìm thấy \"$q\"", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                items(shown) { s ->
+                    val crmItem = Store.isCrm(s.id)
+                    val nImg = s.options.count { kindOf(it) == "img" }
+                    val nAud = s.options.count { kindOf(it) == "aud" }
+                    val preview = s.options.firstOrNull { kindOf(it) == null }.orEmpty()
                     Card(onClick = {
-                        if (Store.isCrm(s.id)) Toast.makeText(ctx, "Mục lấy từ CRM — sửa trên CRM (tab Zalo AI → Viết tắt), rồi bấm ☁ CRM để cập nhật", Toast.LENGTH_LONG).show()
+                        if (crmItem) Toast.makeText(ctx, "Mục lấy từ CRM — sửa trên CRM (tab Zalo AI → Viết tắt), rồi bấm ☁ CRM để cập nhật", Toast.LENGTH_LONG).show()
                         else editing = s
                     }, Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(s.abbr, style = MaterialTheme.typography.titleMedium)
-                            if (s.keyword.isNotBlank()) Text("Từ khoá: ${s.keyword}", style = MaterialTheme.typography.bodySmall)
-                            Text("${s.options.size} nội dung · ${labelOf(s.options.firstOrNull().orEmpty())}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text(s.abbr, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                if (crmItem) Text("☁ CRM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            if (s.keyword.isNotBlank()) Text(s.keyword, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (preview.isNotBlank()) Text(preview, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text("${s.options.size} nội dung" + (if (nImg > 0) " · 🖼 $nImg" else "") + (if (nAud > 0) " · 🎤 $nAud" else ""), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
         }
     }
+    if (diag) DiagDialog { diag = false }
     editing?.let { SnippetDialog(it) { editing = null; doSync() } }
+    if (pickFolder) FolderTreeDialog("Chọn thư mục", Store.folders, selKey, true,
+        count = { n -> Store.snippets.count { it.folderId in n.ids } },
+        canPick = { true },
+        onPick = { n -> selKey = n?.key; pickFolder = false },
+        onDismiss = { pickFolder = false })
     if (newFolder) {
-        var name by remember { mutableStateOf("") }
+        // Thư mục con: gõ "Mẹ › Con" (đang đứng trong 1 thư mục tự tạo thì điền sẵn tên mẹ). Cây dựng từ tên nên không đổi dữ liệu/đồng bộ.
+        var name by remember { mutableStateOf(if (node != null && !node.key.startsWith("CRM")) node.key + " › " else "") }
         AlertDialog(onDismissRequest = { newFolder = false }, title = { Text("Thư mục mới") },
-            text = { OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên thư mục") }) },
+            text = { OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên thư mục") },
+                supportingText = { Text("Thư mục con: gõ  Mẹ › Con  (vd: Túi tiền › Cổ)") }) },
             confirmButton = { TextButton({
-                if (name.isNotBlank()) { Store.folders += Folder(UUID.randomUUID().toString(), name.trim(), System.currentTimeMillis()); Store.save() }
+                val nm = name.trim().trimEnd('›', ' ')
+                if (nm.isNotBlank()) { Store.folders += Folder(UUID.randomUUID().toString(), nm, System.currentTimeMillis()); Store.save() }
                 newFolder = false; doSync()
             }) { Text("Tạo") } })
     }
@@ -172,6 +229,7 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     var abbr by remember { mutableStateOf(s.abbr) }
     var kw by remember { mutableStateOf(s.keyword) }
     var folder by remember { mutableStateOf(s.folderId) }
+    var pickFolderDlg by remember { mutableStateOf(false) }
     val opts = remember { s.options.toMutableStateList() }
     var rec by remember { mutableStateOf<MediaRecorder?>(null) }
     var recName by remember { mutableStateOf("") }
@@ -179,14 +237,21 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     fun copyIn(u: android.net.Uri, def: String): String {
         val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(ctx.contentResolver.getType(u)) ?: def
         val name = "${UUID.randomUUID()}.$ext"
-        ctx.contentResolver.openInputStream(u)?.use { i -> File(Store.mediaDir, name).outputStream().use { i.copyTo(it) } }
+        (ctx.contentResolver.openInputStream(u) ?: error("không mở được tệp")).use { i -> File(Store.mediaDir, name).outputStream().use { i.copyTo(it) } }
         return name
     }
-    val pickImg = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { u ->
-        if (u != null) opts.add("[[img:${copyIn(u, "jpg")}]]")
+    // NGUYÊN NHÂN GỐC (14/11/2026): trước đây dùng GetContent() = bộ chọn đúng 1 tệp/lần nên "+ Hình ảnh" không chọn được nhiều ảnh cùng lúc
+    // (phải bấm lại từng ảnh một). GetMultipleContents() cho chọn nhiều; mỗi ảnh thành 1 lựa chọn [[img:..]] riêng, giữ đúng thứ tự đã chọn.
+    // Một tệp lỗi (không đọc được) chỉ bỏ qua tệp đó, không làm mất các tệp còn lại.
+    val pickImg = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
+        var bad = 0
+        us.forEach { u -> runCatching { opts.add("[[img:${copyIn(u, "jpg")}]]") }.onFailure { bad++ } }
+        if (bad > 0) Toast.makeText(ctx, "$bad ảnh không đọc được, đã bỏ qua", Toast.LENGTH_SHORT).show()
     }
-    val pickAud = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { u ->
-        if (u != null) opts.add("[[aud:${copyIn(u, "m4a")}]]")
+    val pickAud = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
+        var bad = 0
+        us.forEach { u -> runCatching { opts.add("[[aud:${copyIn(u, "m4a")}]]") }.onFailure { bad++ } }
+        if (bad > 0) Toast.makeText(ctx, "$bad tệp âm thanh không đọc được, đã bỏ qua", Toast.LENGTH_SHORT).show()
     }
     fun startRec() {
         val name = "${UUID.randomUUID()}.m4a"
@@ -213,8 +278,8 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(abbr, { abbr = it }, singleLine = true, label = { Text("Viết tắt (vd: stk)") })
                 OutlinedTextField(kw, { kw = it }, singleLine = true, label = { Text("Từ khoá (cách nhau dấu phẩy)") })
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Store.folders.forEach { f -> FilterChip(folder == f.id, { folder = f.id }, { Text(f.name) }) }
+                OutlinedButton({ pickFolderDlg = true }, Modifier.fillMaxWidth()) {
+                    Text("📁 " + (Store.folders.firstOrNull { it.id == folder }?.name ?: "Chung") + "  ▾", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 opts.forEachIndexed { i, o ->
                     if (kindOf(o) != null) {
@@ -256,6 +321,15 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
                 TextButton(onDone) { Text("Huỷ") }
             }
         })
+    if (pickFolderDlg) {
+        val own = Store.folders.filter { !Store.isCrm(it.id) }   // mục tự tạo không được lưu vào thư mục CRM (bị ghi đè khi ☁ CRM)
+        val curName = own.firstOrNull { it.id == folder }?.name
+        FolderTreeDialog("Lưu vào thư mục", own, curName?.let { FolderTree.segs(it).joinToString(FolderTree.SEP) }, false,
+            count = { n -> Store.snippets.count { it.folderId in n.ids } },
+            canPick = { it.folderId != null },
+            onPick = { n -> n?.folderId?.let { folder = it }; pickFolderDlg = false },
+            onDismiss = { pickFolderDlg = false })
+    }
 }
 
 @Composable

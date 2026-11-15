@@ -263,7 +263,9 @@ function doGetCore_(e) {
 
     if (action === 'audit') {
       var shA = ss.getSheetByName(SH_AUDIT); var auditRows = [];
-      if (shA && shA.getLastRow() > 1) {
+      var _apAu = String((e.parameter || {}).actionPrefix || '');   // R9c: co tien to -> loc tren toan sheet (xem _auditReadByPrefix_); khong co -> 200 dong moi nhat nhu cu
+      if (_apAu) { auditRows = _auditReadByPrefix_(shA, _apAu, (e.parameter || {}).limit); }
+      else if (shA && shA.getLastRow() > 1) {
         var lastA = shA.getLastRow();
         var nA = Math.min(200, lastA - 1);
         var vA = shA.getRange(lastA - nA + 1, 1, nA, 6).getValues();
@@ -552,6 +554,7 @@ function doGetCore_(e) {
       return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
     }
     if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
+    if (action === 'vietTatAudio') return jsonOut_(vietTatAudio_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // app/extension tai byte 1 tep ghi am cua muc Viet tat (base64)
     if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
       var _vr = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
       if (!String(_vr.name || '').trim()) return jsonOut_({ error: 'Can dang nhap CRM (hoac nhap ten CS) de chon anh.', code: 'FORBIDDEN' });

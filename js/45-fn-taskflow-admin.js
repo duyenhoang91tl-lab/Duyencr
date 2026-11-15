@@ -61,7 +61,7 @@ function _tfmOverlay(){
   var ov = document.getElementById('tf-mgr-overlay');
   if (!ov){
     ov = document.createElement('div'); ov.className = 'assign-modal-overlay'; ov.id = 'tf-mgr-overlay';
-    ov.innerHTML = '<div class="assign-modal" style="width:560px;max-height:90vh"><div class="assign-modal-hdr"><div class="assign-modal-title">🧩 Quy trình công việc</div>'+
+    ov.innerHTML = '<div class="assign-modal" style="width:560px;max-height:calc(var(--vh,1vh)*90)"><div class="assign-modal-hdr"><div class="assign-modal-title">🧩 Quy trình công việc</div>'+
       '<button class="close-btn" onclick="closeTaskFlowManager()">✕</button></div><div class="assign-body" id="tf-mgr-body"></div></div>';
     document.body.appendChild(ov);
   }

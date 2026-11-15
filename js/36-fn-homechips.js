@@ -68,6 +68,10 @@ function hmRenderChips(){
     chip('rebuy', '🔄', 'Khách đến hạn tái mua', r.rebuy.length, false) + chip('idle', '📉', 'Cơ hội thiếu hoạt động', r.idle.length, false) + '</div>';
 }
 var _HM_TITLES = { today:'Việc hôm nay', overdue:'Việc quá hạn', rebuy:'Khách đến hạn tái mua', idle:'Cơ hội thiếu hoạt động' };
+// Chiều cao tối đa của hộp danh sách. NGUYÊN NHÂN GỐC (ảnh app Android 15/11 19:53): trước đây dùng max-height:84vh, nhưng WebView của app có lúc kẹt đơn vị vh = 0
+// (xem vhFixJs trong CrmWeb.kt, js/59-fn-mobilefit.js) nên hộp bị ép còn đúng phần đệm + dòng tiêu đề → 1 dải trắng mỏng, không thấy danh sách. Dùng px theo innerHeight THẬT;
+// chưa có kích thước (innerHeight < 120) thì dùng 84% (lớp phủ position:fixed;inset:0 luôn có chiều cao xác định, không phụ thuộc vh).
+function hmModalMaxH_(innerH){ var h = Math.round(Number(innerH)); return h >= 120 ? Math.round(h * 0.84) + 'px' : '84%'; }
 function hmOpenList(key){
   var r = _hmLast || hmCompute(), list = r[key] || [], cfg = r.cfg;
   var hint = key === 'rebuy' ? 'Mua gần nhất cách nay ≥ ' + cfg.cycle + ' ngày' : key === 'idle' ? 'Có trạng thái chăm sóc nhưng ≥ ' + cfg.idle + ' ngày chưa cập nhật' : '';
@@ -75,7 +79,7 @@ function hmOpenList(key){
   var m = document.createElement('div'); m.id = 'hm-modal';
   m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) hmCloseList(); };
-  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:84vh;overflow:auto;padding:14px 16px">' +
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:' + hmModalMaxH_(window.innerHeight) + ';overflow:auto;padding:14px 16px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">' + esc(_HM_TITLES[key] || '') + ' (' + list.length + ')</b><button class="btn sm" onclick="hmCloseList()">✕</button></div>' +
     (hint ? '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">' + esc(hint) + '</div>' : '') +
     (list.length ? list.slice(0, 100).map(function(it){

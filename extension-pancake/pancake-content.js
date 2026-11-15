@@ -387,9 +387,10 @@
       <div id="pk-ai-header">
         <div id="pk-ai-header-title" style="flex:1">
           <div style="font-weight:700">🤖 Pancake AI</div>
-          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
+          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách${(() => { try { return " · v" + chrome.runtime.getManifest().version; } catch (e) { return ""; } })()}</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
+        <button id="pk-vt-toggle" type="button" class="pk-vt-off" title="Gõ tắt trong ô chat — đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)">⌨ Gõ tắt: Tắt</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
@@ -408,9 +409,8 @@
           <button id="pk-link-chat-btn" title="Liên kết đoạn chat ĐANG MỞ với khách này — làm 1 lần để lần sau tự nhận diện dù không đọc được SĐT/khung Sản phẩm order">🔗</button>
           <button id="pk-add-new-btn" title="Mở ngay form thêm khách mới — không cần tra cứu trước, dán SĐT vào form rồi điền và lưu">＋ Thêm KH</button>
         </div>
-        <div id="pk-ai-customer"></div>
-
         <div id="pk-menu-wrap">
+          <div id="pk-menu-row">
           <select id="pk-menu-sel">
             <option value="">— Chọn mục —</option>
             <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
@@ -421,6 +421,8 @@
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
             <option value="assign">📋 Data được chia (0)</option>
           </select>
+          <button type="button" id="pk-menu-close" title="Tắt mục đang mở" style="display:none">✕ Tắt</button>
+          </div>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
               <div id="pk-rem-toolbar"><button id="pk-rem-refresh" title="Tải lại">🔄 Tải lại</button></div>
@@ -479,6 +481,8 @@
             </div>
           </div>
         </div>
+
+        <div id="pk-ai-customer"></div>
 
         <div id="pk-cart-section" style="display:none">
           <div id="pk-cart-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -707,6 +711,14 @@
       _setCollapseBtnIcon_(collapsed);
       try { chrome.storage.local.set({ pkPanelCollapsed: collapsed }); } catch (e) {}
     });
+    // Nút bật/tắt GÕ TẮT (mặc định tắt) — lưu vtOn ở storage.local, pancake-viettat.js nghe storage.onChanged nên có hiệu lực ngay, không cần tải lại trang
+    (function () {
+      const b = panelEl.querySelector("#pk-vt-toggle"); if (!b) return;
+      const paint = (on) => { b.classList.toggle("pk-vt-on", !!on); b.classList.toggle("pk-vt-off", !on); b.textContent = on ? "⌨ Gõ tắt: Bật" : "⌨ Gõ tắt: Tắt"; b.title = on ? "Gõ tắt đang BẬT. Bấm để tắt" : "Gõ tắt đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)"; };
+      try { chrome.storage.local.get({ vtOn: false }, (v) => paint(v && v.vtOn === true)); } catch (e) {}
+      b.addEventListener("click", (e) => { e.stopPropagation(); const on = !b.classList.contains("pk-vt-on"); paint(on); try { chrome.storage.local.set({ vtOn: on }); } catch (er) {} });
+      try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.vtOn) paint(ch.vtOn.newValue === true); }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
       // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
       chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
@@ -749,7 +761,39 @@
       if (v === "stats") initStats_();
       if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
       if (v === "assign") initAssignTab_();
+      panelEl.querySelector("#pk-menu-close").style.display = v ? "" : "none"; // chỉ hiện nút Tắt khi đang mở 1 mục
     });
+    // Nút Tắt: về "— Chọn mục —" qua CHÍNH handler change ở trên (1 đường duy nhất → không lệch với chỗ khác tự mở mục)
+    panelEl.querySelector("#pk-menu-close").addEventListener("click", () => {
+      const sel = panelEl.querySelector("#pk-menu-sel");
+      sel.value = "";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    // ── Giao diện v2 (2026-11-14): lưới nút công cụ thay cho ô chọn "— Chọn mục —" ──
+    // <select id="pk-menu-sel"> VẪN là nguồn dữ liệu duy nhất (mọi chỗ khác gán .value / nghe 'change' / đổi chữ option như cũ);
+    // lưới nút chỉ vẽ lại từ các <option> (kèm số đếm "(n)") và bấm = gán .value rồi bắn 'change' qua đúng đường cũ.
+    (function () {
+      const sel = panelEl.querySelector("#pk-menu-sel"), row = panelEl.querySelector("#pk-menu-row");
+      if (!sel || !row || panelEl.querySelector("#pk-menu-chips")) return;
+      const grid = document.createElement("div"); grid.id = "pk-menu-chips"; row.parentNode.insertBefore(grid, row);
+      const paint = () => {
+        grid.textContent = "";
+        [...sel.options].filter((o) => o.value).forEach((o) => {
+          const m = /^(\S+)\s+(.*?)(?:\s*\((\d+)\))?$/.exec(o.textContent.trim()) || [];
+          const b = document.createElement("button"); b.type = "button"; b.className = "pk-chip" + (sel.value === o.value ? " active" : ""); b.dataset.v = o.value;
+          b.title = o.textContent.trim();
+          const ic = document.createElement("span"); ic.className = "pk-chip-ic"; ic.textContent = m[1] || "•";
+          const tx = document.createElement("span"); tx.className = "pk-chip-tx"; tx.textContent = m[2] || o.textContent.trim();
+          b.appendChild(ic); b.appendChild(tx);
+          if (m[3] !== undefined) { const n = document.createElement("span"); n.className = "pk-chip-n" + (m[3] === "0" ? " zero" : ""); n.textContent = m[3]; b.appendChild(n); }
+          b.addEventListener("click", () => { sel.value = sel.value === o.value ? "" : o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); });
+          grid.appendChild(b);
+        });
+      };
+      paint();
+      sel.addEventListener("change", paint);
+      try { new MutationObserver(paint).observe(sel, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -1391,13 +1435,26 @@
       // TRƯỚC ĐÂY: để trống trơn im lặng khi không tự nhận ra SĐT — trông như panel bị lỗi/không
       // dùng được, dù thật ra form vẫn hoạt động đầy đủ (tên/trạng thái/ghi chú...), chỉ là nó
       // CHỈ hiện SAU KHI tra cứu được 1 khách. Giờ luôn hiện rõ hướng dẫn thay vì im lặng.
-      panelEl.querySelector("#pk-ai-customer").innerHTML =
-        `<div class="pk-ai-no-phone-hint">
-          📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
-          • Khách <b>đã có</b> trong CRM: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
-          • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
-          rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
+      // Hướng dẫn mặc định ẨN (chỉ còn 1 nút nhỏ 👁); bấm để hiện, bấm lại để ẩn — khỏi chiếm chỗ panel.
+      const custBox = panelEl.querySelector("#pk-ai-customer");
+      custBox.innerHTML =
+        `<div class="pk-ai-hint-wrap">
+          <button type="button" class="pk-ai-hint-toggle" aria-expanded="false" title="Hiện / ẩn hướng dẫn">👁 Hướng dẫn tra cứu</button>
+          <div class="pk-ai-no-phone-hint" style="display:none">
+            📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
+            • Khách <b>đã có</b> trong CRM: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
+            • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
+            rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
+          </div>
         </div>`;
+      const hintBtn = custBox.querySelector(".pk-ai-hint-toggle");
+      const hintEl = custBox.querySelector(".pk-ai-no-phone-hint");
+      hintBtn.addEventListener("click", () => {
+        const show = hintEl.style.display === "none";
+        hintEl.style.display = show ? "block" : "none";
+        hintBtn.setAttribute("aria-expanded", show ? "true" : "false");
+        hintBtn.textContent = show ? "🙈 Ẩn hướng dẫn" : "👁 Hướng dẫn tra cứu";
+      });
       return;
     }
     lookupByPhone(phone);

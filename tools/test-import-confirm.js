@@ -54,23 +54,19 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 
   // ---- _impUpload ----
   const pv = { dryRun: true, wouldWrite: 2000, skippedExisting: 0, wouldUpdateRows: 0, wouldUpdateCells: 0, skippedDupInFile: 0 };
-  // a) bam Huy tren hop trong trang -> thong bao co so lieu xem truoc, khong ghi
-  fetchLog.length = 0; toasts.length = 0; fetchPlan = [{ body: pv }]; ctx._impState.uploading = false;
-  let up = ctx._impUpload('base'); await tick(); await tick();
-  const ov2 = w.document.getElementById('imp-ask-ov');
-  ok(!!ov2 && /THÊM 2000 dòng MỚI/.test(ov2.textContent) && /Tiếp tục nhập\?/.test(ov2.textContent) && /NHẬP DỮ LIỆU Base/.test(ov2.textContent), 'nhap file: hop xac nhan in-page co so lieu xem truoc (them 2000 dong)');
-  ov2.querySelector('button[data-v="0"]').click(); await up;
-  ok(fetchLog.length === 1 && fetchLog[0].body.dryRun === true && toasts.some((t) => /Đã hủy — chưa ghi gì\. \(Xem trước: thêm 2000 dòng mới, 0 đơn đã có\.\)/.test(t)) && nativeConfirm === 0, 'Huy: chi goi xem truoc, KHONG ghi; thong bao kem so lieu xem truoc; khong dung confirm()');
-  ok(ctx._impState.uploading === false, 'het trang thai uploading');
-  // b) dong y -> goi that
-  fetchLog.length = 0; toasts.length = 0; ctx._impState.baseRows = [['x']]; fetchPlan = [{ body: pv }, { body: { ok: true, written: 2000, skippedExisting: 0, batchId: 'imp_1' } }];
-  up = ctx._impUpload('base'); await tick(); await tick(); w.document.querySelector('#imp-ask-ov button[data-v="1"]').click(); await up;
-  ok(fetchLog.length === 2 && fetchLog[1].body.dryRun === undefined && fetchLog[1].body.action === 'importSheetRows' && fetchLog[1].body.token === 'TOK' && toasts.some((t) => /Đã nhập 2000 dòng mới/.test(t)), 'Dong y: goi GHI THAT 1 lan (co token), bao da nhap');
-  // c) chay khi tab o nen (modal khong bi tu dong huy): khong co phan hoi nguoi dung -> van cho
-  fetchLog.length = 0; toasts.length = 0; ctx._impState.baseRows = [['x']]; fetchPlan = [{ body: pv }];
-  up = ctx._impUpload('base'); await tick(); await tick(); await tick();
-  ok(!!w.document.getElementById('imp-ask-ov') && !toasts.some((t) => /Đã hủy/.test(t)) && fetchLog.length === 1, 'chua ai bam gi: hop van cho, KHONG tu "Da huy" (khac confirm() bi chan)');
-  w.document.querySelector('#imp-ask-ov button[data-v="0"]').click(); await up;
+  // Duyen 2026-11-11: "cho minh nhap du lieu thi nhap luon di, khong can hoi lai" -> _impUpload KHONG con hien hop xac nhan sau xem truoc;
+  // van chay dryRun truoc (de bao 'khong co dong moi') roi GHI THAT ngay. (_impAsk_ van con va duoc test o tren.)
+  // a) co dong moi -> xem truoc 1 lan + GHI THAT 1 lan, khong hop xac nhan, khong confirm() cua trinh duyet
+  fetchLog.length = 0; toasts.length = 0; ctx._impState.uploading = false; ctx._impState.baseRows = [['x']];
+  fetchPlan = [{ body: pv }, { body: { ok: true, written: 2000, skippedExisting: 0, batchId: 'imp_1' } }];
+  await ctx._impUpload('base');
+  ok(!w.document.getElementById('imp-ask-ov') && nativeConfirm === 0, 'nhap file: KHONG hien hop xac nhan, khong dung confirm() (Duyen 11/11)');
+  ok(fetchLog.length === 2 && fetchLog[0].body.dryRun === true && fetchLog[1].body.dryRun === undefined && fetchLog[1].body.action === 'importSheetRows' && fetchLog[1].body.token === 'TOK' && toasts.some((t) => /Đã nhập 2000 dòng mới/.test(t)), 'xem truoc 1 lan roi GHI THAT 1 lan (co token), bao da nhap');
+  ok(ctx._impState.uploading === false && ctx._impState.baseRows === null, 'het trang thai uploading; file da nhap duoc don');
+  // b) GHI THAT loi 502 -> bao loi 'co the da ghi', KHONG tu thu lai, het uploading
+  fetchLog.length = 0; toasts.length = 0; ctx._impState.baseRows = [['x']]; fetchPlan = [{ body: pv }, { status: 502, body: '<h1>502</h1>' }];
+  await ctx._impUpload('base');
+  ok(fetchLog.length === 2 && toasts.some((t) => /Nhập lỗi/.test(t) && /có thể máy chủ đã ghi/.test(t)) && ctx._impState.uploading === false && !w.document.getElementById('imp-ask-ov'), 'GHI THAT loi 502: bao co the da ghi, khong tu thu lai, het uploading');
   // d) khong con dong moi
   fetchLog.length = 0; toasts.length = 0; ctx._impState.baseRows = [['x']]; fetchPlan = [{ body: { dryRun: true, wouldWrite: 0, skippedExisting: 2000, wouldUpdateRows: 0 } }];
   await ctx._impUpload('base'); ok(!w.document.getElementById('imp-ask-ov') && toasts.some((t) => /đều ĐÃ CÓ/.test(t)) && fetchLog.length === 1, 'tat ca da co: khong hoi, khong ghi');

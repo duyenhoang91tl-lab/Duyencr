@@ -44,3 +44,13 @@ Thêm mục mới ở CUỐI, mỗi mục: triệu chứng → nguyên nhân g�
 - **Font:** Be Vietnam Pro toàn CRM (`--font`); nút/ô nhập phải `font-family:inherit`.
 - **Bài học kiểm tra:** lỗi giao diện phải chụp bằng Chrome thật (cả hai chế độ), jsdom không thấy màu/bố cục.
 
+## 2026-11-15 — Nhật ký/Phân quyền (R9c) và PWA (R10c)
+- **"Thay đổi gần đây" ở trang Phân quyền luôn rỗng:** 2 lỗi chồng nhau — (1) GAS ghi `config:setting:roleConfig` nhưng client chỉ nhận `config:roleConfig`; (2) `action=audit` chỉ trả 200 dòng mới nhất của mọi loại nên bản ghi cấu hình bị thao tác khách đẩy ra. Sửa: `actionPrefix` lọc trên toàn sheet (`_auditReadByPrefix_`) + client nhận cả 2 tên. Test `tools/test-audit-prefix.js`.
+- **Tóm tắt phân quyền hiện "Cập nhật cấu hình":** `_auditClip_` cắt giá trị ở 1500 ký tự làm hỏng JSON `roleConfig`. Sửa: riêng khoá này 20.000 (`_auditClipMax_`). Dòng cũ đã cắt không phục hồi.
+- **App PWA trắng trang khi mất mạng:** `sw.js` cũ không cache gì. Sửa: ưu tiên mạng, rơi về bản lưu (xem `10-ui-redesign-notes.md`).
+
+## 2026-11-15 — Hộp bị dải trắng trên app Android (R13) và quy ước viết test
+- **Mọi hộp/modal `max-height:NNvh` chỉ còn dải trắng trên app Android:** WebView kẹt `vh`=0 (đã thấy ở hộp chip Tổng quan, rồi rà ra 22 chỗ js + 21 chỗ css + 14 chỗ index.html). Sửa chung bằng biến `--vh` (xem `10-ui-redesign-notes.md`).
+- **Quy ước test:** khi thêm hàm mới vào mã thật mà test có danh sách hàm nạp thủ công (`grab(...)`/`NAMES`), grep `tools/test-*.js` tìm danh sách đó và thêm hàm mới. ĐỪNG ghim cứng `?v=` hay class/inline-style cụ thể trong test (dùng `\d{8}[a-z]`) — 2 test đã đỏ chỉ vì tăng `?v=`.
+- **Test so thân hàm với `HEAD`** (vd `test-dept-frame`) sẽ đỏ trước commit nếu cố ý sửa đúng hàm đó; tự hết đỏ sau commit.
+

@@ -114,7 +114,7 @@ function openConnDiag() {
   var ov = document.getElementById('cd-overlay'); if (ov) ov.remove();
   ov = document.createElement('div'); ov.id = 'cd-overlay';
   ov.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:3vh';
-  ov.innerHTML = '<div style="width:min(760px,96vw);max-height:92vh;display:flex;flex-direction:column;background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
+  ov.innerHTML = '<div style="width:min(760px,96vw);max-height:calc(var(--vh,1vh)*92);display:flex;flex-direction:column;background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
     '<div style="display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border,#ddd)"><b>🩺 Chẩn đoán kết nối</b><span style="flex:1"></span>' +
     '<button type="button" class="btn secondary sm" id="cd-deep">Kiểm tra đầy đủ</button><button type="button" class="btn secondary sm" id="cd-copy">📋 Sao chép</button><button type="button" class="btn secondary sm" id="cd-x">✕</button></div>' +
     '<pre id="cd-pre" style="margin:0;padding:12px 14px;overflow:auto;font-size:11.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word">Đang đo…</pre></div>';

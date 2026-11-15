@@ -29,7 +29,7 @@ function openPromoConfig(){
   var ov = document.createElement('div');
   ov.id = 'promo-cfg-ov';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center';
-  ov.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:16px 18px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
+  ov.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:16px 18px;width:min(760px,96vw);max-height:calc(var(--vh,1vh)*90);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
     '<div style="font-weight:600;margin-bottom:4px">🎁 Cấu hình khuyến mãi</div>' +
     '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Hệ thống tự tính giá cuối theo các chương trình dưới đây. Mỗi chương trình chọn <b>áp đồng thời được</b> hoặc <b>không áp cùng CT khác</b>; có thể ghi thêm mã CT loại trừ. Khi nhiều CT cùng đủ điều kiện, hệ thống chọn tổ hợp giảm nhiều nhất cho khách.</div>' +
     '<div id="promo-list" style="font-size:12px"></div>' +

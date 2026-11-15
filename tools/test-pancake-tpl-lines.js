@@ -16,6 +16,7 @@ const TPLS = [
 ];
 (async () => {
   const dom = new JSDOM('<!doctype html><body><div id="panel"><input id="pk-tpl-q"><div id="pk-tpl-form"></div><div id="pk-tpl-result"></div></div></body>', { runScripts: 'outside-only' }), w = dom.window;
+  if (!w.CSS) w.CSS = { escape: s => String(s).replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, c => '\\' + c) };   // jsdom 24 khong co CSS.escape (trinh duyet that co); polyfill toi gian cho test
   const clip = [], inserted = []; let status = '';
   w.navigator.clipboard = { writeText: async t => { clip.push(t); } };
   const f = new w.Function('panelEl', 'settings', 'safeSendMessage_', 'escapeHtml', 'insertReply', 'setStatus', 'navigator', 'confirm',

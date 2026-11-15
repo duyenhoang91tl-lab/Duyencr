@@ -162,9 +162,16 @@ function _bdRenderBody_(d){
   return html;
 }
 function renderSalesReportTabBD_(wrap, subTabs){
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
-  wrap.innerHTML = _srGFiltersHtml_() +
-    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
+  var bar = _srGFiltersHtml_() +
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>';
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = _srGFiltersHtml_() +
+      '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' +
+      (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn: thanh lọc G + nút quay về → nội dung chi tiết thưởng (_bdRenderBody_ KHÔNG sửa)
+  wrap.innerHTML = uiReportFrame_({ id: 'BD', barHtml: bar, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _bdRenderBody_(_srState.dataG) });
 }
 
 // ── Từ Báo cáo G: bấm "Chi tiết" của 1 sale → màn hình chi tiết đơn thưởng (K) lọc theo sale đó ──
@@ -240,7 +247,7 @@ function _bdOpenOrder(counter){
   m.id = 'bd-order-modal';
   m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) _bdCloseOrder(); };
-  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:calc(var(--vh,1vh)*86);overflow:auto;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:15px">📦 Thông tin đơn '+esc(counter)+'</b><button class="btn sm" onclick="_bdCloseOrder()">✕ Đóng</button></div>'+
     _bdOrderModalHtml_(x)+'</div>';
   document.body.appendChild(m);

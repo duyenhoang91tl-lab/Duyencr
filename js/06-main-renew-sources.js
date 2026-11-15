@@ -548,7 +548,7 @@ var NAME_ALLOWED_CHARS_RE = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
 // ═══════════════════════════════════════════════════════
 var PTS_RATE = 0.01, PTS_VALUE = 1000;
 // Column visibility state
-const _colVisDefault = { lastpos:true, name:true, tier:true, hang:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
+const _colVisDefault = { lastpos:true, name:true, tier:true, hang:true, level:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
 const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') || {});
 
 // ── Tab chính (Dashboard/Quản lý Team/Nhật ký/Báo cáo doanh số/Báo cáo Pancake/KPI

@@ -5,7 +5,7 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
-const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100,VIETTAT_UPLOAD_MAX_BYTES=3*1024*1024,VIETTAT_FOLDER_SCAN=600;\n' + ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_', '_vtKnownImageIds_', '_vtFolder_', 'vietTatUploadImage_', '_vtCheckImage_', 'vietTatResolveImages_', 'vietTatImage_'].map(fn).join('\n');
+const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_MAX_AUDIOS=10,VIETTAT_AUDIO_MAX_BYTES=10*1048576,VIETTAT_NHOM_MAX=100,VIETTAT_UPLOAD_MAX_BYTES=3*1024*1024,VIETTAT_FOLDER_SCAN=600;\n' + ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtAudsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_', '_vtKnownIds_', '_vtKnownImageIds_', '_vtCheckAudio_', '_vtFolder_', 'vietTatUploadImage_', '_vtCheckImage_', 'vietTatResolveImages_', 'vietTatImage_'].map(fn).join('\n');
 const rows = [];   // khong gom header
 const sheet = {
   getLastRow: () => rows.length + 1,
@@ -137,4 +137,8 @@ ok(up.ok && !/[\/\\\n]/.test(up.name) && created[created.length - 1].getMimeType
 // anh vua tai len luu duoc vao muc (qua kiem tra _vtCheckImage_)
 rows.length = 0; r = save({ abbr: 'up', options: ['a'], scope: 'me', images: [{ id: up.id, name: up.name }] }, hoa);
 ok(r.ok && list(hoa)[0].images[0].id === up.id, 'anh vua tai len gan duoc vao muc');
+
+// ── Route POST con trong doPost (2026-11-14): merge f06722e (03/11) tung lam MAT 3 route nay -> CRM khong luu/xoa/tai anh Viet tat duoc ma test ham van xanh ──
+{ const gsrc = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
+  ['saveVietTat', 'deleteVietTat', 'vietTatUploadImage'].forEach(a => ok(gsrc.indexOf("if (action === '" + a + "')") >= 0, 'doPost co route action=' + a)); }
 console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-GAS TESTS PASSED'); process.exit(bad ? 1 : 0);

@@ -341,7 +341,9 @@ function _saleGroupLabel_(key, groups) {
 // ═══════════════════════════════════════════════════════════════
 var _AUDIT_TOKEN_ = '';
 var AUDIT_SKIP_SETTING_ = /^(gasSource|ttLastTrackedMs$|demoToken$|chotOrders_|assignReportManual_|autoAssignState$)/;
-function _auditClip_(v) { v = String(v == null ? '' : v); return v.length > 1500 ? v.slice(0, 1500) + '…(+' + (v.length - 1500) + ' ký tự)' : v; }
+function _auditClip_(v, max) { v = String(v == null ? '' : v); max = max || 1500; return v.length > max ? v.slice(0, max) + '…(+' + (v.length - max) + ' ký tự)' : v; }
+// R9c: JSON roleConfig lớn hơn 1500 ký tự bị cắt hỏng → trang Phân quyền mất tóm tắt "Vai trò/Phòng". NGUYÊN NHÂN GỐC: ngưỡng chung 1500 cho mọi khóa. Riêng khóa này nâng lên 20000 (1 ô Sheet tối đa 50000); khóa khác giữ 1500.
+function _auditClipMax_(what) { return what === 'setting:roleConfig' ? 20000 : 1500; }
 function _auditActor_() {
   try { var p = _sessVerify_(_AUDIT_TOKEN_); if (p && p.u) return String(p.u); } catch (e) {}
   return _AUDIT_TOKEN_ ? '(token hết hạn)' : '(không token)';
@@ -351,7 +353,7 @@ function _auditCfg_(rows) {
   try {
     if (!rows || !rows.length) return;
     var who = _auditActor_(), now = new Date().toISOString();
-    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1]), _auditClip_(r[2])]; });
+    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1], _auditClipMax_(r[0])), _auditClip_(r[2], _auditClipMax_(r[0]))]; });
     var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS);
     sh.getRange(sh.getLastRow() + 1, 1, m.length, AUDIT_HEADERS.length).setValues(m);
   } catch (e) {}
@@ -364,6 +366,23 @@ function _auditDiffRows_(what, oldMap, newMap) {
     else if (oldMap[k] !== newMap[k]) out.push([what, k + ': ' + oldMap[k], k + ': ' + newMap[k]]);
   });
   Object.keys(oldMap).forEach(function (k) { if (!(k in newMap)) out.push([what, k + ': ' + oldMap[k], '(đã xóa)']); });
+  return out;
+}
+// R9c (2026-11-15): doc AuditLog LOC THEO TIEN TO hanh dong tren TOAN BO sheet (quet tu cuoi len, theo khoi 1000 dong, toi da 30000 dong cuoi, dung khi du `limit` dong khop).
+// NGUYEN NHAN GOC can lam: action=audit chi tra 200 dong moi nhat cua MOI loai thao tac (status/cs/assign...) nen dong "config:setting:roleConfig" (doi phan quyen) bi day ra ngoai
+// ngay khi CRM co nhieu thao tac khach -> trang Phan quyen muc "Thay doi gan day" rong du da co nguoi doi. Tra ve mang moi nhat truoc, cung dang {timestamp,user,action,phone,oldValue,newValue}.
+function _auditReadByPrefix_(sh, prefix, limit) {
+  var out = [];
+  if (!sh || !prefix) return out;
+  var last = sh.getLastRow(), lim = Math.max(1, Math.min(200, Number(limit) || 20)), BLK = 1000, MAXSCAN = 30000, scanned = 0, end = last;
+  while (end > 1 && out.length < lim && scanned < MAXSCAN) {
+    var n = Math.min(BLK, end - 1), start = end - n + 1;
+    var v = sh.getRange(start, 1, n, 6).getValues();
+    for (var i = v.length - 1; i >= 0 && out.length < lim; i--) {
+      if (String(v[i][2]).indexOf(prefix) === 0) out.push({ timestamp: v[i][0], user: v[i][1], action: v[i][2], phone: v[i][3], oldValue: v[i][4], newValue: v[i][5] });
+    }
+    end = start - 1; scanned += n;
+  }
   return out;
 }
 function _auditUserSig_(u) {

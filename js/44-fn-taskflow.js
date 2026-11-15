@@ -270,7 +270,7 @@ function _tfReassignOpen(taskId, stageId){
   var ov = document.getElementById('tf-re-overlay');
   if (!ov){
     ov = document.createElement('div'); ov.className = 'assign-modal-overlay'; ov.id = 'tf-re-overlay'; ov.style.zIndex = 10050;
-    ov.innerHTML = '<div class="assign-modal" style="width:420px;max-height:85vh"><div class="assign-modal-hdr"><div class="assign-modal-title">✏️ Đổi người phụ trách</div>'+
+    ov.innerHTML = '<div class="assign-modal" style="width:420px;max-height:calc(var(--vh,1vh)*85)"><div class="assign-modal-hdr"><div class="assign-modal-title">✏️ Đổi người phụ trách</div>'+
       '<button class="close-btn" onclick="document.getElementById(\'tf-re-overlay\').classList.remove(\'open\')">✕</button></div>'+
       '<div class="assign-body" id="tf-re-body"></div></div>';
     document.body.appendChild(ov);
