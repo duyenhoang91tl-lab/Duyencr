@@ -2141,43 +2141,41 @@ function _moreRowsShow_(key, total, rerenderFn){
   _moreRows_[key] = Math.min(total, _moreRowsLimit_(key) + _MORE_ROWS_PAGE_);
   if (typeof window[rerenderFn] === 'function') window[rerenderFn]();
 }
+// Báo cáo D: phần nội dung tách riêng (HTML GIỮ NGUYÊN so với bản cũ) để vẽ qua khuôn uiReportFrame_ (js/76).
+function _srRenderD_(d){
+  if (!d) return _srNoDataHtml_();
+  var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
+  html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
+  if (_srState.dCsView === 'table'){
+    html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
+    (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
+    if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+    else html += _srTotalRowHtml_(['Tổng', fmt((d.byCS||[]).reduce(function(s,r){return s+(r.count||0);},0))]);
+    html += '</tbody></table>';
+  } else {
+    html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
+  }
+  html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
+  html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
+  var dKey_ = 'dRows|'+(d.total||0), dAll_ = d.rows||[], dShow_ = Math.min(dAll_.length, _moreRowsLimit_(dKey_));
+  dAll_.slice(0, dShow_).forEach(function(r){
+    var latestNote = r.note || '';
+    try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
+    html += '<tr><td>'+_custLinkHtml_(r.phone, esc(r.phone))+'</td><td>'+_custLinkHtml_(r.phone, esc(r.name))+'</td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
+  });
+  if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+  else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
+  html += '</tbody></table>';
+  return html;
+}
 function renderSalesReportTabD_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body;
-  if (_srState.loading) {
-    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  } else {
-    var d = _srState.dataD;
-    if (!d) {
-      body = _srNoDataHtml_();
-    } else {
-      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
-      html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
-      if (_srState.dCsView === 'table'){
-        html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
-        (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
-        if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
-        else html += _srTotalRowHtml_(['Tổng', fmt((d.byCS||[]).reduce(function(s,r){return s+(r.count||0);},0))]);
-        html += '</tbody></table>';
-      } else {
-        html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
-      }
-      html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
-      html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
-      var dKey_ = 'dRows|'+(d.total||0), dAll_ = d.rows||[], dShow_ = Math.min(dAll_.length, _moreRowsLimit_(dKey_));
-      dAll_.slice(0, dShow_).forEach(function(r){
-        var latestNote = r.note || '';
-        try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
-        html += '<tr><td>'+_custLinkHtml_(r.phone, esc(r.phone))+'</td><td>'+_custLinkHtml_(r.phone, esc(r.name))+'</td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
-      });
-      if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
-      else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
-      html += '</tbody></table>';
-      body = html;
-    }
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderD_(_srState.dataD));
+    return;
   }
-  wrap.innerHTML = filters + body;
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn: thanh lọc → nội dung D
+  wrap.innerHTML = uiReportFrame_({ id: 'D', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderD_(_srState.dataD) });
 }
 
 // ═══════════════════════════════════════════════════════
