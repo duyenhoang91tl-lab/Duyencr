@@ -9,10 +9,11 @@ const CASES = [
   { id: 'H', file: 'js/13-fn-bpseedofficialonlinetemplate.js', render: 'renderSalesReportTabH_', bar: '_srBarHtml_', body: '_srRenderH_', build: '_hBuild_', loading: false },
   { id: 'F', file: 'js/12-fn-rendersalesreporttabe.js', render: 'renderSalesReportTabF_', bar: '_srBarHtml_', body: '_srRenderF_', loading: true },
   { id: 'G', file: 'js/12-fn-rendersalesreporttabe.js', render: 'renderSalesReportTabG_', bar: '_srGFiltersHtml_', body: '_srRenderG_', loading: true },
+  { id: 'C', file: 'js/11-fn-srload.js', render: 'renderSalesReportTabC_', bar: '_srBarHtml_', body: '_srRenderC', loading: true },
   /*@@CASES@@*/
 ];
 function load(c, frame) {
-  const ctx = { console, location: { search: '' }, document: { readyState: 'complete', addEventListener() {} }, _srState: { loading: false, dataF: {}, dataG: {} } };
+  const ctx = { console, location: { search: '' }, document: { readyState: 'complete', addEventListener() {} }, _srState: { loading: false, dataF: {}, dataG: {}, dataC: {} } };
   ctx[c.bar] = () => '<div class="srb-bar" id="BAR"></div>';
   ctx[c.body] = d => d ? '<div class="dash-section-title" id="BODY">mục a</div><table id="TB"></table>' : '<div id="NODATA">Chưa có dữ liệu</div>';
   if (c.build) ctx[c.build] = () => ({ x: 1 });

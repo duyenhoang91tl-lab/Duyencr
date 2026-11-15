@@ -1868,8 +1868,12 @@ function renderSalesReportTabC_(wrap, subTabs){
   }
   filters = _srBarHtml_(filters);
 
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc C → nội dung C (KHÔNG sửa _srRenderC nên số liệu không đổi)
+  wrap.innerHTML = uiReportFrame_({ id: 'C', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderC(_srState.dataC) });
 }
 
 function _impParseFile(file, kind){ // kind: 'base' | 'pos'
