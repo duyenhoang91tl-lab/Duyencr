@@ -4,3 +4,15 @@
 html.ui-pro .pro-lead{margin:var(--ui-sp-2) 0}
 html.ui-pro .pro-lead-row{display:flex;gap:var(--ui-sp-2);flex-wrap:wrap;align-items:center}
 html.ui-pro .pro-lead-why{margin:var(--ui-sp-1) 0 var(--ui-sp-2);font-size:var(--ui-fs-sm);color:var(--muted)}
+/* R8d — bảng / biểu đồ thanh trong câu trả lời của trợ lý (js/38-pro-dock.js proRichHtml_). */
+html.ui-pro #pro-ai .pro-rich-bars{display:flex;flex-direction:column;gap:var(--ui-sp-1);margin-top:var(--ui-sp-2)}
+html.ui-pro #pro-ai .pro-rich-bar{display:grid;grid-template-columns:minmax(64px,28%) 1fr auto;align-items:center;gap:var(--ui-sp-2);font-size:var(--ui-fs-sm)}
+html.ui-pro #pro-ai .pro-rich-lb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.ui-pro #pro-ai .pro-rich-tr{display:block;height:8px;border-radius:var(--ui-r-pill);background:var(--border);overflow:hidden}
+html.ui-pro #pro-ai .pro-rich-tr i{display:block;height:100%;border-radius:var(--ui-r-pill);background:var(--ui-brand)}
+html.ui-pro #pro-ai .pro-rich-v{color:var(--muted);white-space:nowrap}
+html.ui-pro #pro-ai .pro-rich-wrap{margin-top:var(--ui-sp-2);overflow-x:auto;max-width:100%}
+html.ui-pro #pro-ai .pro-rich-table{width:100%;border-collapse:collapse;font-size:var(--ui-fs-sm)}
+html.ui-pro #pro-ai .pro-rich-table th,html.ui-pro #pro-ai .pro-rich-table td{padding:var(--ui-sp-1) var(--ui-sp-2);border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+html.ui-pro #pro-ai .pro-rich-table th{color:var(--muted);font-weight:var(--ui-fw-semibold);white-space:nowrap}
+html.ui-pro #pro-ai .pro-rich-link{border:0;background:none;padding:0;color:var(--ui-brand);font:inherit;text-align:left;cursor:pointer;text-decoration:underline}

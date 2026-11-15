@@ -91,6 +91,26 @@ function lsNextStep_(s, c){
   return { text: 'Đặt lịch chăm tiếp trong ' + LS_SOON_DAYS + ' ngày để giữ nhịp', why: 'khách ấm nhưng chưa có lịch hẹn sắp tới', go: 'sched', act: 'Đặt lịch' };
 }
 
+// R8d: gom lịch CHƯA xong theo SĐT (1 lần) để quét hàng trăm nghìn khách không phải lọc lại mảng lịch cho từng khách.
+function lsSchedByPhone_(schedules){
+  var by = {}; (schedules || []).forEach(function(s){ if (s && !s.done && s.phone) (by[s.phone] = by[s.phone] || []).push(s); });
+  return by;
+}
+// R8d: tổng hợp 1 lượt quét cho trợ lý hỏi đáp: số khách theo mức, số khách có lịch quá hạn, top sắp mất (doanh thu cao trước), top nóng (điểm cao trước).
+function lsSummary_(customers, byPhone, nowTs, topN){
+  var n = topN || 10, out = { total: 0, hot: 0, warm: 0, cold: 0, risk: 0, over: 0, riskTop: [], hotTop: [] }, risk = [], hot = [];
+  (customers || []).forEach(function(c){
+    var s = lsScore_(c, byPhone ? (byPhone[c.phone] || []) : null, nowTs);
+    out.total++; out[s.level]++; if (s.over > 0) out.over++;
+    if (s.risk){ out.risk++; risk.push({ c: c, s: s }); }
+    if (s.level === 'hot') hot.push({ c: c, s: s });
+  });
+  risk.sort(function(a, b){ return ((b.c.totalRevenue || 0) - (a.c.totalRevenue || 0)) || ((b.s.days || 0) - (a.s.days || 0)); });
+  hot.sort(function(a, b){ return (b.s.score - a.s.score) || ((b.c.totalRevenue || 0) - (a.c.totalRevenue || 0)); });
+  out.riskTop = risk.slice(0, n); out.hotTop = hot.slice(0, n);
+  return out;
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  R8b (GIAO DIỆN) — LỌC DANH SÁCH THEO MỨC + THANH BÁO "ĐANG LỌC". Cần trình duyệt (các hàm dưới đều tự thoát nếu thiếu DOM/dữ liệu).
 //  _lsListFilter: '' (tắt) | 'risk' (sắp mất) | 'cold' | 'warm' | 'hot'. applyFilters (js/02) gọi lsFilterPass_(c); _filterSignature (js/08) có _lsListFilter
@@ -133,4 +153,4 @@ function lsOpenList_(mode){
 }
 function lsClearListFilter_(){ _lsListFilter = ''; if (typeof applyFilters === 'function') applyFilters(); lsBarSync_(); }
 
-if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
+if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, lsSchedByPhone_: lsSchedByPhone_, lsSummary_: lsSummary_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
