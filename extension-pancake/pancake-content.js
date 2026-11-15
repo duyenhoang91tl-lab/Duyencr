@@ -387,9 +387,10 @@
       <div id="pk-ai-header">
         <div id="pk-ai-header-title" style="flex:1">
           <div style="font-weight:700">🤖 Pancake AI</div>
-          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
+          <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách${(() => { try { return " · v" + chrome.runtime.getManifest().version; } catch (e) { return ""; } })()}</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
+        <button id="pk-vt-toggle" type="button" class="pk-vt-off" title="Gõ tắt trong ô chat — đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)">⌨ Gõ tắt: Tắt</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
@@ -710,6 +711,14 @@
       _setCollapseBtnIcon_(collapsed);
       try { chrome.storage.local.set({ pkPanelCollapsed: collapsed }); } catch (e) {}
     });
+    // Nút bật/tắt GÕ TẮT (mặc định tắt) — lưu vtOn ở storage.local, pancake-viettat.js nghe storage.onChanged nên có hiệu lực ngay, không cần tải lại trang
+    (function () {
+      const b = panelEl.querySelector("#pk-vt-toggle"); if (!b) return;
+      const paint = (on) => { b.classList.toggle("pk-vt-on", !!on); b.classList.toggle("pk-vt-off", !on); b.textContent = on ? "⌨ Gõ tắt: Bật" : "⌨ Gõ tắt: Tắt"; b.title = on ? "Gõ tắt đang BẬT. Bấm để tắt" : "Gõ tắt đang TẮT. Bấm để bật (gõ viết tắt → Tab chèn nội dung)"; };
+      try { chrome.storage.local.get({ vtOn: false }, (v) => paint(v && v.vtOn === true)); } catch (e) {}
+      b.addEventListener("click", (e) => { e.stopPropagation(); const on = !b.classList.contains("pk-vt-on"); paint(on); try { chrome.storage.local.set({ vtOn: on }); } catch (er) {} });
+      try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.vtOn) paint(ch.vtOn.newValue === true); }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
       // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
       chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
@@ -760,6 +769,31 @@
       sel.value = "";
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    // ── Giao diện v2 (2026-11-14): lưới nút công cụ thay cho ô chọn "— Chọn mục —" ──
+    // <select id="pk-menu-sel"> VẪN là nguồn dữ liệu duy nhất (mọi chỗ khác gán .value / nghe 'change' / đổi chữ option như cũ);
+    // lưới nút chỉ vẽ lại từ các <option> (kèm số đếm "(n)") và bấm = gán .value rồi bắn 'change' qua đúng đường cũ.
+    (function () {
+      const sel = panelEl.querySelector("#pk-menu-sel"), row = panelEl.querySelector("#pk-menu-row");
+      if (!sel || !row || panelEl.querySelector("#pk-menu-chips")) return;
+      const grid = document.createElement("div"); grid.id = "pk-menu-chips"; row.parentNode.insertBefore(grid, row);
+      const paint = () => {
+        grid.textContent = "";
+        [...sel.options].filter((o) => o.value).forEach((o) => {
+          const m = /^(\S+)\s+(.*?)(?:\s*\((\d+)\))?$/.exec(o.textContent.trim()) || [];
+          const b = document.createElement("button"); b.type = "button"; b.className = "pk-chip" + (sel.value === o.value ? " active" : ""); b.dataset.v = o.value;
+          b.title = o.textContent.trim();
+          const ic = document.createElement("span"); ic.className = "pk-chip-ic"; ic.textContent = m[1] || "•";
+          const tx = document.createElement("span"); tx.className = "pk-chip-tx"; tx.textContent = m[2] || o.textContent.trim();
+          b.appendChild(ic); b.appendChild(tx);
+          if (m[3] !== undefined) { const n = document.createElement("span"); n.className = "pk-chip-n" + (m[3] === "0" ? " zero" : ""); n.textContent = m[3]; b.appendChild(n); }
+          b.addEventListener("click", () => { sel.value = sel.value === o.value ? "" : o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); });
+          grid.appendChild(b);
+        });
+      };
+      paint();
+      sel.addEventListener("change", paint);
+      try { new MutationObserver(paint).observe(sel, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+    })();
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);

@@ -1,6 +1,55 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — Pancake AI: GÕ TẮT mặc định TẮT + nút bật/tắt, rồi TRÌNH BÀY LẠI panel) — ĐANG LÀM, mỗi bước 1 push
+
+**Yêu cầu Duyên:** Pancake AI có nút bật/tắt gõ tắt, ai muốn bật mới bật; và trình bày lại panel Pancake AI cho thông minh, khoa học, đẹp hơn (bản hiện tại bị chê "chán").
+**Kế hoạch:** (1) gõ tắt mặc định tắt + nút trên panel ✅ · (2) trình bày lại panel (header, lưới nút công cụ, thẻ) ✅ · (3) chỉnh theo phản hồi + tài liệu.
+
+### ✅ Bước 1 — gõ tắt mặc định TẮT (extension-pancake, manifest 2026.11.14.3)
+NGUYÊN NHÂN GỐC: `pancake-viettat.js` đọc `enabled = v.vtOn !== false` (khuyết = BẬT) nên ai cài extension cũng bị bật gõ tắt dù không cần, và luôn gọi GAS `vietTat` mỗi 5 phút. Nay `enabled = v.vtOn === true` (khuyết = TẮT); khi tắt thì KHÔNG gọi GAS và ẩn popup gợi ý; bật lên thì nạp ngay (`storage.onChanged` → `loadLocal` → `refresh`).
+- `pancake-viettat.js`: mặc định tắt, tắt thì không fetch.
+- `pancake-content.js` + `.css`: nút `⌨ Gõ tắt: Tắt/Bật` (`#pk-vt-toggle`) ở header panel, ghi `vtOn` vào storage.local, đồng bộ 2 chiều với Options.
+- `pancake-options.js/.html`: checkbox mặc định bỏ tick + ghi chú.
+- `tools/test-viettat-ext.js`: boot mặc định vtOn:true; thêm 2 ca "chưa từng bật → tắt, không gọi GAS". PASS (jsdom).
+- ⚠ Người đang dùng gõ tắt sẽ thấy nó TẮT sau khi cập nhật (vì chưa từng lưu vtOn) → bấm nút ⌨ trên panel để bật lại.
+- ⚠ KHÔNG đụng Zalo AI (`zalo-viettat.js` vẫn mặc định bật như cũ). `tools/derive-zalo-viettat.js` ĐÃ HỎNG SẴN trước phiên này ("Khong thay doan const resp = await new Promise…" vì dòng đó trong pancake-viettat.js đã được sửa thêm comment lastError) → chưa sinh lại được; việc riêng cần sửa trước khi đồng bộ Zalo.
+- Không đổi GAS → không cần deploy GAS. Cần reload extension Pancake trong chrome://extensions.
+### ✅ Bước 2 — trình bày lại panel Pancake AI (giao diện v2; manifest 2026.11.14.4)
+NGUYÊN NHÂN GỐC "chán": panel cũ phẳng — header xanh trơn, mọi nhóm (CS, SĐT, chọn mục, thẻ khách) là các hàng trần cùng 1 kiểu, 7 chức năng giấu sau 1 ô chọn "— Chọn mục —" (phải bấm 2 lần, không thấy số nhắc hẹn/data được chia nếu chưa mở).
+- `pancake-content.css` (khối "GIAO DIỆN V2" ở CUỐI file, chỉ đổi màu/khoảng cách, KHÔNG đổi id/class JS dùng): header gradient tím→hồng, nền xám nhạt, mỗi nhóm là 1 thẻ trắng bo 12px, ô nhập có viền focus, nút Tra cứu dạng gradient.
+- `pancake-content.js` (đoạn "Giao diện v2" trong `injectPanel`): LƯỚI NÚT CÔNG CỤ 2 cột thay ô chọn mục — mỗi nút icon + tên + badge số đếm (Nhắc hẹn, Data được chia hiện sẵn, đỏ khi >0). `<select id="pk-menu-sel">` GIỮ NGUYÊN làm nguồn dữ liệu (ẩn bằng CSS) nên mọi chỗ khác gán `.value`/nghe `change`/đổi chữ option vẫn chạy; bấm nút = gán value + bắn `change`; bấm lại nút đang mở = tắt; MutationObserver cập nhật badge khi đếm đổi.
+- `tools/test-pancake-chips.js` (mới, 9 ca jsdom) PASS; `test-viettat-ext.js` PASS; `node -c` OK.
+- Quay về giao diện cũ: xoá khối "GIAO DIỆN V2" cuối CSS + đoạn "Giao diện v2" trong JS (ghi sẵn trong comment CSS).
+- ⚠ CHƯA nhìn được bằng mắt trên Pancake thật (chat không có trình duyệt có đăng nhập) → Duyên reload extension (chrome://extensions) + F5 Pancake, xem panel; chê chỗ nào (màu, cỡ chữ, thứ tự) nói để chỉnh tiếp. Không đổi GAS.
+### ✅ Sửa lỗi "Từng đoạn" bị bẻ mỗi ký tự 1 dòng (manifest 2026.11.14.5) — Duyên quay video 16:44
+Triệu chứng: Mẫu tư vấn → bấm "📑 Từng đoạn (n)" → chữ của đoạn hiện dọc 1 ký tự/dòng, nút "Copy đoạn" tràn ra ngoài panel, không đọc được nội dung để cắt đoạn. (Video là giao diện CŨ → lỗi có từ trước giao diện v2, không phải do v2.)
+NGUYÊN NHÂN GỐC: `.pk-tpl-line` là flex 1 hàng gồm chữ (`flex:1; min-width:0`) + 2 nút (`flex:none`, nowrap); panel 340px bị 2 nút chiếm gần hết → chữ còn ~0px. Sửa `pancake-content.css`: `flex-wrap:wrap`, chữ `flex:1 1 100%` (hàng riêng), nút xuống hàng dưới. KHÔNG đổi JS. Chưa xem layout bằng mắt (chat không có trình duyệt) → Duyên reload extension + F5 kiểm lại.
+### 🔎 "Từng đoạn" Duyên báo VẪN LỖI sau bản .5 — đã dựng lại bằng Chromium thật (manifest 2026.11.14.6)
+Dựng đúng cấu trúc thẻ mẫu trong Chromium (playwright): CSS CŨ cho chữ rộng 0px/cao 1528px (đúng video); CSS MỚI (bản .5) cho chữ rộng 300px, nút trong panel → code ĐÃ ĐÚNG. Nhiều khả năng trình duyệt Duyên vẫn chạy bản cũ (chưa reload extension, hoặc nạp từ thư mục local chưa `git pull`).
+- Thêm số phiên bản vào header panel (`· v2026.11.14.6` dưới tên "Pancake AI") để nhìn là biết đang chạy bản nào; nếu KHÔNG thấy "· v…" nghĩa là đang chạy bản cũ.
+- Test mới `tools/test-pancake-tpl-lines-layout.py` (layout thật, cần playwright): chữ đoạn rộng >100px và nút không tràn panel.
+- [ ] VIỆC KẾ TIẾP: Duyên pull repo → reload extension → F5 Pancake → xem header có "· v2026.11.14.6"; nếu CÓ số đó mà "Từng đoạn" vẫn bẻ dọc thì gửi lại ảnh/video mới (có thể do CSS của trang Pancake đè) để dò tiếp.
+- [ ] VIỆC KẾ TIẾP: bước 3 — chỉnh theo phản hồi của Duyên sau khi xem thật; có thể làm tiếp thẻ khách (`.pk-ai-cust-card`: nhóm trạng thái/lịch hẹn/ghi chú), khối gợi ý AI và giỏ hàng; cập nhật `docs/crm-kb/04-extension-pancake.md` (ghi nút gõ tắt + lưới nút) khi giao diện chốt.
+
+## 2026-11-14 (phiên Claude — Android Viết tắt: DROPDOWN THƯ MỤC MẸ/CON trên app) — XONG code, CHỜ CI + Duyên thử
+
+**Yêu cầu Duyên:** đã yêu cầu thư mục mẹ/con dạng dropdown nhưng app Android chưa hiển thị (HANDOFF B3b trước đó ghi "Android chưa làm").
+NGUYÊN NHÂN GỐC: app lưu thư mục PHẲNG (`Folder.name` = "CRM · Túi tiền › Cổ") và vẽ thành chip độc lập (`MainActivity.kt` LazyRow + chip trong `SnippetDialog`), không có cấp mẹ/con. KHÔNG đổi dữ liệu/đồng bộ (Data.kt, Sync.kt giữ nguyên) — chỉ dựng cây từ tên thư mục.
+- [x] Bước 1: file mới `FolderTree.kt` — `FolderTree.build/flatten/index/ancestors` (tách tên theo " › " và phần đầu theo " · " → CRM / Của tôi / Túi tiền / Cổ) + composable `FolderTreeDialog` (▸/▾ xổ thu, thụt lề, chọn mẹ = gồm cả con cháu qua `FNode.ids`). Chưa có chỗ nào gọi.
+- [x] Bước 2: `MainActivity.kt` — màn chính: nút `📁 <thư mục> ▾` mở `FolderTreeDialog` (lọc; chọn mẹ gồm con cháu; `selKey` thay `sel`); `SnippetDialog`: ô thư mục = nút mở cây (chỉ thư mục tự tạo, vì thư mục CRM bị xoá mỗi lần ☁ CRM); "+ Thư mục" gõ `Mẹ › Con` (điền sẵn mẹ). Sửa kèm lỗi: nút "+" khi đang đứng trong thư mục CRM giờ tạo mục mới ở "default" (trước đây mục mới rơi vào thư mục CRM và mất khi ☁ CRM). versionCode 23 / 1.22. Đã mô phỏng logic dựng cây bằng Python với tên thật (CRM · Túi tiền › Cổ, CRM · Của tôi · …, Bán hàng › Nhẫn): đúng.
+- [ ] VIỆC KẾ TIẾP: chờ CI "Build Android VietTat" (Kotlin chưa biên dịch được ở chat; nếu đỏ sửa `FolderTree.kt`/`MainActivity.kt`) → Duyên cài VietTat.apk 1.22 (Release `viettat-latest`), bấm ☁ CRM, bấm nút 📁 xem cây CRM → Túi tiền → Cổ; thử "+ Thư mục" gõ `Bán hàng › Nhẫn`. Không đổi GAS/extension/CRM web.
+- ⚠ Kotlin CHƯA biên dịch được ở chat (không có Android SDK) → chờ CI "Build Android VietTat".
+
+## 2026-11-14 (phiên Claude — Android Viết tắt 1.21: "+ Hình ảnh" chọn được NHIỀU ảnh 1 lúc) — XONG phần code; CHỜ CI build + Duyên thử
+
+**Yêu cầu Duyên:** app Viết tắt, khi thêm ảnh để add vào mẫu tin nhắn có sẵn thì không chọn được nhiều ảnh cùng lúc.
+- [x] `MainActivity.kt` (`SnippetDialog`): NGUYÊN NHÂN GỐC — `pickImg`/`pickAud` dùng `ActivityResultContracts.GetContent()` (bộ chọn đúng 1 tệp/lần). Đổi sang `GetMultipleContents()`: mỗi ảnh/tệp thành 1 lựa chọn `[[img:..]]`/`[[aud:..]]` riêng theo thứ tự chọn; 1 tệp lỗi chỉ bỏ qua tệp đó + Toast số tệp lỗi (`copyIn` giờ báo lỗi khi không mở được tệp thay vì trả tên file không tồn tại). Đã grep: chỉ 2 chỗ này dùng GetContent ngoài `CrmWeb.kt` (CrmWeb đã chọn nhiều qua EXTRA_ALLOW_MULTIPLE, không đổi).
+- [x] `build.gradle.kts`: versionCode 22 / versionName 1.21 (để cài đè được bản 1.20).
+- GAS/extension/CRM web KHÔNG đổi → không cần deploy GAS, không cần reload extension.
+- ⚠ Kotlin CHƯA biên dịch được ở môi trường chat (không có Android SDK) → chờ GitHub Actions "Build Android VietTat"; nếu CI đỏ, đọc log và sửa `MainActivity.kt` dòng ~185-195.
+- [ ] VIỆC KẾ TIẾP: Duyên tải VietTat.apk (Release `viettat-latest`) cài đè bản 1.21 → mở "+ Thêm viết tắt" → "+ Hình ảnh" → chọn nhiều ảnh cùng lúc (giữ ảnh đầu để vào chế độ chọn nhiều) → kiểm mỗi ảnh hiện thành 1 dòng "N. Hình ảnh" và lưu/chèn đúng.
+
 ## 2026-11-15 — App Android: bấm mục CRM xem được NỘI DUNG + sửa CÁ NHÂN HOÁ trên máy mình — bước 1/2 đã push (lõi lưu trữ)
 - **Yêu cầu Duyên (kèm video):** mẫu viết tắt lấy từ CRM, bấm trong app chỉ hiện toast "Mục lấy từ CRM — sửa trên CRM…" → không xem được nội dung bên trong; muốn xem được, và app của ai thì sửa cá nhân hoá cho người ấy.
 - **Nguyên nhân gốc:** `MainActivity.App` chặn mọi mục `crm_*` bằng toast; và `Store.replaceCrm` xoá-rồi-nạp-lại TOÀN BỘ mục CRM mỗi lần ☁ CRM nên không có chỗ nào giữ bản sửa riêng.
