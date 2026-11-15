@@ -7,7 +7,7 @@ const old = cp.execSync('git show dcec0ba:' + F, { cwd: root, maxBuffer: 1 << 26
 function fn(src, n) { const i = src.indexOf('function ' + n + '('); if (i < 0) return ''; let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 function vr(src, n) { const m = src.match(new RegExp('var ' + n + ' = [^;]*;')); return m ? m[0] : ''; }
 let fail = 0; const t = (c, m) => { if (c) console.log('ok   ' + m); else { fail++; console.log('FAIL ' + m); } };
-const NAMES = ['splitPhoneKey_', 'splitEsc_', 'splitMoney_', 'splitNum_', 'splitPct_', 'splitTile_', 'splitStatGrid_', 'splitWarnBox_', 'splitCheckCell_', 'splitBaseKind_', 'splitCheckLabel_', 'splitDetRows_', 'splitDetailPanelHtml_', 'splitReportHtml_'];
+const NAMES = ['splitPhoneKey_', 'splitEsc_', 'splitMoney_', 'splitNum_', 'splitPct_', 'splitTile_', 'splitStatGrid_', 'splitKitOn_', 'splitStateChip_', 'splitErrColor_', 'splitWarnBox_', 'splitCheckCell_', 'splitBaseKind_', 'splitCheckLabel_', 'splitDetRows_', 'splitDetailPanelHtml_', 'splitReportHtml_'];
 function mk(src, kit) {
   const ctx = { console, location: { search: '' }, document: { readyState: 'complete', addEventListener() {} }, _custLinkHtml_: (p, h) => h };
   ctx.window = ctx; vm.createContext(ctx);

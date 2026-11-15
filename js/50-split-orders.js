@@ -50,6 +50,12 @@ function splitCheckCell_(c){   // c = nhãn splitCheckLabel_ (LỆCH… / Khớp
   if (typeof uiChip_==='function') return '<td>'+(c ? uiChip_(c, { tone: /^LỆCH/.test(c)?'danger':/^Khớp/.test(c)?'success':'neutral', dot: true }) : '')+'</td>';
   return '<td style="font-weight:700;color:'+(/^LỆCH/.test(c)?'var(--red)':/^Khớp/.test(c)?'var(--green,#15803d)':'var(--muted)')+'">'+splitEsc_(c)+'</td>';
 }
+// R7d-3: chip trạng thái + màu lỗi của panel chi tiết / bảng Sửa lệch. Có ui-kit (js/68) → uiChip_/token; thiếu → màu cứng y như cũ.
+function splitKitOn_(){ return typeof uiChip_==='function'; }
+function splitStateChip_(text, tone, fbStyle, fbText){   // fbStyle/fbText = HTML bản cũ khi thiếu ui-kit
+  return splitKitOn_() ? uiChip_(text, { tone: tone, dot: true }) : '<span style="'+fbStyle+'">'+(fbText==null?splitEsc_(text):fbText)+'</span>';
+}
+function splitErrColor_(){ return splitKitOn_() ? 'var(--ui-danger)' : '#c0392b'; }
 function splitDetailHtml_(items, max, all){
   if (!items.length) return '<div class="split-msg">Không có đơn chia nào trong kỳ này.</div>';
   var rows = items.slice(0,max).map(function(it){
@@ -119,7 +125,9 @@ function splitDetailPanelHtml_(m){
   h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)+' · '
     + (m.tab==='base' ? '<b>'+splitNum_(sm.baseOrders)+'</b> đơn gốc Base · tổng '+splitMoney_(sm.baseTotal)+' · phần của sale <b>'+splitMoney_(sm.baseShare)+'</b>'
                       : '<b>'+splitNum_(sm.posOrders)+'</b> đơn Pos chia · tổng '+splitMoney_(sm.posTotal)+' · phần của sale <b>'+splitMoney_(sm.posShare)+'</b>')+'</div>';
-  if (m.tab==='pos' && sm.check){ var ck = sm.check; h += '<div style="font-size:12px;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap"><span style="color:var(--red);font-weight:700">🔴 '+splitNum_(ck.lech)+' đơn LỆCH Base</span><span style="color:var(--green,#15803d)">🟢 '+splitNum_(ck.khop)+' khớp</span><span style="color:var(--muted)">⚪ '+splitNum_(ck.khongCoBase)+' không có đơn Base để đối chiếu</span>'+(ck.goiY?'<span style="color:var(--muted)">('+splitNum_(ck.goiY)+' đơn đối chiếu theo gợi ý SĐT + ngày, cần kế toán xác nhận)</span>':'')+'</div>'; }
+  if (m.tab==='pos' && sm.check){ var ck = sm.check; h += '<div style="font-size:12px;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">'+(splitKitOn_()
+      ? splitStateChip_(splitNum_(ck.lech)+' đơn LỆCH Base','danger')+splitStateChip_(splitNum_(ck.khop)+' khớp','success')+splitStateChip_(splitNum_(ck.khongCoBase)+' không có đơn Base để đối chiếu','neutral')
+      : '<span style="color:var(--red);font-weight:700">🔴 '+splitNum_(ck.lech)+' đơn LỆCH Base</span><span style="color:var(--green,#15803d)">🟢 '+splitNum_(ck.khop)+' khớp</span><span style="color:var(--muted)">⚪ '+splitNum_(ck.khongCoBase)+' không có đơn Base để đối chiếu</span>')+(ck.goiY?'<span style="color:var(--muted)">('+splitNum_(ck.goiY)+' đơn đối chiếu theo gợi ý SĐT + ngày, cần kế toán xác nhận)</span>':'')+'</div>'; }
   if (!rows.length) h += '<div class="split-msg">'+(m.tab==='base' ? 'Không có đơn gốc Base nào trong kỳ này (đơn chia của sale này không ghép với đơn Base).' : (m.onlyLech ? 'Không có đơn nào lệch Base.' : 'Không có đơn chia nào trong kỳ này.'))+'</div>';
   else {
     var money = m.tab==='base' ? {7:1,8:1} : {7:1,8:1,9:1};
@@ -333,14 +341,14 @@ function splitFixPanelHtml_(){
     + '<button type="button" class="btn sm" onclick="splitFixLoad_()">↻ Tải lại</button></div>'
     + '<div style="color:var(--muted);font-size:12px;margin-bottom:8px">Mỗi dòng: <code>sale1, sale2 = số tiền</code> (sale cùng dòng chia đều). Đơn đã có dòng chia tay (tab onl của kế toán hoặc bảng CRM) không hiện ở đây.</div>';
   if (f.loading) return h + '<div style="padding:16px;color:var(--muted)">Đang tải…</div></div>';
-  if (f.err) return h + '<div style="padding:10px;color:#c0392b">' + splitEsc_(f.err) + '</div></div>';
+  if (f.err) return h + '<div style="padding:10px;color:' + splitErrColor_() + '">' + splitEsc_(f.err) + '</div></div>';
   var d = f.data; if (!d) return h + '</div>';
   h += '<div style="margin-bottom:8px">Có <b>' + d.total + '</b> đơn ghép lệch Pos–Base' + (d.truncated ? ' (chỉ hiện ' + d.rows.length + ' đơn lệch nhiều nhất — lọc thêm bằng ô tìm)' : '') + '.</div>';
   d.rows.forEach(function(o, i){
     var t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o);
     h += '<div style="border-top:1px solid var(--border);padding:10px 0">'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b>' + splitEsc_(o.code || '(không mã)') + '</b><span style="color:var(--muted)">' + splitEsc_(o.ngay) + ' · ' + splitEsc_(o.khach) + ' · ' + splitEsc_(o.sdt) + '</span></div>'
-      + '<div style="margin:4px 0">Pos: <b>' + splitMoney_(o.posVal) + '</b> · thẻ Pos: <b>' + splitEsc_(o.the.join(', ') || '—') + '</b> · Base: <b>' + splitMoney_(o.baseSum) + '</b> · <span style="color:' + (o.lechTien ? '#c0392b' : '#b9770e') + '">' + (o.lechTien ? 'lệch ' + (o.lechTien>0?'+':'') + splitMoney_(o.lechTien) : 'lệch người bán') + '</span></div>'
+      + '<div style="margin:4px 0">Pos: <b>' + splitMoney_(o.posVal) + '</b> · thẻ Pos: <b>' + splitEsc_(o.the.join(', ') || '—') + '</b> · Base: <b>' + splitMoney_(o.baseSum) + '</b> · ' + splitStateChip_(o.lechTien ? 'lệch ' + (o.lechTien>0?'+':'') + splitMoney_(o.lechTien) : 'lệch người bán', o.lechTien ? 'danger' : 'warning', 'color:' + (o.lechTien ? '#c0392b' : '#b9770e')) + '</div>'
       + '<table style="font-size:12px;border-collapse:collapse;margin:4px 0"><tr style="color:var(--muted)"><td style="padding:1px 10px 1px 0">Đơn gốc Base</td><td style="padding:1px 10px">Sale bán</td><td style="padding:1px 10px;text-align:right">Giá trị</td><td style="padding:1px 10px">Trạng thái</td></tr>'
       + o.base.map(function(x){ return '<tr style="' + (x.tinh ? '' : 'opacity:.55;text-decoration:line-through') + '"><td style="padding:1px 10px 1px 0">' + splitEsc_(x.ma) + ' <span style="color:var(--muted)">' + splitEsc_(x.ngay) + '</span></td><td style="padding:1px 10px">' + splitEsc_(x.saleBan || '—') + '</td><td style="padding:1px 10px;text-align:right">' + splitMoney_(x.giaTri) + '</td><td style="padding:1px 10px">' + splitEsc_(x.trangThai) + '</td></tr>'; }).join('') + '</table>'
       + '<textarea rows="' + Math.max(2, Math.min(6, t.split('\n').length)) + '" oninput="splitFixEdit_(' + i + ',this.value)" style="width:100%;max-width:560px;font-family:monospace;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px">' + splitEsc_(t) + '</textarea>'
@@ -349,7 +357,7 @@ function splitFixPanelHtml_(){
   });
   var ex = {}; (f.extra||[]).forEach(function(x){ if (!x || !x.code) return; var k = splitFixCodeNy_(x.code); (ex[k] = ex[k] || { code: x.code, rows: [] }).rows.push(x); });
   var keys = Object.keys(ex);
-  h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>Chia tay đang lưu trong CRM</b> (' + keys.length + ' đơn)' + (f.extraErr ? ' <span style="color:#c0392b">— không đọc được bảng</span>' : '') + '</div>';
+  h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>Chia tay đang lưu trong CRM</b> (' + keys.length + ' đơn)' + (f.extraErr ? ' <span style="color:' + splitErrColor_() + '">— không đọc được bảng</span>' : '') + '</div>';
   keys.forEach(function(k){
     var g = ex[k];
     h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;font-size:12px"><b>' + splitEsc_(g.code) + '</b><span>' + g.rows.map(function(r){ return splitEsc_((r.sales||[]).join(', ')) + ' = ' + splitMoney_(r.tong); }).join(' · ') + '</span>'
