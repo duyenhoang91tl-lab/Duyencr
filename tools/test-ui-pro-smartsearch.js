@@ -66,4 +66,19 @@ if (JSDOM) {
   inp.value = 'nguyen'; w.ssRender_(); inp.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   ok(box().style.display === 'none', 'DOM: Esc ẩn hộp');
 }
+// Chạy NGUYÊN dòng lọc đã nối trong js/02 (trích từ mã nguồn) với ví dụ thật — cả khi có js/69 lẫn khi thiếu (kiểu cũ)
+{
+  const mm = j02.match(/\n(\s*if \(q && !\(_sn \? ssMatchText_[^\n]*return false;)/);
+  ok(!!mm, 'tìm thấy dòng lọc đã nối trong applyFilters');
+  if (mm) {
+    const pred = new Function('ssMatchText_', 'c', 'q', '_sn', mm[1].replace(/\breturn false;$/, 'return false; return true;').replace(/^\s*/, ''));
+    const run = (raw, withModule) => { const sn = withModule ? N(raw) : null; const q = sn ? sn.q : raw.trim().toLowerCase(); return C.filter(c => pred(m.ssMatchText_, c, q, sn)).map(c => c.phone).join(); };
+    ok(run('nguyen van', true) === '0912345678,0912000111', 'applyFilters: "nguyen van" ra 2 khách Nguyễn Văn / Văn Nguyễn');
+    ok(run('nguyen van', false) === '', 'applyFilters kiểu CŨ (thiếu js/69): "nguyen van" → 0 khách (đúng lỗi gốc)');
+    ok(run('nguyễn văn', false) === '0912345678', 'kiểu cũ vẫn chạy khi gõ đủ dấu (không vỡ khi thiếu js/69)');
+    ok(run('0912 345 678', true) === '0912345678' && /^\d{4,}$/.test(N('0912 345 678').q), 'SĐT có dấu cách → q thành dãy số → còn đi vào nhánh isPhoneSearch');
+    ok(run('+84 987 654 321', true) === '0987654321', '+84 → đúng khách');
+    ok(run('', true) === C.map(c => c.phone).join(), 'ô rỗng → không lọc');
+  }
+}
 console.log(bad ? ('FAILED ' + bad) : 'ALL SMART-SEARCH TESTS PASSED'); process.exit(bad ? 1 : 0);

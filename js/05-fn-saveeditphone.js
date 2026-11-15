@@ -152,7 +152,8 @@ document.addEventListener('DOMContentLoaded', function () {
 //  EXPORT + CLEAR
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const q=s(document.getElementById('search-input').value).toLowerCase();
+  const _sn=(typeof ssNormQuery_==='function')?ssNormQuery_(document.getElementById('search-input').value):null;   // R5c: cùng cách tìm với bảng (js/69)
+  const q=_sn?_sn.q:s(document.getElementById('search-input').value).toLowerCase();
   const csFList=_csFilterListMatch();
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
@@ -162,7 +163,7 @@ function exportCSV() {
       if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
     }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
-    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)&&!(c.cskhNameLower&&c.cskhNameLower.includes(q))) return false;
+    if(q&&!(_sn?ssMatchText_(c,_sn):(c.name.toLowerCase().includes(q)||c.phone.includes(q)||(c.cskhNameLower&&c.cskhNameLower.includes(q))))) return false;
     return true;
   });
   const BOM='\uFEFF';

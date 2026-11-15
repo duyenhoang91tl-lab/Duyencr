@@ -501,7 +501,9 @@ function debouncedApplyFilters() {
 }
 
 function applyFilters() {
-  const q = s(document.getElementById('search-input').value).toLowerCase();
+  // R5c (15/11/2026): chuẩn hoá ô tìm (js/69) — tên bỏ dấu + mọi từ, SĐT có dấu cách/chấm/+84. Thiếu js/69 → _sn=null → kiểu cũ y nguyên.
+  const _sn = (typeof ssNormQuery_ === 'function') ? ssNormQuery_(document.getElementById('search-input').value) : null;
+  const q = _sn ? _sn.q : s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
   const csFList = _csFilterListMatch();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
@@ -584,7 +586,7 @@ function applyFilters() {
       }
       if (!_matchAnyCS) return false;
     }
-    if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
+    if (q && !(_sn ? ssMatchText_(c, _sn) : (c.nameLower.includes(q) || c.phone.includes(q) || (c.cskhNameLower && c.cskhNameLower.includes(q))))) return false;
 
     // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
