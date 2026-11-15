@@ -1,6 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — Pancake AI panel BƯỚC 3: thẻ khách + gợi ý AI + giỏ hàng) — XONG 1/1 (đã push); CHỜ Duyên xem thực tế
+NGUYÊN NHÂN GỐC: sau bước 2 chỉ header/lưới nút/thẻ nhóm đổi màu tím–hồng; thẻ khách, khối gợi ý AI và giỏ hàng vẫn dùng CSS cũ (xanh lá/xanh dương) nên panel nhìn lệch tông.
+- `extension-pancake/pancake-content.css` (cuối khối GIAO DIỆN V2): thẻ khách viền gradient trên, tên/SĐT/chip/nhãn tím, `.pk-ai-suggestion-item` viền trái accent, nút lưu gợi ý gradient, giỏ hàng nền trắng + viền. CHỈ CSS, không đổi id/class JS. Manifest `2026.11.14.7`.
+- `docs/crm-kb/04-extension-pancake.md`: thêm mục "Giao diện v2" (nút gõ tắt, lưới nút, số phiên bản, cách quay về giao diện cũ).
+- Test: `node -c pancake-content.js` OK, `test-pancake-chips.js` + `test-viettat-ext.js` PASS (jsdom). Không đổi GAS → KHÔNG cần deploy GAS / đồng bộ `gas-code-v9`.
+- 🧪 Duyên: `git pull` → reload extension Pancake AI ở `chrome://extensions` → F5 Pancake → header phải có `· v2026.11.14.7` → xem thẻ khách + gợi ý AI + giỏ hàng; chê chỗ nào (màu, cỡ chữ) nói để chỉnh.
+- [ ] VIỆC KẾ TIẾP: chỉnh theo phản hồi/ảnh của Duyên; nếu muốn làm tiếp: form "Soạn đơn" (`pkb-`) và bảng dòng giỏ hàng. Kế hoạch lớn R0–R12 (mục bên dưới) VẪN chờ: R2c trở đi + 4 câu hỏi cho Duyên.
+
 ## 2026-11-14 (phiên Claude — KẾ HOẠCH THIẾT KẾ LẠI TOÀN BỘ CRM, chia bước nhỏ) — ĐANG LÀM: R1 (mã thiết kế) XONG + đã push; kế tiếp R2 (bộ thành phần); R0 chờ ảnh của Duyên; 4 câu hỏi cuối mục vẫn chờ Duyên trả lời
 **Nguyên tắc (đọc trước khi làm bất kỳ bước nào):**
 - KHÔNG viết lại từ đầu. CRM đã có khung navy (`css/13-shell.css`), bộ `pro-*` (`css/06-pro.css`), Trang chủ/Hồ sơ 360°/Báo cáo PRO/dock trợ lý (P0–P4 trong `docs/UI-PRO-PLAN.md`), trang Phân quyền 3 tab (L3), thanh viên thuốc ngày (`js/56-fn-qrpills.js`), vừa màn điện thoại (`css/15-mobile.css`). Kế hoạch này GOM các phần còn dở trong `docs/UI-LAYOUT-PLAN.md` (L0, L2 còn lại, L4–L6) thành 1 lộ trình duy nhất + thêm lớp "thông minh". Làm kiểu BỌC/ÁP KHUÔN lên hàm cũ, không đổi logic dữ liệu.
