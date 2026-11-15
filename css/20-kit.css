@@ -1,0 +1,32 @@
+/* ════════════════════════════════════════════════════════════════════
+   20-kit.css — BỘ THÀNH PHẦN DÙNG CHUNG `ui-*` (R2 trong HANDOFF.md). Khung HOÀNG HÔN + MÀU ĐỔ NHẸ (Duyên chốt 15/11/2026).
+   LUẬT: chỉ dùng var(--ui-*) (không mã màu cứng — tools/test-tokens.js, TOKEN_ONLY); biến cục bộ của thành phần đặt tên `--uk-*`.
+   Xem trước: mở CRM với đuôi  ?ui=kit  (hoặc gõ uiKitOpen_() ở Console). Mã HTML sinh bởi js/68-ui-kit.js (hàm uiXxx_).
+   ════════════════════════════════════════════════════════════════════ */
+.ui-tone-brand{--uk-tone:var(--ui-brand);--uk-tone-soft:var(--ui-brand-soft);--uk-tone-line:var(--ui-brand-mid)}
+.ui-tone-success{--uk-tone:var(--ui-success);--uk-tone-soft:var(--ui-success-soft);--uk-tone-line:var(--ui-success-line)}
+.ui-tone-warning{--uk-tone:var(--ui-warning);--uk-tone-soft:var(--ui-warning-soft);--uk-tone-line:var(--ui-warning-line)}
+.ui-tone-danger{--uk-tone:var(--ui-danger);--uk-tone-soft:var(--ui-danger-soft);--uk-tone-line:var(--ui-danger-line)}
+.ui-tone-info{--uk-tone:var(--ui-info);--uk-tone-soft:var(--ui-info-soft);--uk-tone-line:var(--ui-info-line)}
+.ui-tone-neutral{--uk-tone:var(--ui-text-muted);--uk-tone-soft:var(--ui-surface-2);--uk-tone-line:var(--ui-border-md)}
+
+/* ── R2a: THẺ SỐ ── */
+.ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--ui-sp-3)}
+.ui-stat{display:flex;align-items:center;gap:var(--ui-sp-3);min-width:0;padding:var(--ui-sp-4);font-family:var(--ui-font);background:var(--ui-grad-soft);border:1px solid var(--ui-border);border-radius:var(--ui-r-xl);box-shadow:var(--ui-shadow-sm)}
+.ui-stat-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;font-size:var(--ui-fs-xl);color:var(--uk-tone,var(--ui-brand));background:var(--uk-tone-soft,var(--ui-brand-soft));border:1px solid var(--uk-tone-line,var(--ui-brand-mid));border-radius:var(--ui-r-xl)}
+.ui-stat-body{min-width:0}
+.ui-stat-lb{font-size:var(--ui-fs-sm);color:var(--ui-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ui-stat-n{font-size:var(--ui-fs-3xl);font-weight:var(--ui-fw-bold);line-height:1.15;color:var(--ui-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ui-stat-sub{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);margin-top:2px;font-size:var(--ui-fs-xs);color:var(--ui-text-hint)}
+.ui-delta{display:inline-block;padding:1px 7px;font-weight:var(--ui-fw-semibold);color:var(--ui-success);background:var(--ui-success-soft);border-radius:var(--ui-r-pill)}
+.ui-delta.down{color:var(--ui-danger);background:var(--ui-danger-soft)}
+/*@@KIT-CSS@@*/
+
+/* ── Trang mẫu ?ui=kit ── */
+.ui-kit-page{position:fixed;inset:0;z-index:var(--ui-z-top);overflow:auto;padding:var(--ui-sp-6);font-family:var(--ui-font);color:var(--ui-text);background:var(--ui-grad-page),var(--ui-bg)}
+.ui-kit-h{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-sp-3);margin-bottom:var(--ui-sp-5)}
+.ui-kit-h h1{font-size:var(--ui-fs-2xl);font-weight:var(--ui-fw-bold)}
+.ui-kit-sec{margin-bottom:var(--ui-sp-8)}
+.ui-kit-sec>h2{margin-bottom:var(--ui-sp-3);font-size:var(--ui-fs-lg);font-weight:var(--ui-fw-semibold);color:var(--ui-brand)}
+.ui-kit-close{padding:var(--ui-sp-2) var(--ui-sp-4);font-size:var(--ui-fs-base);font-weight:var(--ui-fw-semibold);color:var(--ui-text);background:var(--ui-surface);border:1px solid var(--ui-border-md);border-radius:var(--ui-r-pill);cursor:pointer}
+.ui-kit-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-3)}
