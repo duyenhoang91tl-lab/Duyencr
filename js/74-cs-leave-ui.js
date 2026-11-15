@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════
 //  R6c-2 (BƯỚC 2/4: GIAO DIỆN) — nút "🏖 Nghỉ phép" trên màn Quá hạn + form đặt kỳ nghỉ + XEM TRƯỚC việc giao. Nạp SAU js/73, 72.
 //  NGUYÊN NHÂN GỐC: có logic giao lại (js/73) nhưng chưa có chỗ để admin/nhân viên đặt kỳ nghỉ và xem ai nhận bao nhiêu khách.
-//  Bước này CHỈ xem trước — chưa đổi CS khách, chưa lưu kỳ nghỉ (nút Lưu để bước 3 nối vào). Bọc renderOverdueTab, không sửa js/02/72.
+//  Bước 2 = form + xem trước; bước 3 (js/75) nối nút "Lưu & giao" (clSave_) → lưu + giao thật. Bọc renderOverdueTab, không sửa js/02/72.
 //  Ai chọn được nhân viên nào: admin = mọi CS (từ team + tài khoản); leader/manager = CS trong team của mình + chính mình; CS = chỉ chính mình.
 //  Hàm thuần: clAllowedNames_ (test: node tools/test-cs-leave-ui.js)
 // ════════════════════════════════════════════════════════════════════
@@ -63,11 +63,35 @@ function clOpen(){
     '<div class="cl-f">Giao khách thế nào?<label class="cl-r"><input type="radio" name="cl-mode" value="even" checked> Chia đều cho CS cùng team</label><label class="cl-r"><input type="radio" name="cl-mode" value="to"> Chuyển cho người khác</label></div>' +
     '<label class="cl-f" id="cl-target-wrap" style="display:none">Người nhận<select id="cl-target"><option value="">— chọn —</option>' + all.map(function(n){ return '<option>' + clEsc_(n) + '</option>'; }).join('') + '</select></label>' +
     '<div id="cl-preview" class="cl-preview"></div></div>' +
-    '<div class="cl-foot"><button type="button" class="btn sm" data-cl="close">Đóng</button><button type="button" class="btn sm primary" data-cl="save" disabled title="Bước 3 sẽ nối nút này: áp dụng đổi CS + lưu kỳ nghỉ">Lưu & giao (sắp có)</button></div></div>';
+    '<div class="cl-foot"><button type="button" class="btn sm" data-cl="close">Đóng</button><button type="button" class="btn sm primary" data-cl="save">Lưu & giao</button></div></div>';
   document.body.appendChild(ov);
   ov.addEventListener('input', clPreview_); ov.addEventListener('change', clPreview_);
-  ov.addEventListener('click', function(e){ if (e.target === ov || (e.target.closest && e.target.closest('[data-cl="close"]'))) ov.remove(); });
+  ov.addEventListener('click', function(e){
+    if (e.target === ov || (e.target.closest && e.target.closest('[data-cl="close"]'))) { ov.remove(); return; }
+    if (e.target.closest && e.target.closest('[data-cl="save"]')) clSave_(ov);
+  });
   clPreview_();
+}
+function clSave_(ov){
+  var l = clReadForm_(), today = scYmd_(new Date());
+  if (!l.name || !l.from){ scToast_('Chọn nhân viên và "Từ ngày".'); return; }
+  if (l.to && l.to < l.from){ scToast_('"Đến ngày" phải sau hoặc bằng "Từ ngày".'); return; }
+  if (l.to && l.to < today){ scToast_('Kỳ nghỉ đã kết thúc trong quá khứ.'); return; }
+  l.id = 'L' + Date.now(); l.by = (currentUser && currentUser.name) || ''; l.at = new Date().toISOString(); l.applied = false; l.ended = false; l.handed = [];
+  if (l.mode === 'to' && !l.target){ scToast_('Chọn người nhận.'); return; }
+  var day = l.from > today ? l.from : today, p = clPlanFor_(l, day);
+  if (p.noTarget){ scToast_(l.mode === 'to' ? 'Người nhận không hợp lệ (trùng người nghỉ hoặc đang nghỉ).' : 'Không có CS cùng team đang đi làm để chia đều.'); return; }
+  var future = l.from > today;
+  if (!confirm(future ? 'Lưu kỳ nghỉ của ' + l.name + ' từ ' + l.from + '? Đến ngày đó hệ thống sẽ tự giao khách.' : 'Giao ' + p.rows.length + ' khách của ' + l.name + ' ngay bây giờ?')) return;
+  _csLeaves.push(l);
+  var msg = '✓ Đã lưu kỳ nghỉ';
+  if (!future){ var r = clApplyLeave_(l, today); msg = '✓ Đã giao ' + r.n + ' khách của ' + l.name; }
+  clSaveLeaves_();
+  ov.remove();
+  try { if (typeof updateSchedBadges === 'function') updateSchedBadges(); } catch (e) {}
+  if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  if (typeof renderScheduleTab === 'function') renderScheduleTab();
+  scToast_(msg + (future ? ' (tự giao khi tới ' + l.from + ')' : ''));
 }
 function clDecorate_(){
   var grid = document.getElementById('overdue-grid'); if (!grid) return;
@@ -81,6 +105,6 @@ function clDecorate_(){
   if (typeof window === 'undefined') return;
   var orig = window.renderOverdueTab;
   if (typeof orig !== 'function') return;
-  window.renderOverdueTab = function(){ orig.apply(this, arguments); clDecorate_(); };
+  window.renderOverdueTab = function(){ if (typeof clApplyDue_ === 'function') clApplyDue_(); orig.apply(this, arguments); clDecorate_(); };
 })();
 if (typeof module !== 'undefined' && module.exports){ module.exports = { clAllowedNames_: clAllowedNames_ }; }
