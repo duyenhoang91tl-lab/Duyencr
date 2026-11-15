@@ -48,6 +48,7 @@ function _tkEnsure(){
         '<label class="tk-chk"><input type="checkbox" id="tk-low"> Sắp hết</label>' +
         '<button type="button" class="btn secondary sm" id="tk-new" style="display:none">＋ Mặt hàng</button>' +
         '<button type="button" class="btn secondary sm" id="tk-imp" style="display:none">📥 Nhập Excel</button>' +
+        '<button type="button" class="btn secondary sm" id="tk-exp">📤 Xuất Excel</button>' +
         '<button type="button" class="btn secondary sm" id="tk-hist">📜 Lịch sử</button></div>' +
       '<div class="tk-info" id="tk-info"></div>' +
       '<div class="tk-list" id="tk-list"></div>' +
@@ -63,6 +64,7 @@ function _tkEnsure(){
   document.getElementById('tk-new').addEventListener('click', function(){ tkItemDlg(null); });
   document.getElementById('tk-imp').addEventListener('click', tkImportDlg);
   document.getElementById('tk-hist').addEventListener('click', function(){ tkHistDlg(''); });
+  document.getElementById('tk-exp').addEventListener('click', tkExportDlg);
   document.getElementById('tk-manage').addEventListener('click', tkManageDlg);
   document.getElementById('tk-list').addEventListener('click', function(e){
     var more = e.target.closest('[data-tk-more]'); if (more) { _tk.shown += 200; _tkRenderList(); return; }
@@ -116,9 +118,10 @@ function _tkRenderTools(){
   document.getElementById('tk-new').style.display = (m && k.active) ? '' : 'none';
   document.getElementById('tk-imp').style.display = (m && k.active) ? '' : 'none';
 }
-function _tkFiltered(){
+function _tkFiltered(){ return _tkFilterItems_(_tk.items); }
+function _tkFilterItems_(items){   // cùng bộ lọc (ô tìm + "Sắp hết") dùng cho danh sách và Xuất Excel
   var q = _tkNorm(_tk.q);
-  return _tk.items.filter(function(it){
+  return items.filter(function(it){
     if (_tk.low && !_tkIsLow(it)) return false;
     if (!q) return true;
     return _tkNorm(it.maHang).indexOf(q) >= 0 || _tkNorm(it.tenHang).indexOf(q) >= 0;
@@ -128,16 +131,37 @@ function _tkRenderList(){
   var k = _tkCurKho(), list = document.getElementById('tk-list'), info = document.getElementById('tk-info');
   if (!k) return;
   var rows = _tkFiltered(), low = _tk.items.filter(_tkIsLow).length, lv = _tkLevel(k);
-  info.innerHTML = esc(k.name) + ' · ' + _tk.items.length + ' mặt hàng' + (low ? ' · <span class="tk-lowtxt">' + low + ' sắp hết</span>' : '') +
-    ' · ' + (lv === 'admin' ? 'Bạn là admin' : lv === 'leader' ? 'Bạn là leader kho này' : lv === 'staff' ? 'Bạn là nhân viên kho này' : 'Chỉ xem') + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '');
+  var roleTxt = (lv === 'admin' ? 'Bạn là admin' : lv === 'leader' ? 'Bạn là leader kho này' : lv === 'staff' ? 'Bạn là nhân viên kho này' : 'Chỉ xem');
+  if (typeof uiStatGrid_ === 'function'){   // R7c-1: số liệu thành thẻ số (ui-kit); tên kho · quyền · ngưng · ghi chú giữ dạng chữ bên dưới
+    info.innerHTML = uiStatGrid_([
+      { label: 'Mặt hàng', value: _tkNum(_tk.items.length), icon: '📦', tone: 'brand' },
+      { label: 'Sắp hết', value: _tkNum(low), tone: low ? 'danger' : 'success', note: low ? '' : 'không có mặt hàng nào' },
+      { label: 'Đang hiển thị', value: _tkNum(rows.length), tone: 'neutral', note: rows.length !== _tk.items.length ? 'đang lọc / tìm kiếm' : '' }
+    ]) + '<div class="tk-meta">' + esc(k.name) + ' · ' + roleTxt + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '') + '</div>';
+  } else {   // dự phòng: js/68 chưa nạp → dòng chữ như cũ
+    info.innerHTML = esc(k.name) + ' · ' + _tk.items.length + ' mặt hàng' + (low ? ' · <span class="tk-lowtxt">' + low + ' sắp hết</span>' : '') +
+      ' · ' + roleTxt + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '');
+  }
   if (!rows.length) { list.innerHTML = '<div class="tk-empty">' + (_tk.items.length ? 'Không có mặt hàng khớp.' : 'Kho chưa có mặt hàng. ' + (_tkCanManage(k) ? 'Thêm từng mặt hàng hoặc bấm “📥 Nhập Excel” (file Pos “Tổng hợp tồn kho”).' : '')) + '</div>'; return; }
   var can = _tkCanEdit(k) && k.active;
-  list.innerHTML = rows.slice(0, _tk.shown).map(function(it){
+  var shownRows = rows.slice(0, _tk.shown), moreHtml = (rows.length > _tk.shown ? '<div class="tk-more"><button type="button" class="btn secondary sm" data-tk-more="1">Hiện thêm (' + (rows.length - _tk.shown) + ')</button></div>' : '');
+  if (typeof uiChip_ === 'function'){   // R7c-2: BẢNG trên máy tính (mã · tên · tồn · tình trạng · thao tác); CSS tự xếp lại thành dòng trên điện thoại (≤640px). data-tk-edit / data-tk-hist / data-tk-more GIỮ NGUYÊN cho bộ bắt click ở _tkEnsure.
+    list.innerHTML = '<table class="dash-table tk-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="tk-c-qty">Tồn</th><th>Tình trạng</th><th></th></tr></thead><tbody>' + shownRows.map(function(it){
+      var low = _tkIsLow(it);
+      return '<tr class="tk-trow' + (low ? ' low' : '') + '"><td class="tk-c-code">' + esc(it.maHang) + '</td><td class="tk-c-name">' + esc(it.tenHang || '—') + '</td>' +
+        '<td class="tk-c-qty"><b>' + _tkNum(it.ton) + '</b></td>' +
+        '<td class="tk-c-st' + (low ? '' : ' tk-c-ok') + '">' + (low ? uiChip_('sắp hết (≤ ' + _tkNum(it.minTon) + ')', { tone: 'danger', dot: true }) : uiChip_('Còn hàng', { tone: 'success' })) + '</td>' +
+        '<td class="tk-c-act">' + (can ? '<button type="button" class="btn sm" data-tk-edit="' + esc(it.maHang) + '">Sửa</button>' : '') +
+        '<button type="button" class="btn secondary sm" data-tk-hist="' + esc(it.maHang) + '" title="Lịch sử">📜</button></td></tr>';
+    }).join('') + '</tbody></table>' + moreHtml;
+    return;
+  }
+  list.innerHTML = shownRows.map(function(it){
     return '<div class="tk-row' + (_tkIsLow(it) ? ' low' : '') + '"><div class="tk-main"><div class="tk-code">' + esc(it.maHang) + '</div><div class="tk-name">' + esc(it.tenHang || '—') + '</div></div>' +
       '<div class="tk-qty"><b>' + _tkNum(it.ton) + '</b>' + (_tkIsLow(it) ? '<span class="tk-low">sắp hết (≤ ' + _tkNum(it.minTon) + ')</span>' : '') + '</div>' +
       '<div class="tk-act">' + (can ? '<button type="button" class="btn sm" data-tk-edit="' + esc(it.maHang) + '">Sửa</button>' : '') +
       '<button type="button" class="btn secondary sm" data-tk-hist="' + esc(it.maHang) + '" title="Lịch sử">📜</button></div></div>';
-  }).join('') + (rows.length > _tk.shown ? '<div class="tk-more"><button type="button" class="btn secondary sm" data-tk-more="1">Hiện thêm (' + (rows.length - _tk.shown) + ')</button></div>' : '');
+  }).join('') + moreHtml;
 }
 function _tkFind(code){ return _tk.items.find(function(x){ return x.maHang === code; }) || null; }
 function _tkReplace(item){ if (!item) return; var i = _tk.items.findIndex(function(x){ return x.maHang === item.maHang; }); if (i >= 0) _tk.items[i] = item; else _tk.items.push(item); }
@@ -273,6 +297,52 @@ function tkImportDlg(){
     } catch(e){ res.textContent = 'Lỗi mạng: ' + e.message; btn.disabled = false; }
   };
 }
+// ── Xuất Excel (R7c-4, Duyên chốt 15/11: đủ cột Mã · Tên · Tồn · Tình trạng; xuất kho đang xem HOẶC mọi kho; vẫn áp bộ lọc tìm/sắp hết như màn hình) ──
+var TK_EXPORT_HEAD = ['Kho', 'Mã hàng', 'Tên hàng', 'Tồn', 'Tình trạng'];
+function _tkExportRows_(khoName, items){   // thuần: items ĐÃ lọc → các dòng Excel (không gồm tiêu đề)
+  return items.map(function(it){
+    var low = _tkIsLow(it);
+    return [khoName, it.maHang, it.tenHang || '', isFinite(Number(it.ton)) ? Number(it.ton) : it.ton, low ? 'Sắp hết (≤ ' + _tkNum(it.minTon) + ')' : 'Còn hàng'];
+  });
+}
+function _tkExportName_(scope, khoName, d){
+  var ymd = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  var nm = scope === 'all' ? 'TatCaKho' : String(khoName || 'Kho').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'Kho';
+  return 'TonKho_' + nm + '_' + ymd + '.xlsx';
+}
+function _tkFilterNote_(){ var p = []; if (String(_tk.q || '').trim()) p.push('tìm “' + esc(_tk.q.trim()) + '”'); if (_tk.low) p.push('chỉ sắp hết'); return p.length ? 'Đang lọc: ' + p.join(', ') + '.' : 'Không lọc — xuất toàn bộ mặt hàng.'; }
+function tkExportDlg(){
+  var k = _tkCurKho(); if (!k) { _tkToast('Chưa có kho để xuất'); return; }
+  var n = _tkFiltered().length;
+  var box = _tkDlg('<div class="tk-head"><b>📤 Xuất Excel tồn kho</b><span class="tk-sp"></span><button type="button" class="btn secondary sm" id="tk-d-x">✕</button></div>' +
+    '<div class="tk-form"><div class="tk-muted">Cột: Kho · Mã hàng · Tên hàng · Tồn · Tình trạng. ' + _tkFilterNote_() + '</div>' +
+    '<div class="tk-btns"><button type="button" class="btn primary" id="tk-x-cur">Kho đang xem — ' + esc(k.name) + ' (' + n + ' dòng)</button></div>' +
+    (_tk.kho.length > 1 ? '<div class="tk-btns"><button type="button" class="btn" id="tk-x-all">Mọi kho (' + _tk.kho.length + ' kho)</button></div>' : '') +
+    '<div id="tk-res" class="tk-muted"></div></div>');
+  box.querySelector('#tk-d-x').onclick = tkDlgClose;
+  async function go(scope, btn){
+    if (typeof XLSX === 'undefined') { box.querySelector('#tk-res').textContent = 'Thư viện Excel chưa tải xong, đợi vài giây rồi bấm lại.'; return; }
+    var res = box.querySelector('#tk-res');
+    box.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+    try {
+      var rows = [];
+      if (scope === 'cur') rows = _tkExportRows_(k.name, _tkFiltered());
+      else for (var i = 0; i < _tk.kho.length; i++) {
+        var kk = _tk.kho[i]; res.textContent = 'Đang tải ' + (i + 1) + '/' + _tk.kho.length + ' — ' + kk.name + '…';
+        var j = await _tkGet('action=tonKho&khoId=' + encodeURIComponent(kk.id));
+        if (!j || j.ok === false || j.error) throw new Error(kk.name + ': ' + _tkErr(j));
+        rows = rows.concat(_tkExportRows_(kk.name, _tkFilterItems_((j && j.items) || [])));
+      }
+      if (!rows.length) { res.textContent = 'Không có mặt hàng nào khớp bộ lọc để xuất.'; box.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); return; }
+      var ws = XLSX.utils.aoa_to_sheet([TK_EXPORT_HEAD].concat(rows)); ws['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 40 }, { wch: 10 }, { wch: 18 }];
+      var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, scope === 'all' ? 'Tất cả kho' : 'Tồn kho');
+      XLSX.writeFile(wb, _tkExportName_(scope, k.name, new Date()));
+      tkDlgClose(); _tkToast('Đã xuất ' + rows.length + ' dòng');
+    } catch(e){ res.textContent = 'Không xuất được: ' + e.message; box.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); }
+  }
+  box.querySelector('#tk-x-cur').onclick = function(){ return go('cur', this); };
+  var all = box.querySelector('#tk-x-all'); if (all) all.onclick = function(){ return go('all', this); };
+}
 // ── Lịch sử ──
 async function tkHistDlg(code){
   var k = _tkCurKho(); if (!k) return;
@@ -282,9 +352,10 @@ async function tkHistDlg(code){
     var j = await _tkGet('action=tonKhoLog&khoId=' + encodeURIComponent(k.id) + (code ? '&maHang=' + encodeURIComponent(code) : '') + '&limit=100');
     var lg = (j && j.log) || [], el = box.querySelector('#tk-h'); if (!el) return;
     var LB = { kiem_ke: 'Kiểm kê', nhap: 'Nhập', xuat: 'Xuất', tao: 'Thêm mới', import: 'Nhập Excel', xoa: 'Xoá' };
+    var LT = { kiem_ke: 'info', nhap: 'success', xuat: 'warning', tao: 'brand', import: 'brand', xoa: 'danger' };   // R7c-3: chip loại thay đổi (có js/68); thiếu → chữ xám như cũ
     el.innerHTML = lg.length ? lg.map(function(x){
       var d = x.delta; var ds = d == null ? '' : (d > 0 ? '+' : '') + _tkNum(d);
-      return '<div class="tk-row"><div class="tk-main"><div class="tk-code">' + esc(x.maHang) + ' <span class="tk-muted">' + esc(LB[x.loai] || x.loai) + '</span></div><div class="tk-name">' + esc(x.lyDo || '') + '</div><div class="tk-muted">' + esc(x.user) + ' · ' + esc(new Date(x.ts).toLocaleString('vi-VN')) + '</div></div>' +
+      return '<div class="tk-row"><div class="tk-main"><div class="tk-code">' + esc(x.maHang) + ' ' + (typeof uiChip_ === 'function' ? uiChip_(LB[x.loai] || x.loai, { tone: LT[x.loai] || 'neutral' }) : '<span class="tk-muted">' + esc(LB[x.loai] || x.loai) + '</span>') + '</div><div class="tk-name">' + esc(x.lyDo || '') + '</div><div class="tk-muted">' + esc(x.user) + ' · ' + esc(new Date(x.ts).toLocaleString('vi-VN')) + '</div></div>' +
         '<div class="tk-qty"><b>' + esc(ds) + '</b><span class="tk-muted">' + (x.before == null ? '' : _tkNum(x.before) + ' → ') + (x.after == null ? '' : _tkNum(x.after)) + '</span></div></div>';
     }).join('') : '<div class="tk-empty">Chưa có thay đổi nào.</div>';
   } catch(e){ var el2 = box.querySelector('#tk-h'); if (el2) el2.innerHTML = '<div class="tk-empty">Không tải được lịch sử.</div>'; }

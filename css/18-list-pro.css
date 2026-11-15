@@ -14,7 +14,7 @@ html.ui-pro{--lp-ctl-h:30px;}
 /* ── 1. Sidebar lọc KH: nhãn mục đủ đậm/đủ to để đọc được ── */
 html.ui-pro .sidebar .cs-filter-label,
 html.ui-pro .sidebar .sb-label{
-  color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;
+  color:var(--muted);font-size:var(--ui-fs-xs);font-weight:700;letter-spacing:.04em;
 }
 html.ui-pro .sidebar .sb-label{text-transform:uppercase;padding-top:2px;}
 html.ui-pro .sidebar .fbadge{color:var(--muted);font-size:10.5px;font-weight:600;}
@@ -26,11 +26,11 @@ html.ui-pro #ymf-bar .ymf-sep{color:var(--border-strong);}
 html.ui-pro #ymf-bar select,
 html.ui-pro #ymf-bar input[type=date],
 html.ui-pro #ymf-bar .btn.sm{
-  height:var(--lp-ctl-h);box-sizing:border-box;font-size:12px;
+  height:var(--lp-ctl-h);box-sizing:border-box;font-size:var(--ui-fs-sm);
 }
 html.ui-pro #ymf-bar select,
 html.ui-pro #ymf-bar input[type=date]{
-  padding:0 8px;border:1px solid var(--border-md);border-radius:8px;background:var(--surface);color:var(--text);
+  padding:0 8px;border:1px solid var(--border-md);border-radius:var(--ui-r-md);background:var(--surface);color:var(--text);
 }
 html.ui-pro #ymf-bar select:hover,
 html.ui-pro #ymf-bar input[type=date]:hover{border-color:var(--border-strong);}
@@ -43,7 +43,7 @@ html.ui-pro #col-toggle-bar .col-toggle-chip{flex-shrink:0;white-space:nowrap;pa
 
 /* ── 4. Bảng: tiêu đề cột rõ, đồng cỡ; không cắt chữ; hàng dữ liệu thoáng ── */
 html.ui-pro #main-table thead th{
-  color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.03em;white-space:nowrap;
+  color:var(--muted);font-size:var(--ui-fs-xs);font-weight:700;letter-spacing:.03em;white-space:nowrap;
   padding-top:10px;padding-bottom:10px;vertical-align:middle;
 }
 html.ui-pro #main-table thead th .th-inner{color:inherit;font-size:inherit;gap:4px;}

@@ -134,7 +134,7 @@ const lbls=()=>QA('#host .srb-m-cat .srb-m-t').map(x=>x.textContent);
 const tasks=()=>QA('#sr-gear-ab > div').map(x=>x.textContent.trim());
 const expect={
  C:['Tính theo ngày','Sale','Team','Kênh bán','Sản phẩm','Tính theo người tạo đơn'],
- D:['CS','Team'], E:['Sale','Team'], F:['Sale','Team'], G:['Sale'], K:['Sale'], L:['Sale'],
+ D:['CS','Team'], E:['Sale','Team'], F:['Sale','Team'], G:['Sale'], BD:['Sale'], L:['Sale'],
  H:['Team','CS','Cách nhóm'], I:['Team','CS']};
 for(const sub of Object.keys(expect)){
   const el=barOf(sub);
@@ -142,6 +142,8 @@ for(const sub of Object.keys(expect)){
   click($('srb-menu-btn'));
   ok(lbls().join('|')===expect[sub].join('|'),'báo cáo '+sub+': menu lọc = '+expect[sub].join(', '));
 }
+// K = Chốt tháng (posMonthK, chỉ chọn tháng): KHÔNG có menu lọc Sale/Team/Nguồn... (3263f71 đổi K cũ thành BD; K mới không được rơi vào menu mặc định 9 mục)
+{ const el=barOf('K'); ok(el.querySelectorAll('.srb-bar').length===1&&el.querySelectorAll('.subsel').length===1&&!el.querySelector('#srb-menu-btn')&&QA('#host .srb-m-cat').length===0,'báo cáo K: có ô chọn báo cáo, KHÔNG có menu lọc (chỉ chọn tháng)'); }
 barOf('C');ok(QA('#host input[type=date]').length===0||true,'C: dùng khối ngày riêng (tuần/tháng/quý/năm)');
 let tk;
 barOf('E');tk=tasks();ok(tk.length===6&&tk[0].includes('hoa hồng cá nhân')&&tk[4].includes('Kênh'),'E: Tác vụ gom 5 cài đặt (admin) + Ẩn bộ lọc KH');

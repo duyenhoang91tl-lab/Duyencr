@@ -45,4 +45,29 @@ function sim(proOn){const els={};const tabs={parentNode:{insertBefore:(n,ref)=>{
  ctx.openDp('0901');ctx.renderDpTab('care');return {calls,host:els['dp-pro']};}
 let r=sim(true);ok(r.calls.join()==='open,tab','hàm gốc vẫn được gọi');ok(r.host&&r.host.innerHTML.includes('pro-stage')&&r.host.innerHTML.includes('class="cur"')&&r.host.innerHTML.includes('>5<'),'ui-pro BẬT → chèn thanh giai đoạn + 5 ngày');
 r=sim(false);ok(r.calls.join()==='open,tab'&&!r.host,'ui-pro TẮT → không chèn gì, bản cũ nguyên');
+// R5b: thanh thao tác nhanh
+{
+const Q=m.proQuickActionsHtml_;
+let h=Q('0912 345 678');
+ok(h.includes('href="tel:0912345678"')&&h.includes('href="https://zalo.me/0912345678"')&&h.includes('target="_blank"')&&h.includes('rel="noopener"'),'Gọi = tel:, Zalo = zalo.me (tab mới, noopener), SĐT bỏ dấu cách');
+ok(['note','sched','order'].every(k=>h.includes('<button type="button" class="pro-qa" data-pro-qa="'+k+'">')),'3 nút Ghi chú / Đặt lịch / Tạo đơn là <button type="button"> (không submit form)');
+ok(Q('+84912345678').includes('tel:+84912345678')&&Q('+84912345678').includes('zalo.me/84912345678'),'số quốc tế: tel giữ "+", Zalo chỉ chữ số');
+ok(Q('')===''&&Q(null)===''&&Q('abc')==='','SĐT rỗng/không có chữ số → không vẽ thanh');
+h=Q('0912"><script>alert(1)</script>');ok(!h.includes('<script')&&!h.includes('">'+'<s'),'chèn ký tự lạ vào SĐT không phá được href (chỉ giữ chữ số)');
+ok(m.proQuickPhone_(' 0901-234.567 ')==='0901234567','chuẩn hoá SĐT có gạch/chấm');
+}
+// R5b: bấm nút → chuyển tab + focus đúng ô (DOM giả; chạy NGUYÊN hàm proQuickGo_ trong file thật)
+{
+const fs=require('fs'),vm=require('vm');
+const calls=[];let formDisp='none',focused=[];
+const el=(id)=>({style:id==='add-order-form'?{get display(){return formDisp}}:{},focus(){focused.push(id)},scrollIntoView(){}});
+const tabs=['care','schedule','history'].map((k)=>({k}));
+const ctx={console,document:{querySelectorAll:()=>tabs,getElementById:(id)=>({'cs-note-new':1,'new-snote':1,'add-order-form':1,'mo-product':1}[id]?el(id):null)},
+ switchDpTab:(key,t)=>{calls.push('tab:'+key)},_toggleAddOrderForm:()=>{calls.push('toggle');formDisp=formDisp==='none'?'block':'none'}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('js/33-pro-profile.js','utf8'),ctx);
+ctx.proQuickGo_('note');ok(calls.join()==='tab:care'&&focused.join()==='cs-note-new','Ghi chú → tab Chăm sóc + focus ô ghi chú mới');
+calls.length=0;focused.length=0;ctx.proQuickGo_('sched');ok(calls.join()==='tab:schedule'&&focused.join()==='new-snote','Đặt lịch → tab Lịch hẹn + focus ô nội dung lịch');
+calls.length=0;focused.length=0;ctx.proQuickGo_('order');ok(calls.join()==='tab:history,toggle'&&focused.join()==='mo-product'&&formDisp==='block','Tạo đơn → tab Lịch sử đơn, MỞ form (đang ẩn), focus ô sản phẩm');
+calls.length=0;focused.length=0;ctx.proQuickGo_('order');ok(calls.join()==='tab:history'&&formDisp==='block','bấm Tạo đơn lần nữa khi form đã mở → KHÔNG tắt (hàm gốc là toggle)');
+}
 process.exit(bad?1:0);

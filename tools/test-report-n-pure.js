@@ -15,7 +15,8 @@ ok(run('_srItems_().map(function(i){return i[0]}).join(",")').endsWith('L,M,N') 
 run('_srApplySub_("N")'); ok(run('_srState.sub') === 'B' && run('_srState.bView') === 'pure' && run('_srCurCode_()') === 'N', 'chon N => sub B + bView pure, ma hien thi N');
 run('_srApplySub_("B")'); ok(run('_srState.sub') === 'B' && !run('_srState.bView') && run('_srCurCode_()') === 'B', 'chon B => xoa co pure');
 run('_srApplySub_("N")'); run('_srApplySub_("E")'); ok(run('_srState.sub') === 'E' && !run('_srState.bView') && run('_srCurCode_()') === 'E', 'tu N sang E: xoa co pure');
-run('_srState.sub = "K"; _srState.bView = ""'); ok(run('_srCurCode_()') === 'G', 'K van hien nhu G');
+run('_srState.sub = "BD"; _srState.bView = ""'); ok(run('_srCurCode_()') === 'G', 'BD (Chi tiet thuong, con cua G) van hien nhu G');
+run('_srState.sub = "K"; _srState.bView = ""'); ok(run('_srCurCode_()') === 'K', 'K (Chot thang, doc lap tu 10/11) la bao cao rieng, KHONG hien nhu G');
 // (3) cấu hình ẩn: người thường đang ở N mà N bị ẩn => chuyển sang báo cáo bật đầu tiên (A) và xóa cờ; B bị ẩn nhưng N bật => KHÔNG đuổi khỏi N
 run('_rcApply_({ N: { enabled: false } })'); run('_srApplySub_("N")');
 ok(run('_srEnsureSubAllowed_()') === true && run('_srState.sub') === 'A' && !run('_srState.bView'), 'N bi an => nguoi thuong chuyen sang A, xoa co pure');

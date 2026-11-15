@@ -1,0 +1,10 @@
+/* R9a — trung tâm lối tắt cài đặt (js/78-settings-hub.js). TOKEN-ONLY: chỉ dùng var(--ui-*) / biến cũ, không màu cứng. */
+.sh-hub{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--ui-sp-3)}
+.sh-grp{min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--ui-r-lg);padding:var(--ui-sp-4);display:flex;flex-direction:column;gap:var(--ui-sp-2)}
+.sh-grp-h{margin:0;display:flex;align-items:center;gap:var(--ui-sp-2);font-size:var(--ui-fs-md);font-weight:var(--ui-fw-semibold);color:var(--text)}
+.sh-grp-ic{font-size:var(--ui-fs-lg)}
+.sh-grp-d{margin:0;font-size:var(--ui-fs-sm);color:var(--muted)}
+.sh-items{display:flex;flex-wrap:wrap;gap:var(--ui-sp-2)}
+.sh-item{white-space:normal;text-align:left}
+.sh-item.is-danger{color:var(--ui-danger);border-color:var(--ui-danger)}
+@media (max-width:640px){.sh-hub{grid-template-columns:1fr}.sh-item{flex:1 1 auto;min-height:44px}}

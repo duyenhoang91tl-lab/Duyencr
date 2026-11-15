@@ -4,12 +4,15 @@
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srEMismatchBanner_() + _srRenderE_(_srState.dataE);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srEMismatchBanner_() + _srRenderE_(_srState.dataE));
+    return;
+  }
+  // Báo cáo E nhiều mục có tiêu đề riêng (a, b, thu nhập, thi đua…) nên đưa vào ô bodyHtml của khuôn: thanh lọc → cảnh báo lệch → nội dung.
+  wrap.innerHTML = uiReportFrame_({ id: 'E', barHtml: filters, loading: !!_srState.loading,
+    noticeHtml: _srState.loading ? '' : _srEMismatchBanner_(), bodyHtml: _srState.loading ? '' : _srRenderE_(_srState.dataE) });
 }
 
 // ── Tính CHƯƠNG TRÌNH THƯỞNG cho các đơn đang lọc (dùng CHUNG d.orders với phần hoa hồng ở trên) ──
@@ -538,12 +541,14 @@ function _srRenderE_(d){
 // ════════════════════════════════════════════════════════════════════
 function renderSalesReportTabF_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srRenderF_(_srState.dataF);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srRenderF_(_srState.dataF));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc → nội dung F
+  wrap.innerHTML = uiReportFrame_({ id: 'F', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderF_(_srState.dataF) });
 }
 
 function _srRenderF_(d){
@@ -983,11 +988,14 @@ function _srGFiltersHtml_(){
 }
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = _srGFiltersHtml_();
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srRenderG_(_srState.dataG);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srRenderG_(_srState.dataG));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc G → nội dung G
+  wrap.innerHTML = uiReportFrame_({ id: 'G', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderG_(_srState.dataG) });
 }
 
 function openSaleKpiConfigModal_(){
@@ -1047,7 +1055,7 @@ function _srRenderKpiConfigModal_(){
     return '<div><label style="font-size:11px;color:var(--muted);display:block">'+t+'</label>'+
       '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>';
   }
-  el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
+  el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:calc(var(--vh,1vh)*85);overflow-y:auto">'+
     '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
     '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng; tháng sau TVF1→F1, TVF2→F2. Riêng TVF2→F2: 2 tháng đầu làm F2 phải MỖI tháng đạt ≥100% KPI F2, không đạt (dù chỉ 1 tháng) thì xuống ngay F1 để xét lại từ đầu. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
     '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
@@ -1670,7 +1678,7 @@ function _bpXSrcListHtml_(){
 }
 function _bpXSrcSelHtml_(){
   var s = _bpDraft.excludeSources || [];
-  return s.length ? ('Đang LOẠI '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — đơn thuộc các nguồn này không được tính.') : '<span class="guide-text" style="color:var(--muted)">Chưa loại nguồn nào.</span>';
+  return s.length ? ('Đang LOẠI '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — đơn thuộc các nguồn này không được tính.') : '<span style="color:var(--muted)">Chưa loại nguồn nào.</span>';
 }
 function _bpXSrcRefresh_(){
   var a = document.getElementById('bp-xsrc-list'), b = document.getElementById('bp-xsrc-sel');

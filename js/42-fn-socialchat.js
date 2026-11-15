@@ -190,7 +190,7 @@ function _scDiagBox(txt) {
   if (!el) {
     el = document.createElement('div'); el.id = 'sc-diag';
     el.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(20,20,10,.5);display:flex;align-items:center;justify-content:center;padding:14px';
-    el.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(720px,100%);max-height:92vh;display:flex;flex-direction:column;padding:14px 16px;gap:8px;box-shadow:var(--shadow-md)">'
+    el.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(720px,100%);max-height:calc(var(--vh,1vh)*92);display:flex;flex-direction:column;padding:14px 16px;gap:8px;box-shadow:var(--shadow-md)">'
       + '<div style="display:flex;align-items:center;gap:8px"><b style="flex:1">🔍 Chẩn đoán hội thoại Pancake</b><button class="btn sm" id="sc-diag-copy">Sao chép</button><button class="btn sm" id="sc-diag-x">Đóng</button></div>'
       + '<textarea id="sc-diag-t" readonly style="flex:1;min-height:320px;font:12px/1.4 monospace;width:100%;box-sizing:border-box"></textarea></div>';
     document.body.appendChild(el);

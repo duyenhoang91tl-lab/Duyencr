@@ -412,6 +412,25 @@ function editAccount(u){
 }
 function cancelAcctEdit(){ _acctEditing = ''; renderAcctModal(); }
 
+// R9b — huy hiệu vai trò / "đã khoá" trong hộp thoại Tài khoản: có uiChip_ (js/68) thì vẽ chip theo khuôn
+// (admin=brand, leader/manager/viewer=info, còn lại=success; khoá=danger); thiếu js/68 → HTML y hệt bản cũ từng ký tự.
+// CHỈ đổi phần HIỂN THỊ — không đụng _acctSave/addAccount/deleteAccount/resetPassword/toggleAcctActive.
+function _acctBadgeHtml_(a, badgeCls, badgeCol){
+  try {
+    if (typeof uiChip_ === 'function') {
+      var base = _roleBaseOf(a.role);
+      var tn = a.role==='admin' ? 'brand' : ((base==='leader'||base==='manager'||base==='viewer') ? 'info' : 'success');
+      return uiChip_(_roleLabel(a.role), { tone: tn });
+    }
+  } catch(e){}
+  return '<span class="ar-badge" style="background:var(--'+badgeCls+');color:'+badgeCol+'">'+_roleLabel(a.role)+'</span>';
+}
+function _acctLockHtml_(a){
+  if (a.active !== false) return '';
+  try { if (typeof uiChip_ === 'function') return uiChip_('Đã khoá', { tone: 'danger' }); } catch(e){}
+  return '<span style="color:var(--red);font-size:10px">(đã khoá)</span>';
+}
+
 function renderAcctModal(){
   var body = document.getElementById('acct-modal-body'); if (!body) return;
   var ed = _acctEditing ? _findAccount(_acctEditing) : null;
@@ -463,9 +482,9 @@ function renderAcctModal(){
              'data-u="'+uk+'" onclick="toggleAcctDetail(this.dataset.u)">'+
           '<div style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
             '<span class="ar-caret">'+(open?'▼':'▶')+'</span>'+esc(a.username)+
-            '<span class="ar-badge" style="background:var(--'+badgeCls+');color:'+badgeCol+'">'+_roleLabel(a.role)+'</span>'+
+            _acctBadgeHtml_(a, badgeCls, badgeCol)+
             countPill+
-            (a.active===false?'<span style="color:var(--red);font-size:10px">(đã khoá)</span>':'')+
+            _acctLockHtml_(a)+
           '</div>'+
           '<div style="color:var(--muted);font-size:11px">'+(namesDisp?esc(namesDisp):'—')+(a.team?' · '+esc(a.team):'')+'</div>'+
         '</div>'+

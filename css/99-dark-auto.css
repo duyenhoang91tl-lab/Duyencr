@@ -1,5 +1,5 @@
 /* TỰ SINH bởi tools/gen-dark-theme.js — ĐỪNG SỬA TAY (sửa tool rồi chạy lại: node tools/gen-dark-theme.js). Chỉ có hiệu lực ở chế độ tối.
-   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 10-medialib.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, 17-reports-pro.css, 18-list-pro.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
+   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 10-medialib.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, 17-reports-pro.css, 18-list-pro.css, 20-kit.css, 21-task-board.css, 22-sched-calendar.css, 23-overdue-bulk.css, 24-cs-leave.css, 25-report-frame.css, 26-lead-score.css, 27-settings-hub.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
 /* ── 01-base.css ── */
 html[data-theme="dark"] .btn.secondary:hover{background:#18293f!important}
 html[data-theme="dark"] .assign-badge-pill.has-assign{background:#3f3718!important;color:#edab82!important;border-color:#655a34!important}
@@ -98,6 +98,8 @@ html[data-theme="dark"] tr[data-drill]:hover td{background:var(--surface2,var(--
 html[data-theme="dark"].ui-pro{--pro-line:var(--border-md)!important;--pro-grey:var(--surface3)!important}
 html[data-theme="dark"].ui-pro .pro-card-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro .pro-stage>li{color:var(--muted)!important}
+html[data-theme="dark"].ui-pro .pro-stage-opt{border-color:var(--border-md)!important;background:var(--surface,var(--surface))!important;color:var(--text,var(--text))!important}
+html[data-theme="dark"].ui-pro .pro-stage-opt:hover{background:var(--surface2,var(--surface2))!important}
 html[data-theme="dark"].ui-pro .pro-next .n-pct{color:#7fd98a!important}
 html[data-theme="dark"].ui-pro .pro-next .n-act{color:#7eb0ff!important}
 html[data-theme="dark"].ui-pro .pro-gauge text.g-v{fill:var(--text)!important}
@@ -213,6 +215,14 @@ html[data-theme="dark"] .qr-pills .qr-b.on,html[data-theme="dark"] .qr-pills .qr
 html[data-theme="dark"] #qs-input::placeholder{color:var(--muted)!important}
 /* ── 17-reports-pro.css ── */
 /* ── 18-list-pro.css ── */
+/* ── 20-kit.css ── */
+/* ── 21-task-board.css ── */
+/* ── 22-sched-calendar.css ── */
+/* ── 23-overdue-bulk.css ── */
+/* ── 24-cs-leave.css ── */
+/* ── 25-report-frame.css ── */
+/* ── 26-lead-score.css ── */
+/* ── 27-settings-hub.css ── */
 /* ── <style> trong index.html ── */
 html[data-theme="dark"] #boot-splash i{border-top-color:var(--border-md)!important}
 html[data-theme="dark"] .ev-spin{color:#a992dd!important}
@@ -221,6 +231,7 @@ html[data-theme="dark"] [style*="background:#d1d5db;" i],html[data-theme="dark"]
 html[data-theme="dark"] [style*="background:#dbeafe;" i],html[data-theme="dark"] [style$="background:#dbeafe" i]{background:#18293f!important}
 html[data-theme="dark"] [style*="background:#dcfce7;" i],html[data-theme="dark"] [style$="background:#dcfce7" i]{background:#183f25!important}
 html[data-theme="dark"] [style*="background:#e0e7ff;" i],html[data-theme="dark"] [style$="background:#e0e7ff" i]{background:#18213f!important}
+html[data-theme="dark"] [style*="background:#ede9fe;" i],html[data-theme="dark"] [style$="background:#ede9fe" i]{background:var(--surface3)!important}
 html[data-theme="dark"] [style*="background:#eff6ff;" i],html[data-theme="dark"] [style$="background:#eff6ff" i]{background:var(--surface2)!important}
 html[data-theme="dark"] [style*="background:#f0fdf4;" i],html[data-theme="dark"] [style$="background:#f0fdf4" i]{background:var(--surface2)!important}
 html[data-theme="dark"] [style*="background:#f3f4f6;" i],html[data-theme="dark"] [style$="background:#f3f4f6" i]{background:var(--surface2)!important}
@@ -282,6 +293,7 @@ html[data-theme="dark"] [style^="color:#374151;" i],html[data-theme="dark"] [sty
 html[data-theme="dark"] [style^="color:#44403c;" i],html[data-theme="dark"] [style="color:#44403c" i],html[data-theme="dark"] [style*=";color:#44403c;" i],html[data-theme="dark"] [style$=";color:#44403c" i],html[data-theme="dark"] [style*=" color:#44403c;" i],html[data-theme="dark"] [style$=" color:#44403c" i]{color:var(--text)!important}
 html[data-theme="dark"] [style^="color:#4a2c8f;" i],html[data-theme="dark"] [style="color:#4a2c8f" i],html[data-theme="dark"] [style*=";color:#4a2c8f;" i],html[data-theme="dark"] [style$=";color:#4a2c8f" i],html[data-theme="dark"] [style*=" color:#4a2c8f;" i],html[data-theme="dark"] [style$=" color:#4a2c8f" i]{color:#a992dd!important}
 html[data-theme="dark"] [style^="color:#555;" i],html[data-theme="dark"] [style="color:#555" i],html[data-theme="dark"] [style*=";color:#555;" i],html[data-theme="dark"] [style$=";color:#555" i],html[data-theme="dark"] [style*=" color:#555;" i],html[data-theme="dark"] [style$=" color:#555" i]{color:var(--muted)!important}
+html[data-theme="dark"] [style^="color:#5b21b6;" i],html[data-theme="dark"] [style="color:#5b21b6" i],html[data-theme="dark"] [style*=";color:#5b21b6;" i],html[data-theme="dark"] [style$=";color:#5b21b6" i],html[data-theme="dark"] [style*=" color:#5b21b6;" i],html[data-theme="dark"] [style$=" color:#5b21b6" i]{color:#ad86e9!important}
 html[data-theme="dark"] [style^="color:#666;" i],html[data-theme="dark"] [style="color:#666" i],html[data-theme="dark"] [style*=";color:#666;" i],html[data-theme="dark"] [style$=";color:#666" i],html[data-theme="dark"] [style*=" color:#666;" i],html[data-theme="dark"] [style$=" color:#666" i]{color:var(--muted)!important}
 html[data-theme="dark"] [style^="color:#6b7280;" i],html[data-theme="dark"] [style="color:#6b7280" i],html[data-theme="dark"] [style*=";color:#6b7280;" i],html[data-theme="dark"] [style$=";color:#6b7280" i],html[data-theme="dark"] [style*=" color:#6b7280;" i],html[data-theme="dark"] [style$=" color:#6b7280" i]{color:var(--muted)!important}
 html[data-theme="dark"] [style^="color:#6d28d9;" i],html[data-theme="dark"] [style="color:#6d28d9" i],html[data-theme="dark"] [style*=";color:#6d28d9;" i],html[data-theme="dark"] [style$=";color:#6d28d9" i],html[data-theme="dark"] [style*=" color:#6d28d9;" i],html[data-theme="dark"] [style$=" color:#6d28d9" i]{color:#ad86ea!important}
@@ -296,7 +308,6 @@ html[data-theme="dark"] [style^="color:#9ca3af;" i],html[data-theme="dark"] [sty
 html[data-theme="dark"] [style^="color:#a16207;" i],html[data-theme="dark"] [style="color:#a16207" i],html[data-theme="dark"] [style*=";color:#a16207;" i],html[data-theme="dark"] [style$=";color:#a16207" i],html[data-theme="dark"] [style*=" color:#a16207;" i],html[data-theme="dark"] [style$=" color:#a16207" i]{color:#edc182!important}
 html[data-theme="dark"] [style^="color:#b45309;" i],html[data-theme="dark"] [style="color:#b45309" i],html[data-theme="dark"] [style*=";color:#b45309;" i],html[data-theme="dark"] [style$=";color:#b45309" i],html[data-theme="dark"] [style*=" color:#b45309;" i],html[data-theme="dark"] [style$=" color:#b45309" i]{color:#edb082!important}
 html[data-theme="dark"] [style^="color:#b91c1c;" i],html[data-theme="dark"] [style="color:#b91c1c" i],html[data-theme="dark"] [style*=";color:#b91c1c;" i],html[data-theme="dark"] [style$=";color:#b91c1c" i],html[data-theme="dark"] [style*=" color:#b91c1c;" i],html[data-theme="dark"] [style$=" color:#b91c1c" i]{color:#ec8383!important}
-html[data-theme="dark"] [style^="color:#b9770e;" i],html[data-theme="dark"] [style="color:#b9770e" i],html[data-theme="dark"] [style*=";color:#b9770e;" i],html[data-theme="dark"] [style$=";color:#b9770e" i],html[data-theme="dark"] [style*=" color:#b9770e;" i],html[data-theme="dark"] [style$=" color:#b9770e" i]{color:#edc482!important}
 html[data-theme="dark"] [style^="color:#be185d;" i],html[data-theme="dark"] [style="color:#be185d" i],html[data-theme="dark"] [style*=";color:#be185d;" i],html[data-theme="dark"] [style$=";color:#be185d" i],html[data-theme="dark"] [style*=" color:#be185d;" i],html[data-theme="dark"] [style$=" color:#be185d" i]{color:#ed82af!important}
 html[data-theme="dark"] [style^="color:#c00;" i],html[data-theme="dark"] [style="color:#c00" i],html[data-theme="dark"] [style*=";color:#c00;" i],html[data-theme="dark"] [style$=";color:#c00" i],html[data-theme="dark"] [style*=" color:#c00;" i],html[data-theme="dark"] [style$=" color:#c00" i]{color:#ed8282!important}
 html[data-theme="dark"] [style^="color:#c0392b;" i],html[data-theme="dark"] [style="color:#c0392b" i],html[data-theme="dark"] [style*=";color:#c0392b;" i],html[data-theme="dark"] [style$=";color:#c0392b" i],html[data-theme="dark"] [style*=" color:#c0392b;" i],html[data-theme="dark"] [style$=" color:#c0392b" i]{color:#e5938a!important}

@@ -18,5 +18,5 @@ ok(/\.fp-gear \.fp-mn\{[^}]*padding:11px 0/.test(mob) && /\.fp-mn\{flex:1;min-wi
 // may tinh khong doi
 ok(/\.fp-gear\{min-width:250px;\}/.test(desk) && /\.fp-sel\{max-width:210px;/.test(desk), 'may tinh giu nguyen: .fp-gear min-width 250, .fp-sel max-width 210');
 ok(!/@media/.test(desk.replace(/\/\*[\s\S]*?\*\//g, '')), 'khong co @media nao khac lam doi may tinh');
-ok(/css\/10-filter-presets\.css\?v=20261031a/.test(idx), 'index.html da doi ?v= de tranh cache CSS cu');
+ok(/css\/10-filter-presets\.css\?v=\d{8}[a-z]/.test(idx), 'index.html da doi ?v= de tranh cache CSS cu');
 process.exit(fail ? 1 : 0);

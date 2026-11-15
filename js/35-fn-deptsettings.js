@@ -81,6 +81,7 @@ function _dpMarkDirty(){
   var b = document.getElementById('dp-save'); if (b){ b.disabled = false; b.textContent = '💾 Lưu phòng'; }
   var h = document.getElementById('dp-dirty'); if (h) h.style.display = '';
   var o = document.getElementById('dp-okbar'); if (o) o.style.display = 'none';
+  var st = document.getElementById('dp-stats'); if (st) st.innerHTML = _dpStatsInner_();   // R9b: thẻ số theo kịp thay đổi chưa lưu
 }
 function _dpSetSec(s){ _dp.sec = s; _dpRender(); }
 
@@ -105,6 +106,28 @@ function _dpNames(){
   return out.sort(function(a, b){ return a.localeCompare(b, 'vi'); });
 }
 
+// ── R9b — phần HIỂN THỊ theo khuôn (thẻ số + chip "N người"); thiếu js/68 → bản cũ từng ký tự. KHÔNG đụng _dpSave/_dpPost/_dpGet/_dpAssignTeam/_dpSetPerson. ──
+function _dpStatsInner_(){
+  try {
+    if (typeof uiStatGrid_ !== 'function') return '';
+    var rooms = _dp.list.filter(function(g){ return String(g.label || '').trim(); });
+    var ok = {}; rooms.forEach(function(g){ ok[g.key] = true; });
+    var names = _dpNames(), assigned = 0;
+    names.forEach(function(n){ if (_dp.map[n] && ok[_dp.map[n]]) assigned++; });
+    var left = names.length - assigned;
+    return uiStatGrid_([
+      { icon: '🏢', label: 'Số phòng', value: String(rooms.length), tone: 'brand' },
+      { icon: '🧑‍💼', label: 'Đã gán phòng', value: String(assigned), tone: 'success' },
+      { icon: '❓', label: 'Chưa phân phòng', value: String(left), tone: left > 0 ? 'warning' : 'neutral', note: left > 0 ? 'gán ở mục “Từng người”' : '' }
+    ]);
+  } catch (e) { return ''; }
+}
+function _dpStatsHtml_(){ var h = _dpStatsInner_(); return h ? '<div id="dp-stats">' + h + '</div>' : ''; }
+function _dpCntHtml_(n){
+  try { if (typeof uiChip_ === 'function') return uiChip_(n + ' người', { tone: n > 0 ? 'info' : 'neutral' }); } catch (e) {}
+  return '<span class="dpg-cnt">' + n + ' người</span>';
+}
+
 // ── vẽ trang ──
 function _dpRender(){
   var ov = document.getElementById('dp-page'); if (!ov) return;
@@ -116,13 +139,13 @@ function _dpRender(){
     '<button id="dp-save" class="btn primary" onclick="_dpSave()"' + ((_dp.dirty && !_dp.busy) ? '' : ' disabled') + '>' + (_dp.busy ? '⏳ Đang lưu…' : '💾 Lưu phòng') + '</button></div>' +
     '<div class="rs-body"><div class="rs-nav">' + _DP_SECS.map(function(s){ return '<button class="rs-navbtn' + (_dp.sec === s[0] ? ' on' : '') + '" onclick="_dpSetSec(\'' + s[0] + '\')">' + s[1] + '</button>'; }).join('') +
     '<div class="rs-note">Phòng ban <b>độc lập</b> với Online / Văn phòng / Thử việc — gán phòng <b>không ảnh hưởng</b> đối tượng thưởng hay các báo cáo khác.<br><br>Chỉnh xong bấm <b>💾 Lưu phòng</b> ở thanh trên.</div></div>' +
-    '<div class="rs-main">' + msgs + body + '</div></div>';
+    '<div class="rs-main">' + msgs + _dpStatsHtml_() + body + '</div></div>';
 }
 function _dpRoomsHtml(){
   return '<h3>🏢 Danh sách phòng</h3><div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đặt tên phòng, thêm hoặc xóa tuỳ ý. Phòng để trống tên sẽ bị bỏ khi lưu.</div>' +
     _dp.list.map(function(g, i){
       return '<div class="dpg-row"><input type="text" value="' + esc(g.label) + '" placeholder="Tên phòng" oninput="_dpRoomLabel(' + i + ',this.value)" class="dpg-in">' +
-        '<span class="dpg-cnt">' + _dpCount(g.key) + ' người</span>' +
+        _dpCntHtml_(_dpCount(g.key)) +
         '<button class="btn xs danger" onclick="_dpDelRoom(' + i + ')" title="Xóa phòng">🗑</button></div>';
     }).join('') + '<button class="btn sm secondary" onclick="_dpAddRoom()">＋ Thêm phòng</button>';
 }
@@ -157,7 +180,7 @@ function _dpPeopleHtml(){
 function _dpPeopleListHtml(){
   var q = (_dp.q || '').toLowerCase();
   var rows = _dpNames().filter(function(n){ return !q || n.toLowerCase().indexOf(q) !== -1; });
-  return '<div style="max-height:60vh;overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
+  return '<div style="max-height:calc(var(--vh,1vh)*60);overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
     rows.map(function(n){ return '<tr><td>' + esc(n) + '</td><td><select data-n="' + esc(n) + '" onchange="_dpSetPerson(this.dataset.n,this.value)" style="width:180px">' + _dpOpts(_dp.map[n] || '', '— chưa phân phòng —') + '</select></td></tr>'; }).join('') +
     (rows.length ? '' : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
 }

@@ -10,6 +10,7 @@ function mkSheet(){
     getLastRow:()=>rows.length,getLastColumn:()=>rows.length?rows[0].length:0,
     appendRow:r=>{rows.push(r.slice());},
     getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),
+    getRangeList:a1=>({setValue:v=>{a1.forEach(a=>{const m=/^([A-Z])(\d+)$/.exec(a);rows[+m[2]-1]=rows[+m[2]-1]||[];rows[+m[2]-1][m[1].charCodeAt(0)-65]=v;});}}),
     getRange:(r,c,nr=1,nc=1)=>({
       getValues:()=>{const o=[];for(let i=0;i<nr;i++){const row=rows[r-1+i]||[];const x=[];for(let j=0;j<nc;j++)x.push(row[c-1+j]===undefined?'':row[c-1+j]);o.push(x);}return o;},
       setValues:v=>{for(let i=0;i<nr;i++){rows[r-1+i]=rows[r-1+i]||[];for(let j=0;j<nc;j++)rows[r-1+i][c-1+j]=v[i][j];}},

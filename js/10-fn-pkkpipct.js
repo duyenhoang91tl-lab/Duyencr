@@ -895,10 +895,10 @@ function renderAuditTab(){
   var wrap = document.getElementById('audit-wrap');
   if (!wrap) return;
   var rows = auditLog.slice(0, 500);
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+  var head = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">🧾 Nhật ký thao tác ('+fmt(auditLog.length)+')</div>'+
     '<button class="btn secondary" onclick="exportAudit()">⬇ Xuất CSV</button></div>';
-  html += '<table class="audit-table"><thead><tr><th style="width:140px">Thời gian</th><th style="width:120px">Người dùng</th>'+
+  var html = '<table class="audit-table"><thead><tr><th style="width:140px">Thời gian</th><th style="width:120px">Người dùng</th>'+
     '<th style="width:90px">Hành động</th><th style="width:120px">SĐT</th><th>Thay đổi</th></tr></thead><tbody>';
   if (!rows.length){ html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">Chưa có thao tác nào được ghi.</td></tr>'; }
   rows.forEach(function(r){
@@ -913,7 +913,29 @@ function renderAuditTab(){
       '<td>'+change+'</td></tr>';
   });
   html += '</tbody></table>';
-  wrap.innerHTML = html;
+  // R9b: có khuôn chung (js/76) → tiêu đề + thẻ số + bảng (HTML bảng GIỮ NGUYÊN) + nút Xuất; thiếu js/76 → giao diện cũ y hệt.
+  if (typeof uiReportFrame_ === 'function'){
+    wrap.innerHTML = uiReportFrame_({ id:'AUDIT', title:'🧾 Nhật ký thao tác', desc:'Hiện tối đa 500 thao tác mới nhất trong dữ liệu đã nạp; "Xuất CSV" lấy toàn bộ.',
+      stats:_auditStats_(), tableHtml:html, exports:[{ label:'Xuất CSV', icon:'⬇', onclick:'exportAudit()', kind:'csv' }] });
+    return;
+  }
+  wrap.innerHTML = head + html;
+}
+// R9b: thẻ số đầu tab Nhật ký — chỉ ĐẾM trên auditLog đã nạp (không gọi server).
+function _auditStats_(){
+  var log = (typeof auditLog !== 'undefined' && auditLog) || [], today = new Date().toDateString(), nToday = 0, nCfg = 0, users = {};
+  log.forEach(function(r){
+    var d = r.timestamp ? new Date(r.timestamp) : null;
+    if (d && !isNaN(d.getTime()) && d.toDateString() === today) nToday++;
+    if (String(r.action || '').indexOf('config:') === 0) nCfg++;
+    if (r.user) users[r.user] = 1;
+  });
+  return [
+    { label:'Tổng thao tác', value:fmt(log.length), tone:'brand' },
+    { label:'Hôm nay', value:fmt(nToday), tone:nToday ? 'success' : 'neutral' },
+    { label:'Đổi cấu hình', value:fmt(nCfg), note:'trong dữ liệu đã nạp', tone:nCfg ? 'info' : 'neutral' },
+    { label:'Người thao tác', value:fmt(Object.keys(users).length), tone:'info' }
+  ];
 }
 function exportAudit(){
   var head = ['timestamp','user','action','phone','oldValue','newValue'];

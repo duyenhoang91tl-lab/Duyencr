@@ -21,17 +21,16 @@ function _srKCsv_(){
   a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
   a.download = 'BaoCao_K_ChotThang_' + d.month + '.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
-function _srKBodyHtml_(d){
-  if (_srState.loading) return '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  if (!d || !d.ok) return '<div style="color:#dc2626;padding:12px">Không tải được: ' + esc((d && d.error) || _srState.lastFetchError || 'lỗi không rõ') + '</div>';
-  var cell = 'padding:8px 10px;border-bottom:1px solid var(--border)', num = cell + ';text-align:right;white-space:nowrap';
-  var h = '';
-  if (!d.applied) h += '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px">⚠ ' + esc(d.reason || '') + '</div>';
-  else h += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đã trừ phần hoàn/hủy phát sinh của tháng <b>' + esc(d.prevMonth) + '</b> sau mốc chốt ' + esc(d.closedAt) + '.</div>';
-  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' +
-    '<div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:var(--muted)">Doanh thu</div><div style="font-size:20px;font-weight:700">' + _srMoney(d.total.revenue) + '</div></div>' +
-    '<div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:var(--muted)">Doanh thu sau hoàn/hủy</div><div style="font-size:20px;font-weight:700">' + _srMoney(d.total.net) + '</div></div></div>';
-  h += '<div style="overflow-x:auto"><table class="dash-table" style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;' + cell + '">Sale</th><th style="text-align:left;' + cell + '">Nhóm</th>' +
+// Tách _srKBodyHtml_ thành 4 phần để khuôn chung (js/76 uiReportFrame_) xếp lại: cảnh báo · thẻ số · bảng · đối chiếu. SỐ LIỆU/HTML từng phần giữ nguyên như cũ.
+var _srKCell_ = 'padding:8px 10px;border-bottom:1px solid var(--border)', _srKNum_ = _srKCell_ + ';text-align:right;white-space:nowrap';
+function _srKNoticeHtml_(d){
+  if (!d.applied) return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px">⚠ ' + esc(d.reason || '') + '</div>';
+  return '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đã trừ phần hoàn/hủy phát sinh của tháng <b>' + esc(d.prevMonth) + '</b> sau mốc chốt ' + esc(d.closedAt) + '.</div>';
+}
+function _srKStats_(d){ return [{ label: 'Doanh thu', value: _srMoney(d.total.revenue) }, { label: 'Doanh thu sau hoàn/hủy', value: _srMoney(d.total.net) }]; }
+function _srKTableHtml_(d){
+  var cell = _srKCell_, num = _srKNum_;
+  var h = '<div style="overflow-x:auto"><table class="dash-table" style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;' + cell + '">Sale</th><th style="text-align:left;' + cell + '">Nhóm</th>' +
     '<th style="' + num + '">Doanh thu</th><th style="' + num + '">Trừ hoàn/hủy ' + esc(d.prevMonth) + '</th><th style="' + num + '">Sau hoàn/hủy</th></tr></thead><tbody>';
   (d.rows || []).forEach(function(r){
     h += '<tr><td style="' + cell + '">' + esc(r.name) + '</td><td style="' + cell + ';color:var(--muted)">' + esc(r.group) + '</td><td style="' + num + '">' + _srMoney(r.revenue) + '</td>' +
@@ -40,7 +39,10 @@ function _srKBodyHtml_(d){
   });
   if (!(d.rows || []).length) h += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">Chưa có sale nào thuộc phòng kinh doanh / phòng Sale có doanh thu trong tháng này.</td></tr>';
   else h += '<tr style="font-weight:700"><td style="' + cell + '" colspan="2">TỔNG (' + d.rows.length + ' sale)</td><td style="' + num + '">' + _srMoney(d.total.revenue) + '</td><td style="' + num + '">' + (d.total.deduction ? '−' + _srMoney(d.total.deduction) : '—') + '</td><td style="' + num + '">' + _srMoney(d.total.net) + '</td></tr>';
-  h += '</tbody></table></div>';
+  return h + '</tbody></table></div>';
+}
+function _srKReconHtml_(d){
+  var cell = _srKCell_, num = _srKNum_, h = '';
   var rc = d.recon;   // Duyên 2026-11-11: đối chiếu với tổng Báo cáo B để thấy ngay khoản bị loại khỏi K (K chỉ cộng sale Online/Văn phòng/Phòng Sale)
   if (rc) {
     var out = rc.outside || [], un = Math.round(rc.unattributed || 0);
@@ -56,6 +58,13 @@ function _srKBodyHtml_(d){
   }
   return h;
 }
+// Bản cũ (không dùng khuôn): giữ làm dự phòng khi js/76 chưa nạp và cho test cũ — ghép đúng 4 phần ở trên.
+function _srKBodyHtml_(d){
+  if (_srState.loading) return '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
+  if (!d || !d.ok) return '<div style="color:#dc2626;padding:12px">Không tải được: ' + esc((d && d.error) || _srState.lastFetchError || 'lỗi không rõ') + '</div>';
+  var cards = _srKStats_(d).map(function(c){ return '<div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:var(--muted)">' + esc(c.label) + '</div><div style="font-size:20px;font-weight:700">' + c.value + '</div></div>'; }).join('');
+  return _srKNoticeHtml_(d) + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' + cards + '</div>' + _srKTableHtml_(d) + _srKReconHtml_(d);
+}
 function _srKCloseHtml_(d){
   if (!_srIsAdmin()) return '';
   var prev = (d && d.prevMonth) || '', cm = (d && d.closedMonths) || [];
@@ -69,13 +78,24 @@ function _srKCloseHtml_(d){
 }
 function renderSalesReportTabK_(wrap, subTabs){
   var m = _srKMonth_(), inp = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
-  var date = '<button class="btn sm" onclick="_srKShift_(-1)" title="Tháng trước">◀</button>' +
-    '<input type="month" value="' + esc(m) + '" onchange="_srKSetMonth_(this.value)" style="' + inp + '">' +
-    '<button class="btn sm" onclick="_srKShift_(1)" title="Tháng sau">▶</button>' +
-    '<button class="btn sm secondary" onclick="_srKCsv_()" title="Tải bảng này (CSV)">⬇ CSV</button>';
   var d = _srState.dataK;
-  wrap.innerHTML = _srBarHtml_(date) +
-    '<div style="font-size:12px;color:var(--muted);margin:6px 0 10px">Báo cáo chốt tháng — chỉ sale phòng kinh doanh (Online, Văn phòng) và phòng Sale · chỉ doanh thu và doanh thu sau hoàn/hủy.</div>' +
-    _srKBodyHtml_(d) + (_srState.loading ? '' : _srKCloseHtml_(d));
+  var nav = '<button class="btn sm" onclick="_srKShift_(-1)" title="Tháng trước">◀</button>' +
+    '<input type="month" value="' + esc(m) + '" onchange="_srKSetMonth_(this.value)" style="' + inp + '">' +
+    '<button class="btn sm" onclick="_srKShift_(1)" title="Tháng sau">▶</button>';
+  var desc = 'Báo cáo chốt tháng — chỉ sale phòng kinh doanh (Online, Văn phòng) và phòng Sale · chỉ doanh thu và doanh thu sau hoàn/hủy.';
+  var close = _srState.loading ? '' : _srKCloseHtml_(d);
+  if (typeof uiReportFrame_ !== 'function') {   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = _srBarHtml_(nav + '<button class="btn sm secondary" onclick="_srKCsv_()" title="Tải bảng này (CSV)">⬇ CSV</button>') +
+      '<div style="font-size:12px;color:var(--muted);margin:6px 0 10px">' + desc + '</div>' + _srKBodyHtml_(d) + close;
+    return;
+  }
+  var ready = !_srState.loading && d && d.ok;
+  var o = { id: 'K', desc: desc, barHtml: _srBarHtml_(nav), loading: !!_srState.loading, retry: '_srLoad()',
+    error: (!_srState.loading && !ready) ? 'Không tải được: ' + ((d && d.error) || _srState.lastFetchError || 'lỗi không rõ') : '' };
+  if (ready) {
+    o.noticeHtml = _srKNoticeHtml_(d); o.stats = _srKStats_(d); o.tableHtml = _srKTableHtml_(d); o.afterHtml = _srKReconHtml_(d);
+    o.exports = [{ label: 'Tải CSV', icon: '⬇', kind: 'excel', onclick: '_srKCsv_()' }];
+  }
+  wrap.innerHTML = uiReportFrame_(o) + close;
 }
-if (typeof module !== 'undefined') module.exports = { _srKBodyHtml_: _srKBodyHtml_ };
+if (typeof module !== 'undefined') module.exports = { _srKBodyHtml_: _srKBodyHtml_, _srKTableHtml_: _srKTableHtml_, _srKReconHtml_: _srKReconHtml_ };

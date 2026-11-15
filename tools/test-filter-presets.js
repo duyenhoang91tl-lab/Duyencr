@@ -117,7 +117,9 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     const cb2 = w.eval('__calls').filter(x => x.action === 'salesReportB').pop(); ok(cb2 && /dungnguyen1995/.test(cb2.params.sale || ''), 'tai lai Bao cao B voi dung Sale');
     ok(w.eval('_srState.sale').length === 0 || true, 'bo loc cua A khong bi dung vao');
     // Bao cao khac co o Sale deu co thanh mau: C, D, E, F, G, K, L
-    for (const sb of ['C', 'D', 'E', 'F', 'G', 'K', 'L', 'M']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(ctl() && ctl().parentNode.classList.contains('srb-bar'), 'Bao cao ' + sb + ' co o mau loc nhanh'); }
+    for (const sb of ['C', 'D', 'E', 'F', 'G', 'BD', 'L', 'M']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(ctl() && ctl().parentNode.classList.contains('srb-bar'), 'Bao cao ' + sb + ' co o mau loc nhanh'); }
+    // K = Bao cao Chot thang (doc lap tu 10/11, khong co bo loc sale) => KHONG co o mau loc nhanh; BD = Chi tiet thuong cu (cung bo loc voi G) moi co.
+    w.eval("_srState.sub = 'K'; renderSalesReportTab();"); await wait(20); ok(!ctl(), 'Bao cao K (Chot thang) KHONG co o mau loc nhanh (khong co bo loc sale)');
     // Bao cao H/I (loc theo DANH SACH CS, 02/11/2026): co thanh mau; bam mau -> hCsList/iCsList = ten CS khop, xoa o chon 1 Team/1 CS cu
     w.eval("assignHistory = [{csName:'dungnguyen1995',date:'2026-10-05',phones:['0901']},{csName:'Lan',date:'2026-10-05',phones:['0902']}]; _srState.hTeam='T1'; _srState.hCs='Lan'; _srState.iTeam='T1'; _srState.iCs='Lan';");
     for (const sb of ['H', 'I']) {

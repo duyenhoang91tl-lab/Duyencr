@@ -12,7 +12,7 @@ function fnSrc(name) {            // cat 1 ham cap cao nhat theo dau ngoac nhon
 function between(a, b) { const i = src.indexOf(a), j = src.indexOf(b, i); if (i < 0 || j < 0) throw new Error('khong thay moc ' + a); return src.slice(i, j); }
 const consts = between("var DT_TONG_SHEET", "// SUA 2026-10-04: 15") + between("var DON_CHITIET_WIDTH = 17;", "// ─── DT TỔNG = nguon") + between("var DT_COL_NGAYTAO", "// Sentinel dung thay cho");
 const code = [consts, 'var VN_OFFSET_MS = 7 * 3600 * 1000;', fnSrc('_vnYmdParts_'), fnSrc('normPhone_'), fnSrc('_dtCellToVnStr_'), fnSrc('_normMoney_'),
-  fnSrc('_donConvertRows_'), src.slice(src.indexOf('var SB_BATCH_ ='))].join('\n');
+  fnSrc('_donMoneyToken_'), fnSrc('_donListPriceTotal_'), fnSrc('_donConvertRows_'), src.slice(src.indexOf('var SB_BATCH_ ='))].join('\n');
 // ^ tu 'var SB_BATCH_' den het file = toan bo khoi Supabase (buoc 2/3/4a; can cho sbCfg_/sb_/_sbHeader_).
 
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };

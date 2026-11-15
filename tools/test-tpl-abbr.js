@@ -7,11 +7,11 @@ function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) 
 function line(re) { const m = re.exec(src); if (!m) throw new Error('thieu dong ' + re); return m[0]; }
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
 const consts = [
-  'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100;',
+  line(/var SH_VIETTAT = [^\n]*;/), line(/var VIETTAT_HEADERS = \[[^\]]*\];/), line(/var VIETTAT_MAX_AUDIOS = [^\n]*;/), 'var VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100;',   // 15/11: lay hang so THAT tu gas_v13.js (them cot audios o r[9]) thay vi chep tay de khoi lech
   line(/var MSG_TPL_HEADERS = \[[^\]]*\];/), line(/var MSG_TPL_APPROVER_ROLES_ = \[[^\]]*\];/), line(/var MSG_TPL_STATUS_ = \{[^}]*\};/),
   line(/var VIETTAT_TPL_MAX = [^\n]*;/), line(/var VIETTAT_TPL_ONLY_ADMIN = [^\n]*;/), 'var SH_MSG_TPL="MessageTemplates",SH_USER="Users";'
 ].join('\n');
-const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_',
+const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtAudsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_',
   '_tplRowToObj_', '_tplOwns_', '_tplCheckAbbr_', 'saveMessageTemplate_', 'setTemplateAbbr_'].map(fn).join('\n');
 // sheet gia theo ten (dung chung cho MessageTemplates va VietTat)
 const mk = (name) => { const s = { rows: [], hdr: name === 'VietTat' ? ['id'] : null };

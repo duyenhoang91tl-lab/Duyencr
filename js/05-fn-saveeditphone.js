@@ -152,7 +152,8 @@ document.addEventListener('DOMContentLoaded', function () {
 //  EXPORT + CLEAR
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
-  const q=s(document.getElementById('search-input').value).toLowerCase();
+  const _sn=(typeof ssNormQuery_==='function')?ssNormQuery_(document.getElementById('search-input').value):null;   // R5c: cùng cách tìm với bảng (js/69)
+  const q=_sn?_sn.q:s(document.getElementById('search-input').value).toLowerCase();
   const csFList=_csFilterListMatch();
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
@@ -162,7 +163,7 @@ function exportCSV() {
       if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
     }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
-    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)&&!(c.cskhNameLower&&c.cskhNameLower.includes(q))) return false;
+    if(q&&!(_sn?ssMatchText_(c,_sn):(c.name.toLowerCase().includes(q)||c.phone.includes(q)||(c.cskhNameLower&&c.cskhNameLower.includes(q))))) return false;
     return true;
   });
   const BOM='\uFEFF';
@@ -799,7 +800,7 @@ function openTabCustomizeModal(){
   var box = document.createElement('div');
   box.id = 'tab-customize-overlay';
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:900;display:flex;align-items:center;justify-content:center';
-  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:320px;max-width:92vw;max-height:80vh;overflow:auto">'+
+  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:320px;max-width:92vw;max-height:calc(var(--vh,1vh)*80);overflow:auto">'+
     '<div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙ Tuỳ chỉnh tab hiển thị</div>'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Bỏ tích tab nào để ẩn khỏi thanh của riêng bạn — người khác không bị ảnh hưởng.</div>'+
     rows +
@@ -878,7 +879,7 @@ function toggleLastActSort() {
   if (icon) icon.textContent = _lastActSortDir === -1 ? '↓' : _lastActSortDir === 1 ? '↑' : '↕';
   // Chỉ 1 cột dùng icon ↕ để sắp xếp tại 1 thời điểm — bật cột này thì tắt cột kia, tránh 2
   // chiều sắp xếp "ngầm" cùng tồn tại gây khó hiểu khi xem danh sách.
-  if (_lastActSortDir !== 0) { _lastPosSortDir = 0; const i2 = document.getElementById('lastpos-sort-icon'); if (i2) i2.textContent = '↕'; }
+  if (_lastActSortDir !== 0) { _lastPosSortDir = 0; const i2 = document.getElementById('lastpos-sort-icon'); if (i2) i2.textContent = '↕'; if (typeof lsResetLevelSort_ === 'function') lsResetLevelSort_(); }   // R8e: cũng tắt xếp theo Mức
   applyFilters();
 }
 
@@ -886,7 +887,7 @@ function toggleLastPosSort() {
   _lastPosSortDir = _lastPosSortDir === 0 ? -1 : _lastPosSortDir === -1 ? 1 : 0;
   const icon = document.getElementById('lastpos-sort-icon');
   if (icon) icon.textContent = _lastPosSortDir === -1 ? '↓' : _lastPosSortDir === 1 ? '↑' : '↕';
-  if (_lastPosSortDir !== 0) { _lastActSortDir = 0; const i2 = document.getElementById('lastact-sort-icon'); if (i2) i2.textContent = '↕'; }
+  if (_lastPosSortDir !== 0) { _lastActSortDir = 0; const i2 = document.getElementById('lastact-sort-icon'); if (i2) i2.textContent = '↕'; if (typeof lsResetLevelSort_ === 'function') lsResetLevelSort_(); }   // R8e: cũng tắt xếp theo Mức
   applyFilters();
 }
 

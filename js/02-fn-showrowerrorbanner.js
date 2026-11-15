@@ -501,7 +501,9 @@ function debouncedApplyFilters() {
 }
 
 function applyFilters() {
-  const q = s(document.getElementById('search-input').value).toLowerCase();
+  // R5c (15/11/2026): chuẩn hoá ô tìm (js/69) — tên bỏ dấu + mọi từ, SĐT có dấu cách/chấm/+84. Thiếu js/69 → _sn=null → kiểu cũ y nguyên.
+  const _sn = (typeof ssNormQuery_ === 'function') ? ssNormQuery_(document.getElementById('search-input').value) : null;
+  const q = _sn ? _sn.q : s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
   const csFList = _csFilterListMatch();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
@@ -584,7 +586,7 @@ function applyFilters() {
       }
       if (!_matchAnyCS) return false;
     }
-    if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
+    if (q && !(_sn ? ssMatchText_(c, _sn) : (c.nameLower.includes(q) || c.phone.includes(q) || (c.cskhNameLower && c.cskhNameLower.includes(q))))) return false;
 
     // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
@@ -618,6 +620,8 @@ function applyFilters() {
 
     // No-action filter: chưa có _lastActionDate
     if (noActionF && c._lastActionDate) return false;
+    // R8b: lọc theo mức nóng/ấm/nguội/sắp mất (js/77). _lsListFilter rỗng → bỏ qua, thiếu js/77 → bỏ qua.
+    if (typeof _lsListFilter !== 'undefined' && _lsListFilter && typeof lsFilterPass_ === 'function' && !lsFilterPass_(c)) return false;
 
     // Column filters
     if (colFilters.name.size > 0 && !colFilters.name.has(c.name)) return false;
@@ -802,7 +806,9 @@ function applyFilters() {
     return true;
   });
 
-  if (_lastPosSortDir !== 0) {
+  if (typeof _lsLevelSortDir !== 'undefined' && _lsLevelSortDir !== 0 && typeof lsLevelSortList_ === 'function') {
+    lsLevelSortList_(list, _lsLevelSortDir);   // R8e: xếp theo Mức nóng/ấm/nguội (js/77); loại trừ với 2 kiểu xếp bên dưới
+  } else if (_lastPosSortDir !== 0) {
     // Mua gan nhat: KH chua co don Pos nao (lastPosDate rong) luon xep CUOI du dang sap xep chieu nao.
     list.sort((a, b) => {
       const da = a.lastPosDate, db = b.lastPosDate;
@@ -930,6 +936,9 @@ function _rowHtml(c) {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
   const lastPosDisp = (typeof colVisible !== 'undefined' && colVisible.lastpos !== false) ? '' : 'display:none';
+  const levelDisp = (typeof colVisible !== 'undefined' && colVisible.level !== false) ? '' : 'display:none';
+  let levelHtml = '';   // R8e: ô "Mức" (js/77); thiếu js/77 hoặc lỗi → ô trống, không làm hỏng cả dòng
+  try { if (typeof lsRowScore_ === 'function') levelHtml =lsLevelCellHtml_(lsRowScore_(c)); } catch (e) {}
   let lastPosHtml;
   if (c.lastPosDate) {
     const _lpDa = _calendarDaysAgo(c.lastPosDate);
@@ -943,6 +952,7 @@ function _rowHtml(c) {
     <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-hang">${hangBadge(c.hangKey)}</td>
+    <td class="col-level" style="${levelDisp}">${levelHtml}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
     <td class="col-order"><span style="font-weight:600">${c.totalOrders}</span><span style="color:var(--muted);font-size:11px"> / ${fmtVND(c.totalRevenue)}</span></td>
@@ -1229,7 +1239,7 @@ function renderOverdueTab() {
       const c = _customerByPhone(it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
-      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
+      html += `<div class="sched-item sched-overdue" data-id="${esc(it.id)}" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
         <div class="sched-dot" style="background:${st.color}"></div>
         <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
         <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>

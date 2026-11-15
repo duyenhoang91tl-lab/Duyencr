@@ -50,7 +50,8 @@ ok(names(a.bySale) === 'anhtrinh1995', 'A: loc theo TEN KHAC (alias) cua cung ng
 vm.runInContext('_expandSaleFilterWithPancakeAliases_ = function(a) { return a; };', ctx);
 
 // ── BAO CAO C (ky tu chon: periodType=custom) ──
-const PC = { periodType: 'custom', customCurFrom: '01/10/2026', customCurTo: '31/10/2026', customPrevFrom: '01/09/2026', customPrevTo: '30/09/2026' };
+// Duyen 2026-11-10: C mac dinh lay don POS (qua B); test nay kiem duong DT Tong (Base) nen ep source:'base'.
+const PC = { source: 'base', periodType: 'custom', customCurFrom: '01/10/2026', customCurTo: '31/10/2026', customPrevFrom: '01/09/2026', customPrevTo: '30/09/2026' };
 let c = run('buildSalesReportC_', Object.assign({ sale: ['anhtrinh1995', 'yenNTH2004'] }, PC));
 const cn = x => (x.byEmployee || []).map(r => r.name).sort().join(',');
 ok(cn(c) === 'anhtrinh1995,yenNTH2004', 'C: loc 2 sale -> bang theo nhan vien CHI co 2 nguoi do: ' + cn(c));
@@ -61,7 +62,7 @@ ok(cn(c) === 'anhtrinh1995,menbui2002,phongketoan,yenNTH2004', 'C: KHONG loc Sal
 
 // ── B (POS) va Bao cao don that bai: cung 1 co che — kiem tra tinh vi 2 bao cao nay can nhieu du lieu gia (Base ghep, don chi tiet) ──
 const bBody = src.slice(src.indexOf('function buildSalesReportB_('), src.indexOf('function buildSalesReportB_(') + 60000);
-ok(/var wantSaleB_ = _saleWantedFn_\(saleFilterFold\);/.test(bBody) && /if \(!wantSaleB_\(sName\)\) continue;[^\n]*\n\s*var fr = fracOf\(sName\)/.test(bBody), 'B: vong cong don Theo Sale co kiem tra nguoi trong bo loc truoc khi cong');
+ok(/var wantSaleB_ = _saleWantedFn_\(saleFilterFold\);/.test(bBody) && /if \(!wantSaleB_\(sName\) && !mergedB\[si2\]\.raws\.some\(function\(rn\) \{ return wantSaleB_\(rn\); \}\)\) continue;[^\n]*\n\s*var fr = mergedB\[si2\]\.frac/.test(bBody), 'B: vong cong don Theo Sale co kiem tra nguoi trong bo loc (ke ca ten goc da gop alias) truoc khi cong');
 const fBody = src.slice(src.indexOf('function buildFailedOrderReport_('), src.indexOf('function buildFailedOrderReport_(') + 9000);
 ok(/var wantSaleF_ = _saleWantedFn_\(saleFilterFold\);/.test(fBody) && /if \(!wantSaleF_\(salesList\[k\]\)\) continue; add_\(bySale/.test(fBody), 'Don that bai: vong cong don Theo Sale co kiem tra nguoi trong bo loc');
 console.log(fails ? '\nFAILED ' + fails : '\nALL PASS'); process.exit(fails ? 1 : 0);
