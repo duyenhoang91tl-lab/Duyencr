@@ -62,6 +62,27 @@ function _vtCustomerName() {
 }
 
 
+// ---------- DÙNG NHANH trên điện thoại (2026-11-14, Duyên: "tối ưu app thiết kế thông minh dễ sử dụng") ----------
+// Điện thoại không có phím Tab → chạm vào nội dung 1 mục = sao chép (tự thay {tên} bằng khách đang mở); 6 mục dùng gần nhất hiện thành chip ở đầu danh sách (nhớ trong localStorage, riêng từng máy).
+var _VT_RECENT_KEY = 'vt_recent', _VT_RECENT_MAX = 6;
+function _vtRecent() { try { var a = JSON.parse(localStorage.getItem(_VT_RECENT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function _vtPushRecent(id) { try { var a = _vtRecent().filter(function (x) { return x !== id; }); a.unshift(id); localStorage.setItem(_VT_RECENT_KEY, JSON.stringify(a.slice(0, _VT_RECENT_MAX))); } catch (e) {} }
+function _vtCopyText(t) {
+  return (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t).then(function () { return true; }, function () { return false; }) : Promise.resolve(false)).then(function (ok) {
+    if (ok) return true;
+    try { var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.focus(); ta.select(); var r = document.execCommand('copy'); document.body.removeChild(ta); return !!r; } catch (e) { return false; }
+  });
+}
+function vtCopyOption(id, i) {
+  var s = _vtSt.list.find(function (x) { return x.id === id; }); if (!s || !s.options[i || 0]) return Promise.resolve(false);
+  var name = _vtCustomerName(), raw = s.options[i || 0], txt = _vtResolve(raw, name);
+  return _vtCopyText(txt).then(function (ok) {
+    if (ok) _vtPushRecent(s.id);
+    if (typeof toast === 'function') toast(ok ? '📋 Đã chép "' + s.abbr + '"' + (/\{tên/.test(txt) ? ' — chưa chọn khách nên {tên} giữ nguyên' : '') + ' — dán vào ô chat' : 'Không chép được — chọn chữ rồi chép tay');
+    vtRender(); return ok;
+  });
+}
+
 // ---------- CÂY THƯ MỤC mẹ/con (2026-11-14, Duyên: chọn thư mục kiểu dropdown, mẹ xổ con theo hàng dọc; tạo mẫu cũng tạo được thư mục mẹ/con) ----------
 // nhom = đường dẫn "Mẹ/Con/Cháu" (server _vtNhom_ cắt tối đa 3 cấp). 2 panel dùng chung 1 bộ vẽ cây: 'f' = LỌC danh sách, 'p' = CHỌN thư mục trong form (thêm ＋ con / mẹ mới).
 // Chọn thư mục mẹ = gồm mọi con cháu (khớp theo tiền tố path + '/', nên "Túi" KHÔNG khớp nhầm "Túi tiền").
@@ -118,10 +139,12 @@ function _vtAskName(parent) {
     '.vtn{display:flex;align-items:center;gap:4px;border-radius:7px;padding:1px 2px}.vtn:hover{background:var(--surface2,#f3f4f6)}.vtn.on{background:rgba(30,102,245,.12);font-weight:700}' +
     '.vtg{flex:0 0 26px;text-align:center;cursor:pointer;color:var(--muted);padding:6px 0}.vtl{flex:1;min-width:0;cursor:pointer;padding:6px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vtc{font-size:11px;color:var(--muted)}' +
     '.vta{cursor:pointer;color:var(--accent,#1e66f5);font-weight:700;padding:4px 8px;border-radius:6px}.vta:hover{background:rgba(30,102,245,.15)}.vtk{margin-left:16px;border-left:2px solid var(--border,#e3e6ea)}' +
-    '.vt-fold{cursor:pointer;user-select:none}' +
+    '.vt-fold{cursor:pointer;user-select:none}.vt-copy:active{background:rgba(30,102,245,.12)}@media (pointer:coarse){.vt-copy{font-size:14px!important}}' +
     '@media (max-width:700px),(pointer:coarse){.vt-tree-wrap{position:static}.vt-tree-panel{position:fixed;left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));min-width:0;max-width:none;max-height:calc(var(--vh,1vh)*70);z-index:2147483000;font-size:15px;box-shadow:0 -6px 28px rgba(0,0,0,.3)}.vtn{min-height:44px}.vtg{flex-basis:40px}.vta{padding:10px 14px}.vtt{font-size:14px;padding:6px 8px 10px}}';
     document.head.appendChild(st); } catch (e) {}
   document.addEventListener('click', function (e) {
+    var cp = e.target.closest && e.target.closest('[data-vtc],[data-vtr]');
+    if (cp) { if (cp.hasAttribute('data-vtc')) { var kk = cp.getAttribute('data-vtc'), at = kk.lastIndexOf('#'); vtCopyOption(kk.slice(0, at), +kk.slice(at + 1)); } else vtCopyOption(cp.getAttribute('data-vtr'), 0); return; }
     var t = e.target.closest && e.target.closest('[data-vtn]');
     if (!t) { if (!(e.target.closest && e.target.closest('.vt-tree-wrap'))) ['vt-nf-panel', 'vt-np-panel'].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = true; }); return; }
     var act = t.getAttribute('data-vtn'), p = t.getAttribute('data-p') || '', pan = t.closest('.vt-tree-panel'), kind = pan ? (pan.id === 'vt-nf-panel' ? 'f' : 'p') : '';
@@ -185,6 +208,7 @@ function vtRender() {
   var hint = document.getElementById('vt-hint');
   var nfb = document.getElementById('vt-nf-btn'); if (nfb) nfb.textContent = _vtNfLabel();
   if (hint) hint.textContent = _vtSt.canTeam ? 'Bạn là admin: mục "👥 Chung" cả team dùng được; mục "🙋 Của tôi" chỉ mình bạn thấy.' : 'Mục "👥 Chung" do admin quản lý (cả team dùng). Bạn tạo được mục "🙋 Của tôi" — chỉ mình bạn thấy và dùng.';
+  if (hint) hint.textContent += ' 👆 Chạm vào nội dung để sao chép rồi dán vào ô chat.';
   if (_vtSt.err && !_vtSt.list.length) { el.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải viết tắt: ' + _vtEsc(_vtSt.err) + ' <button class="btn sm" onclick="loadVietTat(true)">Thử lại</button></div>'; return; }
   var rows = _vtSt.list.filter(function (s) {
     if (sf && s.scope !== sf) return false;
@@ -193,6 +217,11 @@ function vtRender() {
     return _vtFold([s.abbr, s.keyword, s.nhom, s.options.join(' ')].join(' ')).indexOf(q) >= 0;
   });
   if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_vtSt.list.length ? 'Không có mục nào khớp bộ lọc.' : 'Chưa có viết tắt nào — bấm "+ Thêm viết tắt". Ví dụ: viết tắt <b>ch</b> → "Dạ em chào chị {tên} ạ".') + '</div>'; return; }
+  var recentHtml = '';
+  if (!q && !sf && !_vtSt.nf) {
+    var rc = _vtRecent().map(function (id) { return _vtSt.list.find(function (x) { return x.id === id; }); }).filter(Boolean);
+    if (rc.length) recentHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px"><span style="font-size:11.5px;font-weight:700;color:var(--muted)">🕘 Dùng gần đây</span>' + rc.map(function (x) { return '<button type="button" class="btn sm" data-vtr="' + _vtEsc(x.id) + '" title="Chạm để sao chép nội dung đầu tiên" style="min-height:34px">' + _vtEsc(x.abbr) + '</button>'; }).join('') + '</div>';
+  }
   var groups = {}; rows.forEach(function (s) { (groups[s.nhom || ''] = groups[s.nhom || ''] || []).push(s); });
   var names = Object.keys(groups).sort(function (a, b) { return a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'vi'); });
   var shown = {}, html = '';
@@ -216,13 +245,13 @@ function vtRender() {
       return '<div style="margin-left:' + (depth * 16) + 'px;border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-start;margin-bottom:4px">' +
         '<div style="min-width:70px;max-width:100%"><code style="font-size:13px;font-weight:700;overflow-wrap:anywhere;word-break:break-all">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt — sửa nội dung/xoá ở 📚 Quản lý mẫu; viết tắt đổi bằng nút ⌨️"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
         '<div style="flex:1 1 200px;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
-        s.options.map(function (o, i) { return '<div style="font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + auds + '</div>' +
+        s.options.map(function (o, i) { return '<div class="vt-copy" data-vtc="' + _vtEsc(s.id) + '#' + i + '" title="Chạm để sao chép" style="cursor:pointer;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + auds + '</div>' +
         (!can && _vtCanEditAbbr(s) ? '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtEditTplAbbr(this.dataset.vtId)" title="Sửa viết tắt của mẫu này (nội dung sửa ở 📚 Quản lý mẫu)">⌨️ Sửa viết tắt</button></div>' : '') +
         (can ? '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtOpenForm(this.dataset.vtId)" title="Sửa">✏️</button><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtDelete(this.dataset.vtId)" title="Xoá">🗑</button></div>' : '') +
         '</div>';
     }).join('');
   });
-  el.innerHTML = html;
+  el.innerHTML = recentHtml + html;
   var dl = document.getElementById('vt-nhom-list');
   if (dl) { var seen = {}; _vtSt.list.forEach(function (s) { var p = s.nhom ? s.nhom.split('/') : []; for (var k = 1; k <= p.length; k++) seen[p.slice(0, k).join('/')] = 1; }); dl.innerHTML = Object.keys(seen).map(function (n) { return '<option value="' + _vtEsc(n) + '">'; }).join(''); }
 }
