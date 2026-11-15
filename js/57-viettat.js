@@ -287,7 +287,7 @@ function vtRender() {
     if (sf && s.scope !== sf) return false;
     if (_vtSt.nf && !_vtInNhom(s.nhom, _vtSt.nf)) return false;
     if (!q) return true;
-    return _vtFold([s.abbr, s.keyword, s.nhom, s.options.join(' ')].join(' ')).indexOf(q) >= 0;
+    return _vtFold([s.abbr, s.keyword, s.nhom, s.options.join(' '), (s.images || []).map(function (x) { return x.name; }).join(' '), (s.audios || []).map(function (x) { return x.name; }).join(' ')].join(' ')).indexOf(q) >= 0;   // 2026-11-14: tìm được cả theo TÊN FILE ảnh/ghi âm đính kèm
   });
   if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_vtSt.list.length ? 'Không có mục nào khớp bộ lọc.' : 'Chưa có viết tắt nào — bấm "+ Thêm viết tắt". Ví dụ: viết tắt <b>ch</b> → "Dạ em chào chị {tên} ạ".') + '</div>'; return; }
   var usedMode = _vtSortMode() === 'used', usage = _vtUsage();
