@@ -39,7 +39,7 @@ function _uxModal(id, title, html){
   var m = document.createElement('div'); m.id = id;
   m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) m.remove(); };
-  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:640px;width:100%;max-height:86vh;overflow:auto;padding:16px 18px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:16px">' + title + '</b><button class="btn sm" onclick="document.getElementById(\'' + id + '\').remove()">✕</button></div>' + html + '</div>';
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:640px;width:100%;max-height:calc(var(--vh,1vh)*86);overflow:auto;padding:16px 18px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:16px">' + title + '</b><button class="btn sm" onclick="document.getElementById(\'' + id + '\').remove()">✕</button></div>' + html + '</div>';
   document.body.appendChild(m);
 }
 function openErrLogModal(){

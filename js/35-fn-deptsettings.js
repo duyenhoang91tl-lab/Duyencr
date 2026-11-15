@@ -180,7 +180,7 @@ function _dpPeopleHtml(){
 function _dpPeopleListHtml(){
   var q = (_dp.q || '').toLowerCase();
   var rows = _dpNames().filter(function(n){ return !q || n.toLowerCase().indexOf(q) !== -1; });
-  return '<div style="max-height:60vh;overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
+  return '<div style="max-height:calc(var(--vh,1vh)*60);overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
     rows.map(function(n){ return '<tr><td>' + esc(n) + '</td><td><select data-n="' + esc(n) + '" onchange="_dpSetPerson(this.dataset.n,this.value)" style="width:180px">' + _dpOpts(_dp.map[n] || '', '— chưa phân phòng —') + '</select></td></tr>'; }).join('') +
     (rows.length ? '' : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
 }

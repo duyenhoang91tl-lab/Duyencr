@@ -800,7 +800,7 @@ function openTabCustomizeModal(){
   var box = document.createElement('div');
   box.id = 'tab-customize-overlay';
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:900;display:flex;align-items:center;justify-content:center';
-  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:320px;max-width:92vw;max-height:80vh;overflow:auto">'+
+  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:320px;max-width:92vw;max-height:calc(var(--vh,1vh)*80);overflow:auto">'+
     '<div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙ Tuỳ chỉnh tab hiển thị</div>'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Bỏ tích tab nào để ẩn khỏi thanh của riêng bạn — người khác không bị ảnh hưởng.</div>'+
     rows +

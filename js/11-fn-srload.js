@@ -1953,7 +1953,7 @@ function _impAsk_(title, body, okLabel){
     var ov = document.createElement('div');
     ov.id = 'imp-ask-ov';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px';
-    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;max-width:600px;width:100%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;max-width:600px;width:100%;max-height:calc(var(--vh,1vh)*88);overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
       + '<div style="font-weight:700;font-size:15px;margin-bottom:10px">' + esc(title) + '</div>'
       + '<div style="white-space:pre-wrap;font-size:13px;line-height:1.55;user-select:text">' + esc(body) + '</div>'
       + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'

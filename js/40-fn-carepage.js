@@ -138,7 +138,7 @@ function _stuckRender(){
     '<div style="display:flex;gap:6px;flex-wrap:wrap">' + ['xem', 'xuly', 'xong'].map(function(st){ return '<button class="btn sm' + (f && f.status === st ? ' primary' : '') + '" ' + (_stuck.busy ? 'disabled ' : '') + 'onclick="stuckSave(\'' + st + '\')">' + _ST_LABEL[st][0] + ' ' + _ST_LABEL[st][1] + '</button>'; }).join('') +
     (f ? '<button class="btn sm" ' + (_stuck.busy ? 'disabled ' : '') + 'onclick="stuckSave(\'bo\')">↩ Bỏ theo dõi</button>' : '') + '</div>';
   else follow += '<div style="font-size:12px;color:var(--muted)">Chỉ CS phụ trách đơn này (' + esc(it.sale || '—') + ') hoặc quản trị mới tích được.</div>';
-  ov.innerHTML = '<div style="background:var(--surface,#fff);border-radius:12px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
+  ov.innerHTML = '<div style="background:var(--surface,#fff);border-radius:12px;max-width:560px;width:100%;max-height:calc(var(--vh,1vh)*92);overflow:auto;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
     '<div style="display:flex;align-items:center;gap:8px"><div style="font-size:16px;font-weight:700;flex:1">📦 Đơn kẹt ' + esc(it.maBoDem || it.id) + '</div><button class="btn sm" onclick="stuckClose()">✕</button></div>' +
     sec('👤 Khách hàng') + cust + (hasProfile ? '<div style="margin-top:6px"><button class="btn sm primary" onclick="stuckClose();' + (openFn === 'ttOpenCustomer_' ? 'ttOpenCustomer_(\'' + esc(it.phone || '') + '\',\'' + esc(it.id) + '\')' : 'openDp(\'' + esc(it.phone) + '\')') + '">👤 Mở hồ sơ khách</button></div>' : '') +
     sec('📦 Đơn hàng') + order + sec('👁 Theo dõi xử lý') + follow +
