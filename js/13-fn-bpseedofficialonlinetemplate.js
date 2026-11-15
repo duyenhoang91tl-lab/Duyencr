@@ -453,8 +453,9 @@ function _srRenderH_(d){
   return html;
 }
 function renderSalesReportTabH_(wrap, subTabs){
-  var d = _hBuild_();
-  wrap.innerHTML = _srBarHtml_() + _srRenderH_(d);
+  var d = _hBuild_(), bar = _srBarHtml_();
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = bar + _srRenderH_(d); return; }   // dự phòng: js/76 chưa nạp → giao diện cũ
+  wrap.innerHTML = uiReportFrame_({ id: 'H', barHtml: bar, bodyHtml: _srRenderH_(d) });   // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn
 }
 function renderSalesReportTabI_(wrap, subTabs) {
   // ═══ Báo cáo I — Chia data Renew (nguồn CSKH-Duyên) ═══
