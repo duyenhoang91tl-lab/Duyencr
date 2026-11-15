@@ -116,13 +116,44 @@ function vtAbbrCheck() {
     html = same.length ? '<span style="color:#b45309">⚠ "' + _vtEsc(v) + '" đã dùng ở: ' + same.slice(0, 3).map(function (x) { return _vtEsc(_vtScopeLabel(x)); }).join('; ') + (same.length > 3 ? ' (+' + (same.length - 3) + ' mục nữa)' : '') + ' — gõ "' + _vtEsc(v) + '" sẽ hiện cả các mục đó. Vẫn lưu được; muốn tách riêng thì đổi tên viết tắt.</span>' : '<span style="color:#16a34a">✓ Chưa trùng viết tắt nào.</span>';
   }
   msg.innerHTML = html;
+  vtKwSuggest();
 }
+
+// GỢI Ý TỪ KHOÁ (2026-11-14): từ khoá giúp gõ ĐẦU từ khoá cũng ra gợi ý (khớp tiền tố, bỏ dấu). Lấy từ NỘI DUNG đang soạn: bỏ biến {tên}..., bỏ từ đệm (dạ, em, chị, ạ...),
+// số thuần, từ <3 ký tự, từ trùng viết tắt/đã có trong ô từ khoá; xếp theo số lần lặp rồi thứ tự xuất hiện; tối đa 6. Chạm chip = thêm vào ô từ khoá (tối đa 200 ký tự như server).
+var _VT_STOP = {}; ('da em chi anh a la va cua cho co duoc nhe nha oi the nay kia voi de khi thi ma se rat cung nhieu it minh ban shop ben toi mot nhung cac ve tai o tu den khong bi nen neu vi do sau truoc ma ay y d nhi vang uh um ok roi con da dang vua moi het luon cung nua thoi lai di len xuong ra vao nao gi sao dau day kia the nao hay hoac cung nhu cua nen can phai').split(' ').forEach(function (w) { _VT_STOP[w] = 1; });
+function _vtSuggestKeywords(texts, abbr, current) {
+  var have = {}; String(current || '').split(',').forEach(function (k) { k = _vtFold(k.trim()); if (k) have[k] = 1; });
+  if (abbr) have[_vtFold(abbr)] = 1;
+  var cnt = {}, order = [], disp = {};
+  (texts || []).forEach(function (t) {
+    String(t || '').replace(/\{[^}]*\}/g, ' ').toLowerCase().replace(/[\p{L}\p{N}]+/gu, function (w) {
+      var f = _vtFold(w);
+      if (w.length < 3 || /^\d+$/.test(f) || _VT_STOP[f] || have[f]) return w;
+      if (!cnt[f]) { cnt[f] = 0; order.push(f); disp[f] = w; } cnt[f]++; return w;
+    });
+  });
+  return order.map(function (f, i) { return { f: f, n: cnt[f], i: i }; }).sort(function (a, b) { return (b.n - a.n) || (a.i - b.i); }).slice(0, 6).map(function (x) { return disp[x.f]; });
+}
+function vtKwSuggest() {
+  var box = document.getElementById('vt-f-kwmsg'), kw = document.getElementById('vt-f-keyword'); if (!box || !kw) return;
+  var texts = Array.prototype.map.call(document.querySelectorAll('#vt-f-opts textarea'), function (t) { return t.value; });
+  var list = _vtSuggestKeywords(texts, (document.getElementById('vt-f-abbr') || {}).value, kw.value);
+  box.innerHTML = list.length ? '<span style="color:var(--muted)">💡 Gợi ý từ khoá:</span> ' + list.map(function (w) { return '<button type="button" class="btn sm" data-vtk="' + _vtEsc(w) + '" style="min-height:32px">+ ' + _vtEsc(w) + '</button>'; }).join(' ') : '';
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('[data-vtk]'); if (!b) return;
+  var kw = document.getElementById('vt-f-keyword'), w = b.getAttribute('data-vtk'), cur = String(kw.value || '').trim().replace(/,\s*$/, '');
+  var nv = cur ? cur + ', ' + w : w;
+  if (nv.length > 200) { if (typeof toast === 'function') toast('Từ khoá tối đa 200 ký tự — bỏ bớt từ cũ rồi thêm'); return; }
+  kw.value = nv; vtKwSuggest();
+});
 function _vtUpdateMedia(open) {
   var sum = document.getElementById('vt-f-mediasum'), det = document.getElementById('vt-f-media'), ni = _vtDraftImgs.length, na = (typeof _vtDraftAuds !== 'undefined' ? _vtDraftAuds : []).length;
   if (sum) sum.textContent = (ni || na) ? '(' + (ni ? ni + ' ảnh' : '') + (ni && na ? ', ' : '') + (na ? na + ' ghi âm' : '') + ')' : '(không bắt buộc)';
   if (det && open !== undefined) det.open = !!open;
 }
-document.addEventListener('input', function (e) { var t = e.target; if (t && (t.id === 'vt-f-abbr' || (t.closest && t.closest('#vt-f-opts')))) vtAbbrCheck(); });
+document.addEventListener('input', function (e) { var t = e.target; if (t && (t.id === 'vt-f-abbr' || t.id === 'vt-f-keyword' || (t.closest && t.closest('#vt-f-opts')))) vtAbbrCheck(); });
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-vta]'); if (b) { document.getElementById('vt-f-abbr').value = b.getAttribute('data-vta'); vtAbbrCheck(); } });
 
 // ---------- CÂY THƯ MỤC mẹ/con (2026-11-14, Duyên: chọn thư mục kiểu dropdown, mẹ xổ con theo hàng dọc; tạo mẫu cũng tạo được thư mục mẹ/con) ----------
