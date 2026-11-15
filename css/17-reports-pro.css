@@ -25,31 +25,31 @@
 #salesreport-wrap .srb-bar input[type=text],
 #salesreport-wrap .srb-bar input[type=search]{
   height:var(--rp-ctl-h); font-size:12.5px !important; padding:0 10px !important;
-  border:1px solid var(--border-md); border-radius:8px; background:var(--surface); color:var(--text);
+  border:1px solid var(--border-md); border-radius:var(--ui-r-md); background:var(--surface); color:var(--text);
 }
 #salesreport-wrap .srb-bar select:hover,
 #salesreport-wrap .srb-bar input:hover{border-color:var(--border-strong);}
 /* Ô "Chọn báo cáo" (nằm đầu thanh hoặc đầu tab con) — nổi bật hơn các ô lọc */
 #salesreport-wrap select[onchange^="_srSetSub"]{
-  height:var(--rp-ctl-h) !important; padding:0 12px !important; font-size:13px !important; font-weight:700 !important;
-  border:1px solid var(--green-mid) !important; border-radius:8px !important;
+  height:var(--rp-ctl-h) !important; padding:0 12px !important; font-size:var(--ui-fs-base) !important; font-weight:700 !important;
+  border:1px solid var(--green-mid) !important; border-radius:var(--ui-r-md) !important;
   background:var(--green-bg) !important; color:var(--green) !important; min-width:190px; max-width:100% !important;
 }
 #salesreport-wrap .srb-bar-arrow{color:var(--hint);padding:0 2px;}
-#salesreport-wrap .srb-bar-lock{height:var(--rp-ctl-h);display:inline-flex;align-items:center;border-radius:8px;}
+#salesreport-wrap .srb-bar-lock{height:var(--rp-ctl-h);display:inline-flex;align-items:center;border-radius:var(--ui-r-md);}
 
 /* ── 2. Nút: cùng chiều cao với ô nhập, "Lọc" là nút chính ── */
 #salesreport-wrap .btn{
-  height:var(--rp-ctl-h); padding:0 12px; border-radius:8px; font-size:12.5px; font-weight:600;
+  height:var(--rp-ctl-h); padding:0 12px; border-radius:var(--ui-r-md); font-size:12.5px; font-weight:600;
   justify-content:center; white-space:nowrap;
 }
-#salesreport-wrap .btn.sm,#salesreport-wrap .btn.xs{height:30px;padding:0 10px;font-size:12px;}
+#salesreport-wrap .btn.sm,#salesreport-wrap .btn.xs{height:30px;padding:0 10px;font-size:var(--ui-fs-sm);}
 #salesreport-wrap .btn:hover{border-color:var(--border-strong);color:var(--text);}
 #salesreport-wrap .srb-bar > button[onclick="_srApply()"]{
   background:var(--green); border-color:var(--green); color:#fff;
 }
 #salesreport-wrap .srb-bar > button[onclick="_srApply()"]:hover{background:var(--green-mid);color:#fff;}
-#salesreport-wrap .gear-menu-list{border-radius:10px;box-shadow:var(--shadow-md);border:1px solid var(--border-md);}
+#salesreport-wrap .gear-menu-list{border-radius:var(--ui-r-lg);box-shadow:var(--shadow-md);border:1px solid var(--border-md);}
 
 /* ── 3. Thẻ KPI: lưới đều, thẻ cùng padding/bo góc, số lớn - nhãn nhỏ ── */
 #salesreport-wrap .kpi-grid{
@@ -71,14 +71,14 @@
 
 /* ── 4. Tiêu đề mục: thanh nhấn xanh bên trái, khoảng cách đều ── */
 #salesreport-wrap .dash-section-title{
-  font-size:14px; font-weight:700; margin:22px 0 10px; padding-left:10px; gap:8px;
+  font-size:var(--ui-fs-md); font-weight:700; margin:22px 0 10px; padding-left:10px; gap:8px;
   position:relative; color:var(--text);
 }
 #salesreport-wrap .dash-section-title::before{
   content:""; position:absolute; left:0; top:2px; bottom:2px; width:3px; border-radius:2px; background:var(--green-mid);
 }
 #salesreport-wrap .dash-section-title:first-child{margin-top:4px;}
-#salesreport-wrap .guide-text{font-size:12px;color:var(--muted);line-height:1.5;}
+#salesreport-wrap .guide-text{font-size:var(--ui-fs-sm);color:var(--muted);line-height:1.5;}
 
 /* ── 5. Bảng: đầu bảng dịu, dòng thoáng, số căn phải thẳng hàng ── */
 #salesreport-wrap .dash-table{
@@ -87,7 +87,7 @@
 }
 #salesreport-wrap .dash-table thead th,
 #salesreport-wrap .dash-table th{
-  padding:10px 12px; font-size:11px; letter-spacing:.04em; white-space:nowrap;
+  padding:10px 12px; font-size:var(--ui-fs-xs); letter-spacing:.04em; white-space:nowrap;
   background:var(--surface2); border-bottom:1px solid var(--border-md);
 }
 #salesreport-wrap .dash-table td{padding:9px 12px;vertical-align:middle;}
@@ -112,18 +112,18 @@
   #salesreport-wrap .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
   #salesreport-wrap .kpi-card{padding:12px !important;}
   #salesreport-wrap .kpi-card .kpi-val{font-size:clamp(15px,4.4vw,18px);white-space:nowrap;overflow-wrap:normal;}
-  #salesreport-wrap .dash-table{font-size:12px;}
+  #salesreport-wrap .dash-table{font-size:var(--ui-fs-sm);}
   #salesreport-wrap .dash-table th,#salesreport-wrap .dash-table td{padding:8px 9px;}
 }
 
 /* ── Bước 2: class thay cho style inline lặp lại trong _srRenderA/_srRenderB (js/11) ── */
 #salesreport-wrap td.r,#salesreport-wrap th.r{text-align:right;}
 #salesreport-wrap .sr-empty{text-align:center;color:var(--muted);padding:14px;}
-#salesreport-wrap .sr-empty-lg{padding:20px;font-size:12px;}
-#salesreport-wrap .sr-sub{font-weight:400;color:var(--muted);font-size:11px;}
+#salesreport-wrap .sr-empty-lg{padding:20px;font-size:var(--ui-fs-sm);}
+#salesreport-wrap .sr-sub{font-weight:400;color:var(--muted);font-size:var(--ui-fs-xs);}
 #salesreport-wrap .sr-input{
-  height:var(--rp-ctl-h);padding:0 10px;border:1px solid var(--border);border-radius:8px;
-  background:var(--surface);color:var(--text);font-size:12px;margin-bottom:6px;box-sizing:border-box;
+  height:var(--rp-ctl-h);padding:0 10px;border:1px solid var(--border);border-radius:var(--ui-r-md);
+  background:var(--surface);color:var(--text);font-size:var(--ui-fs-sm);margin-bottom:6px;box-sizing:border-box;
 }
 #salesreport-wrap .sr-input:hover{border-color:var(--border-strong);}
 #salesreport-wrap .sr-w220{width:220px;max-width:100%;}
