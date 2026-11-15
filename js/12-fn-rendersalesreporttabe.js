@@ -988,11 +988,14 @@ function _srGFiltersHtml_(){
 }
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = _srGFiltersHtml_();
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srRenderG_(_srState.dataG);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srRenderG_(_srState.dataG));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc G → nội dung G
+  wrap.innerHTML = uiReportFrame_({ id: 'G', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderG_(_srState.dataG) });
 }
 
 function openSaleKpiConfigModal_(){

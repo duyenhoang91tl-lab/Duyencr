@@ -8,6 +8,7 @@ function fn(src, n) { const i = src.indexOf('function ' + n + '('); if (i < 0) t
 const CASES = [
   { id: 'H', file: 'js/13-fn-bpseedofficialonlinetemplate.js', render: 'renderSalesReportTabH_', bar: '_srBarHtml_', body: '_srRenderH_', build: '_hBuild_', loading: false },
   { id: 'F', file: 'js/12-fn-rendersalesreporttabe.js', render: 'renderSalesReportTabF_', bar: '_srBarHtml_', body: '_srRenderF_', loading: true },
+  { id: 'G', file: 'js/12-fn-rendersalesreporttabe.js', render: 'renderSalesReportTabG_', bar: '_srGFiltersHtml_', body: '_srRenderG_', loading: true },
   /*@@CASES@@*/
 ];
 function load(c, frame) {
