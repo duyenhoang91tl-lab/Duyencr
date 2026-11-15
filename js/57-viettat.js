@@ -67,6 +67,15 @@ function _vtCustomerName() {
 var _VT_RECENT_KEY = 'vt_recent', _VT_RECENT_MAX = 6;
 function _vtRecent() { try { var a = JSON.parse(localStorage.getItem(_VT_RECENT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function _vtPushRecent(id) { try { var a = _vtRecent().filter(function (x) { return x !== id; }); a.unshift(id); localStorage.setItem(_VT_RECENT_KEY, JSON.stringify(a.slice(0, _VT_RECENT_MAX))); } catch (e) {} }
+// ĐẾM LƯỢT DÙNG (2026-11-14): chạm để chép HOẶC gõ tắt rồi Tab/chạm gợi ý trong ô chat đều tính 1 lượt. Lưu localStorage riêng từng máy (key vt_usage {id: số lượt}) — phục vụ sắp xếp "Dùng nhiều nhất".
+var _VT_USAGE_KEY = 'vt_usage', _VT_SORT_KEY = 'vt_sort';
+function _vtUsage() { try { var o = JSON.parse(localStorage.getItem(_VT_USAGE_KEY) || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } }
+function _vtNoteUse(id) {
+  if (!id) return; _vtPushRecent(id);
+  try { var u = _vtUsage(); u[id] = (+u[id] || 0) + 1; localStorage.setItem(_VT_USAGE_KEY, JSON.stringify(u)); } catch (e) {}
+}
+function _vtSortMode() { try { return localStorage.getItem(_VT_SORT_KEY) === 'used' ? 'used' : 'folder'; } catch (e) { return 'folder'; } }
+function vtSetSort(v) { try { localStorage.setItem(_VT_SORT_KEY, v === 'used' ? 'used' : 'folder'); } catch (e) {} vtRender(); }
 function _vtCopyText(t) {
   return (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t).then(function () { return true; }, function () { return false; }) : Promise.resolve(false)).then(function (ok) {
     if (ok) return true;
@@ -77,7 +86,7 @@ function vtCopyOption(id, i) {
   var s = _vtSt.list.find(function (x) { return x.id === id; }); if (!s || !s.options[i || 0]) return Promise.resolve(false);
   var name = _vtCustomerName(), raw = s.options[i || 0], txt = _vtResolve(raw, name);
   return _vtCopyText(txt).then(function (ok) {
-    if (ok) _vtPushRecent(s.id);
+    if (ok) _vtNoteUse(s.id);
     if (typeof toast === 'function') toast(ok ? '📋 Đã chép "' + s.abbr + '"' + (/\{tên/.test(txt) ? ' — chưa chọn khách nên {tên} giữ nguyên' : '') + ' — dán vào ô chat' : 'Không chép được — chọn chữ rồi chép tay');
     vtRender(); return ok;
   });
@@ -250,17 +259,19 @@ function vtRender() {
     return _vtFold([s.abbr, s.keyword, s.nhom, s.options.join(' ')].join(' ')).indexOf(q) >= 0;
   });
   if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_vtSt.list.length ? 'Không có mục nào khớp bộ lọc.' : 'Chưa có viết tắt nào — bấm "+ Thêm viết tắt". Ví dụ: viết tắt <b>ch</b> → "Dạ em chào chị {tên} ạ".') + '</div>'; return; }
+  var usedMode = _vtSortMode() === 'used', usage = _vtUsage();
+  var sortSel = document.getElementById('vt-sort'); if (sortSel) sortSel.value = usedMode ? 'used' : 'folder';
   var recentHtml = '';
-  if (!q && !sf && !_vtSt.nf) {
+  if (!usedMode && !q && !sf && !_vtSt.nf) {
     var rc = _vtRecent().map(function (id) { return _vtSt.list.find(function (x) { return x.id === id; }); }).filter(Boolean);
     if (rc.length) recentHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px"><span style="font-size:11.5px;font-weight:700;color:var(--muted)">🕘 Dùng gần đây</span>' + rc.map(function (x) { return '<button type="button" class="btn sm" data-vtr="' + _vtEsc(x.id) + '" title="Chạm để sao chép nội dung đầu tiên" style="min-height:34px">' + _vtEsc(x.abbr) + '</button>'; }).join('') + '</div>';
   }
-  var groups = {}; rows.forEach(function (s) { (groups[s.nhom || ''] = groups[s.nhom || ''] || []).push(s); });
+  var groups = {}; rows.forEach(function (s) { (groups[usedMode ? '' : (s.nhom || '')] = groups[usedMode ? '' : (s.nhom || '')] || []).push(s); });
   var names = Object.keys(groups).sort(function (a, b) { return a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'vi'); });
   var shown = {}, html = '';
   names.forEach(function (g) {
     var parts = g ? g.split('/') : [], depth = Math.max(parts.length - 1, 0);
-    if (!g) html += '<div style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px">🗂 Chưa phân nhóm</div>';
+    if (!g && !usedMode) html += '<div style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px">🗂 Chưa phân nhóm</div>';
     var qOn = !!q, hid = function (path, self) { var ps = path ? path.split('/') : [], lim = self ? ps.length : ps.length - 1; for (var j = 1; j <= lim; j++) if (_vtSt.fold[ps.slice(0, j).join('/')]) return true; return false; };
     for (var k = 1; k <= parts.length; k++) {   // thư mục cha chưa có mục riêng vẫn hiện tiêu đề để thấy cây; bấm tiêu đề = thu/xổ thư mục con
       var pre = parts.slice(0, k).join('/'); if (shown[pre]) continue; shown[pre] = 1;
@@ -269,14 +280,14 @@ function vtRender() {
       html += '<div class="vt-fold" data-vtn="fold" data-p="' + _vtEsc(pre) + '" title="Bấm để ' + (_vtSt.fold[pre] ? 'xổ' : 'thu') + ' thư mục — ' + _vtEsc(pre) + '" style="font-size:11.5px;font-weight:700;color:var(--muted);margin:6px 0 2px;padding-left:' + ((k - 1) * 16) + 'px">' + (_vtSt.fold[pre] && !qOn ? '▸' : '▾') + ' 🗂 ' + _vtEsc(parts[k - 1]) + ' <span style="font-weight:400">(' + cnt + ')</span></div>';
     }
     if (!qOn && hid(g, true)) return;
-    html += (groups[g] || []).sort(function (a, b) { return String(a.abbr).localeCompare(String(b.abbr), 'vi'); }).map(function (s) {
+    html += (groups[g] || []).sort(function (a, b) { var d = usedMode ? (+usage[b.id] || 0) - (+usage[a.id] || 0) : 0; return d || String(a.abbr).localeCompare(String(b.abbr), 'vi'); }).map(function (s) {
       var can = _vtCanEdit(s);
       var kw = String(s.keyword || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean).map(function (k) { return '<span class="zi-chip">' + _vtEsc(k) + '</span>'; }).join(' ');
       var imgs = (s.images || []).length ? '<div class="vt-imgs" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center"><span style="font-size:11px;color:var(--muted)">🖼 ' + s.images.length + ' ảnh</span>' +
         s.images.slice(0, 12).map(function (im) { return '<img src="' + _vtEsc(_vtThumb(im.id)) + '" alt="' + _vtEsc(im.name) + '" title="' + _vtEsc(im.name) + '" loading="lazy" referrerpolicy="no-referrer" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'; }).join('') + (s.images.length > 12 ? '<span style="font-size:11px;color:var(--muted)">+' + (s.images.length - 12) + ' ảnh nữa</span>' : '') + '</div>' : '';
       var auds = (s.audios || []).length ? '<div class="vt-auds" style="margin-top:4px;font-size:11px;color:var(--muted)" title="' + _vtEsc(s.audios.map(function (a) { return a.name; }).join('\n')) + '">🎤 ' + s.audios.length + ' tệp ghi âm: ' + s.audios.slice(0, 3).map(function (a) { return _vtEsc(a.name || 'ghi âm'); }).join(', ') + (s.audios.length > 3 ? ' …' : '') + '</div>' : '';
       return '<div style="margin-left:' + (depth * 16) + 'px;border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-start;margin-bottom:4px">' +
-        '<div style="min-width:70px;max-width:100%"><code style="font-size:13px;font-weight:700;overflow-wrap:anywhere;word-break:break-all">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt — sửa nội dung/xoá ở 📚 Quản lý mẫu; viết tắt đổi bằng nút ⌨️"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
+        '<div style="min-width:70px;max-width:100%"><code style="font-size:13px;font-weight:700;overflow-wrap:anywhere;word-break:break-all">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt — sửa nội dung/xoá ở 📚 Quản lý mẫu; viết tắt đổi bằng nút ⌨️"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div>' + (usedMode ? '<div style="font-size:10.5px;color:#b45309">' + ((+usage[s.id] || 0) ? '🔥 ×' + usage[s.id] : '—') + (s.nhom ? ' · ' + _vtEsc(String(s.nhom).split('/').join(' › ')) : '') + '</div>' : '') + '</div>' +
         '<div style="flex:1 1 200px;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
         s.options.map(function (o, i) { return '<div class="vt-copy" data-vtc="' + _vtEsc(s.id) + '#' + i + '" title="Chạm để sao chép" style="cursor:pointer;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + auds + '</div>' +
         '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtClone(this.dataset.vtId)" title="Nhân bản: tạo mục mới từ nội dung này (sửa rồi bấm Lưu)">📄</button></div>' +
@@ -618,6 +629,7 @@ async function vtDelete(id) {
     var d = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
     el.focus(); if (d && d.set) d.set.call(el, v.slice(0, end - L) + text + v.slice(end)); else el.value = v.slice(0, end - L) + text + v.slice(end);
     var pos = end - L + text.length; el.setSelectionRange(pos, pos);
+    var hit = (s.hits || []).filter(function (h) { return h.options && h.options.indexOf(o) >= 0; })[0]; if (hit) _vtNoteUse(hit.id);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
   document.addEventListener('focusin', function (e) { if (eligible(e.target)) loadVietTat(false); }, true);

@@ -856,6 +856,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <span class="vt-tree-wrap"><button type="button" class="assign-input" id="vt-nf-btn" onclick="vtToggleTree('f')" style="font-size:12px;padding:4px 8px;cursor:pointer;text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lọc theo thư mục — chọn thư mục mẹ sẽ gồm cả thư mục con">🗂 Tất cả thư mục ▾</button><div id="vt-nf-panel" class="vt-tree-panel" hidden></div></span>
+          <select id="vt-sort" class="assign-input" onchange="vtSetSort(this.value)" title="Cách sắp xếp danh sách" style="font-size:12px;padding:4px 8px"><option value="folder">🗂 Theo thư mục</option><option value="used">🔥 Dùng nhiều nhất</option></select>
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
           <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
