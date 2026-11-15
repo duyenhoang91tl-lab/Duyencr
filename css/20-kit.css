@@ -20,6 +20,12 @@
 .ui-stat-sub{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);margin-top:2px;font-size:var(--ui-fs-xs);color:var(--ui-text-hint)}
 .ui-delta{display:inline-block;padding:1px 7px;font-weight:var(--ui-fw-semibold);color:var(--ui-success);background:var(--ui-success-soft);border-radius:var(--ui-r-pill)}
 .ui-delta.down{color:var(--ui-danger);background:var(--ui-danger-soft)}
+/* ── R2b: CHIP / HUY HIỆU / CHẤM TRẠNG THÁI ── */
+.ui-chip{display:inline-flex;align-items:center;gap:var(--ui-sp-1);padding:2px 9px;font-family:var(--ui-font);font-size:var(--ui-fs-xs);font-weight:var(--ui-fw-semibold);line-height:1.5;white-space:nowrap;color:var(--uk-tone,var(--ui-brand));background:var(--uk-tone-soft,var(--ui-brand-soft));border:1px solid var(--uk-tone-line,var(--ui-brand-mid));border-radius:var(--ui-r-pill)}
+.ui-chip-solid{color:var(--ui-on-brand);background:var(--uk-tone,var(--ui-brand));border-color:transparent}
+.ui-chip-solid.ui-tone-brand{background:var(--ui-grad-brand)}
+.ui-dot{display:inline-block;flex:none;width:8px;height:8px;background:var(--uk-tone,var(--ui-brand));border-radius:var(--ui-r-round)}
+.ui-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;font-size:var(--ui-fs-2xs);font-weight:var(--ui-fw-bold);line-height:1;color:var(--ui-on-brand);background:var(--uk-tone,var(--ui-danger));border-radius:var(--ui-r-pill)}
 /*@@KIT-CSS@@*/
 
 /* ── Trang mẫu ?ui=kit ── */

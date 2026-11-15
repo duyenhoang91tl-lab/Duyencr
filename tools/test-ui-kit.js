@@ -13,7 +13,7 @@ const t = (c, m) => c ? ok(m) : bad(m);
 const used = new Set(); for (const m of jsSrc.matchAll(/['" ]((?:ui)-[a-z][a-z0-9-]*)(?=[ '"])/g)) used.add(m[1]);
 const defined = new Set(); for (const m of css.matchAll(/\.(ui-[a-z][a-z0-9-]*)/g)) defined.add(m[1]);
 const IGNORE = new Set(['ui-kit-page', 'ui-kit', 'ui-tone-']);   // id/tiền tố
-const missing = [...used].filter(c => !defined.has(c) && !IGNORE.has(c) && !/^ui-tone-$/.test(c));
+const missing = [...used].filter(c => !defined.has(c) && !IGNORE.has(c) && !/-$/.test(c));
 t(!missing.length, 'mọi class ui-* trong JS đều có CSS' + (missing.length ? ' — THIẾU: ' + missing.join(', ') : ' (' + used.size + ' class)'));
 for (const n of ['brand', 'success', 'warning', 'danger', 'info', 'neutral']) if (!defined.has('ui-tone-' + n)) bad('thiếu .ui-tone-' + n);
 
@@ -29,4 +29,9 @@ t(!/ui-delta/.test(K.uiStat_({ label: 'a', value: '1' })), 'không có delta th�
 t(/ui-tone-brand/.test(K.uiStat_({ label: 'a', value: '1', tone: 'hack"onclick' })), 'tone lạ → về brand (không chèn được thuộc tính)');
 // (4) trang mẫu dựng được
 t(/ui-stat-grid/.test(K.uiKitHtml_()), 'trang mẫu dựng được');
+const c1 = K.uiChip_('<b>x</b>', { tone: 'danger', solid: true, dot: true });
+t(!/<b>/.test(c1) && /ui-chip-solid/.test(c1) && /ui-dot/.test(c1) && /ui-tone-danger/.test(c1), 'uiChip_: escape + solid + dot + tone');
+t(/ui-tone-brand/.test(K.uiChip_('a', { tone: 'zzz"' })), 'uiChip_: tone lạ → brand');
+t(K.uiBadge_(0) === '' && K.uiBadge_('') === '' && />99\+</.test(K.uiBadge_(120)) && />7</.test(K.uiBadge_(7.9)), 'uiBadge_: 0/rỗng ẩn, >99 → 99+, làm tròn xuống');
+t(/ui-tone-success/.test(K.uiDot_('success')), 'uiDot_ theo tone');
 console.log(fail ? '\n' + fail + ' lỗi' : '\ntất cả đạt'); process.exit(fail ? 1 : 0);
