@@ -879,7 +879,7 @@ function toggleLastActSort() {
   if (icon) icon.textContent = _lastActSortDir === -1 ? '↓' : _lastActSortDir === 1 ? '↑' : '↕';
   // Chỉ 1 cột dùng icon ↕ để sắp xếp tại 1 thời điểm — bật cột này thì tắt cột kia, tránh 2
   // chiều sắp xếp "ngầm" cùng tồn tại gây khó hiểu khi xem danh sách.
-  if (_lastActSortDir !== 0) { _lastPosSortDir = 0; const i2 = document.getElementById('lastpos-sort-icon'); if (i2) i2.textContent = '↕'; }
+  if (_lastActSortDir !== 0) { _lastPosSortDir = 0; const i2 = document.getElementById('lastpos-sort-icon'); if (i2) i2.textContent = '↕'; if (typeof lsResetLevelSort_ === 'function') lsResetLevelSort_(); }   // R8e: cũng tắt xếp theo Mức
   applyFilters();
 }
 
@@ -887,7 +887,7 @@ function toggleLastPosSort() {
   _lastPosSortDir = _lastPosSortDir === 0 ? -1 : _lastPosSortDir === -1 ? 1 : 0;
   const icon = document.getElementById('lastpos-sort-icon');
   if (icon) icon.textContent = _lastPosSortDir === -1 ? '↓' : _lastPosSortDir === 1 ? '↑' : '↕';
-  if (_lastPosSortDir !== 0) { _lastActSortDir = 0; const i2 = document.getElementById('lastact-sort-icon'); if (i2) i2.textContent = '↕'; }
+  if (_lastPosSortDir !== 0) { _lastActSortDir = 0; const i2 = document.getElementById('lastact-sort-icon'); if (i2) i2.textContent = '↕'; if (typeof lsResetLevelSort_ === 'function') lsResetLevelSort_(); }   // R8e: cũng tắt xếp theo Mức
   applyFilters();
 }
 

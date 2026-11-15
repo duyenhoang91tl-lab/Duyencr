@@ -806,7 +806,9 @@ function applyFilters() {
     return true;
   });
 
-  if (_lastPosSortDir !== 0) {
+  if (typeof _lsLevelSortDir !== 'undefined' && _lsLevelSortDir !== 0 && typeof lsLevelSortList_ === 'function') {
+    lsLevelSortList_(list, _lsLevelSortDir);   // R8e: xếp theo Mức nóng/ấm/nguội (js/77); loại trừ với 2 kiểu xếp bên dưới
+  } else if (_lastPosSortDir !== 0) {
     // Mua gan nhat: KH chua co don Pos nao (lastPosDate rong) luon xep CUOI du dang sap xep chieu nao.
     list.sort((a, b) => {
       const da = a.lastPosDate, db = b.lastPosDate;
@@ -934,6 +936,9 @@ function _rowHtml(c) {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
   const lastPosDisp = (typeof colVisible !== 'undefined' && colVisible.lastpos !== false) ? '' : 'display:none';
+  const levelDisp = (typeof colVisible !== 'undefined' && colVisible.level !== false) ? '' : 'display:none';
+  let levelHtml = '';   // R8e: ô "Mức" (js/77); thiếu js/77 hoặc lỗi → ô trống, không làm hỏng cả dòng
+  try { if (typeof lsRowScore_ === 'function') levelHtml =lsLevelCellHtml_(lsRowScore_(c)); } catch (e) {}
   let lastPosHtml;
   if (c.lastPosDate) {
     const _lpDa = _calendarDaysAgo(c.lastPosDate);
@@ -947,6 +952,7 @@ function _rowHtml(c) {
     <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-hang">${hangBadge(c.hangKey)}</td>
+    <td class="col-level" style="${levelDisp}">${levelHtml}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
     <td class="col-order"><span style="font-weight:600">${c.totalOrders}</span><span style="color:var(--muted);font-size:11px"> / ${fmtVND(c.totalRevenue)}</span></td>

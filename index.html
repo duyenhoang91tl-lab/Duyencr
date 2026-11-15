@@ -594,6 +594,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('hang',this)"> Phân hạng KH</label>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('level',this)"> Mức (nóng/ấm/nguội)</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('zalo',this)"> Zalo</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('order',this)"> Đơn/DT</label>
@@ -619,6 +620,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-hang" id="th-hang"><div class="th-inner"><span id="hang-label-btn" onclick="openTierTooltip(event,'hang-tooltip')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân hạng">Phân hạng KH</span> <span class="th-filter-icon" onclick="openColDropdown('hang',event)" style="cursor:pointer">▼</span></div></th>
+            <th class="col-level" id="th-level" style="min-width:96px" title="Mức quan tâm: 🔥Nóng / 🌤Ấm / 🧊Nguội (điểm + lý do khi rê chuột). Nhấn ↕ để xếp nóng→nguội"><div class="th-inner">Mức</div><span id="level-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();lsToggleLevelSort_()" title="Sắp xếp theo mức nóng/ấm/nguội">↕</span></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-zalo" id="th-zalo" onclick="openColDropdown('zalo',event)"><div class="th-inner">Zalo <span class="th-filter-icon">▼</span></div></th>
             <th class="col-order">Đơn / DT</th>
@@ -973,8 +975,8 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261112a"></script>
-<script src="js/05-fn-saveeditphone.js?v=20261026a"></script>
-<script src="js/06-main-renew-sources.js?v=20261110a"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261115e"></script>
+<script src="js/06-main-renew-sources.js?v=20261115e"></script>
 
 <!-- ASSIGN DATA MODAL -->
 <div class="assign-modal-overlay" id="assign-modal">
@@ -1051,7 +1053,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js?v=20261029a"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261115e"></script>
 <script src="js/09-fn-deleteteam.js?v=20261029a"></script>
 <script src="js/10-fn-pkkpipct.js?v=20261109a"></script>
 <script src="js/11-fn-srload.js?v=20261115d"></script>
@@ -1839,7 +1841,7 @@ function openBcLogModal(phone){
 <script src="js/74-cs-leave-ui.js?v=20261115a"></script><!-- R6c-2 bước 2: nút Nghỉ phép + form + xem trước -->
 <script src="js/75-cs-leave-store.js?v=20261115a"></script><!-- R6c-2 bước 3: lưu kỳ nghỉ (csLeave) + áp dụng giao khách -->
 <script src="js/76-report-frame.js?v=20261115e"></script><!-- R7a: uiReportFrame_ khuôn chung báo cáo (chưa áp báo cáo nào; R7b áp từng cái) -->
-<script src="js/77-lead-score.js?v=20261115d"></script><!-- R8a: chấm điểm khách nóng/ấm/nguội (logic thuần, nguội = quá 60 ngày chưa chăm; R8b/c/d gắn giao diện) -->
+<script src="js/77-lead-score.js?v=20261115e"></script><!-- R8a: chấm điểm khách nóng/ấm/nguội (logic thuần, nguội = quá 60 ngày chưa chăm; R8b/c/d gắn giao diện) -->
 <script src="js/78-settings-hub.js?v=20261115f"></script><!-- R9a: uiSettingsHub_ trung tâm lối tắt cài đặt (dùng ở js/37 trang ⚙ Cấu hình) -->
 
 
