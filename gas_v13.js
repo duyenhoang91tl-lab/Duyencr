@@ -1163,7 +1163,9 @@ function _saleGroupLabel_(key, groups) {
 // ═══════════════════════════════════════════════════════════════
 var _AUDIT_TOKEN_ = '';
 var AUDIT_SKIP_SETTING_ = /^(gasSource|ttLastTrackedMs$|demoToken$|chotOrders_|assignReportManual_|autoAssignState$)/;
-function _auditClip_(v) { v = String(v == null ? '' : v); return v.length > 1500 ? v.slice(0, 1500) + '…(+' + (v.length - 1500) + ' ký tự)' : v; }
+function _auditClip_(v, max) { v = String(v == null ? '' : v); max = max || 1500; return v.length > max ? v.slice(0, max) + '…(+' + (v.length - max) + ' ký tự)' : v; }
+// R9c: JSON roleConfig lớn hơn 1500 ký tự bị cắt hỏng → trang Phân quyền mất tóm tắt "Vai trò/Phòng". NGUYÊN NHÂN GỐC: ngưỡng chung 1500 cho mọi khóa. Riêng khóa này nâng lên 20000 (1 ô Sheet tối đa 50000); khóa khác giữ 1500.
+function _auditClipMax_(what) { return what === 'setting:roleConfig' ? 20000 : 1500; }
 function _auditActor_() {
   try { var p = _sessVerify_(_AUDIT_TOKEN_); if (p && p.u) return String(p.u); } catch (e) {}
   return _AUDIT_TOKEN_ ? '(token hết hạn)' : '(không token)';
@@ -1173,7 +1175,7 @@ function _auditCfg_(rows) {
   try {
     if (!rows || !rows.length) return;
     var who = _auditActor_(), now = new Date().toISOString();
-    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1]), _auditClip_(r[2])]; });
+    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1], _auditClipMax_(r[0])), _auditClip_(r[2], _auditClipMax_(r[0]))]; });
     var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS);
     sh.getRange(sh.getLastRow() + 1, 1, m.length, AUDIT_HEADERS.length).setValues(m);
   } catch (e) {}
