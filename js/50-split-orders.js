@@ -11,6 +11,16 @@ function splitMoney_(n){ return (Math.round(Number(n)||0)).toLocaleString('vi-VN
 function splitNum_(n){ return (Math.round(Number(n)||0)).toLocaleString('vi-VN'); }
 function splitPct_(n){ return (n===null||n===undefined) ? '—' : (Math.round(n*10)/10).toString().replace('.',',')+'%'; }
 function splitTile_(cls, label, value, sub){ return '<div class="pro-kpi '+cls+'"><span class="k-l">'+splitEsc_(label)+'</span><span class="k-v" style="font-size:'+(String(value).length>11?'20':'26')+'px">'+value+'</span>'+(sub?'<span class="k-s">'+sub+'</span>':'')+'</div>'; }
+// R7d-1: nhóm thẻ số. defs = [[màu cũ, nhãn, giá trị, ghi chú(đã escape)], ...]. Có ui-kit (js/68) → thẻ số chuẩn uiStatGrid_; thiếu → thẻ màu cũ (pro-kpi) y như trước.
+var SPLIT_TILE_TONE_ = { blue: 'info', green: 'success', orange: 'warning', purple: 'brand' };
+function splitStatGrid_(wrapCls, wrapStyle, defs){
+  if (typeof uiStat_ === 'function' && typeof uiStatGrid_ === 'function'){
+    var un = function(x){ return String(x == null ? '' : x).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&'); };   // ghi chú đã escape; uiStat_ escape lại nên bỏ escape trước (tránh &amp;amp;)
+    var g = uiStatGrid_(defs.map(function(d){ return { label: d[1], value: un(d[2]), note: un(d[3]), tone: SPLIT_TILE_TONE_[d[0]] || 'brand' }; }));
+    return wrapStyle ? '<div style="' + wrapStyle + '">' + g + '</div>' : g;
+  }
+  return '<div class="pro-grid ' + wrapCls + '"' + (wrapStyle ? ' style="' + wrapStyle + '"' : '') + '>' + defs.map(function(d){ return splitTile_(d[0], d[1], d[2], d[3]); }).join('') + '</div>';
+}
 
 // Banner "Danh sách đơn chia" (d = kết quả splitOrderMine)
 function splitBannerHtml_(d, st){
@@ -21,11 +31,11 @@ function splitBannerHtml_(d, st){
   if (!d) return head+'<div class="split-msg">'+splitEsc_(st.error||'Chưa có dữ liệu.')+'</div>';
   if (d.ok===false) return head+'<div class="split-msg split-err">⚠ '+splitEsc_(d.error||'Lỗi tải đơn chia')+'</div>';
   var s = d.summary||{};
-  var tiles = '<div class="pro-grid split-tiles">'
-    + splitTile_('blue','Số đơn chia', splitNum_(s.orders), 'trong kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to))
-    + splitTile_('green','Doanh thu từ đơn chia', splitMoney_(s.revenue), d.all?'tổng phần các sale':'phần của bạn')
-    + splitTile_('orange','Số khách', splitNum_(s.customers), '')
-    + splitTile_('purple','Giá trị đơn gốc', splitMoney_(s.value), 'trước khi chia')+'</div>';
+  var tiles = splitStatGrid_('split-tiles', '', [
+    ['blue','Số đơn chia', splitNum_(s.orders), 'trong kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)],
+    ['green','Doanh thu từ đơn chia', splitMoney_(s.revenue), d.all?'tổng phần các sale':'phần của bạn'],
+    ['orange','Số khách', splitNum_(s.customers), ''],
+    ['purple','Giá trị đơn gốc', splitMoney_(s.value), 'trước khi chia']]);
   var note = d.note ? '<div class="split-msg">'+splitEsc_(d.note)+'</div>' : '';
   var trunc = d.truncated ? '<div class="split-msg split-err">Chỉ hiện '+splitNum_((d.items||[]).length)+' đơn mới nhất — thu hẹp khoảng ngày để xem đủ.</div>' : '';
   return head + tiles + note + trunc + splitDetailHtml_(d.items||[], 200, !!d.all);
@@ -45,14 +55,14 @@ function splitReportHtml_(d, search, selSale){
   if (d.ok===false || d.error) return '<div style="color:var(--red);padding:20px">⚠ '+splitEsc_(d.error||'Lỗi tải báo cáo')+'</div>';
   var t = d.total||{}, q = String(search||'').trim().toLowerCase();
   var rows = (d.bySale||[]).filter(function(r){ return !q || String(r.name).toLowerCase().indexOf(q)!==-1; });
-  var h = '<div class="pro-grid split-kpis" style="margin-bottom:10px">'
-    + splitTile_('blue','Tổng số đơn (thực tế)', splitNum_(t.orders), 'mỗi đơn tính 1 lần')
-    + splitTile_('green','Doanh thu', splitMoney_(t.revenue), '')
-    + splitTile_('orange','Trung bình đơn', splitMoney_(t.aov), '')+'</div>';
-  h += '<div class="pro-grid split-kpis" style="margin-bottom:14px">'
-    + splitTile_('purple','Số đơn chia', splitNum_(t.splitOrders), splitPct_(t.splitPctOrders)+' tổng số đơn')
-    + splitTile_('green','Doanh thu từ đơn chia', splitMoney_(t.splitRevenue), splitPct_(t.splitPctRevenue)+' doanh thu')
-    + splitTile_('orange','TB đơn chia', splitMoney_(t.splitAov), 'phần chia / đơn chia')+'</div>';
+  var h = splitStatGrid_('split-kpis', 'margin-bottom:10px', [
+    ['blue','Tổng số đơn (thực tế)', splitNum_(t.orders), 'mỗi đơn tính 1 lần'],
+    ['green','Doanh thu', splitMoney_(t.revenue), ''],
+    ['orange','Trung bình đơn', splitMoney_(t.aov), '']]);
+  h += splitStatGrid_('split-kpis', 'margin-bottom:14px', [
+    ['purple','Số đơn chia', splitNum_(t.splitOrders), splitPct_(t.splitPctOrders)+' tổng số đơn'],
+    ['green','Doanh thu từ đơn chia', splitMoney_(t.splitRevenue), splitPct_(t.splitPctRevenue)+' doanh thu'],
+    ['orange','TB đơn chia', splitMoney_(t.splitAov), 'phần chia / đơn chia']]);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Đơn chia = đơn có từ 2 sale trở lên cùng chia (thẻ sale nhiều tên / ghép Base / file kế toán / quầy 30-70). Kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)+(d.scope==='scoped'?' · phạm vi của bạn':'')+'. Doanh thu từ đơn chia = tổng phần mỗi sale được chia.</div>';
   (d.warnings||[]).forEach(function(w){ h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px">⚠ '+splitEsc_(w)+'</div>'; });
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th><th class="r">Tổng đơn</th><th class="r">Doanh thu</th><th class="r">TB/đơn</th><th class="r">Số đơn chia</th><th class="r">Doanh thu từ đơn chia</th><th class="r">TB/đơn chia</th><th class="r">% doanh thu từ đơn chia</th><th>Chi tiết đối soát</th></tr></thead><tbody>';
