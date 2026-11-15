@@ -876,6 +876,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <input id="vt-f-abbr" class="zai-input" placeholder="Viết tắt (1 từ, VD: ch)" maxlength="30" style="width:150px">
             <input id="vt-f-keyword" class="zai-input" placeholder="Từ khoá, cách nhau dấu phẩy (VD: chào, xin chào) — gõ đầu từ khoá cũng gợi ý" style="flex:1;min-width:220px">
           </div>
+          <div id="vt-f-abbrmsg" style="font-size:11.5px;margin:-4px 0 8px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
             <span class="vt-tree-wrap"><button type="button" class="btn sm" id="vt-np-btn" onclick="vtToggleTree('p')" title="Chọn thư mục có sẵn (mẹ/con) hoặc tạo thư mục mới">📂 Chọn / tạo thư mục ▾</button><div id="vt-np-panel" class="vt-tree-panel" hidden></div></span>
@@ -883,6 +884,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
           <div id="vt-f-opts"></div>
+          <details id="vt-f-media" style="margin:6px 0 4px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent,#1e66f5);padding:8px 0">🖼 Ảnh &amp; 🎤 ghi âm kèm theo <span id="vt-f-mediasum" style="font-weight:400;color:var(--muted)">(không bắt buộc)</span></summary>
           <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🖼 Ảnh kèm theo</b> <span id="vt-f-imgcount"></span> — tối đa <b>50 ảnh</b> cho mỗi mục. Thêm ảnh bằng 1 trong 2 cách: <b>(1)</b> dán link <b>Google Drive</b> (ảnh hoặc thư mục, mỗi dòng 1 link; thư mục lấy tối đa 50 ảnh đầu theo tên) để dùng ảnh ĐÃ CÓ, không tải lại — ảnh phải chia sẻ cho tài khoản chạy GAS hoặc "ai có link"; <b>(2)</b> <b>📷 Chọn ảnh từ máy / điện thoại</b> — chọn nhiều ảnh 1 lúc (máy tính, iPhone/iPad, Android), ảnh tự nén nhỏ trước khi tải lên. Khi gõ tắt, nội dung chèn trước rồi ảnh dán lần lượt. Nhớ bấm <b>Lưu</b> sau khi thêm ảnh.</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
             <input type="file" id="vt-f-files" accept="image/*" multiple data-vt="off" style="display:none" onchange="vtUploadFiles(this.files); this.value=''">
@@ -900,6 +902,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div id="vt-f-audmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
           <div id="vt-f-auds" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+          </details>
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
             <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
             <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
