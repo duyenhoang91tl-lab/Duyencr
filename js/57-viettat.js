@@ -279,8 +279,9 @@ function vtRender() {
         '<div style="min-width:70px;max-width:100%"><code style="font-size:13px;font-weight:700;overflow-wrap:anywhere;word-break:break-all">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)"' + (s.fromTpl ? ' title="Lấy từ Mẫu tin đã duyệt — sửa nội dung/xoá ở 📚 Quản lý mẫu; viết tắt đổi bằng nút ⌨️"' : '') + '>' + (s.fromTpl ? '📝 Từ Mẫu tin' : s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
         '<div style="flex:1 1 200px;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
         s.options.map(function (o, i) { return '<div class="vt-copy" data-vtc="' + _vtEsc(s.id) + '#' + i + '" title="Chạm để sao chép" style="cursor:pointer;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;white-space:pre-wrap;word-break:break-word;' + (i ? 'border-top:1px dashed var(--border);margin-top:3px;padding-top:3px' : '') + '">' + _vtEsc(o) + '</div>'; }).join('') + imgs + auds + '</div>' +
-        (!can && _vtCanEditAbbr(s) ? '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtEditTplAbbr(this.dataset.vtId)" title="Sửa viết tắt của mẫu này (nội dung sửa ở 📚 Quản lý mẫu)">⌨️ Sửa viết tắt</button></div>' : '') +
-        (can ? '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtOpenForm(this.dataset.vtId)" title="Sửa">✏️</button><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtDelete(this.dataset.vtId)" title="Xoá">🗑</button></div>' : '') +
+        '<div style="display:flex;gap:4px;flex:0 0 auto;margin-left:auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtClone(this.dataset.vtId)" title="Nhân bản: tạo mục mới từ nội dung này (sửa rồi bấm Lưu)">📄</button></div>' +
+        (!can && _vtCanEditAbbr(s) ? '<div style="display:flex;gap:4px;flex:0 0 auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtEditTplAbbr(this.dataset.vtId)" title="Sửa viết tắt của mẫu này (nội dung sửa ở 📚 Quản lý mẫu)">⌨️ Sửa viết tắt</button></div>' : '') +
+        (can ? '<div style="display:flex;gap:4px;flex:0 0 auto"><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtOpenForm(this.dataset.vtId)" title="Sửa">✏️</button><button class="btn sm" data-vt-id="' + _vtEsc(s.id) + '" onclick="vtDelete(this.dataset.vtId)" title="Xoá">🗑</button></div>' : '') +
         '</div>';
     }).join('');
   });
@@ -318,6 +319,26 @@ function vtOpenForm(id) {
   document.getElementById('vt-form-wrap').style.display = 'block';
   _vtUpdateMedia(_vtDraftImgs.length || (typeof _vtDraftAuds !== 'undefined' && _vtDraftAuds.length)); vtAbbrCheck();
   document.getElementById('vt-f-abbr').focus();
+}
+
+// NHÂN BẢN (2026-11-14): tạo mục MỚI từ nội dung mục có sẵn (biến thể: cùng thư mục/từ khoá/ảnh/ghi âm, viết tắt tự thêm số cho khỏi trùng) — mở form, chưa lưu gì cho tới khi bấm Lưu.
+// Cho cả mục lấy từ Mẫu tin (bản nhân bản là mục viết tắt thường). Mục CHUNG chỉ nhân bản thành CHUNG nếu là admin, ngược lại thành "Của tôi" (server cũng kiểm lại).
+function vtClone(id) {
+  var s = _vtSt.list.find(function (x) { return x.id === id; }); if (!s) return;
+  vtOpenForm();   // form trống: reset ảnh/ghi âm/tải dở/panel thư mục
+  var base = String(s.abbr), cand = base, n = 2; while (_vtSameAbbr(cand, '').length && n < 50) { cand = base + n; n++; }
+  document.getElementById('vt-f-abbr').value = cand.slice(0, 30);
+  document.getElementById('vt-f-keyword').value = s.keyword || '';
+  document.getElementById('vt-f-nhom').value = s.nhom || '';
+  var sc = document.getElementById('vt-f-scope'); sc.value = (s.scope === 'team' && _vtSt.canTeam) ? 'team' : 'me';
+  _vtDraftImgs = (s.images || []).map(function (x) { return { id: x.id, name: x.name }; }); vtRenderDraftImgs();
+  _vtResetAudDraft(s.audios || []);
+  var w = document.getElementById('vt-f-opts'); w.innerHTML = '';
+  (s.options && s.options.length ? s.options : ['']).forEach(function (o) { w.appendChild(_vtOptRow(o)); });
+  _vtUpdateMedia(_vtDraftImgs.length || _vtDraftAuds.length); vtAbbrCheck();
+  var fw = document.getElementById('vt-form-wrap'); try { if (fw.scrollIntoView) fw.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+  var ia = document.getElementById('vt-f-abbr'); ia.focus(); try { ia.select(); } catch (e) {}
+  if (typeof toast === 'function') toast('📄 Đã nhân bản "' + s.abbr + '" — đổi viết tắt/nội dung rồi bấm Lưu');
 }
 function vtRenderDraftImgs() {
   var el = document.getElementById('vt-f-imgs'); if (!el) return;
