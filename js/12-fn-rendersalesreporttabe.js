@@ -1678,7 +1678,7 @@ function _bpXSrcListHtml_(){
 }
 function _bpXSrcSelHtml_(){
   var s = _bpDraft.excludeSources || [];
-  return s.length ? ('Đang LOẠI '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — đơn thuộc các nguồn này không được tính.') : '<span class="guide-text" style="color:var(--muted)">Chưa loại nguồn nào.</span>';
+  return s.length ? ('Đang LOẠI '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — đơn thuộc các nguồn này không được tính.') : '<span style="color:var(--muted)">Chưa loại nguồn nào.</span>';
 }
 function _bpXSrcRefresh_(){
   var a = document.getElementById('bp-xsrc-list'), b = document.getElementById('bp-xsrc-sel');
