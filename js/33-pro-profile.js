@@ -124,6 +124,18 @@ function proQuickGo_(kind){
     if (f && f.style.display==='none' && typeof _toggleAddOrderForm==='function') _toggleAddOrderForm();   // đã mở rồi thì KHÔNG bật/tắt lại (hàm gốc là toggle)
     var pr = document.getElementById('mo-product'); if (pr){ pr.focus(); if (pr.scrollIntoView) pr.scrollIntoView({ block:'center' }); } }
 }
+// R8c: khối "Mức quan tâm" (nóng/ấm/nguội + điểm + LÝ DO) và 1 gợi ý "việc tiếp theo" có nút hành động (dùng lại data-pro-qa của thanh nhanh). s = lsScore_, step = lsNextStep_. Thiếu s → ''.
+function proLeadHtml_(s, step){
+  if (!s || !s.level) return '';
+  var cls = { hot:'ok', warm:'warn', cold:'bad' }, ico = { hot:'🔥', warm:'🌤', cold:'🧊' };
+  var why = (s.reasons||[]).slice(0, 4).map(proEsc_).join(' · ');
+  return '<div class="pro-lead" id="pro-lead"><div class="pro-card-h" style="margin:4px 0 6px">Mức quan tâm</div>'
+    + '<div class="pro-lead-row"><span class="pro-chip '+(cls[s.level]||'')+'">'+(ico[s.level]||'')+' '+proEsc_(s.label||'')+' · '+(Number(s.score)||0)+' điểm</span>'+(s.risk ? '<span class="pro-chip bad">Sắp mất</span>' : '')+'</div>'
+    + (why ? '<div class="pro-lead-why">'+why+'</div>' : '')
+    + (step ? '<div class="pro-next"><span class="n-pct">→</span><span><b>Gợi ý:</b> '+proEsc_(step.text)+'<br><span style="color:var(--muted)">'+proEsc_(step.why)+'</span></span>'
+        + (step.go ? '<button type="button" class="pro-qa" data-pro-qa="'+proEsc_(step.go)+'">'+proEsc_(step.act||'Mở')+'</button>' : '')+'</div>' : '')
+    + '</div>';
+}
 // Gom dữ liệu 1 khách (dùng cho hồ sơ 360° và trợ lý AI): care, số đơn (ưu tiên Pos), đơn, ghi chú, lịch hẹn của khách, loại lịch
 function proProfileData_(c){
   var care = careData[c.phone] || {};
@@ -153,7 +165,9 @@ function proRenderProfile_(){
   var D = proProfileData_(c), care = D.care, nOrd = D.nOrd, types = D.types, mine = D.mine;
   var wasOpen = !!(host.querySelector('details.pro-tl-d') && host.querySelector('details.pro-tl-d').open);
   var tl = proTimeline_(D.notes, mine, D.orders, 30), tlTotal = D.notes.length + mine.length + D.orders.length;
+  var leadHtml = ''; try { if (typeof lsScore_==='function'){ var ls_ = lsScore_(c, mine, Date.now()); leadHtml = proLeadHtml_(ls_, typeof lsNextStep_==='function' ? lsNextStep_(ls_, c) : null); } } catch(e){ leadHtml = ''; }   // R8c
   host.innerHTML = proQuickActionsHtml_(c.phone)
+                 + leadHtml
                  + proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
                  + proKpiHtml_(proDaysSinceLastOrder_(c.orders, new Date()), nOrd, _custRev_(c))
                  + proFactsHtml_(c.orders, care.custom||c.custom, new Date(), (typeof _hmCfg==='function'?_hmCfg().cycle:30))
@@ -169,4 +183,4 @@ function proRenderProfile_(){
   if (typeof openDp==='function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
   if (typeof renderDpTab==='function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
 })();
-if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proQuickPhone_, proQuickActionsHtml_ };
+if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proQuickPhone_, proQuickActionsHtml_, proLeadHtml_ };

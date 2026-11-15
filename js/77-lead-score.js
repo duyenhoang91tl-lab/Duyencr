@@ -78,6 +78,19 @@ function lsAtRisk_(customers, schedules, nowTs, limit, filter, byPhone){
   return { n: all.length, items: limit ? all.slice(0, limit) : all };
 }
 
+// R8c: gợi ý "việc tiếp theo" cho 1 khách từ kết quả lsScore_ (s) + dữ liệu khách (c). Luật theo THỨ TỰ ƯU TIÊN, luôn trả kèm lý do `why` (không hộp đen).
+// go: 'note' (Ghi chú) | 'sched' (Đặt lịch) | 'order' (Tạo đơn) — khớp data-pro-qa của thanh hành động nhanh (js/33).
+function lsNextStep_(s, c){
+  s = s || {}; c = c || {}; var n = c.totalOrders || 0, d = s.days;
+  if (s.over > 0) return { text: 'Xử lý ' + s.over + ' lịch hẹn đã quá hạn', why: 'lịch hẹn quá hạn là dấu hiệu khách đang bị bỏ sót', go: 'sched', act: 'Mở lịch' };
+  if (s.risk) return { text: 'Liên hệ lại ngay để giữ khách', why: 'đã ' + (d == null ? '>' + LS_COLD_DAYS : d) + ' ngày chưa chăm, từng mua ' + n + ' đơn' + (c.tier ? ' (hạng ' + c.tier + ')' : ''), go: 'note', act: 'Ghi chú' };
+  if (s.days == null && n === 0) return { text: 'Gọi làm quen — khách chưa được chăm sóc lần nào', why: 'chưa có lần tiếp xúc và chưa có đơn nào', go: 'note', act: 'Ghi chú' };
+  if (s.level === 'cold') return { text: 'Nhắn gợi mở hoặc đặt lịch gọi lại', why: (d == null ? 'chưa có mốc chăm sóc' : 'đã ' + d + ' ngày chưa chăm') + ' → khách đang nguội', go: 'sched', act: 'Đặt lịch' };
+  if (s.soon > 0) return { text: 'Chuẩn bị cho ' + s.soon + ' lịch hẹn sắp tới', why: 'đã có lịch trong ' + LS_SOON_DAYS + ' ngày tới', go: 'sched', act: 'Mở lịch' };
+  if (s.level === 'hot') return { text: 'Khách đang nóng — đề xuất chốt đơn hoặc đặt lịch chăm tiếp', why: 'điểm ' + s.score + ' (mới chăm/mua gần đây)', go: 'order', act: 'Tạo đơn' };
+  return { text: 'Đặt lịch chăm tiếp trong ' + LS_SOON_DAYS + ' ngày để giữ nhịp', why: 'khách ấm nhưng chưa có lịch hẹn sắp tới', go: 'sched', act: 'Đặt lịch' };
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  R8b (GIAO DIỆN) — LỌC DANH SÁCH THEO MỨC + THANH BÁO "ĐANG LỌC". Cần trình duyệt (các hàm dưới đều tự thoát nếu thiếu DOM/dữ liệu).
 //  _lsListFilter: '' (tắt) | 'risk' (sắp mất) | 'cold' | 'warm' | 'hot'. applyFilters (js/02) gọi lsFilterPass_(c); _filterSignature (js/08) có _lsListFilter
@@ -120,4 +133,4 @@ function lsOpenList_(mode){
 }
 function lsClearListFilter_(){ _lsListFilter = ''; if (typeof applyFilters === 'function') applyFilters(); lsBarSync_(); }
 
-if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
+if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
