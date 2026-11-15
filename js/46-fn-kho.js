@@ -303,9 +303,10 @@ async function tkHistDlg(code){
     var j = await _tkGet('action=tonKhoLog&khoId=' + encodeURIComponent(k.id) + (code ? '&maHang=' + encodeURIComponent(code) : '') + '&limit=100');
     var lg = (j && j.log) || [], el = box.querySelector('#tk-h'); if (!el) return;
     var LB = { kiem_ke: 'Kiểm kê', nhap: 'Nhập', xuat: 'Xuất', tao: 'Thêm mới', import: 'Nhập Excel', xoa: 'Xoá' };
+    var LT = { kiem_ke: 'info', nhap: 'success', xuat: 'warning', tao: 'brand', import: 'brand', xoa: 'danger' };   // R7c-3: chip loại thay đổi (có js/68); thiếu → chữ xám như cũ
     el.innerHTML = lg.length ? lg.map(function(x){
       var d = x.delta; var ds = d == null ? '' : (d > 0 ? '+' : '') + _tkNum(d);
-      return '<div class="tk-row"><div class="tk-main"><div class="tk-code">' + esc(x.maHang) + ' <span class="tk-muted">' + esc(LB[x.loai] || x.loai) + '</span></div><div class="tk-name">' + esc(x.lyDo || '') + '</div><div class="tk-muted">' + esc(x.user) + ' · ' + esc(new Date(x.ts).toLocaleString('vi-VN')) + '</div></div>' +
+      return '<div class="tk-row"><div class="tk-main"><div class="tk-code">' + esc(x.maHang) + ' ' + (typeof uiChip_ === 'function' ? uiChip_(LB[x.loai] || x.loai, { tone: LT[x.loai] || 'neutral' }) : '<span class="tk-muted">' + esc(LB[x.loai] || x.loai) + '</span>') + '</div><div class="tk-name">' + esc(x.lyDo || '') + '</div><div class="tk-muted">' + esc(x.user) + ' · ' + esc(new Date(x.ts).toLocaleString('vi-VN')) + '</div></div>' +
         '<div class="tk-qty"><b>' + esc(ds) + '</b><span class="tk-muted">' + (x.before == null ? '' : _tkNum(x.before) + ' → ') + (x.after == null ? '' : _tkNum(x.after)) + '</span></div></div>';
     }).join('') : '<div class="tk-empty">Chưa có thay đổi nào.</div>';
   } catch(e){ var el2 = box.querySelector('#tk-h'); if (el2) el2.innerHTML = '<div class="tk-empty">Không tải được lịch sử.</div>'; }
