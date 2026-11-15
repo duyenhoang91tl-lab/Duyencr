@@ -25,3 +25,7 @@ Mở web CRM bằng Chrome (Android) hoặc Safari (iPhone) → menu → **Thêm
 
 ## Cập nhật app
 Từ bản có khóa ký cố định (versionCode 3 trở đi), tải VietTat.apk mới và cài ĐÈ lên bản cũ (giữ nguyên dữ liệu). Nếu đang dùng bản cũ hơn (ký bằng khóa tạm), phải **gỡ app cũ một lần** rồi cài bản mới — Android không cho cài đè khác chữ ký. Khóa ký nằm trong repo (`app/keystore/`), chỉ để cài thủ công; muốn lên Play Store thì đổi sang keystore riêng đặt trong GitHub Secrets.
+
+## Kiểm thử Data.kt trên máy tính (không cần điện thoại)
+`android-viettat/test/run-store-test.sh` chạy `StoreOverrideTest.kt` (18 ca: bản cá nhân hoá mục CRM, ☁ CRM không ghi đè, khôi phục, mục bị xoá khỏi CRM, danh sách rỗng, lưu/đọc lại, nhập file) trên JVM. Cần: `kotlinc` ≥ 1.9, JDK 17+ (có `javac`), `android.jar` (chỉ để biên dịch) và mã nguồn `org.json` (stleary/JSON-java) — đặt đường dẫn qua biến `KT`, `AJAR`, `JSONSRC`.
+

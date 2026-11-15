@@ -1,6 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 — App Android: bấm mục CRM xem được NỘI DUNG + sửa CÁ NHÂN HOÁ trên máy mình — bước 1/2 đã push (lõi lưu trữ)
+- **Yêu cầu Duyên (kèm video):** mẫu viết tắt lấy từ CRM, bấm trong app chỉ hiện toast "Mục lấy từ CRM — sửa trên CRM…" → không xem được nội dung bên trong; muốn xem được, và app của ai thì sửa cá nhân hoá cho người ấy.
+- **Nguyên nhân gốc:** `MainActivity.App` chặn mọi mục `crm_*` bằng toast; và `Store.replaceCrm` xoá-rồi-nạp-lại TOÀN BỘ mục CRM mỗi lần ☁ CRM nên không có chỗ nào giữ bản sửa riêng.
+- [x] **Bước 1 (`Data.kt`, đã test trên JVM thật):** `Store.overrides` (id mục CRM → bản cá nhân hoá) lưu trong `data.json` (`"overrides"`); `savePersonal(n)` / `restoreCrm(id)` / `isPersonal(id)`; `replaceCrm` ÁP LẠI bản cá nhân hoá sau mỗi lần ☁ CRM (giữ thư mục CRM); mục gốc bị XOÁ trên CRM mà đã cá nhân hoá → GIỮ thành mục riêng (thư mục Chung, không mất; `Store.orphaned` báo trên dòng trạng thái); CRM trả danh sách RỖNG (lỗi máy chủ tạm) → giữ nguyên, không chuyển; `importJson` KHÔNG nhận overrides từ file người khác. Test: `android-viettat/test/run-store-test.sh` (18 ca, org.json thật; xem README-vi.md).
+- [ ] **Bước 2 (đang làm):** `MainActivity.kt` — bấm mục CRM mở hộp xem ĐỦ nội dung (chữ + hình + ghi âm) và sửa; lưu = bản cá nhân hoá (chỉ máy này); badge "✎ cá nhân hoá" ở danh sách; nút "Khôi phục bản chung"; mục CRM không có nút Xoá. Compose không biên dịch được trên máy chat → cần Actions `build-android` xanh.
+
 ## 2026-11-14 (phiên Claude — kiểm Viết tắt Android qua video/ảnh Duyên) — XONG; CHỜ Duyên cài APK 1.20
 - Kết luận: luồng gõ tắt → chọn nhiều → Chèn/chia sẻ → Zalo chạy đúng (video 14:00). Cảnh báo "riêng 0" chỉ là nhắc; "ô mật khẩu…" là do ô trống hiện chữ gợi ý.
 - [x] 1.20 (`ExpanderService.kt`): `cleanOldMedia` xoá bản sao `vt_*` quá 24h trong Pictures/VietTat + Download/VietTat (NGUYÊN NHÂN GỐC: `saveMedia` chỉ thêm, không xoá → album phình); thông báo ô trống rõ hơn. CI Build Android VietTat xanh.
