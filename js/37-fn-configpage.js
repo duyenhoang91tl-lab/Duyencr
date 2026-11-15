@@ -50,7 +50,8 @@ function _cfgRender(){
       '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">' + esc(f.hint) + '</div></div>';
   }).join('');
   function sc(label, js){ return '<button class="btn" onclick="' + js + '">' + label + '</button>'; }
-  w.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:12px">⚙ Cấu hình</div>' +
+  var _title = '<div style="font-size:18px;font-weight:700;margin-bottom:12px">⚙ Cấu hình</div>';
+  var _body =
     '<div class="dash-section"><div style="font-weight:700;margin-bottom:2px">⏱ Mốc nhắc việc</div>' + rows +
     '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-save" onclick="_cfgSave()">💾 Lưu cấu hình</button><span style="font-size:11.5px;color:var(--muted)">Lưu lên server — mọi máy dùng chung; mỗi thay đổi ghi vào Nhật ký.</span></div></div>' +
     _cfgBizHtml_() +
@@ -58,10 +59,60 @@ function _cfgRender(){
     _cfgResaleHtml_() +
     _cfgBannedHtml_() +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:6px">🤖 Chạy tự động</div><div style="font-size:13px">Lần theo dõi giai đoạn đơn Base gần nhất: <b>' + esc(_cfgFmtTime(_cfg.last)) + '</b></div>' +
-    '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Chạy mỗi giờ trên máy chủ (trong Apps Script chạy <code>ttCaiTrigger</code> một lần để bật). Quá 2 giờ chưa chạy nghĩa là trigger đang tắt.</div></div>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Chạy mỗi giờ trên máy chủ (trong Apps Script chạy <code>ttCaiTrigger</code> một lần để bật). Quá 2 giờ chưa chạy nghĩa là trigger đang tắt.</div></div>';
+  var _short =
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:8px">🔗 Lối tắt cài đặt</div><div style="display:flex;flex-wrap:wrap;gap:8px">' +
     sc('🏢 Phòng ban', "_cfgGoDept()") + sc('🔑 Tài khoản & quyền', "openAcctModal()") + sc('📨 Mẫu hỏi thăm sau mua', "openFuTplModal()") +
     sc('⚙ Trạng thái chăm sóc', "openCareStatusModal()") + sc('🧾 Nhật ký', "_cfgGoTab('audit')") + '</div></div>';
+  // R9a: có khung chung (js/76) + trung tâm lối tắt gom nhóm (js/78) → vẽ theo khuôn; thiếu 1 trong 2 → giao diện cũ y hệt từng ký tự.
+  if (typeof uiReportFrame_ === 'function' && typeof uiSettingsHub_ === 'function'){
+    var _hub = '<div style="margin-top:14px"><div style="font-weight:700;margin-bottom:8px">🔗 Lối tắt cài đặt</div>' + uiSettingsHub_(_cfgHubGroups_()) + '</div>';
+    w.innerHTML = uiReportFrame_({ id:'CFG', title:'⚙ Cấu hình', desc:'Chỉnh một lần, áp cho cả công ty. Mỗi lần đổi đều ghi vào Nhật ký (giá trị cũ → mới).', stats:_cfgStats_(), bodyHtml:_body + _hub });
+  } else w.innerHTML = _title + _body + _short;
+}
+// ── R9a: thẻ số đầu trang + trung tâm lối tắt gom nhóm (hàm vẽ: js/78-settings-hub.js). Chỉ ĐỌC trạng thái có sẵn, không đổi cách lưu. ──
+function _cfgStats_(){
+  var out = [], now = Date.now(), last = _cfg.last, auto;
+  if (!_cfg.loaded) auto = { label:'Theo dõi giai đoạn đơn', value:'Đang tải…', tone:'neutral' };
+  else if (!last) auto = { label:'Theo dõi giai đoạn đơn', value:'Chưa chạy', note:'chưa có lần chạy nào', tone:'warning' };
+  else if (now - last > 2 * 3600 * 1000) auto = { label:'Theo dõi giai đoạn đơn', value:'Có thể đã tắt', note:'lần cuối ' + Math.round((now - last) / 3600000) + ' giờ trước (quá 2 giờ)', tone:'danger' };
+  else auto = { label:'Theo dõi giai đoạn đơn', value:'Đang chạy', note:Math.max(0, Math.round((now - last) / 60000)) + ' phút trước', tone:'success' };
+  out.push(auto);
+  try { out.push({ label:'Từ cấm', value:_cfgBanned.items.length + ' từ', note:_cfgBanned.useSheet ? 'dùng thêm sheet' : 'chỉ danh sách này', tone:'brand' }); } catch(e){}
+  try {
+    var all = (typeof _SR_DEFAULT_ITEMS_ !== 'undefined' && _SR_DEFAULT_ITEMS_) || [], hid = all.filter(function(it){ return (REPORTS_CFG[it[0]] || {}).enabled === false; }).length;
+    if (all.length) out.push({ label:'Báo cáo đang ẩn', value:hid + '/' + all.length, note:hid ? 'nhân viên không thấy' : 'tất cả đang hiện', tone:hid ? 'warning' : 'success' });
+  } catch(e2){}
+  return out;
+}
+function _cfgHubGroups_(){
+  var A = window._SN_ACTS || {};
+  function it(k, fb, tone){
+    var a = A[k], t = fb;
+    try { if (a) t = (typeof a.t === 'function' ? a.t() : a.t) || fb; } catch(e){}
+    return { key:k, label:t, tone:tone };
+  }
+  return [
+    { icon:'👥', title:'Người dùng & quyền', desc:'Ai được vào, thấy gì, thuộc phòng ban nào.', items:[ it('roles', '🛡 Phân quyền'), it('dept', '🏢 Phòng ban'), it('acct', '🔑 Tài khoản đăng nhập') ] },
+    { icon:'🗂', title:'Dữ liệu khách hàng', desc:'Trạng thái, trường tự tạo, hạng khách và khuyến mãi.', items:[ it('cstatus', '⚙ Tình trạng chăm sóc'), it('khstatus', '⚙ Trạng thái KH'), it('cfield', '➕ Trường tự tạo'), it('tier', '🏅 Cấu hình hạng KH'), it('promo', '🎁 Cấu hình khuyến mãi') ] },
+    { icon:'🔁', title:'Quy trình & mẫu tin', desc:'Quy trình công việc, mẫu hỏi thăm, mẫu sinh nhật.', items:[ it('taskflow', '🧩 Quy trình công việc'), it('futpl', '📨 Mẫu hỏi thăm tự động'), it('bday', '🎂 Mẫu sinh nhật') ] },
+    { icon:'🧾', title:'Nhật ký & hệ thống', desc:'Ai đổi gì, lỗi trên máy này, dọn dữ liệu đã nạp trên máy.', items:[ { key:'audit', label:'🧾 Nhật ký thay đổi' }, it('errlog', '🐞 Nhật ký lỗi (máy này)'), it('clear', '🧹 Xóa data trên máy', 'danger') ] },
+    { icon:'🎨', title:'Giao diện & trợ giúp', desc:'Chế độ sáng/tối, hiệu ứng, hướng dẫn sử dụng.', items:[ it('theme', '🌙 Chế độ tối'), it('sakura', '🌸 Cánh đào rơi'), it('help', '❓ Hướng dẫn sử dụng') ] }
+  ];
+}
+// Nút trong trung tâm lối tắt: giữ đúng hành vi các mục cũ (Phòng ban qua _cfgGoDept, Nhật ký qua _cfgGoTab('audit')); mục còn lại gọi đúng hàm của menu bên trái (window._SN_ACTS, js/29-sidenav.js).
+function _shRun_(k){
+  try {
+    if (k === 'audit'){ _cfgGoTab('audit'); return; }
+    if (k === 'dept'){ _cfgGoDept(); return; }
+    var a = (window._SN_ACTS || {})[k], fn = a && window[a.f];
+    if (typeof fn !== 'function'){ toast('Chức năng chưa sẵn sàng'); return; }
+    fn(a.arg);
+    if (k === 'theme' || k === 'sakura'){   // nhãn đổi theo trạng thái (sáng/tối, bật/tắt) → cập nhật ngay đúng nút này, KHÔNG vẽ lại cả trang (tránh mất chữ đang gõ ở ô khác)
+      var b = document.querySelector('.sh-item[data-sh="' + k + '"]');
+      if (b) b.textContent = (typeof a.t === 'function' ? a.t() : a.t);
+    }
+  } catch(e){ toast('Lỗi mở: ' + (e && e.message || e)); }
 }
 // ── QUY TẮC TÍNH DOANH THU & HOA HỒNG (bizRules) — admin tự cài, không cần sửa code. Lưu Settings 'bizRules' (JSON); backend đọc ở gas_v13.js _bizRules_(). ──
 function _cfgLines_(arr){ return (arr || []).join('\n'); }
