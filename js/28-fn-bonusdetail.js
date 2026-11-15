@@ -162,9 +162,16 @@ function _bdRenderBody_(d){
   return html;
 }
 function renderSalesReportTabBD_(wrap, subTabs){
-  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
-  wrap.innerHTML = _srGFiltersHtml_() +
-    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
+  var bar = _srGFiltersHtml_() +
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>';
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = _srGFiltersHtml_() +
+      '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' +
+      (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn: thanh lọc G + nút quay về → nội dung chi tiết thưởng (_bdRenderBody_ KHÔNG sửa)
+  wrap.innerHTML = uiReportFrame_({ id: 'BD', barHtml: bar, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _bdRenderBody_(_srState.dataG) });
 }
 
 // ── Từ Báo cáo G: bấm "Chi tiết" của 1 sale → màn hình chi tiết đơn thưởng (K) lọc theo sale đó ──
