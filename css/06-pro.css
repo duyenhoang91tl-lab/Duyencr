@@ -211,7 +211,7 @@ html.ui-pro .khd-wrap{padding:10px 12px;}
 html.ui-pro .khd-title{font-weight:600;color:var(--pro-ink);font-size:13.5px;margin-bottom:8px;}
 html.ui-pro .khd-title span{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px;}
 html.ui-pro .khd{display:flex;flex-direction:column;border:1px solid var(--pro-line);border-radius:var(--ui-r-xl);overflow:hidden;background:var(--surface);}
-html.ui-pro .khd-log{height:340px;max-height:52vh;overflow-y:auto;padding:10px;background:#f4f1ec;display:flex;flex-direction:column;gap:6px;}
+html.ui-pro .khd-log{height:340px;max-height:calc(var(--vh,1vh)*52);overflow-y:auto;padding:10px;background:#f4f1ec;display:flex;flex-direction:column;gap:6px;}
 html.ui-pro #sc-pane-discuss .khd-log{height:calc(100vh - 330px);min-height:220px;}
 html.ui-pro .khd-m{display:flex;}
 html.ui-pro .khd-m.out{justify-content:flex-end;}

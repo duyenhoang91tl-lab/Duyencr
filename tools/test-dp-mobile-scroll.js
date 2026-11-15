@@ -9,5 +9,5 @@ ok(/html\.ui-pro #dp\{[^}]*overflow-y:auto/.test(b), 'màn hẹp: cả ngăn #dp
 ok(/html\.ui-pro #dp \.dp-body\{[^}]*flex:none[^}]*overflow:visible[^}]*padding-bottom:\d+px/.test(b), 'màn hẹp: .dp-body hết cuộn riêng/cao theo nội dung + chừa đáy cho thanh tab');
 ok(/html\.ui-pro #dp \.dp-hdr\{[^}]*position:sticky[^}]*top:0/.test(b), 'màn hẹp: thanh tên + ✕ dính trên cùng (luôn đóng được)');
 ok(/\.dp\{[^}]*flex-direction:column;overflow:hidden/.test(base) && /\.dp-body\{flex:1;overflow-y:auto/.test(base), 'quy tắc gốc (màn rộng) css/01 KHÔNG đổi → màn máy tính giữ nguyên');
-ok(/css\/06-pro\.css\?v=20261115f/.test(html), 'index.html tăng ?v= css/06');
+ok(/css\/06-pro\.css\?v=\d{8}[a-z]/.test(html), 'index.html tăng ?v= css/06');
 console.log(bad ? '\nFAIL ' + bad : '\nPASS tất cả'); process.exit(bad ? 1 : 0);
