@@ -814,6 +814,11 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: giu-khach, bao-hanh)" style="flex:1;min-width:200px">
           </div>
           <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">🗂 Chọn nhóm sản phẩm hoặc <b>để "tự phân loại"</b> — hệ thống tự xếp nhóm theo tên sản phẩm / nội dung mẫu; mẫu chung (chào hỏi...) không thuộc nhóm nào.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <input id="mt-f-abbr" class="zai-input" maxlength="30" autocomplete="off" placeholder="⌨️ Viết tắt (tuỳ chọn) — VD: ckm" style="width:230px" oninput="document.getElementById('mt-f-abbr-err').textContent=''">
+            <span style="font-size:11px;color:var(--muted);flex:1;min-width:180px">Gõ từ này ở ô chat (Zalo/Pancake) hoặc app Viết tắt rồi bấm Tab để chèn mẫu. Để trống = tự lấy theo tiêu đề. Chỉ dùng được sau khi mẫu được duyệt.</span>
+          </div>
+          <div id="mt-f-abbr-err" style="font-size:11.5px;color:#b91c1c;margin:0 0 8px;min-height:0"></div>
           <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
           <div style="margin-bottom:8px">
             <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🖼 Ảnh đính kèm mẫu (tối đa 4 ảnh, mỗi ảnh ≤ 5MB)</div>
@@ -1358,7 +1363,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 <script src="js/19-opentiertooltip.js"></script>
 
-<script src="js/20-loadaiexamples.js?v=20261021b"></script>
+<script src="js/20-loadaiexamples.js?v=20261114a"></script>
 
 <!-- ═══ BROADCAST COMPOSE MODAL (Gửi tin hàng loạt qua Zalo AI extension) ═══ -->
 <div id="bc-compose-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;">

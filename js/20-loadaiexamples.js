@@ -164,6 +164,7 @@ function _tplFillGroupSelects() {
 }
 function _tplChips(t) {
   var h = '';
+  if (t.abbr) h += '<span class="zi-chip" style="background:#ede9fe;color:#5b21b6" title="Viết tắt: gõ từ này rồi bấm Tab để chèn mẫu">⌨️ ' + esc(t.abbr) + '</span>';
   if (t.nhom) h += '<span class="zi-chip" style="background:#dcfce7;color:#166534" title="' + (t.nhomAuto ? 'Hệ thống tự phân loại theo tên sản phẩm / nội dung' : 'Nhóm sản phẩm do người soạn chọn') + '">🗂 ' + esc(t.nhom) + (t.nhomAuto ? ' · tự phân loại' : '') + '</span>';
   String(t.product || '').split(/[,;|\n]/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (p) { h += '<span class="zi-chip" style="background:#fef3c7;color:#92400e" title="Sản phẩm">📦 ' + esc(p) + '</span>'; });
   if (t.topic) h += '<span class="zi-chip" style="background:#dbeafe;color:#1e40af" title="Nội dung hội thoại">💬 ' + esc(t.topic) + '</span>';
@@ -371,6 +372,8 @@ function openMsgTemplateForm(id) {
   document.getElementById('mt-f-group').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai KHONG dien san: de trong = tiep tuc tu phan loai
   document.getElementById('mt-f-topic').value = t ? (t.topic || '') : '';
   document.getElementById('mt-f-tags').value = t ? t.tags : '';
+  document.getElementById('mt-f-abbr').value = t ? (t.abbr || '') : '';
+  document.getElementById('mt-f-abbr-err').textContent = '';
   document.getElementById('mt-f-content').value = t ? t.content : '';
   // Khoi tao anh: khi sua thi nap URLs cu; khi them moi thi xoa trang
   _mtImgUrls = (t && Array.isArray(t.images)) ? t.images.slice() : [];
@@ -394,22 +397,27 @@ async function saveMsgTemplateUI() {
   var topic = (document.getElementById('mt-f-topic').value || '').trim();
   var nhom = (document.getElementById('mt-f-group').value || '').trim();   // '' = de he thong tu phan loai
   var id = (document.getElementById('mt-f-id').value || '').trim();
+  var abbr = (document.getElementById('mt-f-abbr').value || '').trim();   // luon gui (ke ca rong) de xoa duoc viet tat da dat
+  var abbrErrEl = document.getElementById('mt-f-abbr-err'); abbrErrEl.textContent = '';
   if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
+  if (/\s/.test(abbr)) { abbrErrEl.textContent = 'Viết tắt phải là 1 từ, không có khoảng trắng.'; document.getElementById('mt-f-abbr').focus(); return; }
   var btn = document.getElementById('mt-f-save-btn');
   btn.disabled = true; btn.textContent = 'Đang lưu...';
   var d = null;
   try {
     var body = { action: 'saveMessageTemplate', template: {
-      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic, nhom: nhom,
+      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic, nhom: nhom, abbr: abbr,
       images: _mtImgUrls.slice(),   // mang URL anh da upload (co the rong)
       createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
     } };
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });
     d = await r.json();
+    if (d && d.code === 'ABBR') { abbrErrEl.textContent = '⚠ ' + d.error; document.getElementById('mt-f-abbr').focus(); return; }   // trung/sai dinh dang: giu form de sua, KHONG dong
     if (d && d.error) { alert('Lỗi: ' + d.error); return; }
   } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
   finally { btn.disabled = false; btn.textContent = 'Lưu mẫu'; }
   closeMsgTemplateForm();
+  if (typeof loadVietTat === 'function') { try { loadVietTat(true); } catch (e) {} }   // tab Viet tat (cung trang) lay lai danh sach de thay viet tat moi
   if (d && d.status === 'pending') toast('✓ Đã gửi mẫu — chờ quản lý duyệt mới dùng được');
   else toast('✓ Đã lưu mẫu');
   loadMsgTemplates(true);  // bust cache: xem mau vua luu ngay, khong doi Worker het TTL 60s
