@@ -1,0 +1,46 @@
+/* ═════════════════════════════════════════════════════════════════
+   22-sched-calendar.css — R6b LỊCH CHĂM SÓC dạng Tuần/Ngày (js/71-sched-calendar.js). Chỉ var(--ui-*) (TOKEN_ONLY).
+   Màu từng loại lịch truyền qua biến cục bộ --sc-c (đặt inline từ SCHED_TYPES), CSS không chứa mã màu.
+   ═════════════════════════════════════════════════════════════════ */
+.sc-viewbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);padding:var(--ui-sp-2) var(--ui-sp-4)}
+.sc-seg{display:inline-flex;border:1px solid var(--ui-border-md);border-radius:var(--ui-r-md);overflow:hidden;background:var(--ui-surface)}
+.sc-seg-b{padding:6px 12px;font-family:var(--ui-font);font-size:var(--ui-fs-sm);color:var(--ui-text-muted);background:transparent;border:0;cursor:pointer}
+.sc-seg-b+.sc-seg-b{border-left:1px solid var(--ui-border-md)}
+.sc-seg-b.active{color:var(--ui-on-brand);background:var(--ui-grad-brand);font-weight:var(--ui-fw-semibold)}
+.sc-cal{flex:1;overflow:auto;padding:var(--ui-sp-3) var(--ui-sp-4);font-family:var(--ui-font)}
+.sc-nav{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);margin-bottom:var(--ui-sp-3)}
+.sc-nav-l{margin-left:var(--ui-sp-2);font-size:var(--ui-fs-md);font-weight:var(--ui-fw-semibold);color:var(--ui-text)}
+.sc-filters{display:flex;flex-wrap:wrap;gap:var(--ui-sp-2);margin-bottom:var(--ui-sp-3)}
+.sc-f{padding:4px 10px;font-family:var(--ui-font);font-size:var(--ui-fs-sm);color:var(--ui-text-muted);background:var(--ui-surface);border:1px solid var(--ui-border-md);border-radius:var(--ui-r-pill);cursor:pointer}
+.sc-f b{margin-left:2px;color:var(--ui-text)}
+.sc-f.on{color:var(--ui-brand);background:var(--ui-brand-soft);border-color:var(--ui-brand-mid)}
+.sc-f-clear{color:var(--ui-danger);border-color:var(--ui-danger-line)}
+.sc-week{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:var(--ui-sp-2);min-width:1100px}
+.sc-day{display:flex;flex-direction:column;min-width:0;background:var(--ui-surface-2);border:1px solid var(--ui-border);border-radius:var(--ui-r-xl);transition:box-shadow var(--ui-dur) var(--ui-ease),border-color var(--ui-dur) var(--ui-ease)}
+.sc-day.sc-today{border-color:var(--ui-brand);background:var(--ui-grad-soft)}
+.sc-day.sc-past{opacity:.75}
+.sc-day-h{display:flex;align-items:center;justify-content:space-between;padding:var(--ui-sp-2) var(--ui-sp-3);font-size:var(--ui-fs-sm);font-weight:var(--ui-fw-semibold);color:var(--ui-text);border-bottom:1px solid var(--ui-border);cursor:pointer}
+.sc-today .sc-day-h{color:var(--ui-brand)}
+.sc-day-n{min-width:20px;padding:0 6px;text-align:center;font-size:var(--ui-fs-xs);font-weight:var(--ui-fw-bold);color:var(--ui-brand);background:var(--ui-brand-soft);border-radius:var(--ui-r-pill)}
+.sc-day-b{display:flex;flex-direction:column;gap:var(--ui-sp-2);padding:var(--ui-sp-2);min-height:72px}
+.sc-drop{border-color:var(--ui-brand);box-shadow:0 0 0 2px var(--ui-brand-mid)}
+.sc-deny{border-color:var(--ui-danger-line);background:var(--ui-danger-soft)}
+.sc-none{padding:var(--ui-sp-2);text-align:center;color:var(--ui-text-hint);font-size:var(--ui-fs-sm)}
+.sc-none-big{padding:var(--ui-sp-6);font-size:var(--ui-fs-base)}
+.sc-chip{padding:var(--ui-sp-2) var(--ui-sp-3);background:var(--ui-surface);border:1px solid var(--ui-border);border-left:3px solid var(--sc-c,var(--ui-brand));border-radius:var(--ui-r-lg);box-shadow:var(--ui-shadow-sm);cursor:pointer}
+.sc-chip[draggable="true"]{cursor:grab}
+.sc-chip:hover{border-color:var(--ui-brand-mid);box-shadow:var(--ui-shadow-md)}
+.sc-chip.sc-drag{opacity:.45}
+.sc-chip-h{display:flex;align-items:center;gap:var(--ui-sp-1);min-width:0;font-size:var(--ui-fs-sm)}
+.sc-code{flex:none;font-weight:var(--ui-fw-bold);color:var(--sc-c,var(--ui-brand))}
+.sc-name{min-width:0;font-weight:var(--ui-fw-semibold);color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-sub{font-size:var(--ui-fs-xs);color:var(--ui-text-hint)}
+.sc-note{margin-top:2px;font-size:var(--ui-fs-xs);color:var(--ui-text-muted);overflow-wrap:anywhere}
+.sc-act{display:flex;justify-content:space-between;gap:var(--ui-sp-1);margin-top:var(--ui-sp-2)}
+.sc-b{min-width:36px;min-height:30px;font-size:var(--ui-fs-md);line-height:1;color:var(--ui-brand);background:var(--ui-brand-soft);border:1px solid var(--ui-border);border-radius:var(--ui-r-md);cursor:pointer}
+.sc-b.sc-ok{color:var(--ui-success);background:var(--ui-success-soft);border-color:var(--ui-success-line)}
+.sc-dayview{max-width:760px;padding:var(--ui-sp-3);gap:var(--ui-sp-3)}
+.sc-sec-h{margin-bottom:var(--ui-sp-2);font-size:var(--ui-fs-base);font-weight:var(--ui-fw-semibold);color:var(--ui-text)}
+.sc-sec-h b{margin-left:4px;color:var(--ui-brand)}
+.sc-sec-b{display:flex;flex-direction:column;gap:var(--ui-sp-2)}
+@media (max-width:760px){.sc-week{grid-template-columns:1fr;min-width:0}.sc-day-b{min-height:0}}
