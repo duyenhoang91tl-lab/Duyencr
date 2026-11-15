@@ -541,12 +541,14 @@ function _srRenderE_(d){
 // ════════════════════════════════════════════════════════════════════
 function renderSalesReportTabF_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srRenderF_(_srState.dataF);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srRenderF_(_srState.dataF));
+    return;
+  }
+  // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc → nội dung F
+  wrap.innerHTML = uiReportFrame_({ id: 'F', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderF_(_srState.dataF) });
 }
 
 function _srRenderF_(d){
