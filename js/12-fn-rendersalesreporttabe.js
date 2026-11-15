@@ -4,12 +4,15 @@
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
   var filters = _srBarHtml_();
-
-  var body = _srState.loading
-    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srEMismatchBanner_() + _srRenderE_(_srState.dataE);
-
-  wrap.innerHTML = filters + body;
+  if (typeof uiReportFrame_ !== 'function'){   // dự phòng: js/76 chưa nạp → giao diện cũ
+    wrap.innerHTML = filters + (_srState.loading
+      ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+      : _srEMismatchBanner_() + _srRenderE_(_srState.dataE));
+    return;
+  }
+  // Báo cáo E nhiều mục có tiêu đề riêng (a, b, thu nhập, thi đua…) nên đưa vào ô bodyHtml của khuôn: thanh lọc → cảnh báo lệch → nội dung.
+  wrap.innerHTML = uiReportFrame_({ id: 'E', barHtml: filters, loading: !!_srState.loading,
+    noticeHtml: _srState.loading ? '' : _srEMismatchBanner_(), bodyHtml: _srState.loading ? '' : _srRenderE_(_srState.dataE) });
 }
 
 // ── Tính CHƯƠNG TRÌNH THƯỞNG cho các đơn đang lọc (dùng CHUNG d.orders với phần hoa hồng ở trên) ──

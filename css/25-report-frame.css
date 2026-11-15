@@ -9,7 +9,7 @@
 .rf-sec-h{margin:0 0 var(--ui-sp-3);font-size:var(--ui-fs-md);font-weight:var(--ui-fw-semibold);color:var(--text)}
 .rf-chart svg{max-width:100%;height:auto}
 .rf-table-wrap{overflow-x:auto;max-width:100%}
-.rf-after{min-width:0}
+.rf-body,.rf-after{min-width:0}
 .rf-state{padding:var(--ui-sp-8) var(--ui-sp-4);text-align:center;color:var(--muted);font-size:var(--ui-fs-md)}
 .rf-loading,.rf-empty{font-style:italic}
 .rf-export-btn{white-space:nowrap}

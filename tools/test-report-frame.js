@@ -41,6 +41,11 @@ const af = F.uiReportFrame_({ tableHtml: '<table id="TB"></table>', afterHtml: '
 t(at(af, 'id="TB"') < at(af, 'id="AF"') && at(af, 'id="AF"') < at(af, 'rf-export'), 'afterHtml nằm sau bảng, trước nút Xuất');
 t(/id="AF"/.test(F.uiReportFrame_({ afterHtml: '<i id="AF"></i>' })) && !/rf-empty/.test(F.uiReportFrame_({ afterHtml: '<i></i>' })), 'chỉ có afterHtml → không hiện "rỗng"');
 
+// bodyHtml: nội dung nhiều mục chèn nguyên, sau bảng, trước afterHtml/Xuất; chỉ có bodyHtml → không bị coi là rỗng
+const bd = F.uiReportFrame_({ barHtml: '<i id="BAR"></i>', bodyHtml: '<h4 id="BD"></h4>', afterHtml: '<i id="AF"></i>', exports: [{ label: 'a', onclick: 'x()' }] });
+t(at(bd, 'id="BAR"') < at(bd, 'id="BD"') && at(bd, 'id="BD"') < at(bd, 'id="AF"') && at(bd, 'id="AF"') < at(bd, 'rf-export'), 'bodyHtml nằm sau thanh lọc, trước afterHtml và nút Xuất');
+t(/id="BD"/.test(F.uiReportFrame_({ bodyHtml: '<h4 id="BD"></h4>' })) && !/rf-empty/.test(F.uiReportFrame_({ bodyHtml: '<i></i>' })), 'chỉ có bodyHtml → không hiện "rỗng"');
+
 // (4) escape
 const xss = '<img src=x onerror=alert(1)>';
 const h = F.uiReportFrame_({ id: xss, title: xss, desc: xss, error: xss, chartTitle: xss, chartHtml: 'c', tableTitle: xss, tableHtml: 't', empty: xss, exports: [{ label: xss, onclick: 'a"b', icon: xss }] });
