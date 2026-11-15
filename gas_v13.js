@@ -6220,7 +6220,7 @@ function _acctParseSheet_(sh) {
   return rowsRaw;
 }
 // QUY TAC (Duyen chot 2026-11-06): don can CHIA TAY ke toan ghi o cac tab "onl T10", "onl T11"... (ten bat dau "onl T" + thang; tab "quay ..." khong doc). Moi dong trong tab onl = DA XAC NHAN,
-// UU TIEN hon ghep Base (nhu bang bo sung CRM) va chi thua bang bo sung CRM (acctSplitExtra, admin sua trong CRM). Khong co tab onl nao => doc tab dau tien nhu cu.
+// UU TIEN hon ghep Base va THANG ca bang chia tay admin trong CRM (acctSplitExtra) khi cung ma (Duyen chot 2026-11-15: ke toan thang admin). Khong co tab onl nao => doc tab dau tien nhu cu.
 function _acctShName_(s) { try { return String(s.getName()); } catch (e) { return ''; } }
 function _acctIsOnlSheetName_(name) { return /^onl\s*t\s*\d{1,2}\b/.test(_stripVN_(String(name || '')).trim()); }
 function _loadAcctSplit_() {
@@ -6246,8 +6246,14 @@ function _loadAcctSplit_() {
     var sheetEx = pack.mode === 'onl' ? pack.rows.filter(function(rw) { return rw.code && rw.sales.length && rw.tong > 0; }).map(function(rw) {
       return { line: rw.sheet + '#' + rw.line, kenh: rw.kenh, sales: rw.sales, coc: rw.coc, tong: rw.tong, chenh: rw.chenh, code: rw.code, confirmed: true, extra: true, tyle: rw.tyle, sheet: rw.sheet };
     }) : [];
-    // Gop bang chia bo sung cua CRM: dong bo sung THAY cac dong cung ma trong file ke toan (khop ca khi khac nam /2026); bang CRM (Settings) thang tab onl neu cung ma.
-    var crmEx = _loadAcctExtra_(), crmNy = {};
+    // Gop bang chia bo sung cua CRM: CHI cho don ke toan CHUA ghi (xem QUY TAC MOI ben duoi); khop ma bo nam (17T10 ~ 17T10/2026).
+    // QUY TAC MOI (Duyen chot 2026-11-15, thay cho 2026-11-03/06): FILE KE TOAN (dong da xac nhan: moi dong tab onl, hoac dong co 'x' o che do cu) THANG bang chia tay admin trong CRM khi CUNG MA DON. Dong CRM (acctSplitExtra) chi co hieu luc voi don
+    // KE TOAN CHUA GHI; dong CRM trung ma voi dong ke toan bi BO QUA (ghi vao out.crmShadowed de giao dien bao 'dang bi file ke toan uu tien').
+    var ktNy = {};
+    sheetEx.forEach(function(rw) { ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    rowsRaw.forEach(function(rw) { if (rw.code && rw.confirmed) ktNy[_acctCodeNoYear_(rw.code)] = true; });   // che do cu (tab dau): CHI dong ke toan DA XAC NHAN (x) moi chan bang CRM; dong chua x van de admin chinh
+    var crmEx = [], crmNy = {}; out.crmShadowed = [];
+    _loadAcctExtra_().forEach(function(rw) { if (ktNy[_acctCodeNoYear_(rw.code)]) { if (out.crmShadowed.indexOf(rw.code) === -1) out.crmShadowed.push(rw.code); } else crmEx.push(rw); });
     crmEx.forEach(function(rw) { crmNy[_acctCodeNoYear_(rw.code)] = true; });
     var exRows = sheetEx.filter(function(rw) { return !crmNy[_acctCodeNoYear_(rw.code)]; }).concat(crmEx);
     out.exCount = exRows.length; out.exByCode = {}; out.exByCodeNoYear = {};
@@ -6301,8 +6307,8 @@ function _acctSharesOf_(rows) {
 // NGUYEN NHAN GOC Bao cao B lech ke toan (sheet HUYEN): ke toan chia tay / sua gia tri tung don (bao hanh, COD, don quay) bang tay;
 // file "THEO DOI DON CHIA SALE" cua ke toan la file Google rieng CRM khong ghi duoc, va don ghi chu chi co ma don Pos (vd "M44707") khong co ma bo dem.
 // => CRM giu 1 bang bo sung CUNG DANG DONG nhu file ke toan: [{code, sales:["a","b"], tong}] (moi phan tu = 1 dong; sales trong 1 dong chia deu; nhieu dong cung code = chia tay).
-// code = ma bo dem (17T10/2026) HOAC ma don Pos (M44707). Dong bo sung luon coi la DA XAC NHAN (dung tong ke toan ke ca khi khac gia Pos), UU TIEN hon file ke toan
-// va hon ghep Base. tong = 0 => don tinh 0 (bo khoi bao cao). KHONG gan cung so lieu thang nao vao code — du lieu nam o Settings.
+// code = ma bo dem (17T10/2026) HOAC ma don Pos (M44707). Dong bo sung luon coi la DA XAC NHAN (dung tong ke toan ke ca khi khac gia Pos), UU TIEN hon ghep Base
+// nhung THUA file ke toan neu file ke toan da co dong cung ma (2026-11-15). tong = 0 => don tinh 0 (bo khoi bao cao). KHONG gan cung so lieu thang nao vao code — du lieu nam o Settings.
 var ACCT_EXTRA_KEY_ = 'acctSplitExtra';
 var _acctExtraMemo_ = null;
 function _acctExtraRaw_() { try { return String(getSetting_(ACCT_EXTRA_KEY_) || '').trim(); } catch (e) { return ''; } }
@@ -21295,7 +21301,8 @@ function splitFixList_(p, user) {
       posVal: Math.round(posVal), the: theNames, base: base, baseSum: Math.round(baseSum), lechTien: lechTien, lechSale: lechSale, current: cur, tong: Math.round(tot) });
   });
   rows.sort(function (a, b) { return Math.abs(b.lechTien) - Math.abs(a.lechTien); });
-  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows };
+  var shadowed = []; try { shadowed = _loadAcctSplit_().crmShadowed || []; } catch (eSh) {}   // ma da luu chia tay trong CRM nhung file ke toan da co dong cung ma -> khong co hieu luc
+  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows, shadowed: shadowed };
 }
 function splitDoGet_(action, p) {
   try {

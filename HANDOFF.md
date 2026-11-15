@@ -1,6 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — CHIA TAY ĐƠN LỆCH POS–BASE: KẾ TOÁN THẮNG ADMIN) — XONG (đã push); GAS tự deploy + Ctrl+F5
+Duyên hỏi: admin chỉnh chia tay đơn lệch Pos–Base, "vẫn lấy theo link kế toán trước đúng không?". Kiểm code: TRƯỚC ĐÂY bảng chia tay admin (Settings `acctSplitExtra`) THẮNG file kế toán cùng mã (quy tắc 3/11 & 6/11). Duyên chọn: **KẾ TOÁN THẮNG ADMIN**.
+- ✅ Thứ tự mới: (1) file kế toán ĐÃ XÁC NHẬN (mọi dòng tab "onl Txx"; chế độ cũ = dòng có "x") → (2) chia tay admin trong CRM (chỉ cho đơn kế toán CHƯA ghi) → (3) tự ghép Base theo tỷ lệ Pos. Sửa `_loadAcctSplit_` (gas_v13.js): dòng CRM trùng mã (khớp bỏ năm) với dòng kế toán đã xác nhận bị bỏ, ghi vào `out.crmShadowed`; dòng kế toán CHƯA "x" (chế độ cũ) KHÔNG chặn admin. `splitFixList` trả thêm `shadowed`.
+- ✅ Admin vẫn là người DUY NHẤT sửa (`splitFixList` + `setSetting acctSplitExtra` đều admin-only — không đổi). Panel "🛠 Đơn lệch Pos–Base" (`js/50`, `?v=20261115i`): thêm dòng ghi thứ tự áp dụng + cảnh báo đỏ "File kế toán đã có đơn này → dòng này không có hiệu lực" ở "Chia tay đang lưu trong CRM". Đơn kế toán đã ghi vẫn KHÔNG nằm trong danh sách lệch (đi nhánh kế toán) — muốn đổi số của chúng phải sửa trong file kế toán.
+- Test: `test-acct-onl-sheets` (đổi ca "bảng CRM thắng" → "KT thắng" + ca đơn KT chưa ghi admin vẫn có hiệu lực), `test-acct-extra` (+ca 5b KT đã x thắng), `test-split-fix-ui` (+2 ca cảnh báo), `test-split-fix-kit` (cắt dòng ghi chú mới khi so bản cũ). Cả bộ đạt.
+- ⚠ Hệ quả: các dòng `acctSplitExtra` đã lưu trùng mã với dòng kế toán (vd 17T10) NGỪNG có hiệu lực → số báo cáo có thể đổi so với trước; mở panel xem dòng đỏ.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 + Actions "Deploy GAS" xanh → mở Báo cáo M → 🛠 xem dòng cảnh báo; xuất lại Theo Sale kiểm số.
+
 ## 2026-11-15 (phiên Claude — TỐI ƯU GAS: GOM LẦN GỌI SHEET Ở 3 HÀM HAY CHẠY) — XONG (đã push); GAS tự deploy
 NGUYÊN NHÂN GỐC (mẹo chẩn đoán trong Project): vòng lặp gọi API Sheet từng dòng/từng ô làm Apps Script quá thời gian → trình duyệt báo CORS/"Failed to fetch". Quét `gas_v13.js` tìm `getRange/getValue/setValue/deleteRow` trong vòng lặp; phần lớn là "tìm 1 dòng rồi sửa rồi return" (OK), chỉ 3 chỗ thật sự lặp theo số dòng:
 - ✅ `syncZaloFriendStatus_` (extension quét bạn Zalo — nóng nhất): trước mỗi dòng đọc 2–3 ô + ghi 3–4 ô riêng (20 dòng = 114 lần gọi). Nay đọc 3 cột C/S (+Q chỉ khi có nick) ĐÚNG 1 LẦN, kiểm trên bộ nhớ, ghi gom các dòng liền nhau thành 1 `setValues` (20 dòng = 14 lần; dry-run luôn 3 lần). SĐT lặp trong 1 lần gửi vẫn thấy giá trị mới (cập nhật bộ nhớ đệm).
