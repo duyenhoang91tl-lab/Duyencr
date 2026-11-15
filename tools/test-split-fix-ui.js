@@ -3,7 +3,7 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../js/50-split-orders.js', 'utf8');
 function grab(name, async_) { const key = (async_ ? 'async function ' : 'function ') + name + '('; const i = src.indexOf(key); if (i < 0) throw new Error('thieu ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } }
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
-const names = ['splitEsc_', 'splitMoney_', 'splitFixCodeNy_', 'splitFixParseLines_', 'splitFixRemoveCode_', 'splitFixMergeExtra_', 'splitFixDefaultText_', 'splitFixSumHtml_', 'splitFixPanelHtml_', 'splitFixEdit_'];
+const names = ['splitEsc_', 'splitMoney_', 'splitKitOn_', 'splitStateChip_', 'splitErrColor_', 'splitToneColor_', 'splitFixCodeNy_', 'splitFixParseLines_', 'splitFixRemoveCode_', 'splitFixMergeExtra_', 'splitFixDefaultText_', 'splitFixSumHtml_', 'splitFixPanelHtml_', 'splitFixEdit_'];
 const asyncNames = ['_splitFixGetExtra_', '_splitFixPutExtra_', 'splitFixSave_', 'splitFixDelete_'];
 let SETTING = '', POSTS = [], TOASTS = [], CONFIRM = true, LOADS = 0;
 const ctx = { _srState: { fixOpen: true, mDateFrom: '2026-10-01', mDateTo: '2026-10-31' }, _srIsAdmin_: () => true, gsUrl: 'http://gs', toast: m => TOASTS.push(m), confirm: () => CONFIRM,
