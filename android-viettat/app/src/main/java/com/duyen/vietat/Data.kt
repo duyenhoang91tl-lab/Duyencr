@@ -94,7 +94,7 @@ object Store {
      *  Thư mục con (2026-10-25): CRM lưu nhóm dạng đường dẫn "Túi tiền/Cổ" → mỗi đường dẫn là 1 thư mục "CRM · Túi tiền › Cổ" (xếp theo tên nên
      *  các thư mục con đứng cạnh thư mục cha); mục "Của tôi" cũng chia theo nhóm. Ảnh kèm (images) của CRM được tải về và hiện cùng các lựa chọn chữ (xem imgFiles). */
     @Synchronized
-    fun replaceCrm(a: JSONArray, imgFiles: Map<String, String> = emptyMap()): Int {
+    fun replaceCrm(a: JSONArray, imgFiles: Map<String, String> = emptyMap(), audFiles: Map<String, String> = emptyMap()): Int {
         folders.removeAll { isCrm(it.id) }; snippets.removeAll { isCrm(it.id) }
         var n = 0
         val fresh = mutableListOf<Folder>()
@@ -111,8 +111,10 @@ object Store {
             // Ảnh của mục CRM (2026-10-25): CRM lưu tham chiếu file Drive [{id,name}] → Sync.Crm.pull đã tải về thành file crm_<id>.<đuôi>; ở đây nối vào cuối danh sách
             // lựa chọn dưới dạng [[img:tên_file]] như ảnh tự tạo trên máy (ảnh chưa tải được thì bỏ qua, lần cập nhật sau thử lại).
             val imgs = j.optJSONArray("images")?.let { ia -> (0 until ia.length()).mapNotNull { k -> imgFiles[ia.optJSONObject(k)?.optString("id").orEmpty()]?.let { f -> "[[img:$f]]" } } } ?: emptyList()
+            // Tệp ghi âm đính kèm (audios, 2026-11-14): như ảnh nhưng dạng [[aud:tên_file]] (🎤 Ghi âm); tệp chưa tải được thì bỏ qua, lần cập nhật sau thử lại.
+            val auds = j.optJSONArray("audios")?.let { aa -> (0 until aa.length()).mapNotNull { k -> audFiles[aa.optJSONObject(k)?.optString("id").orEmpty()]?.let { f -> "[[aud:$f]]" } } } ?: emptyList()
             snippets += Snippet("crm_" + j.optString("id", abbr), fid, abbr, j.optString("keyword"),
-                (0 until oa.length()).map { oa.getString(it) } + imgs, j.optLong("updatedAt", 1))
+                (0 until oa.length()).map { oa.getString(it) } + imgs + auds, j.optLong("updatedAt", 1))
             n++
         }
         folders.addAll(fresh.sortedBy { it.name })

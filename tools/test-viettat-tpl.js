@@ -7,11 +7,11 @@ function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) 
 function line(re) { const m = re.exec(src); if (!m) throw new Error('thieu dong ' + re); return m[0]; }
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
 const consts = [
-  'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100;',
+  'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_MAX_AUDIOS=10,VIETTAT_NHOM_MAX=100;',
   line(/var MSG_TPL_HEADERS = \[[^\]]*\];/), line(/var MSG_TPL_APPROVER_ROLES_ = \[[^\]]*\];/), line(/var MSG_TPL_STATUS_ = \{[^}]*\};/),
   line(/var VIETTAT_TPL_MAX = [^\n]*;/), line(/var VIETTAT_TPL_ONLY_ADMIN = [^\n]*;/), 'var SH_MSG_TPL="MessageTemplates",SH_USER="Users";'
 ].join('\n');
-const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_', '_tplRowToObj_', 'vietTatImage_'].map(fn).join('\n');
+const fns = ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtAudsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', '_vtAdminKeys_', '_vtTplImgId_', '_vtTplKeyword_', '_vtFromTemplates_', '_tplRowToObj_', 'vietTatImage_'].map(fn).join('\n');
 
 const sheets = { VietTat: [], MessageTemplates: [] };
 const mkSheet = (rows) => ({ getLastRow: () => rows.length + 1, getRange: (r, c, n, w) => ({ getValues: () => rows.slice(r - 2, r - 2 + n).map(x => x.slice(c - 1, c - 1 + w)) }) });

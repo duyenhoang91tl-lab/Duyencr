@@ -11,7 +11,7 @@
   'use strict';
   if (window.__pkVietTatLoaded) return; window.__pkVietTatLoaded = true;
   const STALE_MS = 5 * 60 * 1000;
-  let snippets = [], enabled = true, picks = {}, state = null, host = null, box = null, tbox = null, fbox = null, fetching = false;
+  let snippets = [], enabled = false, picks = {}, state = null, host = null, box = null, tbox = null, fbox = null, fetching = false;
   let pbox = null, pstate = null;               // màn chọn LỚN (chọn nhiều chữ + hình)
   const imgUrl = new Map();                      // id ảnh → blob URL hiển thị trong màn chọn
   const COARSE = (() => { try { return matchMedia('(pointer:coarse)').matches; } catch (_) { return false; } })();   // màn cảm ứng (điện thoại) → mở thẳng màn chọn lớn
@@ -29,11 +29,12 @@
 
   // ---------- nạp dữ liệu ----------
   async function loadLocal() {
-    const v = await sget('local', { vtData: [], vtOn: true, vtPicks: {} });
-    snippets = Array.isArray(v.vtData) ? v.vtData : []; enabled = v.vtOn !== false; picks = v.vtPicks || {};
+    const v = await sget('local', { vtData: [], vtOn: false, vtPicks: {} });
+    snippets = Array.isArray(v.vtData) ? v.vtData : []; enabled = v.vtOn === true; picks = v.vtPicks || {};   /* MẶC ĐỊNH TẮT (2026-11-14): chỉ chạy khi người dùng tự bật */
+    if (!enabled) hide();
   }
   async function refresh(force) {
-    if (fetching) return; fetching = true;
+    if (!enabled || fetching) return; fetching = true;   // tắt → không gọi GAS, không tốn lượt
     try {
       const l = await sget('local', { vtAt: 0, vtBy: null });
       const sy = await sget('sync', { csName: '' });
@@ -47,7 +48,7 @@
   }
   loadLocal().then(() => refresh(false));
   safe(() => chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === 'local' && (ch.vtData || ch.vtOn || ch.vtPicks)) loadLocal();
+    if (area === 'local' && (ch.vtData || ch.vtOn || ch.vtPicks)) loadLocal().then(() => { if (ch.vtOn && enabled) refresh(false); });
     if (area === 'sync' && ch.csName) refresh(true);   // đổi CS → mục riêng của người khác phải nạp lại
   }));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });

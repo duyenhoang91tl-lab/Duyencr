@@ -39,7 +39,8 @@ class ExpanderService : AccessibilityService() {
         if (e.packageName == packageName) { Diag.note(pkg, "", "bỏ qua vì đang gõ TRONG app Duyên CRM — hãy gõ ở app chat khác (Zalo/Messenger/Pancake)"); hide(); return }
         val n = e.source ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         if (n == null) { Diag.note(pkg, "", "KHÔNG lấy được ô gõ (app này chặn Trợ năng đọc ô nhập)"); return }
-        if (n.isPassword || n.isShowingHintText) { Diag.note(pkg, "", "bỏ qua: ô mật khẩu hoặc ô đang hiện chữ gợi ý"); hide(); return }
+        if (n.isPassword) { Diag.note(pkg, "", "bỏ qua: ô mật khẩu"); hide(); return }
+        if (n.isShowingHintText) { Diag.note(pkg, "", "ô đang trống (hiện chữ gợi ý) — bình thường, gõ viết tắt để thử"); hide(); return }
         var text = n.text?.toString().orEmpty()
         if (text.isEmpty() && e.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) text = e.text.joinToString("")
         if (text.isEmpty()) { Diag.note(pkg, "", "ô gõ trống (app không đưa chữ cho Trợ năng đọc?)"); hide(); return }
@@ -298,10 +299,27 @@ class ExpanderService : AccessibilityService() {
         ui.postDelayed({ tick() }, 900)
     }
 
+    /**
+     * NGUYÊN NHÂN GỐC album "VietTat" phình to (2026-11-14): mỗi lần Chèn nhiều hình, saveMedia lưu thêm bản sao mới vào Thư viện/Tải xuống mà không bao giờ xoá.
+     * Nay trước khi lưu đợt mới, xoá các bản sao vt_* do CHÍNH app tạo đã quá 24 giờ (hình đã gửi xong từ lâu). Chỉ xoá file mang tên vt_ trong thư mục VietTat;
+     * file của app khác / do app bản cài cũ tạo (không còn quyền) bị Android từ chối → bỏ qua, không ảnh hưởng việc chèn.
+     */
+    private fun cleanOldMedia(image: Boolean, nowMs: Long) {
+        try {
+            val base = if (image) android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI else android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val dir = if (image) "Pictures/VietTat%" else "Download/VietTat%"
+            val cutoff = (nowMs / 1000 - 24 * 3600).toString()
+            contentResolver.delete(base,
+                "${android.provider.MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? AND ${android.provider.MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${android.provider.MediaStore.MediaColumns.DATE_ADDED} < ?",
+                arrayOf("vt_%", dir, cutoff))
+        } catch (ex: Exception) { /* không dọn được thì thôi, không chặn việc chèn */ }
+    }
+
     /** Lưu file vào MediaStore (không cần quyền từ Android 10). Hình k có ngày chụp = now − k giây → hình 1 mới nhất = đầu danh sách, tick từ trái sang phải đúng thứ tự. */
     private fun saveMedia(files: List<File>, image: Boolean): Int {
         var ok = 0
         val nowMs = System.currentTimeMillis()
+        cleanOldMedia(image, nowMs)
         files.forEachIndexed { k, f ->
             try {
                 val ext = f.extension.lowercase()

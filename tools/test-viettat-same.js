@@ -8,10 +8,10 @@ const rows = [
   ['1', '', 'ch', 'chào', JSON.stringify(['Chào {tên}']), '', 'admin', 1, '[]'],                 // muc CHUNG
   ['2', '', 'dc', 'dia chi', JSON.stringify(['Số 1']), 'Duyên HT', 'Duyên HT', 2, '[]'],        // muc rieng cua Duyen HT
   ['3', '', 'tk', 'tai khoan', JSON.stringify(['STK 123']), 'Nguyễn Văn An', 'x', 3, '[]']];    // muc rieng nguoi khac
-const ctx = { VIETTAT_HEADERS: H, SH_VIETTAT: 'VietTat', VIETTAT_NHOM_MAX: 80, VIETTAT_MAX_IMAGES: 3, String, Number, Date, JSON, Array, Object, RegExp,
+const ctx = { VIETTAT_HEADERS: H, SH_VIETTAT: 'VietTat', VIETTAT_NHOM_MAX: 80, VIETTAT_MAX_IMAGES: 3, VIETTAT_MAX_AUDIOS: 10, String, Number, Date, JSON, Array, Object, RegExp,
   getSheet_: () => ({ getLastRow: () => rows.length + 1, getRange: () => ({ getValues: () => rows }) }) };
 vm.createContext(ctx);
-vm.runInContext(['_stripVN_', '_vtKey_', '_vtSame_', '_vtNhom_', '_vtImgsFromCell_', '_vtRowToObj_', 'readVietTat_'].map(fn).join('\n'), ctx);
+vm.runInContext(['_stripVN_', '_vtKey_', '_vtSame_', '_vtNhom_', '_vtImgsFromCell_', '_vtAudsFromCell_', '_vtRowToObj_', 'readVietTat_'].map(fn).join('\n'), ctx);
 const names = caller => ctx.readVietTat_({ name: caller }).map(x => x.abbr).join(',');
 ok(names('Duyên HT') === 'ch,dc', 'dung y nguyen "Duyên HT": thay muc chung + muc rieng cua minh, KHONG thay muc rieng nguoi khac');
 ok(names('duyenht') === 'ch,dc', 'LOI GOC: app gui "duyenht" -> truoc day khong khop owner "Duyên HT"; nay thay muc rieng');
