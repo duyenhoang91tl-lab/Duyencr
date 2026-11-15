@@ -38,6 +38,7 @@
        o.stats       mảng cho uiStat_ ({label,value,note,delta,tone,icon})
        o.chartTitle / o.chartHtml   biểu đồ (SVG sẵn có)
        o.tableTitle / o.tableHtml   bảng; o.empty = chữ khi không có bảng và không có thẻ số
+       o.afterHtml   khối phụ nằm SAU bảng, trước nút Xuất (VD đối chiếu, chốt tháng) — code gọi kiểm soát, chèn nguyên
        o.exports     mảng nút Xuất (xem exportsHtml_) */
   function uiReportFrame_(o) {
     o = o || {};
@@ -52,11 +53,12 @@
     }
     var stats = (o.stats && o.stats.length) ? grid_(o.stats) : '';
     var chart = o.chartHtml || '', table = o.tableHtml || '';
-    if (!stats && !chart && !table) return out + '<div class="rf-state rf-empty">' + esc(o.empty || 'Chưa có dữ liệu trong bộ lọc này') + '</div></div>';
+    if (!stats && !chart && !table && !o.afterHtml) return out + '<div class="rf-state rf-empty">' + esc(o.empty || 'Chưa có dữ liệu trong bộ lọc này') + '</div></div>';
     return out +
       (stats ? '<div class="rf-stats">' + stats + '</div>' : '') +
       sec_('chart', o.chartTitle, chart) +
       sec_('table', o.tableTitle, table ? '<div class="rf-table-wrap">' + table + '</div>' : '') +
+      (o.afterHtml ? '<div class="rf-after">' + o.afterHtml + '</div>' : '') +
       exportsHtml_(o.exports) + '</div>';
   }
 

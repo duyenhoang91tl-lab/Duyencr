@@ -36,6 +36,11 @@ const part = F.uiReportFrame_({ tableHtml: '<table></table>' });
 t(!/rf-chart/.test(part) && !/ui-stat/.test(part) && !/rf-export/.test(part) && /<table/.test(part), 'thiếu khối nào thì bỏ cả khối đó (không khung trống)');
 t(!/Xuất|rf-export-btn/.test(F.uiReportFrame_({ tableHtml: '<table></table>', exports: [{ label: 'a' }, null] })), 'nút Xuất thiếu onclick/null bị bỏ');
 
+// afterHtml: nằm SAU bảng, TRƯỚC nút Xuất; có afterHtml thì không bị coi là rỗng
+const af = F.uiReportFrame_({ tableHtml: '<table id="TB"></table>', afterHtml: '<i id="AF"></i>', exports: [{ label: 'a', onclick: 'x()' }] });
+t(at(af, 'id="TB"') < at(af, 'id="AF"') && at(af, 'id="AF"') < at(af, 'rf-export'), 'afterHtml nằm sau bảng, trước nút Xuất');
+t(/id="AF"/.test(F.uiReportFrame_({ afterHtml: '<i id="AF"></i>' })) && !/rf-empty/.test(F.uiReportFrame_({ afterHtml: '<i></i>' })), 'chỉ có afterHtml → không hiện "rỗng"');
+
 // (4) escape
 const xss = '<img src=x onerror=alert(1)>';
 const h = F.uiReportFrame_({ id: xss, title: xss, desc: xss, error: xss, chartTitle: xss, chartHtml: 'c', tableTitle: xss, tableHtml: 't', empty: xss, exports: [{ label: xss, onclick: 'a"b', icon: xss }] });
