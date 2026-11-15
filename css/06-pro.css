@@ -258,3 +258,8 @@ html.ui-pro .pro-d{font-size:11.5px;font-weight:600;opacity:.95;}
 html.ui-pro .pro-d.up{color:var(--ui-success);}
 html.ui-pro .pro-d.down{color:var(--ui-danger);}
 html.ui-pro .pro-kpi .pro-d.up,html.ui-pro .pro-kpi .pro-d.down{color:inherit;}
+/* R5b (2026-11-15): thanh thao tác nhanh đầu hồ sơ khách */
+html.ui-pro .pro-qa-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+html.ui-pro .pro-qa{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:1 1 auto;min-height:36px;padding:6px 12px;border:1px solid var(--border-md);border-radius:999px;background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap;}
+html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color:var(--ui-brand,var(--green));}
+@media (max-width:640px){html.ui-pro .pro-qa{min-height:44px;}}

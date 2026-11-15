@@ -101,6 +101,29 @@ function proTimelineHtml_(items, total){
     + items.map(function(it){ return '<li class="'+it.kind+'"><span class="t-when">'+proEsc_(it.when)+'</span>'+proEsc_(it.title)+'</li>'; }).join('') + '</ul></details>';
 }
 
+// ── R5b (2026-11-15): thanh thao tác nhanh đầu hồ sơ — Gọi · Zalo · Ghi chú · Đặt lịch · Tạo đơn ──
+// Gọi = tel:, Zalo = zalo.me/<SĐT> (tab mới); 3 nút còn lại chuyển sang tab tương ứng của hồ sơ và đưa con trỏ vào đúng ô (xem proQuickGo_).
+// SĐT chỉ giữ chữ số (và "+" đầu) → không chèn được ký tự lạ vào href. Không có chữ số nào → không vẽ thanh (tránh nút gọi vào hư không).
+function proQuickPhone_(phone){ var p = String(phone==null?'':phone).trim(), plus = p.charAt(0)==='+', d = p.replace(/\D/g,''); return d ? (plus?'+':'')+d : ''; }
+function proQuickActionsHtml_(phone){
+  var p = proQuickPhone_(phone); if (!p) return '';
+  var d = p.replace(/\D/g,'');
+  return '<div class="pro-qa-bar" role="toolbar" aria-label="Thao tác nhanh">'
+    + '<a class="pro-qa" href="tel:'+p+'" data-pro-qa="call">📞 Gọi</a>'
+    + '<a class="pro-qa" href="https://zalo.me/'+d+'" target="_blank" rel="noopener" data-pro-qa="zalo">💬 Zalo</a>'
+    + '<button type="button" class="pro-qa" data-pro-qa="note">📝 Ghi chú</button>'
+    + '<button type="button" class="pro-qa" data-pro-qa="sched">📅 Đặt lịch</button>'
+    + '<button type="button" class="pro-qa" data-pro-qa="order">🛒 Tạo đơn</button></div>';
+}
+// Chỉ số tab trong #dp .dp-tab (khớp _order trong renderDpTab): care 0 · schedule 1 · history 2
+function proQuickGo_(kind){
+  var tabs = document.querySelectorAll('#dp .dp-tab'), go = function(i, key){ if (tabs[i] && typeof switchDpTab==='function') switchDpTab(key, tabs[i]); };
+  if (kind==='note'){ go(0,'care'); var n = document.getElementById('cs-note-new'); if (n){ n.focus(); if (n.scrollIntoView) n.scrollIntoView({ block:'center' }); } }
+  else if (kind==='sched'){ go(1,'schedule'); var t = document.getElementById('new-snote'); if (t) t.focus(); }
+  else if (kind==='order'){ go(2,'history'); var f = document.getElementById('add-order-form');
+    if (f && f.style.display==='none' && typeof _toggleAddOrderForm==='function') _toggleAddOrderForm();   // đã mở rồi thì KHÔNG bật/tắt lại (hàm gốc là toggle)
+    var pr = document.getElementById('mo-product'); if (pr){ pr.focus(); if (pr.scrollIntoView) pr.scrollIntoView({ block:'center' }); } }
+}
 // Gom dữ liệu 1 khách (dùng cho hồ sơ 360° và trợ lý AI): care, số đơn (ưu tiên Pos), đơn, ghi chú, lịch hẹn của khách, loại lịch
 function proProfileData_(c){
   var care = careData[c.phone] || {};
@@ -130,17 +153,20 @@ function proRenderProfile_(){
   var D = proProfileData_(c), care = D.care, nOrd = D.nOrd, types = D.types, mine = D.mine;
   var wasOpen = !!(host.querySelector('details.pro-tl-d') && host.querySelector('details.pro-tl-d').open);
   var tl = proTimeline_(D.notes, mine, D.orders, 30), tlTotal = D.notes.length + mine.length + D.orders.length;
-  host.innerHTML = proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
+  host.innerHTML = proQuickActionsHtml_(c.phone)
+                 + proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
                  + proKpiHtml_(proDaysSinceLastOrder_(c.orders, new Date()), nOrd, _custRev_(c))
                  + proFactsHtml_(c.orders, care.custom||c.custom, new Date(), (typeof _hmCfg==='function'?_hmCfg().cycle:30))
                  + proNextHtml_(proNextActions_(mine, c.phone, _ymd(new Date()), types, 3))
                  + proTimelineHtml_(tl, tlTotal);
   var det = host.querySelector('details.pro-tl-d'); if (det && wasOpen) det.open = true;
-  host.onclick = function(e){ var g = e.target.closest && e.target.closest('[data-pro-go]'); if (!g) return;
+  host.onclick = function(e){
+    var q = e.target.closest && e.target.closest('button[data-pro-qa]'); if (q){ proQuickGo_(q.getAttribute('data-pro-qa')); return; }   // R5b (Gọi/Zalo là thẻ <a> → trình duyệt tự xử lý)
+    var g = e.target.closest && e.target.closest('[data-pro-go]'); if (!g) return;
     var tabEl = document.querySelectorAll('#dp .dp-tab')[1]; if (tabEl && typeof switchDpTab==='function') switchDpTab('schedule', tabEl); };
 }
 (function(){
   if (typeof openDp==='function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
   if (typeof renderDpTab==='function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
 })();
-if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_ };
+if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proQuickPhone_, proQuickActionsHtml_ };
