@@ -40,6 +40,16 @@ function splitBannerHtml_(d, st){
   var trunc = d.truncated ? '<div class="split-msg split-err">Chỉ hiện '+splitNum_((d.items||[]).length)+' đơn mới nhất — thu hẹp khoảng ngày để xem đủ.</div>' : '';
   return head + tiles + note + trunc + splitDetailHtml_(d.items||[], 200, !!d.all);
 }
+// R7d-2: khung cảnh báo + chip đối chiếu Base. Có ui-kit (js/68) → màu theo token (tự đổi theo giao diện tối/sáng) + uiChip_; thiếu → màu cứng y như cũ.
+function splitWarnBox_(w, mb){
+  var kit = typeof uiChip_==='function';
+  return kit ? '<div style="background:var(--ui-warning-soft);border:1px solid var(--ui-warning-line);color:var(--ui-warning);border-radius:8px;padding:8px 12px;margin-bottom:'+mb+'px;font-size:12px">⚠ '+splitEsc_(w)+'</div>'
+             : '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:'+mb+'px;font-size:12px">⚠ '+splitEsc_(w)+'</div>';
+}
+function splitCheckCell_(c){   // c = nhãn splitCheckLabel_ (LỆCH… / Khớp… / không có đơn Base…)
+  if (typeof uiChip_==='function') return '<td>'+(c ? uiChip_(c, { tone: /^LỆCH/.test(c)?'danger':/^Khớp/.test(c)?'success':'neutral', dot: true }) : '')+'</td>';
+  return '<td style="font-weight:700;color:'+(/^LỆCH/.test(c)?'var(--red)':/^Khớp/.test(c)?'var(--green,#15803d)':'var(--muted)')+'">'+splitEsc_(c)+'</td>';
+}
 function splitDetailHtml_(items, max, all){
   if (!items.length) return '<div class="split-msg">Không có đơn chia nào trong kỳ này.</div>';
   var rows = items.slice(0,max).map(function(it){
@@ -64,7 +74,7 @@ function splitReportHtml_(d, search, selSale){
     ['green','Doanh thu từ đơn chia', splitMoney_(t.splitRevenue), splitPct_(t.splitPctRevenue)+' doanh thu'],
     ['orange','TB đơn chia', splitMoney_(t.splitAov), 'phần chia / đơn chia']]);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Đơn chia = đơn có từ 2 sale trở lên cùng chia (thẻ sale nhiều tên / ghép Base / file kế toán / quầy 30-70). Kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)+(d.scope==='scoped'?' · phạm vi của bạn':'')+'. Doanh thu từ đơn chia = tổng phần mỗi sale được chia.</div>';
-  (d.warnings||[]).forEach(function(w){ h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px">⚠ '+splitEsc_(w)+'</div>'; });
+  (d.warnings||[]).forEach(function(w){ h += splitWarnBox_(w, 10); });
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th><th class="r">Tổng đơn</th><th class="r">Doanh thu</th><th class="r">TB/đơn</th><th class="r">Số đơn chia</th><th class="r">Doanh thu từ đơn chia</th><th class="r">TB/đơn chia</th><th class="r">% doanh thu từ đơn chia</th><th>Chi tiết đối soát</th></tr></thead><tbody>';
   rows.forEach(function(r){ var on = selSale && String(selSale)===String(r.name); h += '<tr data-m-sale="'+splitEsc_(r.name)+'" style="cursor:pointer'+(on?';background:var(--pro-soft,#f3e8ff)':'')+'" title="Bấm để xem chi tiết các đơn chia của sale này"><td><b>'+splitEsc_(r.name)+'</b></td><td class="r">'+splitNum_(r.orders)+'</td><td class="r">'+splitMoney_(r.revenue)+'</td><td class="r">'+splitMoney_(r.aov)+'</td><td class="r">'+splitNum_(r.splitOrders)+'</td><td class="r"><b>'+splitMoney_(r.splitRevenue)+'</b></td><td class="r">'+splitMoney_(r.splitAov)+'</td><td class="r">'+splitPct_(r.splitPct)+'</td><td style="white-space:nowrap"><button type="button" class="btn sm" data-m-view="base">Base</button> <button type="button" class="btn sm" data-m-view="pos">Pos</button></td></tr>'; });
   if (!rows.length) h += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:16px">Không có dữ liệu trong khoảng ngày này</td></tr>';
@@ -105,7 +115,7 @@ function splitDetailPanelHtml_(m){
   if (m.loading) return h+'<div style="color:var(--muted);padding:20px;text-align:center">Đang tải chi tiết…</div></div>';
   if (m.error) return h+'<div style="color:var(--red);padding:12px">⚠ '+splitEsc_(m.error)+'</div></div>';
   var d = m.data||{}, sm = d.summary||{}, rows = splitDetRows_(d, m.tab, m.onlyLech), head = m.tab==='base'?SPLIT_DET_BASE_HEAD:SPLIT_DET_POS_HEAD;
-  (d.warnings||[]).forEach(function(w){ h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">⚠ '+splitEsc_(w)+'</div>'; });
+  (d.warnings||[]).forEach(function(w){ h += splitWarnBox_(w, 8); });
   h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)+' · '
     + (m.tab==='base' ? '<b>'+splitNum_(sm.baseOrders)+'</b> đơn gốc Base · tổng '+splitMoney_(sm.baseTotal)+' · phần của sale <b>'+splitMoney_(sm.baseShare)+'</b>'
                       : '<b>'+splitNum_(sm.posOrders)+'</b> đơn Pos chia · tổng '+splitMoney_(sm.posTotal)+' · phần của sale <b>'+splitMoney_(sm.posShare)+'</b>')+'</div>';
@@ -116,7 +126,7 @@ function splitDetailPanelHtml_(m){
     h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+head.map(function(t,i){ return '<th'+(money[i]?' class="r"':'')+'>'+splitEsc_(t)+'</th>'; }).join('')+'</tr></thead><tbody>';
     rows.forEach(function(r){ h += '<tr>'+r.map(function(c,i){
       if (money[i]) return '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>';
-      if (m.tab==='pos' && i===10) return '<td style="font-weight:700;color:'+(/^LỆCH/.test(c)?'var(--red)':/^Khớp/.test(c)?'var(--green,#15803d)':'var(--muted)')+'">'+splitEsc_(c)+'</td>';
+      if (m.tab==='pos' && i===10) return splitCheckCell_(c);
       if (m.tab==='pos' && (i===12||i===13) && c) return '<td style="color:var(--red);font-weight:600">'+splitEsc_(c)+'</td>';
       if (m.tab==='pos' && i===15) return '<td>'+(r.fbKey ? '<input type="text" class="split-fb" data-fb-key="'+splitEsc_(r.fbKey)+'" value="'+splitEsc_(c)+'" maxlength="500" placeholder="Sale phản hồi…" style="min-width:220px;width:100%">' : splitEsc_(c))+'</td>';
       if (m.tab==='base' && i===9) return '<td style="color:'+(/^Tham chiếu/.test(c)?'var(--muted)':'inherit')+'">'+splitEsc_(c)+'</td>';
