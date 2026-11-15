@@ -1,6 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-14 (phiên Claude — thiết kế lại màn Viết tắt Android) — XONG 1.21; CHỜ Duyên cài APK xem thực tế
+- [x] `MainActivity.kt`: thẻ trạng thái trên cùng (tự đọc Trợ năng bật/tắt), menu ⋮ (Cập nhật CRM/Xuất/Nhập/Kiểm tra), ô tìm bo tròn, thẻ mục có nhãn ☁ CRM + xem trước + số hình/ghi âm, trạng thái trống, nút "+ Thêm viết tắt". `DiagCard` → `DiagDialog`. Logic Store/Crm/FolderTree/SnippetDialog KHÔNG đổi. CI Build Android xanh.
+- [ ] VIỆC KẾ TIẾP: Duyên cài APK 1.21 (Release `viettat-latest`), chụp màn hình góp ý chỉnh màu/khoảng cách. Chưa làm: tab CRM (WebView) và hộp sửa mục (SnippetDialog) giữ giao diện cũ.
+
 ## 2026-11-14 (phiên Claude — Pancake AI: GÕ TẮT mặc định TẮT + nút bật/tắt, rồi TRÌNH BÀY LẠI panel) — ĐANG LÀM, mỗi bước 1 push
 
 **Yêu cầu Duyên:** Pancake AI có nút bật/tắt gõ tắt, ai muốn bật mới bật; và trình bày lại panel Pancake AI cho thông minh, khoa học, đẹp hơn (bản hiện tại bị chê "chán").
