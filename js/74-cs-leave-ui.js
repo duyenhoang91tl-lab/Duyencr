@@ -43,12 +43,12 @@ function clPreview_(){
   if (msg){ box.innerHTML = '<span class="cl-warn">' + clEsc_(msg) + '</span>'; return; }
   var leaves = (typeof _csLeaves !== 'undefined' && _csLeaves) ? _csLeaves : [];
   var day = l.from > today ? l.from : today;   // người nhận phải đi làm vào ngày bắt đầu nghỉ (hoặc hôm nay nếu đã bắt đầu)
-  var p = clPlan_(l, schedules, careData, typeof _schedResponsibleCS === 'function' ? _schedResponsibleCS : function(){ return ''; }, teams, leaves.concat([l]), day, clLoad_());
-  var skipped = Object.keys(p.skipped).map(function(k){ return p.skipped[k] + ' lịch ' + k; }).join(', ');
+  var p = clPlanFor_(l, day);
+  var skipped = '';
   if (p.noTarget){ box.innerHTML = '<span class="cl-warn">' + (l.mode === 'to' ? 'Chọn người nhận (không trùng người nghỉ, không phải người đang nghỉ).' : 'Không có CS cùng team đang đi làm để chia đều — chọn "Chuyển cho người khác".') + '</span>'; return; }
-  if (!p.rows.length){ box.innerHTML = 'Không có khách nào cần giao (' + clEsc_(l.name) + ' không còn lịch chưa xong).' + (skipped ? '<div class="cl-sub">Bỏ qua: ' + clEsc_(skipped) + '</div>' : ''); return; }
+  if (!p.rows.length){ box.innerHTML = 'Không có khách nào cần giao (' + clEsc_(l.name) + ' không đang chăm sóc khách nào).' + (skipped ? '<div class="cl-sub">Bỏ qua: ' + clEsc_(skipped) + '</div>' : ''); return; }
   var by = {}; p.rows.forEach(function(r){ by[r.to] = (by[r.to] || 0) + 1; });
-  box.innerHTML = '<b>' + p.rows.length + '</b> khách của <b>' + clEsc_(l.name) + '</b> sẽ giao: ' + Object.keys(by).map(function(n){ return clEsc_(n) + ' <b>' + by[n] + '</b>'; }).join(' · ') +
+  box.innerHTML = '<b>' + p.rows.length + '</b> khách (toàn bộ khách đang chăm sóc) của <b>' + clEsc_(l.name) + '</b> sẽ giao: ' + Object.keys(by).map(function(n){ return clEsc_(n) + ' <b>' + by[n] + '</b>'; }).join(' · ') +
     (skipped ? '<div class="cl-sub">Bỏ qua: ' + clEsc_(skipped) + '</div>' : '') + '<div class="cl-sub">' + (l.to ? 'Nghỉ ' + clEsc_(l.from) + ' → ' + clEsc_(l.to) : 'Tạm nghỉ từ ' + clEsc_(l.from) + ', chưa biết ngày về (trả lại khi đi làm).') + '</div>';
 }
 function clOpen(){
@@ -72,6 +72,13 @@ function clOpen(){
   });
   clPreview_();
 }
+// Ai được duyệt/giao ngay: admin; leader/manager với CS trong phạm vi team của mình. CS thường chỉ GỬI YÊU CẦU (chờ duyệt).
+function clCanApprove_(name){
+  var r = currentUser && currentUser.role;
+  if (!currentUser || r === 'admin') return true;
+  if (r !== 'leader' && r !== 'manager') return false;
+  return clAllowedNames_(currentUser, teams, accounts).map(function(n){ return n.toLowerCase(); }).indexOf(String(name).toLowerCase()) !== -1;
+}
 function clSave_(ov){
   var l = clReadForm_(), today = scYmd_(new Date());
   if (!l.name || !l.from){ scToast_('Chọn nhân viên và "Từ ngày".'); return; }
@@ -81,7 +88,8 @@ function clSave_(ov){
   if (l.mode === 'to' && !l.target){ scToast_('Chọn người nhận.'); return; }
   var day = l.from > today ? l.from : today, p = clPlanFor_(l, day);
   if (p.noTarget){ scToast_(l.mode === 'to' ? 'Người nhận không hợp lệ (trùng người nghỉ hoặc đang nghỉ).' : 'Không có CS cùng team đang đi làm để chia đều.'); return; }
-  var future = l.from > today;
+  var future = l.from > today, canApprove = clCanApprove_(l.name);
+  if (!canApprove){ if (!confirm('Gửi yêu cầu nghỉ của ' + l.name + ' từ ' + l.from + (l.to ? ' đến ' + l.to : '') + '? Admin/trưởng nhóm duyệt xong mới giao ' + p.rows.length + ' khách.')) return; l.pending = true; _csLeaves.push(l); clSaveLeaves_(); ov.remove(); if (typeof renderOverdueTab === 'function') renderOverdueTab(); scToast_('✓ Đã gửi yêu cầu nghỉ — chờ admin/trưởng nhóm duyệt'); return; }
   if (!confirm(future ? 'Lưu kỳ nghỉ của ' + l.name + ' từ ' + l.from + '? Đến ngày đó hệ thống sẽ tự giao khách.' : 'Giao ' + p.rows.length + ' khách của ' + l.name + ' ngay bây giờ?')) return;
   _csLeaves.push(l);
   var msg = '✓ Đã lưu kỳ nghỉ';
@@ -93,16 +101,32 @@ function clSave_(ov){
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
   scToast_(msg + (future ? ' (tự giao khi tới ' + l.from + ')' : ''));
 }
-function clReturn_(id){
+async function clReturn_(id){
   var l = (_csLeaves || []).filter(function(x){ return x.id === id; })[0]; if (!l) return;
-  var pending = !l.applied, p = clReturnPlan_(l, careData);
-  var msg = pending ? 'Huỷ kỳ nghỉ hẹn của ' + l.name + '? (chưa giao khách nào)' : 'Trả lại ' + p.rows.length + ' khách cho ' + l.name + '?' + (p.skipped ? '\n(' + p.skipped + ' khách đã được đổi CS sau đó → giữ nguyên, không đè)' : '');
+  var pending = !l.applied;
+  if (!pending && !(await clLoadHanded_(l))){ scToast_('Chưa nạp được danh sách khách đã giao (kiểm tra mạng rồi thử lại).'); return; }
+  var p = clReturnPlan_(l, careData);
+  var msg = l.pending ? 'Huỷ/từ chối yêu cầu nghỉ của ' + l.name + '? (chưa giao khách nào)' : pending ? 'Huỷ kỳ nghỉ hẹn của ' + l.name + '? (chưa giao khách nào)' : 'Trả lại ' + p.rows.length + ' khách cho ' + l.name + '?' + (p.skipped ? '\n(' + p.skipped + ' khách đã được đổi CS sau đó → giữ nguyên, không đè)' : '');
   if (!confirm(msg)) return;
   var r = clReturnLeave_(l);
   try { if (typeof updateSchedBadges === 'function') updateSchedBadges(); } catch (e) {}
   if (typeof renderOverdueTab === 'function') renderOverdueTab();
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
-  scToast_(pending ? '✓ Đã huỷ kỳ nghỉ hẹn' : '✓ Đã trả lại ' + r.rows.length + ' khách cho ' + l.name + (r.skipped ? ' · giữ nguyên ' + r.skipped : ''));
+  scToast_(pending ? '✓ Đã huỷ kỳ nghỉ' : '✓ Đã trả lại ' + r.rows.length + ' khách cho ' + l.name + (r.skipped ? ' · giữ nguyên ' + r.skipped : ''));
+}
+function clApprove_(id){
+  var l = (_csLeaves || []).filter(function(x){ return x.id === id; })[0]; if (!l || !l.pending || !clCanApprove_(l.name)) return;
+  var today = scYmd_(new Date()), day = l.from > today ? l.from : today, p = clPlanFor_(l, day);
+  if (p.noTarget){ scToast_('Không giao được (người nhận không hợp lệ / không có CS cùng team đi làm) — từ chối hoặc bảo nhân viên đặt lại.'); return; }
+  if (!confirm('Duyệt kỳ nghỉ của ' + l.name + (l.from > today ? ' (tự giao khi tới ' + l.from + ')?' : ' và giao ' + p.rows.length + ' khách ngay?'))) return;
+  l.pending = false; l.approvedBy = (currentUser && currentUser.name) || '';
+  var msg = '✓ Đã duyệt kỳ nghỉ';
+  if (l.from <= today){ var r = clApplyLeave_(l, today); msg = '✓ Đã duyệt + giao ' + r.n + ' khách của ' + l.name; }
+  clSaveLeaves_();
+  try { if (typeof updateSchedBadges === 'function') updateSchedBadges(); } catch (e) {}
+  if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  if (typeof renderScheduleTab === 'function') renderScheduleTab();
+  scToast_(msg);
 }
 function clDecorate_(){
   var grid = document.getElementById('overdue-grid'); if (!grid) return;
@@ -112,8 +136,11 @@ function clDecorate_(){
   var fd = function(y){ return y ? y.split('-').reverse().slice(0, 2).join('/') : ''; };
   var list = (typeof _csLeaves !== 'undefined' ? _csLeaves : []).filter(function(l){ return !l.ended && (isAdmin || allowed.indexOf(String(l.name).toLowerCase()) !== -1); }).map(function(l){
     var st = clStatus_(l, today), n = (l.handed || []).length;
-    var txt = clEsc_(l.name) + ' · ' + fd(l.from) + (l.to ? '→' + fd(l.to) : ' (tạm nghỉ)') + (st === 'hen' ? ' · hẹn, chưa giao' : ' · đã giao ' + n + ' khách') + (st === 'het' ? ' · ĐÃ HẾT HẠN NGHỈ' : '');
-    return '<span class="cl-chip' + (st === 'het' ? ' cl-chip-due' : '') + '">' + txt + ' <button type="button" class="cl-chip-b" data-cl="return" data-id="' + clEsc_(l.id) + '">' + (st === 'hen' ? 'Huỷ hẹn' : 'Trả lại') + '</button></span>';
+    n = l.hn || n;
+    var txt = clEsc_(l.name) + ' · ' + fd(l.from) + (l.to ? '→' + fd(l.to) : ' (tạm nghỉ)') + (st === 'cho' ? ' · CHỜ DUYỆT' : st === 'hen' ? ' · hẹn, chưa giao' : ' · đã giao ' + n + ' khách') + (st === 'het' ? ' · ĐÃ HẾT HẠN NGHỈ' : '');
+    var id = clEsc_(l.id), b = function(k, t){ return ' <button type="button" class="cl-chip-b" data-cl="' + k + '" data-id="' + id + '">' + t + '</button>'; };
+    var btns = st === 'cho' ? (clCanApprove_(l.name) ? b('approve', 'Duyệt') + b('return', 'Từ chối') : b('return', 'Huỷ yêu cầu')) : b('return', st === 'hen' ? 'Huỷ hẹn' : 'Trả lại');
+    return '<span class="cl-chip' + (st === 'het' || st === 'cho' ? ' cl-chip-due' : '') + '">' + txt + btns + '</span>';
   }).join('');
   bar.innerHTML = (list ? '<div class="cl-list">' + list + '</div>' : '') + '<button type="button" class="btn sm" data-cl="open">🏖 Nghỉ phép / giao lại khách</button>';
   bar.addEventListener('click', function(e){
@@ -121,6 +148,7 @@ function clDecorate_(){
     e.stopPropagation();
     if (t.getAttribute('data-cl') === 'open'){ clOpen(); return; }
     if (t.getAttribute('data-cl') === 'return') clReturn_(t.getAttribute('data-id'));
+    if (t.getAttribute('data-cl') === 'approve') clApprove_(t.getAttribute('data-id'));
   });
   grid.insertBefore(bar, grid.firstChild);
 }

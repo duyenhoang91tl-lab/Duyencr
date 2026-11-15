@@ -4,6 +4,7 @@
 //  (action CÓ SẴN → KHÔNG đổi GAS); (b) giao khách bằng CHÍNH `_applyCareCSToAssigned` của js/07 (đổi careData.cs + careCS + OrderData cột N theo lô
 //  + queueCareSync + làm mới bộ lọc) — không viết lại đường ghi; (c) kỳ nghỉ bắt đầu ở TƯƠNG LAI → lưu "hẹn", tự áp dụng khi tới ngày (clApplyDue_,
 //  chạy mỗi lần vẽ màn Quá hạn + sau khi nạp từ GAS). Mỗi kỳ nghỉ chỉ áp dụng 1 lần (`applied`). Lưu `handed` [{phone,from,to,prevCs,newCs}] để bước 4 "Trả lại".
+//  GIAO HẾT khách (không chỉ khách có lịch) — Duyên chốt 15/11. CS thường đặt nghỉ = "chờ duyệt" (pending), admin/leader duyệt mới giao.
 //  Hàm thuần: clGroupRows_, clMergeLeaves_, clDue_ (test: node tools/test-cs-leave-store.js)
 // ════════════════════════════════════════════════════════════════════
 var _csLeaves = (typeof loadLS === 'function' ? loadLS('ome_cs_leave') : null) || [];
@@ -24,18 +25,21 @@ function clMergeLeaves_(local, remote){
     var m = Object.assign({}, r);
     if (l.applied && !r.applied){ m.applied = true; m.handed = l.handed; }
     if (l.ended && !r.ended){ m.ended = true; }
+    if (l.handed && l.handed.length && !(m.handed && m.handed.length)) m.handed = l.handed;   // GAS chỉ giữ bản rút gọn (handed nằm ở khoá csLeaveH_*) → giữ danh sách đầy đủ ở máy này
+    if (l.pending === false && r.pending){ m.pending = false; m.approvedBy = l.approvedBy; }   // đã duyệt ở máy này mà GAS chưa kịp có
     by[r.id] = m;
   });
   return order.map(function(id){ return by[id]; });
 }
 // Kỳ nghỉ nào đến hạn áp dụng (đã tới ngày bắt đầu, chưa kết thúc, chưa áp dụng)
 function clDue_(leaves, today){
-  return (leaves || []).filter(function(l){ return !l.ended && !l.applied && l.from && l.from <= today && (!l.to || today <= l.to); });
+  return (leaves || []).filter(function(l){ return !l.ended && !l.pending && !l.applied && l.from && l.from <= today && (!l.to || today <= l.to); });
 }
 
-// Trạng thái kỳ nghỉ: 'xong' (đã trả lại/huỷ) | 'hen' (chưa tới ngày, chưa giao) | 'het' (qua ngày "đến" mà chưa trả lại → gợi ý Trả lại) | 'dang' (đang nghỉ)
+// Trạng thái kỳ nghỉ: 'cho' (CS đặt, chờ admin/leader duyệt) | 'xong' (đã trả lại/huỷ/từ chối) | 'hen' (chưa tới ngày, chưa giao) | 'het' (qua ngày "đến" mà chưa trả lại → gợi ý Trả lại) | 'dang' (đang nghỉ)
 function clStatus_(l, today){
   if (l.ended) return 'xong';
+  if (l.pending) return 'cho';
   if (!l.applied && l.from > today) return 'hen';
   if (l.to && l.to < today) return 'het';
   return 'dang';
@@ -57,14 +61,46 @@ function clReturnLeave_(l){
   clSaveLeaves_();
   return p;
 }
+// Lưu danh sách khách đã giao (handed) gọn: dòng "csCũ<TAB>csMới<TAB>sđt,sđt,…" — gom theo cặp CS để ngắn; cắt khúc ≤40.000 ký tự/khoá vì 1 ô GSheets tối đa 50.000.
+function clPackHanded_(handed){
+  var g = {}, order = [];
+  (handed || []).forEach(function(h){ var k = (h.prevCs || '') + '\t' + (h.newCs || ''); if (!g[k]){ g[k] = []; order.push(k); } g[k].push(h.phone); });
+  return order.map(function(k){ return k + '\t' + g[k].join(','); }).join('\n');
+}
+function clUnpackHanded_(str){
+  var out = [];
+  String(str || '').split('\n').forEach(function(line){
+    var a = line.split('\t'); if (a.length < 3) return;
+    a[2].split(',').forEach(function(p){ if (p) out.push({ phone: p, prevCs: a[0], newCs: a[1] }); });
+  });
+  return out;
+}
+function clChunk_(str, size){ var out = []; for (var i = 0; i < str.length; i += size) out.push(str.slice(i, i + size)); return out.length ? out : ['']; }
+async function clSaveHanded_(l){
+  if (typeof gsUrl === 'undefined' || !gsUrl) return;
+  var ch = clChunk_(clPackHanded_(l.handed), 40000); l.hk = ch.length;
+  try { for (var i = 0; i < ch.length; i++) await fetch(gsUrl, { method: 'POST', body: JSON.stringify({ action: 'setSetting', key: 'csLeaveH_' + l.id + '_' + i, value: ch[i] }) }); clSaveLeaves_(); }
+  catch (e) { if (typeof toast === 'function') toast('❌ Lưu danh sách khách đã giao lên GSheets lỗi: ' + e.message); }
+}
+// Máy khác (hoặc sau khi xoá cache) chỉ có bản rút gọn → nạp lại handed từ GAS trước khi Trả lại. Trả true nếu có danh sách đầy đủ.
+async function clLoadHanded_(l){
+  if (l.handed && l.handed.length >= (l.hn || 0)) return true;
+  if (typeof gsUrl === 'undefined' || !gsUrl || !l.hk) return !!(l.handed && l.handed.length);
+  try {
+    var str = '';
+    for (var i = 0; i < l.hk; i++){ var r = await fetch(gsUrl + '?action=getSetting&key=csLeaveH_' + encodeURIComponent(l.id) + '_' + i, { redirect: 'follow' }), d = await r.json(); str += (d && d.value) || ''; }
+    l.handed = clUnpackHanded_(str); return l.handed.length > 0;
+  } catch (e) { return false; }
+}
 function clPlanFor_(l, today, extraLeaves){
   var all = (_csLeaves || []).filter(function(x){ return x.id !== l.id; }).concat(extraLeaves || [], [l]);
-  return clPlan_(l, schedules, careData, typeof _schedResponsibleCS === 'function' ? _schedResponsibleCS : function(){ return ''; }, teams, all, today, typeof clLoad_ === 'function' ? clLoad_() : null);
+  return clPlan_(l, schedules, careData, typeof _schedResponsibleCS === 'function' ? _schedResponsibleCS : function(){ return ''; }, teams, all, today, typeof clLoad_ === 'function' ? clLoad_() : null, typeof allCustomers !== 'undefined' ? allCustomers : []);
 }
 async function clSaveLeaves_(){
   try { saveLS('ome_cs_leave', _csLeaves); } catch (e) {}
   if (typeof gsUrl === 'undefined' || !gsUrl) return;
-  try { await fetch(gsUrl, { method: 'POST', body: JSON.stringify({ action: 'setSetting', key: 'csLeave', value: JSON.stringify(_csLeaves) }) }); }
+  var slim = _csLeaves.map(function(l){ var o = Object.assign({}, l); delete o.handed; return o; });   // handed (có thể hàng nghìn SĐT) để riêng ở csLeaveH_*, tránh vượt 50.000 ký tự/ô
+  try { await fetch(gsUrl, { method: 'POST', body: JSON.stringify({ action: 'setSetting', key: 'csLeave', value: JSON.stringify(slim) }) }); }
   catch (e) { if (typeof toast === 'function') toast('❌ Lưu kỳ nghỉ lên GSheets lỗi: ' + e.message); }
 }
 async function clSyncFromGAS_(){
@@ -79,8 +115,9 @@ async function clSyncFromGAS_(){
 function clApplyLeave_(l, today){
   var p = clPlanFor_(l, today);
   if (p.noTarget) return { ok: false, n: 0, noTarget: true };
-  l.applied = true; l.appliedAt = new Date().toISOString(); l.handed = p.rows.map(function(r){ return { phone: r.phone, from: r.from, to: r.to, prevCs: r.prevCs, newCs: r.newCs }; });
+  l.applied = true; l.appliedAt = new Date().toISOString(); l.handed = p.rows.map(function(r){ return { phone: r.phone, from: r.from, to: r.to, prevCs: r.prevCs, newCs: r.newCs }; }); l.hn = l.handed.length;
   if (p.rows.length && typeof _applyCareCSToAssigned === 'function') _applyCareCSToAssigned(clGroupRows_(p.rows));
+  clSaveHanded_(l);   // không chờ (nền)
   try { if (typeof logAudit === 'function') logAudit('cs_leave', '', l.name, 'Nghỉ ' + l.from + (l.to ? ' → ' + l.to : ' (tạm nghỉ)') + ': giao ' + p.rows.length + ' khách (' + (l.mode === 'to' ? 'chuyển cho ' + l.target : 'chia đều') + ')'); } catch (e) {}
   return { ok: true, n: p.rows.length };
 }
@@ -92,4 +129,4 @@ function clApplyDue_(){
   return n;
 }
 if (typeof window !== 'undefined') setTimeout(clSyncFromGAS_, 0);   // nạp kỳ nghỉ từ GAS khi mở CRM (giống _sync*FromGAS ở js/06)
-if (typeof module !== 'undefined' && module.exports){ module.exports = { clStatus_: clStatus_, clReturnPlan_: clReturnPlan_, clGroupRows_: clGroupRows_, clMergeLeaves_: clMergeLeaves_, clDue_: clDue_ }; }
+if (typeof module !== 'undefined' && module.exports){ module.exports = { clPackHanded_: clPackHanded_, clUnpackHanded_: clUnpackHanded_, clChunk_: clChunk_, clStatus_: clStatus_, clReturnPlan_: clReturnPlan_, clGroupRows_: clGroupRows_, clMergeLeaves_: clMergeLeaves_, clDue_: clDue_ }; }

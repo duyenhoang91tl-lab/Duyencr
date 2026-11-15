@@ -39,11 +39,13 @@ const sch = [S({ id: '1', phone: '0911' }), S({ id: '2', phone: '0911', type: 'c
   S({ id: '5', phone: '0944', done: true }), S({ id: '6', phone: '0944', autoDao: true }), S({ id: '7', phone: '0944', type: 'birthday' })];
 const resp = it => (care[it.phone] || {}).cs || '';
 let p = m.clPlan_(L({ mode: 'to', target: 'Vy' }), sch, care, resp, teams, [L({ mode: 'to', target: 'Vy' })], '2026-11-16');
-ok(p.rows.map(r => r.phone).join() === '0911,0922', 'chỉ khách có lịch CHƯA xong của người nghỉ; khách có 2 lịch chỉ tính 1 lần; khách của người khác không đụng');
+ok(p.rows.map(r => r.phone).join() === '0911,0922,0944', 'GIAO HẾT khách đang chăm sóc của người nghỉ (kể cả khách chỉ có lịch đã xong); mỗi khách 1 lần; khách của người khác không đụng');
 ok(p.rows[1].newCs === 'Vy, Thúy' && p.rows[1].prevCs === 'Oanh, Thúy', 'CS gộp: thay đúng phần người nghỉ + lưu CS cũ để trả lại');
-ok(p.skipped['lịch tự động'] === 1 && p.skipped['sinh nhật'] === 1, 'lịch tự động + sinh nhật bị bỏ qua và báo rõ');
+ok(Object.keys(p.skipped).length === 0, 'không còn bỏ qua khách nào (lịch tự động/sinh nhật không loại khách)');
+const p2 = m.clPlan_(L({ mode: 'to', target: 'Vy' }), [S({ id: 'z', phone: '0999' })], {}, it => 'Oanh', teams, [], '2026-11-16', null, [{ phone: '0955', careCS: 'Oanh' }, { phone: '0956', careCS: 'Thúy' }]);
+ok(p2.rows.map(r => r.phone).join() === '0955,0999' && p2.rows[0].prevCs === 'Oanh', 'khách chưa có dòng careData (chỉ có careCS / chỉ có lịch) cũng được giao, lưu CS cũ');
 p = m.clPlan_(L(), sch, care, resp, teams, [L()], '2026-11-16');
-ok(p.rows.length === 2 && p.rows.every(r => ['Hà', 'Mai', 'Thúy'].includes(r.to)), 'chia đều: chỉ cho CS cùng team');
+ok(p.rows.length === 3 && p.rows.every(r => ['Hà', 'Mai', 'Thúy'].includes(r.to)), 'chia đều: chỉ cho CS cùng team');
 p = m.clPlan_(L({ mode: 'to', target: 'Oanh' }), sch, care, resp, teams, [], '2026-11-16'); ok(p.noTarget && !p.rows.length, 'chuyển cho chính người nghỉ → không giao');
 p = m.clPlan_(L({ mode: 'to', target: 'Vy' }), sch, care, resp, teams, [L({ id: 'x', name: 'Vy' })], '2026-11-16'); ok(p.noTarget, 'chuyển cho người cũng đang nghỉ → không giao');
 p = m.clPlan_(L({ name: 'Không team' }), sch, care, resp, teams, [], '2026-11-16'); ok(p.noTarget, 'chia đều mà không có team → báo thiếu người nhận');

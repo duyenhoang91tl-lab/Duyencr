@@ -51,4 +51,14 @@ ok(m.clReturnPlan_({}, {}).rows.length === 0, 'chưa giao gì → rỗng');
   vm.runInContext('_csLeaves = [' + JSON.stringify(L({ id: 'r2' })) + ']', sb); calls.applied.length = 0;
   vm.runInContext('clReturnLeave_(_csLeaves[0])', sb); ok(calls.applied.length === 0 && vm.runInContext('_csLeaves[0].ended', sb) === true, 'huỷ kỳ nghỉ hẹn (chưa giao): chỉ đánh dấu ended, không đụng khách');
 }
+// GIAO HẾT + CHỜ DUYỆT + lưu gọn handed
+ok(m.clDue_([L({ pending: true })], '2026-11-17').length === 0 && m.clStatus_(L({ pending: true }), '2026-11-17') === 'cho', 'kỳ nghỉ CS đặt còn "chờ duyệt" → chưa tới hạn giao, trạng thái cho');
+const big = []; for (let i = 0; i < 5000; i++) big.push({ phone: '09' + String(10000000 + i), prevCs: i % 2 ? 'Oanh' : 'Oanh, Thúy', newCs: i % 2 ? 'Hà' : 'Hà, Thúy' });
+const packed = m.clPackHanded_(big), back = m.clUnpackHanded_(packed);
+ok(back.length === 5000 && back.every((h, i) => h.phone === big.filter(x => x.prevCs === h.prevCs && x.newCs === h.newCs).map(x => x.phone)[back.filter((y, j) => j < i && y.prevCs === h.prevCs && y.newCs === h.newCs).length]), 'gói/mở handed: đủ 5000 khách, đúng CS cũ/mới từng khách');
+const ch = m.clChunk_(packed, 40000);
+ok(ch.every(c => c.length <= 40000) && ch.join('') === packed && ch.length >= 1, 'cắt khúc ≤40.000 ký tự/khoá (1 ô GSheets tối đa 50.000), ghép lại y hệt (' + ch.length + ' khúc cho 5000 khách)');
+ok(m.clUnpackHanded_('').length === 0 && m.clChunk_('', 10).length === 1, 'rỗng không văng lỗi');
+r = m.clMergeLeaves_([L({ applied: true, handed: [{ phone: '1' }] })], [L({ applied: true, hn: 1 })]); ok(r[0].handed.length === 1 && r[0].hn === 1, 'GAS chỉ có bản rút gọn → giữ danh sách đầy đủ của máy này');
+r = m.clMergeLeaves_([L({ pending: false, approvedBy: 'Hà' })], [L({ pending: true })]); ok(r[0].pending === false, 'đã duyệt ở máy này, GAS chưa kịp → vẫn là đã duyệt');
 console.log(bad ? `\n${bad} LỖI` : '\nTẤT CẢ ĐẠT'); process.exit(bad ? 1 : 0);

@@ -4,7 +4,7 @@
 //   (1) Admin HOẶC chính nhân viên đặt kỳ nghỉ: "từ ngày …" (chưa biết ngày về → để trống "đến ngày") hoặc "từ ngày … đến ngày …".
 //   (2) Khi có người nghỉ, chọn 1 trong 2 cách giao: "chia đều" cho CS cùng team (không gồm người đang nghỉ) hoặc "chuyển cho người khác" (1 người).
 //  Mô hình 1 kỳ nghỉ: { id, name, from:'YYYY-MM-DD', to:'YYYY-MM-DD'|'' (''=chưa biết ngày về), mode:'even'|'to', target:'Tên'|'', by, at, handed:[{phone,from,to,prevCs}], ended:false }
-//  "Khách cần giao" = khách có lịch CHƯA xong (không tính lịch tự động autoDao / sinh nhật) mà CS chịu trách nhiệm có tên người nghỉ.
+//  "Khách cần giao" = TOÀN BỘ khách đang do người nghỉ chăm sóc (Duyên chốt 15/11 — đổi từ "chỉ khách có lịch chưa xong").
 //  Giao lại = đổi đúng TÊN người nghỉ trong careData[phone].cs (CS ghi gộp "A, B" chỉ thay phần A) — lưu prevCs để "Trả lại" ở bước 4.
 //  Hàm thuần: clIsOnLeave_, clPeers_, clReplaceName_, clAssign_, clPlan_ (test: node tools/test-cs-leave.js)
 // ════════════════════════════════════════════════════════════════════
@@ -51,24 +51,25 @@ function clAssign_(phones, mode, target, peers, load){
   });
   return out;
 }
-// Kế hoạch giao lại cho 1 kỳ nghỉ. resp(it) = CS chịu trách nhiệm của lịch (ở web: _schedResponsibleCS).
-// Trả { rows:[{phone,from,to,prevCs}], noTarget:bool, peers:[...], skipped:{lý do:số lịch} }.
-function clPlan_(leave, schedules, careData, resp, teams, leaves, today, load){
+// Kế hoạch giao lại cho 1 kỳ nghỉ — GIAO HẾT khách đang chăm sóc của người nghỉ (Duyên chốt 15/11: không chỉ khách có lịch).
+// Khách của người nghỉ = (1) careData[phone].cs có tên họ, (2) customers[].careCS có tên họ (khách chưa có dòng careData), (3) khách có lịch chưa xong mà resp(it) trả tên họ.
+// resp(it) = CS chịu trách nhiệm của lịch (ở web: _schedResponsibleCS). Trả { rows:[{phone,from,to,prevCs,newCs}], noTarget, peers, skipped:{} (giữ field cũ, nay luôn rỗng) }.
+function clPlan_(leave, schedules, careData, resp, teams, leaves, today, load, customers){
   var res = { rows: [], noTarget: false, peers: [], skipped: {} };
   var nk = clKey_(leave && leave.name); if (!nk) return res;
-  var phones = [], seen = {};
-  (schedules || []).forEach(function(it){
-    if (it.done) return;
-    if (it.autoDao || it.type === 'birthday'){ var k = it.autoDao ? 'lịch tự động' : 'sinh nhật'; res.skipped[k] = (res.skipped[k] || 0) + 1; return; }
-    if (!clSplit_(resp(it)).some(function(n){ return clKey_(n) === nk; })) return;
-    if (seen[it.phone]) return; seen[it.phone] = 1; phones.push(it.phone);
-  });
+  var phones = [], seen = {}, prevMap = {};
+  function has(cs){ return clSplit_(cs).some(function(n){ return clKey_(n) === nk; }); }
+  function add(p, prev){ if (!p || seen[p]) return; seen[p] = 1; phones.push(p); prevMap[p] = prev; }
+  Object.keys(careData || {}).forEach(function(p){ var cs = (careData[p] || {}).cs; if (has(cs)) add(p, cs); });
+  (customers || []).forEach(function(c){ if (c && c.phone && has(c.careCS)) add(c.phone, ((careData || {})[c.phone] || {}).cs || c.careCS); });
+  (schedules || []).forEach(function(it){ if (it.done) return; var r = resp(it); if (has(r)) add(it.phone, ((careData || {})[it.phone] || {}).cs || r); });
+  phones.sort();
   res.peers = clPeers_(teams, leave.name, leaves, today);
   var target = leave.mode === 'to' ? String(leave.target || '').trim() : '';
   if (leave.mode === 'to' && (!target || clKey_(target) === nk || clIsOnLeave_(leaves, target, today))){ res.noTarget = true; return res; }
   if (leave.mode !== 'to' && !res.peers.length){ res.noTarget = true; return res; }
   clAssign_(phones, leave.mode === 'to' ? 'to' : 'even', target, res.peers, load).forEach(function(a){
-    var prev = ((careData || {})[a.phone] || {}).cs || '';
+    var prev = prevMap[a.phone] || '';
     res.rows.push({ phone: a.phone, from: leave.name, to: a.to, prevCs: prev, newCs: clReplaceName_(prev || leave.name, leave.name, a.to) });
   });
   return res;
