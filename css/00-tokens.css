@@ -1,0 +1,49 @@
+/* ════════════════════════════════════════════════════════════════════
+   00-tokens.css — MÃ THIẾT KẾ `--ui-*` (R1 trong HANDOFF.md "KẾ HOẠCH THIẾT KẾ LẠI TOÀN BỘ CRM")
+   MỤC ĐÍCH: 1 nơi duy nhất định nghĩa màu / chữ / bo góc / bóng / khoảng cách / lớp z-index cho giao diện mới. Mọi CSS MỚI chỉ dùng `var(--ui-*)`,
+   KHÔNG viết mã màu cứng (test: tools/test-tokens.js) → đổi 1 chỗ ở đây là cả app đổi; chế độ tối tự theo.
+   NGUYÊN TẮC AN TOÀN (R1a): file này CHỈ THÊM biến, chưa đổi bất cứ thứ gì đang hiển thị.
+   • MÀU = bí danh của biến đã có ở 01-base.css (--bg, --surface, --green…) nên TỰ ĐỔI THEO chế độ tối (10-dark.css) và theme hoàng hôn (19-theme-sunset.css).
+     Lưu ý: tên cũ `--green` thực chất là MÀU CHÍNH THƯƠNG HIỆU (theme hoàng hôn đổi nó thành hồng) → token là `--ui-brand`, KHÔNG phải "xanh lá". Màu THÀNH CÔNG
+     (xanh lá thật) là token riêng `--ui-success*` (khai báo ở đây, có bản sáng + tối).
+   • Bí danh được tính tại <html> nên 1 phần tử con tự đặt lại --green riêng sẽ không đổi theo — dùng --ui-* ở cấp thành phần, đừng đặt lại biến gốc.
+   • Thang kích thước (chữ, bo góc, khoảng cách, z-index) lấy từ giá trị ĐANG DÙNG nhiều nhất trong css/ (đã đếm 14/11/2026) để R1b đổi sang biến mà KHÔNG lệch 1 pixel.
+   ════════════════════════════════════════════════════════════════════ */
+:root{
+  /* ── Màu: nền & bề mặt ── */
+  --ui-bg:var(--bg); --ui-surface:var(--surface); --ui-surface-2:var(--surface2); --ui-surface-3:var(--surface3);
+  --ui-border:var(--border); --ui-border-md:var(--border-md); --ui-border-strong:var(--border-strong);
+  /* ── Màu: chữ ── */
+  --ui-text:var(--text); --ui-text-muted:var(--muted); --ui-text-hint:var(--hint);
+  /* ── Màu: thương hiệu (theo theme đang bật) ── */
+  --ui-brand:var(--green); --ui-brand-soft:var(--green-bg); --ui-brand-mid:var(--green-mid);
+  /* ── Màu: trạng thái ── */
+  --ui-danger:var(--red); --ui-danger-soft:var(--red-bg); --ui-danger-line:var(--red-b);
+  --ui-warning:var(--tn); --ui-warning-soft:var(--tn-bg); --ui-warning-line:var(--tn-b);
+  --ui-info:var(--tt); --ui-info-soft:var(--tt-bg); --ui-info-line:var(--tt-b);
+  --ui-link:var(--blue); --ui-link-soft:var(--blue-bg); --ui-link-line:var(--blue-b);
+  --ui-vip:var(--vip); --ui-vip-soft:var(--vip-bg); --ui-vip-line:var(--vip-b);
+  /* Thành công = xanh lá THẬT (không đổi theo theme thương hiệu). Giá trị chế độ tối nằm ở khối html[data-theme="dark"] bên dưới. */
+  --ui-success:#146245; --ui-success-soft:#e7f4ee; --ui-success-line:#1f8a5c;
+
+  /* ── Chữ ── */
+  --ui-font:var(--font);
+  --ui-fs-2xs:10px; --ui-fs-xs:11px; --ui-fs-sm:12px; --ui-fs-base:13px; --ui-fs-md:14px; --ui-fs-lg:16px; --ui-fs-xl:18px; --ui-fs-2xl:22px;
+  --ui-fw-normal:400; --ui-fw-medium:500; --ui-fw-semibold:600; --ui-fw-bold:700;
+
+  /* ── Bo góc ── */
+  --ui-r-xs:4px; --ui-r-sm:6px; --ui-r-md:8px; --ui-r-lg:10px; --ui-r-xl:12px; --ui-r-pill:999px; --ui-r-round:50%;
+
+  /* ── Bóng ── */
+  --ui-shadow-sm:var(--shadow); --ui-shadow-md:var(--shadow-md); --ui-shadow-lg:0 12px 40px rgba(0,0,0,.25);
+
+  /* ── Khoảng cách (lưới 4px) ── */
+  --ui-sp-1:4px; --ui-sp-2:8px; --ui-sp-3:12px; --ui-sp-4:16px; --ui-sp-5:20px; --ui-sp-6:24px; --ui-sp-8:32px; --ui-sp-10:40px;
+
+  /* ── Chuyển động ── */
+  --ui-ease:var(--ease); --ui-dur-fast:.15s; --ui-dur:.18s; --ui-dur-slow:.2s;
+
+  /* ── Lớp z-index (thang tham chiếu cho thành phần MỚI; giá trị lấy từ lớp đang chạy: header 200, dropdown 240, dock 320, nền mờ 400,
+        hộp thoại 500, hộp thoại chồng 700–710, thông báo 999, đăng nhập 3000) ── */
+  --ui-z-header:200; --ui-z-dropdown:240; --ui-z-dock:320; --ui-z-backdrop:400; --ui-z-modal:500; --ui-z-modal-top:710; --ui-z-toast:999; --ui-z-top:3000;
+}
