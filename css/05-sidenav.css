@@ -156,3 +156,13 @@ tr[data-drill]:hover td{background:var(--surface2,#f3f4f6)}
   body.rpt-mode #rpt-bar .btn{flex:0 0 auto;white-space:nowrap}
   #rpt-qs-input{flex:1 1 100%;order:3;margin-left:0;max-width:none;min-width:0;width:100%;text-overflow:ellipsis}
 }
+
+/* R5c (15/11/2026): hộp GỢI Ý KHÁCH dưới ô tìm chính — js/69-pro-smart-search.js (cùng kiểu #ord-search-res của mã đơn) */
+#cust-suggest{position:absolute;left:0;right:0;top:100%;z-index:700;margin-top:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow:auto;min-width:260px;}
+#cust-suggest .css-h{padding:6px 10px;font-size:var(--ui-fs-xs);color:var(--muted);border-bottom:1px solid var(--border);}
+#cust-suggest .css-i{padding:8px 10px;font-size:var(--ui-fs-sm);cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px;min-height:36px;}
+#cust-suggest .css-i:hover,#cust-suggest .css-i.on{background:var(--surface2);}
+#cust-suggest .css-i b{color:var(--text);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#cust-suggest .css-p{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
+#cust-suggest .css-s{margin-left:auto;color:var(--hint);font-size:var(--ui-fs-xs);white-space:nowrap;}
+@media (max-width:640px){#cust-suggest .css-i{min-height:44px;}}
