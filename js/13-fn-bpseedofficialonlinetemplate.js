@@ -643,7 +643,9 @@ function renderSalesReportTabI_(wrap, subTabs) {
     '<td style="text-align:right">'+(totalAssigned?Math.round(allChot.size/totalAssigned*100):0)+'%</td>' +
   '</tr></tbody></table></div></div>';
 
-  wrap.innerHTML = filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml;
+  if (typeof uiReportFrame_ !== 'function'){ wrap.innerHTML = filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml; return; }   // dự phòng: js/76 chưa nạp → giao diện cũ
+  // nhiều khối có tiêu đề riêng (KPI, biểu đồ thanh, theo phân loại, bảng CS × tháng) → ô bodyHtml của khuôn; HTML từng khối GIỮ NGUYÊN
+  wrap.innerHTML = uiReportFrame_({ id: 'I', barHtml: filtersHtml, bodyHtml: kpiHtml + barHtml + tierHtml + tableHtml });
 }
 
 function exportRenewReport_() {
