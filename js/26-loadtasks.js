@@ -41,11 +41,12 @@ function setTaskStatusFilter(st, el){
   renderTaskTables();
 }
 
-function renderTaskTables(){
+// Danh sách việc sau khi áp bộ lọc (phạm vi + trạng thái + ô tìm). Dùng chung cho bảng danh sách và Bảng cột (js/70-task-board.js).
+function _taskFilteredList(){
   var myName = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '';
   var q = (document.getElementById('task-search') ? document.getElementById('task-search').value : '').trim().toLowerCase();
 
-  var filtered = allTasks.filter(function(t){
+  return allTasks.filter(function(t){
     if (typeof _tfScopeMatch === 'function'){ var sm_ = _tfScopeMatch(t, _taskScope, myName); if (sm_ === false) return false; }  // Chờ tôi xử lý/duyệt/được tag (js/45)
     if (_taskScope === 'mine' && myName && (t.csAssigned||[]).indexOf(myName) === -1) return false;
     if (_taskScope === 'createdByMe' && myName && t.createdBy !== myName) return false;
@@ -55,6 +56,10 @@ function renderTaskTables(){
     if (q && (t.title||'').toLowerCase().indexOf(q) === -1 && (t.description||'').toLowerCase().indexOf(q) === -1) return false;
     return true;
   });
+}
+
+function renderTaskTables(){
+  var filtered = _taskFilteredList();
 
   txt('tb-task', allTasks.length);
 

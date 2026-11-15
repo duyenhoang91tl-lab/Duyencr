@@ -679,13 +679,18 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       </div>
       <input type="text" id="task-search" class="assign-input" placeholder="🔍 Tìm công việc..." style="min-width:180px" oninput="renderTaskTables()">
     </div>
+    <div id="task-view-bar" class="tb-viewbar"><!-- R6a: chuyển kiểu xem (js/70-task-board.js) -->
+      <div class="tb-seg"><button type="button" class="tb-seg-b active" id="task-vw-list" onclick="tbSetMode('list')">☰ Danh sách</button><button type="button" class="tb-seg-b" id="task-vw-board" onclick="tbSetMode('board')">▦ Bảng cột</button></div>
+      <select id="task-board-flow" class="assign-input" style="display:none;min-width:220px;max-width:100%" onchange="tbSetFlow(this.value)"></select>
+    </div>
     <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border)">
       <div class="task-status-tab active" data-status="all" onclick="setTaskStatusFilter('all',this)">Tất cả</div>
       <div class="task-status-tab" data-status="Đang làm" onclick="setTaskStatusFilter('Đang làm',this)">Đang làm</div>
       <div class="task-status-tab" data-status="Hoàn thành" onclick="setTaskStatusFilter('Hoàn thành',this)">Đã hoàn thành</div>
       <div class="task-status-tab" data-status="overdue" onclick="setTaskStatusFilter('overdue',this)">Quá hạn</div>
     </div>
-    <div style="flex:1;overflow:auto">
+    <div id="task-board-wrap" style="flex:1;overflow:auto;display:none"></div>
+    <div id="task-list-wrap" style="flex:1;overflow:auto">
       <table class="task-table" style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
           <tr style="background:var(--surface2)">
@@ -1270,6 +1275,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/18-list-pro.css?v=20261103a">
 <link rel="stylesheet" href="css/19-theme-sunset.css?v=20261105b"><!-- bảng màu hồng hoàng hôn (chỉ chế độ sáng); gỡ = xoá dòng này -->
 <link rel="stylesheet" href="css/20-kit.css?v=20261115a"><!-- R2: bộ thành phần ui-* (khung Hoàng hôn + màu đổ nhẹ); nạp SAU theme hoàng hôn, TRƯỚC 99-dark-auto -->
+<link rel="stylesheet" href="css/21-task-board.css?v=20261115a"><!-- R6a: bảng công việc dạng cột (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/99-dark-auto.css?v=20261113a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
@@ -1815,7 +1821,8 @@ function openBcLogModal(phone){
 <script src="js/67-report-k.js?v=20261111a"></script>
 <script src="js/66-sakura-petals.js?v=20261104a"></script>
 <script src="js/68-ui-kit.js?v=20261115a"></script>
-<script src="js/69-pro-smart-search.js?v=20261115a"></script><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
+<script src="js/69-pro-smart-search.js?v=20261115a"></script>
+<script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
