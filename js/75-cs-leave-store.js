@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  R6c-2 (BƯỚC 3/4: ÁP DỤNG + LƯU) — nạp SAU js/73, 74. Lưu kỳ nghỉ + thực sự đổi CS khách.
+//  R6c-2 (BƯỚC 3+4/4: ÁP DỤNG + LƯU + TRẢ LẠI) — nạp SAU js/73, 74. Lưu kỳ nghỉ + thực sự đổi CS khách.
 //  NGUYÊN NHÂN GỐC: bước 2 mới xem trước. Nay: (a) kỳ nghỉ lưu ở biến `_csLeaves` + localStorage `ome_cs_leave` + GAS `setSetting` key `csLeave`
 //  (action CÓ SẴN → KHÔNG đổi GAS); (b) giao khách bằng CHÍNH `_applyCareCSToAssigned` của js/07 (đổi careData.cs + careCS + OrderData cột N theo lô
 //  + queueCareSync + làm mới bộ lọc) — không viết lại đường ghi; (c) kỳ nghỉ bắt đầu ở TƯƠNG LAI → lưu "hẹn", tự áp dụng khi tới ngày (clApplyDue_,
@@ -33,6 +33,30 @@ function clDue_(leaves, today){
   return (leaves || []).filter(function(l){ return !l.ended && !l.applied && l.from && l.from <= today && (!l.to || today <= l.to); });
 }
 
+// Trạng thái kỳ nghỉ: 'xong' (đã trả lại/huỷ) | 'hen' (chưa tới ngày, chưa giao) | 'het' (qua ngày "đến" mà chưa trả lại → gợi ý Trả lại) | 'dang' (đang nghỉ)
+function clStatus_(l, today){
+  if (l.ended) return 'xong';
+  if (!l.applied && l.from > today) return 'hen';
+  if (l.to && l.to < today) return 'het';
+  return 'dang';
+}
+// Kế hoạch TRẢ LẠI: chỉ khách còn đang giữ đúng CS đã giao (newCs) mới trả về prevCs; khách đã bị đổi tay sau đó thì KHÔNG đè.
+function clReturnPlan_(l, careData){
+  var rows = [], skipped = 0;
+  (l.handed || []).forEach(function(h){
+    var cur = String(((careData || {})[h.phone] || {}).cs || '').trim().toLowerCase();
+    if (cur === String(h.newCs || '').trim().toLowerCase()) rows.push({ phone: h.phone, newCs: h.prevCs || '' }); else skipped++;
+  });
+  return { rows: rows, skipped: skipped };
+}
+function clReturnLeave_(l){
+  var p = clReturnPlan_(l, careData);
+  l.ended = true; l.endedAt = new Date().toISOString(); l.returned = p.rows.length;   // đánh dấu TRƯỚC khi ghi (không trả 2 lần)
+  if (p.rows.length && typeof _applyCareCSToAssigned === 'function') _applyCareCSToAssigned(clGroupRows_(p.rows));
+  try { if (typeof logAudit === 'function') logAudit('cs_leave', '', l.name, (l.applied ? 'Trả lại ' + p.rows.length + ' khách (bỏ qua ' + p.skipped + ' khách đã đổi tay)' : 'Huỷ kỳ nghỉ hẹn') + ' — ' + l.name); } catch (e) {}
+  clSaveLeaves_();
+  return p;
+}
 function clPlanFor_(l, today, extraLeaves){
   var all = (_csLeaves || []).filter(function(x){ return x.id !== l.id; }).concat(extraLeaves || [], [l]);
   return clPlan_(l, schedules, careData, typeof _schedResponsibleCS === 'function' ? _schedResponsibleCS : function(){ return ''; }, teams, all, today, typeof clLoad_ === 'function' ? clLoad_() : null);
@@ -68,4 +92,4 @@ function clApplyDue_(){
   return n;
 }
 if (typeof window !== 'undefined') setTimeout(clSyncFromGAS_, 0);   // nạp kỳ nghỉ từ GAS khi mở CRM (giống _sync*FromGAS ở js/06)
-if (typeof module !== 'undefined' && module.exports){ module.exports = { clGroupRows_: clGroupRows_, clMergeLeaves_: clMergeLeaves_, clDue_: clDue_ }; }
+if (typeof module !== 'undefined' && module.exports){ module.exports = { clStatus_: clStatus_, clReturnPlan_: clReturnPlan_, clGroupRows_: clGroupRows_, clMergeLeaves_: clMergeLeaves_, clDue_: clDue_ }; }

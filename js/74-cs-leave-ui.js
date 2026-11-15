@@ -93,12 +93,35 @@ function clSave_(ov){
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
   scToast_(msg + (future ? ' (tự giao khi tới ' + l.from + ')' : ''));
 }
+function clReturn_(id){
+  var l = (_csLeaves || []).filter(function(x){ return x.id === id; })[0]; if (!l) return;
+  var pending = !l.applied, p = clReturnPlan_(l, careData);
+  var msg = pending ? 'Huỷ kỳ nghỉ hẹn của ' + l.name + '? (chưa giao khách nào)' : 'Trả lại ' + p.rows.length + ' khách cho ' + l.name + '?' + (p.skipped ? '\n(' + p.skipped + ' khách đã được đổi CS sau đó → giữ nguyên, không đè)' : '');
+  if (!confirm(msg)) return;
+  var r = clReturnLeave_(l);
+  try { if (typeof updateSchedBadges === 'function') updateSchedBadges(); } catch (e) {}
+  if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  if (typeof renderScheduleTab === 'function') renderScheduleTab();
+  scToast_(pending ? '✓ Đã huỷ kỳ nghỉ hẹn' : '✓ Đã trả lại ' + r.rows.length + ' khách cho ' + l.name + (r.skipped ? ' · giữ nguyên ' + r.skipped : ''));
+}
 function clDecorate_(){
   var grid = document.getElementById('overdue-grid'); if (!grid) return;
   var old = document.getElementById('cl-bar'); if (old) old.remove();
   var bar = document.createElement('div'); bar.id = 'cl-bar'; bar.className = 'cl-bar';
-  bar.innerHTML = '<button type="button" class="btn sm" data-cl="open">🏖 Nghỉ phép / giao lại khách</button>';
-  bar.addEventListener('click', function(e){ if (e.target.closest && e.target.closest('[data-cl="open"]')){ e.stopPropagation(); clOpen(); } });
+  var today = scYmd_(new Date()), allowed = clAllowedNames_(currentUser, teams, accounts).map(function(n){ return n.toLowerCase(); }), isAdmin = !currentUser || currentUser.role === 'admin';
+  var fd = function(y){ return y ? y.split('-').reverse().slice(0, 2).join('/') : ''; };
+  var list = (typeof _csLeaves !== 'undefined' ? _csLeaves : []).filter(function(l){ return !l.ended && (isAdmin || allowed.indexOf(String(l.name).toLowerCase()) !== -1); }).map(function(l){
+    var st = clStatus_(l, today), n = (l.handed || []).length;
+    var txt = clEsc_(l.name) + ' · ' + fd(l.from) + (l.to ? '→' + fd(l.to) : ' (tạm nghỉ)') + (st === 'hen' ? ' · hẹn, chưa giao' : ' · đã giao ' + n + ' khách') + (st === 'het' ? ' · ĐÃ HẾT HẠN NGHỈ' : '');
+    return '<span class="cl-chip' + (st === 'het' ? ' cl-chip-due' : '') + '">' + txt + ' <button type="button" class="cl-chip-b" data-cl="return" data-id="' + clEsc_(l.id) + '">' + (st === 'hen' ? 'Huỷ hẹn' : 'Trả lại') + '</button></span>';
+  }).join('');
+  bar.innerHTML = (list ? '<div class="cl-list">' + list + '</div>' : '') + '<button type="button" class="btn sm" data-cl="open">🏖 Nghỉ phép / giao lại khách</button>';
+  bar.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-cl]') : null; if (!t) return;
+    e.stopPropagation();
+    if (t.getAttribute('data-cl') === 'open'){ clOpen(); return; }
+    if (t.getAttribute('data-cl') === 'return') clReturn_(t.getAttribute('data-id'));
+  });
   grid.insertBefore(bar, grid.firstChild);
 }
 (function(){

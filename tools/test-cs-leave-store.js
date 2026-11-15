@@ -35,4 +35,20 @@ ok(calls.applied[0].every(e => ['Hà', 'Mai'].includes(e.csName)), 'chỉ giao c
 n = vm.runInContext('clApplyDue_()', sb); ok(n === 0 && calls.applied.length === 1, 'chạy lại → không giao lần 2');
 sb.schedules = []; vm.runInContext('_csLeaves = [' + JSON.stringify(L({ id: 'l9' })) + ']', sb);
 n = vm.runInContext('clApplyDue_()', sb); ok(n === 0 && vm.runInContext('_csLeaves[0].applied', sb) === false, 'lịch chưa tải (rỗng) → KHÔNG áp dụng, không đánh dấu applied');
+// BƯỚC 4: trạng thái + trả lại
+ok(m.clStatus_(L({ from: '2026-11-20' }), '2026-11-16') === 'hen' && m.clStatus_(L({ applied: true }), '2026-11-16') === 'dang', 'trạng thái: hẹn / đang nghỉ');
+ok(m.clStatus_(L({ applied: true, to: '2026-11-15' }), '2026-11-16') === 'het' && m.clStatus_(L({ ended: true }), '2026-11-16') === 'xong', 'qua ngày "đến" chưa trả → het (gợi ý trả lại); đã trả → xong');
+const hd = [{ phone: '1', prevCs: 'Oanh', newCs: 'Hà' }, { phone: '2', prevCs: 'Oanh, Thúy', newCs: 'Hà, Thúy' }, { phone: '3', prevCs: 'Oanh', newCs: 'Mai' }, { phone: '4', prevCs: '', newCs: 'Mai' }];
+let rp = m.clReturnPlan_({ handed: hd }, { 1: { cs: 'Hà' }, 2: { cs: 'hà, thúy' }, 3: { cs: 'Vy' }, 4: { cs: 'Mai' } });
+ok(rp.rows.map(r => r.phone).join() === '1,2,4' && rp.skipped === 1, 'chỉ trả khách còn giữ đúng CS đã giao (không phân biệt hoa/thường); khách đã bị đổi tay (3) giữ nguyên');
+ok(rp.rows[1].newCs === 'Oanh, Thúy' && rp.rows[2].newCs === '', 'trả về đúng CS cũ (kể cả CS ghép / trống)');
+ok(m.clReturnPlan_({}, {}).rows.length === 0, 'chưa giao gì → rỗng');
+{ // chạy NGUYÊN clReturnLeave_ trên môi trường giả
+  sb.careData = { 1: { cs: 'Hà' }, 3: { cs: 'Vy' } }; calls.applied.length = 0; calls.audit = 0;
+  vm.runInContext('_csLeaves = [' + JSON.stringify(L({ id: 'r1', applied: true, handed: hd.slice(0, 1).concat(hd.slice(2, 3)) })) + ']', sb);
+  const res = vm.runInContext('clReturnLeave_(_csLeaves[0])', sb), l2 = vm.runInContext('_csLeaves[0]', sb);
+  ok(res.rows.length === 1 && res.skipped === 1 && l2.ended === true && l2.returned === 1 && calls.applied.length === 1 && calls.applied[0][0].csName === 'Oanh' && calls.audit === 1, 'clReturnLeave_: trả 1, bỏ qua 1, đánh dấu ended, ghi nhật ký');
+  vm.runInContext('_csLeaves = [' + JSON.stringify(L({ id: 'r2' })) + ']', sb); calls.applied.length = 0;
+  vm.runInContext('clReturnLeave_(_csLeaves[0])', sb); ok(calls.applied.length === 0 && vm.runInContext('_csLeaves[0].ended', sb) === true, 'huỷ kỳ nghỉ hẹn (chưa giao): chỉ đánh dấu ended, không đụng khách');
+}
 console.log(bad ? `\n${bad} LỖI` : '\nTẤT CẢ ĐẠT'); process.exit(bad ? 1 : 0);

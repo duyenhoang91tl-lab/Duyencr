@@ -1,7 +1,7 @@
 /* ═════════════════════════════════════════════════════════════════
    24-cs-leave.css — R6c-2 bước 2: form đặt kỳ nghỉ + xem trước giao khách (js/74-cs-leave-ui.js). Chỉ var(--ui-*) (TOKEN_ONLY).
    ═════════════════════════════════════════════════════════════════ */
-.cl-bar{display:flex;justify-content:flex-end;padding:var(--ui-sp-2) var(--ui-sp-4);font-family:var(--ui-font)}
+.cl-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--ui-sp-2);padding:var(--ui-sp-2) var(--ui-sp-4);font-family:var(--ui-font)}
 .cl-modal{width:460px;font-family:var(--ui-font);color:var(--ui-text)}
 .cl-head{padding:var(--ui-sp-3) var(--ui-sp-4);font-size:var(--ui-fs-md);font-weight:var(--ui-fw-semibold);border-bottom:1px solid var(--ui-border-md)}
 .cl-body{display:flex;flex-direction:column;gap:var(--ui-sp-3);padding:var(--ui-sp-4);max-height:70vh;overflow:auto}
@@ -17,3 +17,9 @@
 .cl-foot{display:flex;justify-content:flex-end;gap:var(--ui-sp-2);padding:var(--ui-sp-3) var(--ui-sp-4);border-top:1px solid var(--ui-border-md)}
 .cl-foot .btn[disabled]{opacity:.5;cursor:not-allowed}
 @media (max-width:640px){.cl-modal{width:96vw}.cl-2{grid-template-columns:1fr}.cl-f select,.cl-f input[type=date]{min-height:44px}.cl-r{min-height:44px}}
+
+.cl-list{display:flex;flex-wrap:wrap;gap:var(--ui-sp-1);margin-right:auto}
+.cl-chip{display:inline-flex;align-items:center;gap:var(--ui-sp-1);padding:2px 4px 2px 10px;font-size:var(--ui-fs-xs);color:var(--ui-text-muted);background:var(--ui-surface);border:1px solid var(--ui-border-md);border-radius:var(--ui-r-pill)}
+.cl-chip-due{color:var(--ui-danger);background:var(--ui-danger-soft);border-color:var(--ui-danger-line)}
+.cl-chip-b{padding:2px 8px;font-family:var(--ui-font);font-size:var(--ui-fs-xs);color:var(--ui-brand);background:transparent;border:1px solid var(--ui-border-md);border-radius:var(--ui-r-pill);cursor:pointer}
+@media (max-width:640px){.cl-chip-b{min-height:32px}}
