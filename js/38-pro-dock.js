@@ -21,7 +21,7 @@ function proDmyDate_(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d
 var PRO_RATING_LABEL = { tot:'Làm tốt', trungbinh:'Trung bình', kem:'Cần cải thiện', chuadu:'Chưa đủ dữ liệu' };
 
 // Ngữ cảnh 1 khách (KHÔNG có SĐT). c: {name,tier,careStatus}; D: kết quả proProfileData_; days/rev tính sẵn.
-function proCustomerContext_(c, D, days, rev, now){
+function proCustomerContext_(c, D, days, rev, now, leadBlock){
   var tl = proTimeline_(D.notes, D.mine, D.orders, 60), by = { note:[], sched:[], order:[] };
   tl.forEach(function(it){ if (by[it.kind] && by[it.kind].length<5) by[it.kind].push('- '+(it.when?it.when+' · ':'')+proClip_(it.title, it.kind==='note'?200:120)); });
   var today = proDmyDate_(now||new Date());
@@ -29,10 +29,11 @@ function proCustomerContext_(c, D, days, rev, now){
     return '- '+proDmy_(x.date)+' · '+proClip_(x.label,40)+(x.note?': '+proClip_(x.note,80):'')+(x.state==='over'?' [QUÁ HẠN]':x.state==='today'?' [HÔM NAY]':''); });
   return ['LOẠI: một khách hàng (đã ẩn SĐT). Hôm nay: '+today,
     'Tên: '+proClip_(c.name||'(chưa có tên)',60)+' | Hạng: '+proClip_(c.tier||'—',20)+' | Tình trạng CS: '+proClip_((D.care&&D.care.status)||c.careStatus||'chưa gán',60),
-    'Số đơn: '+(D.nOrd||0)+' | Doanh thu: '+proMoney_(rev)+' | Ngày từ đơn cuối: '+(days===null||days===undefined?'chưa có đơn':days),
-    'Lịch hẹn chưa xong:'+(pend.length?'\n'+pend.join('\n'):' (không có)'),
+    'Số đơn: '+(D.nOrd||0)+' | Doanh thu: '+proMoney_(rev)+' | Ngày từ đơn cuối: '+(days===null||days===undefined?'chưa có đơn':days)]
+    .concat(leadBlock ? [proScrub_(leadBlock)] : [])   // R8f: mức quan tâm do js/77 chấm (đặt trước lịch/ghi chú để khi prompt bị cắt đuôi vẫn còn)
+    .concat(['Lịch hẹn chưa xong:'+(pend.length?'\n'+pend.join('\n'):' (không có)'),
     'Ghi chú gần nhất:'+(by.note.length?'\n'+by.note.join('\n'):' (không có)'),
-    'Đơn gần nhất:'+(by.order.length?'\n'+by.order.join('\n'):' (không có)')].join('\n');
+    'Đơn gần nhất:'+(by.order.length?'\n'+by.order.join('\n'):' (không có)')]).join('\n');
 }
 function proYmdOf_(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 // Ngữ cảnh doanh số theo PHẠM VI người dùng được xem (s = _ovScope(d), d = dữ liệu orgOverview)
@@ -416,7 +417,9 @@ function proAiContext_(){
     var c = (typeof allCustomers!=='undefined' && typeof currentPhone!=='undefined') ? allCustomers.find(function(x){ return x.phone===currentPhone; }) : null;
     if (!c) return { error:'Chưa mở khách nào — mở hồ sơ một khách rồi hỏi lại.' };
     var D = proProfileData_(c), days = proDaysSinceLastOrder_(c.orders, new Date()), rev = _custRev_(c), now = new Date();
-    return { text: proCustomerContext_(c, D, days, rev, now), raw: { c:c, D:D, days:days, rev:rev, now:now } };
+    var leadBlock = '';
+    try { if (typeof lsRowScore_==='function' && typeof lsAiBlock_==='function'){ var ls = lsRowScore_(c, now.getTime()); leadBlock = lsAiBlock_(ls, typeof lsNextStep_==='function' ? lsNextStep_(ls, c) : null); } } catch(e){ leadBlock = ''; }
+    return { text: proCustomerContext_(c, D, days, rev, now, leadBlock), raw: { c:c, D:D, days:days, rev:rev, now:now } };
   }
   var d = (typeof _ov!=='undefined' && _ov) ? _ov.data : null;
   if (!d || typeof _ovScope!=='function') return { error:'Chưa có số liệu doanh số — mở màn 🏠 Tổng quan để tải trước, rồi hỏi lại.' };

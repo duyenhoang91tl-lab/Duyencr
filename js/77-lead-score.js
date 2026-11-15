@@ -110,6 +110,19 @@ function lsSummary_(customers, byPhone, nowTs, topN){
   out.riskTop = risk.slice(0, n); out.hotTop = hot.slice(0, n);
   return out;
 }
+// R8f: khối chữ "MỨC QUAN TÂM" nhét vào NGỮ CẢNH của trợ lý khi PRO_AI_ENGINE='ai' (js/38 proCustomerContext_). NGUYÊN NHÂN GỐC: AI thật chỉ thấy
+// tên/hạng/số đơn/lịch/ghi chú nên tự đoán "khách nóng hay nguội" khác với điểm CS đang thấy ở cột Mức + hồ sơ 360° → gợi ý hành động lệch nhau.
+// Ở đây đưa NGUYÊN điểm + mức + lý do + ngưỡng + việc nên làm (đều do quy tắc js/77 tính, không phải AI đoán) để AI diễn giải thay vì tự chấm lại.
+// s = lsScore_(...), st = lsNextStep_(s, c) (có thể null). Không chứa SĐT/tên (chỉ số ngày, điểm, nhãn); trả '' nếu không có điểm.
+function lsAiBlock_(s, st){
+  if (!s || !s.level) return '';
+  var lv = (LS_LEVEL_LABEL[s.level] || s.level).toUpperCase();
+  var out = ['Mức quan tâm (hệ thống chấm theo quy tắc, KHÔNG phải AI đoán): ' + lv + ' · ' + (s.score == null ? '?' : s.score) + ' điểm' + (s.risk ? ' · SẮP MẤT (nguội, đã từng mua)' : '')];
+  if (s.reasons && s.reasons.length) out.push('Lý do: ' + s.reasons.slice(0, 6).join('; '));
+  out.push('Ngưỡng: NÓNG ≥' + LS_HOT_MIN + ' điểm, ẤM ≥' + LS_WARM_MIN + ', còn lại NGUỘI; ép NGUỘI nếu quá ' + LS_COLD_DAYS + ' ngày chưa chăm và không có lịch sắp tới');
+  if (st && st.text) out.push('Việc nên làm tiếp (gợi ý theo quy tắc): ' + st.text + (st.why ? ' — vì ' + st.why : ''));
+  return out.join('\n');
+}
 
 // ════════════════════════════════════════════════════════════════════
 //  R8b (GIAO DIỆN) — LỌC DANH SÁCH THEO MỨC + THANH BÁO "ĐANG LỌC". Cần trình duyệt (các hàm dưới đều tự thoát nếu thiếu DOM/dữ liệu).
@@ -204,4 +217,4 @@ function lsToggleLevelSort_(){
   if (typeof applyFilters === 'function') applyFilters();
 }
 
-if (typeof module !== 'undefined' && module.exports){ module.exports = { lsLevelCellHtml_: lsLevelCellHtml_, lsLevelSortList_: lsLevelSortList_, lsRowScore_: lsRowScore_, lsToggleLevelSort_: lsToggleLevelSort_, lsResetLevelSort_: lsResetLevelSort_,lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, lsSchedByPhone_: lsSchedByPhone_, lsSummary_: lsSummary_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
+if (typeof module !== 'undefined' && module.exports){ module.exports = { lsLevelCellHtml_: lsLevelCellHtml_, lsLevelSortList_: lsLevelSortList_, lsRowScore_: lsRowScore_, lsToggleLevelSort_: lsToggleLevelSort_, lsResetLevelSort_: lsResetLevelSort_,lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, lsSchedByPhone_: lsSchedByPhone_, lsSummary_: lsSummary_, lsAiBlock_: lsAiBlock_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
