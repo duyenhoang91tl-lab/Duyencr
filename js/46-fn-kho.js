@@ -128,8 +128,17 @@ function _tkRenderList(){
   var k = _tkCurKho(), list = document.getElementById('tk-list'), info = document.getElementById('tk-info');
   if (!k) return;
   var rows = _tkFiltered(), low = _tk.items.filter(_tkIsLow).length, lv = _tkLevel(k);
-  info.innerHTML = esc(k.name) + ' · ' + _tk.items.length + ' mặt hàng' + (low ? ' · <span class="tk-lowtxt">' + low + ' sắp hết</span>' : '') +
-    ' · ' + (lv === 'admin' ? 'Bạn là admin' : lv === 'leader' ? 'Bạn là leader kho này' : lv === 'staff' ? 'Bạn là nhân viên kho này' : 'Chỉ xem') + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '');
+  var roleTxt = (lv === 'admin' ? 'Bạn là admin' : lv === 'leader' ? 'Bạn là leader kho này' : lv === 'staff' ? 'Bạn là nhân viên kho này' : 'Chỉ xem');
+  if (typeof uiStatGrid_ === 'function'){   // R7c-1: số liệu thành thẻ số (ui-kit); tên kho · quyền · ngưng · ghi chú giữ dạng chữ bên dưới
+    info.innerHTML = uiStatGrid_([
+      { label: 'Mặt hàng', value: _tkNum(_tk.items.length), icon: '📦', tone: 'brand' },
+      { label: 'Sắp hết', value: _tkNum(low), tone: low ? 'danger' : 'success', note: low ? '' : 'không có mặt hàng nào' },
+      { label: 'Đang hiển thị', value: _tkNum(rows.length), tone: 'neutral', note: rows.length !== _tk.items.length ? 'đang lọc / tìm kiếm' : '' }
+    ]) + '<div class="tk-meta">' + esc(k.name) + ' · ' + roleTxt + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '') + '</div>';
+  } else {   // dự phòng: js/68 chưa nạp → dòng chữ như cũ
+    info.innerHTML = esc(k.name) + ' · ' + _tk.items.length + ' mặt hàng' + (low ? ' · <span class="tk-lowtxt">' + low + ' sắp hết</span>' : '') +
+      ' · ' + roleTxt + (k.active ? '' : ' · <b>Kho đã ngưng hoạt động</b>') + (k.note ? '<br>' + esc(k.note) : '');
+  }
   if (!rows.length) { list.innerHTML = '<div class="tk-empty">' + (_tk.items.length ? 'Không có mặt hàng khớp.' : 'Kho chưa có mặt hàng. ' + (_tkCanManage(k) ? 'Thêm từng mặt hàng hoặc bấm “📥 Nhập Excel” (file Pos “Tổng hợp tồn kho”).' : '')) + '</div>'; return; }
   var can = _tkCanEdit(k) && k.active;
   list.innerHTML = rows.slice(0, _tk.shown).map(function(it){

@@ -11,6 +11,8 @@
 .tk-tools input[type=search]{flex:1;min-width:160px;padding:6px 10px;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface);color:var(--text);}
 .tk-chk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;}
 .tk-info{padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);}
+.tk-info .ui-stat-grid{margin-bottom:8px;}
+.tk-meta{font-size:12px;color:var(--muted);}
 .tk-lowtxt{color:#d93025;font-weight:600;}
 .tk-list{overflow:auto;min-height:120px;}
 .tk-empty{padding:28px 14px;text-align:center;color:var(--muted);font-size:13px;}
