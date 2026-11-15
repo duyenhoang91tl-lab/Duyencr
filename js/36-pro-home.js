@@ -29,13 +29,17 @@ function proStatusBarsHtml_(list, topN){
     return '<div class="pro-bar-row"><div class="pro-bar-lbl" title="'+proEsc_(a[0])+'">'+proEsc_(a[0])+'</div><div class="pro-bar"><i style="width:'+Math.max(2,Math.round(a[1]/mx*100))+'%"></i></div><div class="pro-bar-n">'+a[1].toLocaleString('vi-VN')+' · '+p+'%</div></div>';
   }).join('') + '<div class="pro-muted" style="margin-top:6px">Tổng '+total.toLocaleString('vi-VN')+' khách trong phạm vi của bạn.</div>';
 }
+var PRO_UNREPLIED_CAP = 100;   // = limit của pkChatInbox_ khi có bộ lọc (gas_v13.js)
 // Khuyến nghị: quá hạn (date < today) → hôm nay → đơn Base kẹt (nếu đã tải) → nếu không có gì thì báo xong việc. go = tab để mở khi bấm.
-function proRecoItems_(due, today, tasks){
+function proRecoItems_(due, today, tasks, unreplied){
   due = due||[]; var out = [], over = 0, now = 0;
   due.forEach(function(x){ var d = String((x&&x.date)||'').slice(0,10); if (!today) now++; else if (d < today) over++; else if (d === today) now++; });   // ngày tương lai (nếu lọt vào) KHÔNG tính; cắt 10 ký tự phòng ngày có kèm giờ
   if (over) out.push({ n:over, tone:'bad', text:'khách có lịch hẹn <b>QUÁ HẠN</b> — gọi sớm để không mất khách', go:'overdue', act:'Xem quá hạn' });
   if (now) out.push({ n:now, tone:'', text:'khách có lịch hẹn <b>HÔM NAY</b>', go:'schedule', act:'Xem lịch hôm nay' });
   (tasks||[]).forEach(function(t){ if (t && t.count>0) out.push({ n:t.count, tone:'bad', text:proEsc_(t.title||'Đơn cần xử lý'), go:'', act:'' }); });
+  // R4a (2026-11-15): hội thoại Pancake chưa trả lời (toàn hộp thư, từ GAS pkChatInbox un=new). null/0/NaN → không hiện; ≥ PRO_UNREPLIED_CAP → "N+" vì server chỉ trả tối đa 100 hội thoại mỗi lần lọc.
+  var ur = Number(unreplied);
+  if (ur > 0) out.push({ n:(ur >= PRO_UNREPLIED_CAP ? PRO_UNREPLIED_CAP+'+' : ur), tone:'bad', text:'hội thoại Pancake <b>CHƯA TRẢ LỜI</b> — khách đang chờ', go:'chat', act:'Mở chat' });
   if (!out.length) out.push({ n:'✓', tone:'', text:'Không còn việc đến hạn — bạn đã xử lý xong hôm nay.', go:'', act:'' });
   return out;
 }
@@ -52,7 +56,7 @@ function proHomeHtml_(o){
     + '<div class="pro-card"><div class="pro-card-h"><span>🎯 Hiệu suất · '+proEsc_(o.label)+'</span><span class="pro-sp pro-muted">'+proEsc_(o.from)+' → '+proEsc_(o.to)+'</span></div>'
     +   '<div class="pro-gauges">'+proGaugeHtml_(c.pct,'% KPI','đạt mục tiêu doanh số')+proGaugeHtml_(c.tyLeChot,'Tỷ lệ chốt','trên số khách đã tương tác')+'</div>'
     +   '<div class="pro-foot"><span>👥 '+num(c.soNguoi)+' nhân sự</span><span>'+(o.ratingHtml||'')+'</span></div></div>'
-    + '<div class="pro-card"><div class="pro-card-h"><span>💡 Khuyến nghị hôm nay</span><span class="pro-sp pro-muted">việc nên làm ngay</span></div>'+(o.recoHtml||'')+'</div></div>'
+    + '<div class="pro-card" id="pro-reco"><div class="pro-card-h"><span>💡 Khuyến nghị hôm nay</span><span class="pro-sp pro-muted">việc nên làm ngay</span></div><div id="pro-reco-list">'+(o.recoHtml||'')+'</div></div></div>'
     + '<div class="pro-grid">'
     +   '<div class="pro-kpi blue"><span class="k-l">Doanh thu</span><span class="k-v">'+proEsc_(money(c.revenue))+'</span></div>'
     +   '<div class="pro-kpi green"><span class="k-l">Số đơn</span><span class="k-v">'+num(c.orders)+'</span><span class="k-s">đơn thất bại: '+num(c.failed)+'</span></div>'
@@ -66,6 +70,18 @@ function proHomeGo_(tab){
   var el = document.querySelector('[data-bar-id="tab-'+tab+'"]');
   if (el && typeof switchTab==='function') switchTab(tab, el);
 }
+// Đếm hội thoại chưa trả lời: gọi GAS pkChatInbox (un=new, INBOX), token phiên tự kèm nhờ fetch wrapper (js/06). Cache 60s. Lỗi/hết phiên/không quyền chat → null (không hiện mục, KHÔNG báo lỗi trên Tổng quan).
+var _proUr = { n: null, at: 0, busy: false };
+function proUnrepliedLoad_(cb){
+  if (typeof fetch!=='function' || typeof gsUrl==='undefined' || !gsUrl) return;
+  if (Date.now() - _proUr.at < 60000 || _proUr.busy) return;
+  _proUr.busy = true;
+  fetch(gsUrl + (gsUrl.indexOf('?')>-1 ? '&' : '?') + 'action=pkChatInbox&un=new&type=INBOX', { redirect:'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){ _proUr.n = (j && !j.error && Array.isArray(j.conversations)) ? j.conversations.length : null; })
+    .catch(function(){ _proUr.n = null; })
+    .then(function(){ _proUr.at = Date.now(); _proUr.busy = false; try { cb && cb(_proUr.n); } catch(e){} });
+}
 function proHomeRender_(){
   if (!document.documentElement.classList.contains('ui-pro')) return;
   var body = document.getElementById('ov-body'), d = (typeof _ov!=='undefined' && _ov) ? _ov.data : null;
@@ -74,14 +90,17 @@ function proHomeRender_(){
   var list = typeof scopedCustomers==='function' ? safe(scopedCustomers, []) : [];
   var due = typeof _dueReminders==='function' ? safe(_dueReminders, []) : [];
   var tasks = typeof _ttCards==='function' ? safe(_ttCards, []) : [];
+  var today_ = typeof _remDateStr==='function' ? _remDateStr() : '';
   var html = proHomeHtml_({ label:s.label, from:d.from, to:d.to, c:s.company, money:(typeof _ovMoney==='function'?_ovMoney:String),
     ratingHtml:(typeof _ovRatingCounts==='function' ? _ovRatingCounts(s.company||{}) : ''),
-    barsHtml:proStatusBarsHtml_(list, 8), recoHtml:proRecoHtml_(proRecoItems_(due, typeof _remDateStr==='function'?_remDateStr():'', tasks)) });
+    barsHtml:proStatusBarsHtml_(list, 8), recoHtml:proRecoHtml_(proRecoItems_(due, today_, tasks, _proUr.n)) });
   var old = document.getElementById('pro-home'); if (old) old.remove();
   body.insertAdjacentHTML('afterbegin', html);
   var host = document.getElementById('pro-home');
   host.onclick = function(e){ var g = e.target.closest && e.target.closest('[data-home-go]'); if (g) proHomeGo_(g.getAttribute('data-home-go')); };
   // Hàng ô số cũ trùng số liệu → ẩn; chỉ ẩn khi đúng là hàng chứa .ov-card (chế độ CS 'self' không có hàng này, giữ nguyên lời nhắn)
+  // Tải số hội thoại chưa trả lời (nếu cache cũ) rồi vẽ lại CHỈ danh sách khuyến nghị
+  proUnrepliedLoad_(function(n){ var l = document.getElementById('pro-reco-list'); if (l) l.innerHTML = proRecoHtml_(proRecoItems_(due, today_, tasks, n)); });
   var nx = host.nextElementSibling; if (nx && nx.querySelector('.ov-card')) nx.classList.add('pro-hide-old');
 }
 (function(){
@@ -91,4 +110,4 @@ function proHomeRender_(){
     _ovRender._proHome = true;
   }
 })();
-if (typeof module!=='undefined') module.exports = { proGaugeHtml_, proStatusBarsHtml_, proRecoItems_, proRecoHtml_, proHomeHtml_ };
+if (typeof module!=='undefined') module.exports = { proGaugeHtml_, proStatusBarsHtml_, proRecoItems_, proRecoHtml_, proHomeHtml_, PRO_UNREPLIED_CAP };

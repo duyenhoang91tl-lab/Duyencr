@@ -1,6 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-15 (phiên Claude — R4a: Tổng quan "Việc cần làm ngay" thêm HỘI THOẠI PANCAKE CHƯA TRẢ LỜI) — XONG 1/1 (đã push); CHỜ Duyên Ctrl+F5 + xem
+NGUYÊN NHÂN GỐC: thẻ "💡 Khuyến nghị hôm nay" (`js/36-pro-home.js`) mới có lịch hẹn quá hạn/hôm nay + đơn Base kẹt; khách nhắn mà chưa ai trả lời KHÔNG hiện ở Tổng quan nên phải mở tab Chat mới biết.
+- `js/36-pro-home.js`: `proRecoItems_(due, today, tasks, unreplied)` thêm mục đỏ "N hội thoại Pancake CHƯA TRẢ LỜI" (bấm → tab 💬 Chat); `proUnrepliedLoad_` gọi GAS `pkChatInbox&un=new&type=INBOX` (action CÓ SẴN, KHÔNG đổi GAS), cache 60s, lỗi/hết phiên/không quyền chat → ẩn mục, không báo lỗi; chạm trần 100 (server giới hạn 100 hội thoại khi có lọc) → hiện "100+". Thẻ khuyến nghị có `id="pro-reco-list"` nên khi đếm xong chỉ vẽ lại danh sách này (không vẽ lại cả Tổng quan).
+- ⚠ Số đếm là TOÀN hộp thư (không lọc theo nhân viên) — `pkChatInbox` cùng danh sách cho mọi người dùng. Muốn "của tôi" thì cần tham số `nv` (có trong `_scFilterQuery_`), chưa làm.
+- Test: `node tools/test-ui-pro-home.js` (29 ca, thêm 7 ca R4a) PASS; mô phỏng loader bằng Node vm (42 hội thoại → 42, cache 60s chỉ 1 lần gọi, lỗi phiên/mạng → null); `test-ui-pro*`, `test-mobile-fit` PASS; `build-dist` + `test-dist-equivalence` OK (cần `npm i terser clean-css html-minifier-terser jsdom` cục bộ; build-dist tự sửa `css/99-dark-auto.css` nên đã `git checkout` lại, không commit).
+- 🧪 Duyên: Ctrl+F5 CRM → 🏠 Tổng quan → thẻ "Khuyến nghị hôm nay" phải có dòng đỏ "N hội thoại Pancake chưa trả lời" (nếu hộp thư còn tin chưa trả lời); bấm "Mở chat" phải sang tab Chat. Không cần deploy GAS, không cần reload extension.
+- [ ] VIỆC KẾ TIẾP: R4b (KPI so mục tiêu + so kỳ trước, dùng `orgOverview`), R4c (cảnh báo sale tụt doanh số/tỷ lệ chốt bất thường). Cần Duyên chốt: ngưỡng "tụt" (vd −20% so kỳ trước?) và có đổi số đếm chat sang "của tôi" không.
+
 ## 2026-11-15 (phiên Claude — Pancake AI panel BƯỚC 3: thẻ khách + gợi ý AI + giỏ hàng) — XONG 1/1 (đã push); CHỜ Duyên xem thực tế
 NGUYÊN NHÂN GỐC: sau bước 2 chỉ header/lưới nút/thẻ nhóm đổi màu tím–hồng; thẻ khách, khối gợi ý AI và giỏ hàng vẫn dùng CSS cũ (xanh lá/xanh dương) nên panel nhìn lệch tông.
 - `extension-pancake/pancake-content.css` (cuối khối GIAO DIỆN V2): thẻ khách viền gradient trên, tên/SĐT/chip/nhãn tím, `.pk-ai-suggestion-item` viền trái accent, nút lưu gợi ý gradient, giỏ hàng nền trắng + viền. CHỈ CSS, không đổi id/class JS. Manifest `2026.11.14.7`.

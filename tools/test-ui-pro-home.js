@@ -37,3 +37,12 @@ ok(h.includes('id="pro-home"')&&h.includes('319 tr')&&h.includes('109')&&h.inclu
 ok(m.proHomeHtml_({label:'<x>',c:{}}).includes('&lt;x&gt;'),'escape nhãn phạm vi');
 ok(m.proHomeHtml_({c:null,label:'a'}).includes('—'),'không có số liệu → "—", không lỗi');
 process.exit(bad?1:0);
+// R4a: hội thoại Pancake chưa trả lời
+r=m.proRecoItems_([{date:'2026-10-09'},{date:'2026-10-11'}],'2026-10-11',[],37);
+ok(r.length===3&&r[2].n===37&&r[2].tone==='bad'&&r[2].go==='chat'&&r[2].text.includes('CHƯA TRẢ LỜI'),'37 hội thoại chưa trả lời → mục đỏ cuối danh sách, bấm mở tab chat');
+r=m.proRecoItems_([],'2026-10-11',[],m.PRO_UNREPLIED_CAP);ok(r.length===1&&r[0].n===m.PRO_UNREPLIED_CAP+'+','chạm trần 100 → hiện "100+" (server chỉ trả tối đa 100)');
+for(const v of [null,undefined,0,NaN,'abc',-3]){r=m.proRecoItems_([],'2026-10-11',[],v);ok(r.length===1&&r[0].n==='✓','unreplied '+String(v)+' → không hiện mục, vẫn báo xong việc');}
+r=m.proRecoItems_([],'2026-10-11',[],5);ok(r.length===1&&r[0].n===5,'chỉ có tin chưa trả lời → KHÔNG báo "xong việc"');
+r=m.proRecoItems_([],'2026-10-11',[]);ok(r.length===1&&r[0].n==='✓','không truyền tham số thứ 4 (gọi kiểu cũ) vẫn chạy');
+ok(m.proRecoHtml_(m.proRecoItems_([],'2026-10-11',[],5)).includes('data-home-go="chat"'),'HTML có nút data-home-go="chat"');
+ok(m.proHomeHtml_({label:'x',from:'a',to:'b',c:{},recoHtml:'<i>R</i>'}).includes('id="pro-reco-list"><i>R</i>'),'thẻ khuyến nghị có id pro-reco-list để vẽ lại riêng');
