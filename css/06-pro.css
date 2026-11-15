@@ -34,6 +34,18 @@ html.ui-pro .pro-stage>li{position:relative;flex:1 0 110px;height:34px;line-heig
 html.ui-pro .pro-stage>li:first-child{margin-left:0;padding-left:14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);}
 html.ui-pro .pro-stage>li.done{background:var(--pro-green);color:#fff;}
 html.ui-pro .pro-stage>li.cur{background:var(--pro-blue);color:#fff;font-weight:600;}
+/* R14: ô giai đoạn bấm được (CS bấm để đổi Tình trạng CS); ô nhóm có mũi tên ▾ và mở hàng mục con bên dưới */
+html.ui-pro .pro-stage-wrap{margin:0 0 12px;}
+html.ui-pro .pro-stage-wrap>.pro-stage{margin-bottom:0;}
+html.ui-pro .pro-stage>li[data-pro-stage-val],html.ui-pro .pro-stage>li[data-pro-stage-grp]{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+html.ui-pro .pro-stage>li[data-pro-stage-val]:hover,html.ui-pro .pro-stage>li[data-pro-stage-grp]:hover{filter:brightness(.94);}
+html.ui-pro .pro-stage>li[data-pro-stage-val]:focus-visible,html.ui-pro .pro-stage>li[data-pro-stage-grp]:focus-visible{outline:2px solid var(--pro-blue);outline-offset:-2px;}
+html.ui-pro .pro-stage>li[data-pro-stage-grp]::after{content:" \25BE";opacity:.65;}
+html.ui-pro .pro-stage-sub{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;}
+html.ui-pro .pro-stage-sub[hidden]{display:none;}
+html.ui-pro .pro-stage-opt{font:inherit;font-size:12.5px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--border-md,#d4d0e0);background:var(--surface,#fff);color:var(--text,#111);cursor:pointer;}
+html.ui-pro .pro-stage-opt:hover{background:var(--surface2,#f3f4f6);}
+html.ui-pro .pro-stage-opt.cur{background:var(--pro-blue);border-color:var(--pro-blue);color:#fff;font-weight:600;}
 /* Dòng thời gian (ghi chú / lịch hẹn / đơn hàng) */
 html.ui-pro .pro-tl{position:relative;margin:0;padding:0 0 0 22px;list-style:none;}
 html.ui-pro .pro-tl::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--pro-line);}

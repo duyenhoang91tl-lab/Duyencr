@@ -7,7 +7,15 @@
 function proStageModel_(tree, status){
   var st = String(status||'').trim();
   function has(n){ if (n.value!==undefined && String(n.value)===st) return true; return (n.children||[]).some(has); }
-  return (tree||[]).map(function(n){ return { label:n.label, cur: !!st && has(n) }; });
+  // R14: kèm `value` (node lá) hoặc `children` (node nhóm) để CS bấm đổi Tình trạng CS; label/cur giữ nguyên như cũ.
+  return (tree||[]).map(function(n){
+    var m = { label:n.label, cur: !!st && has(n) };
+    if (n.children && n.children.length){
+      m.children = n.children.filter(function(ch){ return ch && ch.value!==undefined && ch.value!==''; })
+        .map(function(ch){ return { label: ch.label || ch.value, value: ch.value, cur: !!st && String(ch.value)===st }; });
+    } else if (n.value!==undefined && n.value!=='') m.value = n.value;
+    return m;
+  });
 }
 // Số ngày kể từ đơn gần nhất (null nếu không có đơn). Đơn chỉ có tháng/năm → tính từ ngày 1 của tháng.
 function proDaysSinceLastOrder_(orders, now){
@@ -52,9 +60,75 @@ function proFactsHtml_(orders, custom, now, cycle){
   if (custom.noPromo) out.push(chip('🚫 Không nhận quảng bá', 'red'));
   return out.length ? '<div style="margin:2px 0 8px">'+out.join('')+'</div>' : '';
 }
-function proStageHtml_(model){
+// opts.phone (R14) → các ô bấm được: ô lá (data-pro-stage-val) đổi ngay; ô nhóm (data-pro-stage-grp) mở hàng chọn mục con. Không có opts.phone → HTML y hệt bản cũ (chỉ xem).
+function proStageHtml_(model, opts){
   if (!model.length) return '';
-  return '<ul class="pro-stage">'+model.map(function(m){ return '<li class="'+(m.cur?'cur':'')+'" title="'+String(m.label).replace(/"/g,'&quot;')+'">'+String(m.label).replace(/</g,'&lt;')+'</li>'; }).join('')+'</ul>';
+  var ph = opts && opts.phone ? String(opts.phone) : '';
+  var esc = function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  if (!ph) return '<ul class="pro-stage">'+model.map(function(m){ return '<li class="'+(m.cur?'cur':'')+'" title="'+String(m.label).replace(/"/g,'&quot;')+'">'+String(m.label).replace(/</g,'&lt;')+'</li>'; }).join('')+'</ul>';
+  var subs = '';
+  var lis = model.map(function(m, i){
+    var act = '', tip = esc(m.label);
+    if (m.children && m.children.length){ act = ' role="button" tabindex="0" data-pro-stage-grp="'+i+'" aria-expanded="false"'; tip += ' — bấm để chọn mục con'; 
+      subs += '<div class="pro-stage-sub" data-pro-stage-sub="'+i+'" hidden>'+m.children.map(function(ch){
+        return '<button type="button" class="pro-stage-opt'+(ch.cur?' cur':'')+'" data-pro-stage-val="'+esc(ch.value)+'">'+esc(ch.label)+'</button>'; }).join('')+'</div>'; }
+    else if (m.value!==undefined){ act = ' role="button" tabindex="0" data-pro-stage-val="'+esc(m.value)+'"'; tip += ' — bấm để chuyển Tình trạng CS sang mục này'; }
+    return '<li class="'+(m.cur?'cur':'')+'" title="'+tip+'"'+act+'>'+esc(m.label)+'</li>';
+  }).join('');
+  return '<div class="pro-stage-wrap" data-pro-stage-ph="'+esc(ph)+'"><ul class="pro-stage">'+lis+'</ul>'+subs+'</div>';
+}
+// R14: CS bấm 1 ô giai đoạn → đổi Tình trạng CS của khách. Hồ sơ đang mở tab Chăm sóc (có ô #cs-status): đặt giá trị rồi gọi ĐÚNG saveCare (cùng nhật ký, khung đơn chốt, tự nhảy Trạng thái KH, đồng bộ GAS).
+// Không có form (tab khác / panel Chat): ghi thẳng careData theo đúng các bước của saveCare (nhật ký, KH tự nhảy, lưu máy, hàng đợi đồng bộ).
+function proStageSet_(phone, value){
+  if (!phone || value==null || value==='' || typeof careData==='undefined') return false;
+  var ex = careData[phone] || {};
+  if (String(ex.status||'') === String(value)) return false;   // bấm đúng mục đang chọn → không làm gì
+  var sel = document.getElementById('cs-status');
+  var formOpen = !!sel && typeof currentPhone!=='undefined' && currentPhone===phone && Array.prototype.some.call(sel.options, function(o){ return o.value===String(value); });
+  if (formOpen){
+    sel.value = String(value);
+    if (typeof _hOnCsStatusChange_==='function') _hOnCsStatusChange_();
+    saveCare(phone);
+  } else {
+    if (typeof logAudit==='function') logAudit('status', phone, ex.status||'(trống)', String(value));
+    var kh = ex.khStatus || (typeof _hAutoKh_==='function' ? _hAutoKh_(String(value)) : '') || '';
+    careData[phone] = Object.assign({}, ex, { status:String(value), khStatus:kh });
+    if (typeof _touchCare==='function') _touchCare(phone);
+    if (typeof saveLS==='function') saveLS('ome_care', careData);
+    if (typeof _invalidateFilterCache==='function') _invalidateFilterCache();
+    var c = (typeof allCustomers!=='undefined') ? allCustomers.find(function(x){ return x.phone===phone; }) : null;
+    if (c) c.careStatus = String(value);
+    if (typeof updateStats==='function') updateStats();
+    if (typeof updateSidebarBadges==='function') updateSidebarBadges();
+    if (typeof applyFilters==='function') applyFilters();
+    if (typeof gsUrl!=='undefined' && gsUrl && typeof queueCareSync==='function') queueCareSync(phone);
+    var chot = false; try { chot = typeof _hIsChot_==='function' && _hIsChot_(String(value)); } catch(e){}
+    if (typeof toast==='function') toast('✓ Đã chuyển Tình trạng CS → '+(typeof careStatusFullLabel==='function' ? careStatusFullLabel(String(value)) : value)+(chot?' (mở tab Chăm sóc để nhập doanh thu đơn chốt)':''));
+  }
+  try { proRenderProfile_(); } catch(e){}
+  try {
+    var conv = (typeof window!=='undefined') ? window._proChatConv_ : null;
+    if (conv && typeof proChatInfoRender_==='function' && typeof proChatFindCustomer_==='function'){ var cc = proChatFindCustomer_(conv.phone); if (cc && cc.phone===phone) proChatInfoRender_(conv); }
+  } catch(e){}
+  return true;
+}
+// Bấm ô nhóm → bật/tắt hàng mục con của nhóm đó (đóng các nhóm khác); bấm ô lá hoặc mục con → đổi tình trạng.
+function proStageClick_(el){
+  if (!el) return;
+  var wrap = el.closest ? el.closest('[data-pro-stage-ph]') : null; if (!wrap) return;
+  var grp = el.getAttribute('data-pro-stage-grp');
+  if (grp!==null){
+    wrap.querySelectorAll('[data-pro-stage-sub]').forEach(function(d){ var on = d.getAttribute('data-pro-stage-sub')===grp && d.hidden; d.hidden = !on; });
+    wrap.querySelectorAll('[data-pro-stage-grp]').forEach(function(l){ l.setAttribute('aria-expanded', String(l.getAttribute('data-pro-stage-grp')===grp && !wrap.querySelector('[data-pro-stage-sub="'+grp+'"]').hidden)); });
+    return;
+  }
+  var v = el.getAttribute('data-pro-stage-val'); if (v===null) return;
+  proStageSet_(wrap.getAttribute('data-pro-stage-ph'), v);
+}
+if (typeof document!=='undefined' && typeof window!=='undefined' && !window._proStageBound_){
+  window._proStageBound_ = true;
+  document.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-pro-stage-grp],[data-pro-stage-val]') : null; if (t) proStageClick_(t); });
+  document.addEventListener('keydown', function(e){ if (e.key!=='Enter' && e.key!==' ') return; var t = e.target && e.target.closest ? e.target.closest('li[data-pro-stage-grp],li[data-pro-stage-val]') : null; if (!t) return; e.preventDefault(); proStageClick_(t); });
 }
 
 
@@ -168,7 +242,7 @@ function proRenderProfile_(){
   var leadHtml = ''; try { if (typeof lsScore_==='function'){ var ls_ = lsScore_(c, mine, Date.now()); leadHtml = proLeadHtml_(ls_, typeof lsNextStep_==='function' ? lsNextStep_(ls_, c) : null); } } catch(e){ leadHtml = ''; }   // R8c
   host.innerHTML = proQuickActionsHtml_(c.phone)
                  + leadHtml
-                 + proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
+                 + proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''), { phone: c.phone })
                  + proKpiHtml_(proDaysSinceLastOrder_(c.orders, new Date()), nOrd, _custRev_(c))
                  + proFactsHtml_(c.orders, care.custom||c.custom, new Date(), (typeof _hmCfg==='function'?_hmCfg().cycle:30))
                  + proNextHtml_(proNextActions_(mine, c.phone, _ymd(new Date()), types, 3))
@@ -183,4 +257,4 @@ function proRenderProfile_(){
   if (typeof openDp==='function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
   if (typeof renderDpTab==='function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
 })();
-if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proQuickPhone_, proQuickActionsHtml_, proLeadHtml_ };
+if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proStageSet_, proStageClick_, proQuickPhone_, proQuickActionsHtml_, proLeadHtml_ };
