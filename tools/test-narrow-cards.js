@@ -8,5 +8,6 @@ ok(!/flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">' \+ acts/.test(a), 
 ok(/display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-start;margin-bottom:4px/.test(b), 'Viết tắt: thẻ được flex-wrap');
 ok(/<code style="font-size:13px;font-weight:700;overflow-wrap:anywhere;word-break:break-all">/.test(b), 'Viết tắt: mã viết tắt dài (vd trangsucnhankimvanloc2027tuvan) tự ngắt dòng');
 ok(/<div style="flex:1 1 200px;min-width:0"><div style="margin-bottom:3px">/.test(b), 'Viết tắt: cột nội dung có flex-basis 200px, không bị bóp còn vài ký tự');
-ok(!/display:flex;gap:4px;flex-shrink:0">/.test(b) && (b.match(/flex:0 0 auto;margin-left:auto/g) || []).length === 2, 'Viết tắt: 2 cột nút (Sửa viết tắt / ✏️🗑) cùng dạng mới, xuống dòng khi hẹp');
+// 16/11: phiên khác thêm nút 📄 Nhân bản làm cột nút ĐẦU (mang margin-left:auto đẩy cả cụm sang phải); các cột sau (⌨️ Sửa viết tắt / ✏️🗑) chỉ cần flex:0 0 auto để cùng xuống dòng khi hẹp.
+ok(!/display:flex;gap:4px;flex-shrink:0">/.test(b) && (b.match(/margin-left:auto/g) || []).length === 1 && (b.match(/display:flex;gap:4px;flex:0 0 auto/g) || []).length >= 2, 'Viết tắt: các cột nút (📄 / Sửa viết tắt / ✏️🗑) dạng mới flex:0 0 auto, cụm đẩy phải bằng 1 margin-left:auto, xuống dòng khi hẹp');
 console.log(bad ? '\nFAIL ' + bad : '\nPASS tất cả'); process.exit(bad ? 1 : 0);

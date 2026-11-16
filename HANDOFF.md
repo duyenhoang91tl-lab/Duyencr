@@ -25,6 +25,10 @@ Duyên: "thêm hiệu ứng linh vật trong CRM là con chó Samoyed của game
 - ⚠ Cả bộ test: 337 file, chỉ `tools/test-narrow-cards.js` đỏ ("Viết tắt: 2 cột nút cùng dạng mới") — ĐỎ CẢ TRÊN BẢN GỐC trước khi sửa (commit c508c9e, phiên Viết tắt), ngoài phạm vi nên KHÔNG tự sửa. Lưu ý: clone nông (`--depth`) làm ~12 test dạng `*-kit`/`report-*-frame` đỏ giả vì thiếu commit cũ → `git fetch --unshallow` trước khi chạy bộ test.
 - [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → thấy chó ở góc dưới trái trên thanh tab; thử tắt/bật ở ⚙ Settings. Nếu muốn: đổi kích thước/vị trí/hành vi (vd bấm vào chó cho nó nhảy — hiện KHÔNG bấm được vì không chặn chuột), hoặc thêm dáng ngồi/ngủ. Việc "Viết tắt: 2 cột nút" (test-narrow-cards) cần phiên Viết tắt xem lại.
 
+## 2026-11-16 (phiên Claude — SỬA TEST ĐỎ `test-narrow-cards`) — XONG (chỉ sửa test)
+NGUYÊN NHÂN GỐC: test kỳ vọng 2 cột nút Viết tắt đều có `margin-left:auto`, nhưng phiên Viết tắt khác thêm nút 📄 Nhân bản làm cột ĐẦU (chỉ cột này giữ `margin-left:auto` đẩy cụm sang phải), các cột sau chỉ `flex:0 0 auto` → test đỏ dù giao diện đúng. Đã cập nhật test cho đúng thiết kế hiện tại; code giao diện KHÔNG đổi. Cả bộ test xanh.
+- [ ] **VIỆC KẾ TIẾP:** không còn việc làm được khi chưa có Duyên (xem các mục [ ] phía dưới: kiểm Actions xanh, thử chỉnh đè đơn, thử tệp ghi âm trên app, R10a/R12a cần ảnh).
+
 ## 2026-11-16 (phiên Claude — CHIA TAY ĐƠN LỆCH POS–BASE: MẶC ĐỊNH THEO KẾ TOÁN, ADMIN CHỈNH ĐÈ ĐƯỢC) — XONG (đã push); GAS tự deploy + Ctrl+F5
 NGUYÊN NHÂN GỐC của việc đổi đi đổi lại: 15/11 mình hiểu sai ý Duyên ("kế toán thắng admin" → commit 81e81aa). Ý đúng (16/11): **vẫn lấy theo kế toán làm mặc định, nhưng khi admin chủ động chỉnh thì số admin ĐÈ lên kế toán.** Đã HOÀN LẠI thứ tự gốc (như 3/11): (1) bảng chia tay admin trong CRM (`acctSplitExtra`) ĐÈ → (2) file kế toán (tab "onl Txx") → (3) tự ghép Base theo tỷ lệ Pos. Đơn không có dòng admin thì vẫn đúng số kế toán.
 - ✅ `gas_v13.js`: gỡ logic bỏ dòng CRM; thêm `out.crmOverrides` (mã dòng admin đang đè lên dòng kế toán đã xác nhận) và `splitFixList` trả `overrides` — chỉ để giao diện báo, KHÔNG đổi cách tính.
