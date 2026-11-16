@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — TĂNG TỐC TẢI BÁO CÁO, BƯỚC 3A: GAS NÂNG TTL CACHE SHEET ĐƠN POS 90s → 600s) — XONG (đã push); GAS TỰ DEPLOY (Actions)
+Duyên đồng ý đề xuất (1). NGUYÊN NHÂN GỐC: `readDonChiTiet_` đọc + đổi + `JSON.stringify` TOÀN BỘ lịch sử sheet Pos mỗi khi cache hết hạn (90s) — không phụ thuộc "chỉ xem 1 tháng".
+- ✅ `gas_v13.js`: hằng số mới `DON_CACHE_TTL_ = 600` (đặt ngay trên `_cachePutBig_`), dùng cho CẢ HAI key xoá-cùng-lúc `donChiTiet_v4` (readDonChiTiet_) và `don_phones_v6` (action donPhones). Số KHÔNG cũ sau nhập file/xoá trùng/dedup: 7 chỗ ghi Pos đã `removeAll(['donChiTiet_v4_n','don_phones_v6_n'])`. Chỉ SỬA TAY trực tiếp trên sheet Pos mới phải chờ tới 10 phút (onChange trigger chỉ xoá cache khi dedup có xoá/sửa ô; không phân biệt được sheet nào đổi nên không xoá vô điều kiện, nếu không Base đổi liên tục sẽ phá cache).
+- Test mới `node tools/test-don-cache-ttl.js` (8 ca, chạy `readDonChiTiet_` THẬT với CacheService giả: TTL 600, lần 2 không đọc lại sheet, removeAll(_n) buộc đọc lại, đếm ≥6 chỗ ghi có xoá cả 2 key). Cả bộ 348/349 (đỏ duy nhất `test-dist-equivalence` do thiếu `dist/`, đỏ cả trên bản gốc).
+- GHI CHÚ ĐỒNG BỘ: repo ĐÃ BỎ khối `gas-code-v9` trong index.html (xác minh 2026-10-08, xem docs/crm-kb/01-rules-and-deploy.md) và GAS tự deploy bằng `.github/workflows/deploy-gas.yml` khi push → KHÔNG cần dán tay / đồng bộ khối nữa. Việc của Duyên: xem tab Actions "Deploy GAS" xanh.
+- 🧪 Duyên: sau khi Actions xanh, mở Báo cáo B (Tháng này) lần đầu sau >90s không dùng → chậm như cũ MỘT lần (nạp cache) → mọi lần xem/đổi báo cáo trong 10 phút sau nhanh hơn rõ.
+- [ ] **VIỆC KẾ TIẾP (bước 3B):** thêm cache cho `_readBaseRowsByCounterCodes_` (đọc 7–8 cột × toàn bộ "DT TỔNG" mỗi lần có đơn ghép; khoá theo tập mã + cờ withProduct; xoá cùng lúc khi ghi DT TỔNG: nhập file Base, dedup Base `removeAll(['srptOptions_v3','orders_v1_n'])`…).
+
 ## 2026-11-16 (phiên Claude — TĂNG TỐC TẢI BÁO CÁO, BƯỚC 3/3: ĐIỀU TRA PHÍA GAS — CHƯA SỬA GÌ, CHỜ ĐO/QUYẾT ĐỊNH CỦA DUYÊN)
 Chỉ ĐỌC `gas_v13.js`, không đổi code (logic tiền phức tạp + mỗi lần sửa phải deploy tay nên không sửa khi chưa đo). Phát hiện:
 - `buildSalesReportB_` (dòng ~6400) mỗi lần cache hết hạn gọi `readDonChiTiet_()` (~4890): đọc TOÀN BỘ sheet "dữ liệu đơn" A:T (mọi tháng) + `_donConvertRows_` + `JSON.stringify` toàn bộ rồi mới lọc theo ngày. Chi phí tỉ lệ với TOÀN BỘ lịch sử, KHÔNG phụ thuộc "chỉ xem 1 tháng". Cache `donChiTiet_v4` (và `don_phones_v6`, xoá cùng lúc) chỉ sống 90 giây → xem lại sau >90s là đọc lại cả sheet.

@@ -281,6 +281,10 @@ function _colLetter_(n) {
 
 // ─── CACHE LON: chia manh de vuot gioi han ~100KB/1 key cua CacheService ─────────────
 // (danh muc gia day du co the vuot 100KB nen cache.put 1 key se bi bo qua am tham)
+// TTL (giay) cua cache TOAN BO sheet don Pos: 'donChiTiet_v4' (readDonChiTiet_) va 'don_phones_v6' (action donPhones) — PHAI dung chung 1 hang so vi hai key xoa cung luc.
+// 2026-11-16 (Duyen: "an load bao cao hoi lau du chi xem thang"): 90s -> 600s. NGUYEN NHAN GOC cham: moi khi cache het han, buildSalesReportB_/E/F/G doc + doi + JSON.stringify TOAN BO lich su sheet Pos
+// (khong phu thuoc "chi xem 1 thang"). Nhap file / xoa trung / sua o qua he thong da removeAll(['donChiTiet_v4_n','don_phones_v6_n']) nen so khong cu; CHI sua tay truc tiep tren sheet Pos moi phai cho toi 10 phut.
+var DON_CACHE_TTL_ = 600;
 function _cachePutBig_(key, str, ttl) {
   try {
     var cache = CacheService.getScriptCache();
@@ -2667,12 +2671,12 @@ function doGetCore_(e) {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
       // 100KB nen payload nay (5 map theo SDT) gan nhu chac chan THAT BAI AM THAM -> khong bao gio duoc cache. Nay doc 1 LAN roi
-      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL 90s bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
+      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL DON_CACHE_TTL_ (600s) bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
       var cachedDP = _cacheGetBig_('don_phones_v6');
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
       var rowsDP = readDonChiTiet_();
       var resDP = { phones: readDonPhones_(rowsDP), saleByPhone: getDonSaleByPhone_(rowsDP), orderCountByPhone: getDonOrderCountByPhone_(rowsDP), lastDateByPhone: getDonLastDateByPhone_(rowsDP), statsByPhone: getDonStatsByPhone_(rowsDP) };
-      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), 90); } catch(ec) {}
+      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
     }
 
@@ -4901,7 +4905,7 @@ function readDonChiTiet_() {
   // posRow = so dong THAT trong sheet "dữ liệu đơn" (header o dong 1) — de ke toan do lai tung don (Bao cao L). Chi gan o day
   // (khong sua _donConvertRows_ dung chung voi Supabase backfill). Cache cu <=90s chua co posRow thi chi hien trong tam.
   var out = conv.items.map(function (it) { var o = it.obj; o.posRow = it.srcRow; return o; });
-  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), DON_CACHE_TTL_); } catch (eCache) {}
   return out;
 }
 
