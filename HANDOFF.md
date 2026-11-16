@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — SỬA "DANH SÁCH KH CHỈ HIỂN THỊ 1 KHÁCH") — XONG (đã push); chờ Duyên xem trên máy thật
+Duyên: "fix danh sách khách hàng chỉ hiển thị 1 khách".
+NGUYÊN NHÂN GỐC (lỗi do R5a bước 1, js/82): `csSelInject_` chèn ô tích NGAY SAU `<td class="col-name">`, trước `<div class="cname">` (khối block) → ô tích thành 1 dòng riêng phía trên tên → mỗi dòng cao 78px thay vì ~59px. Bảng ảo (js/02 `_renderVirtualWindow`) tính theo `VT_ROW_H=58` nên sai lệch, và phần đầu trang (Tổng quan + bộ lọc) đã chiếm ~280px nên trên màn hình nhỏ vùng bảng chỉ còn ~1 dòng. Đo bằng Chromium headless (Playwright) với 3.000 khách giả: trước 78px/dòng, sau 59px/dòng (bằng bản không có js/82).
+- ✅ `js/82-cust-select.js`: ô tích chèn TRONG `<div class="cname">` (cùng dòng với tên); không có cname mới chèn đầu ô Tên. Dùng hàm thay thế trong `replace` để chuỗi chứa `$` không bị hiểu nhầm. `css/28-cust-select.css`: `.cname:has(>.cs-sel-box){display:flex;align-items:center}` + `flex:none` cho ô tích. Bump `?v=` js/82 → 20261116c, css/28 → 20261116b.
+- Test: `tools/test-cust-select.js` thêm ca bắt đúng lỗi này (ô tích nằm trong cname, KHÔNG đứng trước; mỗi dòng 1 ô; js/02 vẫn có `<div class="cname">`; css/28 có rule flex). cust-select + cust-bulk-cs + tokens + dark-theme + mobile-fit + ui-kit đạt. Không đổi GAS/extension → chỉ Ctrl+F5.
+- 🧪 Duyên: Ctrl+F5 → Danh sách KH: mỗi dòng phải gọn như trước (ô tích nằm cạnh tên), cuộn thấy nhiều khách. CHỜ ẢNH nếu vẫn thấy ít dòng.
+- [ ] **VIỆC KẾ TIẾP:** (a) nếu cửa sổ nhỏ vẫn thấy ít dòng thì nguyên nhân là khối "Tổng quan & tác vụ" + bộ lọc phía trên chiếm ~280px (bấm mũi tên ▲ ở Tổng quan để thu gọn) — chưa đổi bố cục, chờ Duyên chốt; (b) vườn hoa-bướm-ong (js/79) vẽ đè ~112px đáy màn hình (không chặn chuột) nên che nhìn 1–2 dòng cuối; tắt bằng Menu → "🌼 Tắt vườn"; (c) R5a BƯỚC 3 (`js/84-cust-bulk-status.js`: đổi tình trạng CS + trạng thái KH hàng loạt) rồi R5d vẫn như mục R5a bên dưới.
+
 ## 2026-11-16 (phiên Claude — VƯỜN HOA-BƯỚM-ONG: CÁNH ONG RÕ HƠN, BƯỚM NHIỀU MÀU, BƯỚM BAY LÊN + ĐẬU HOA) — XONG CẢ 2 BƯỚC (đã push); chờ Duyên xem trên máy thật
 Duyên: "tăng màu cánh ong nhìn rõ hơn; cánh bướm nhiều màu hơn; bướm bay nhẹ lên chứ không chỉ bay xuống; bướm đậu được lên hoa". File: `js/79-mascot-samoyed.js` (+ `tools/test-mascot-samoyed.js`, `?v=` js/79 trong index.html).
 NGUYÊN NHÂN GỐC: cánh ong vẽ `globalAlpha 0.5` + màu `rgba(200,230,255)` gần như trùng nền sáng của CRM nên không thấy; bướm chỉ có 1 màu/con (5 màu pastel, 2 cánh cùng 1 elip) và dùng chung `flyStep` (dội trần/sàn bằng `a=-a`, không có xu hướng bay lên), không có trạng thái đậu như ong.
