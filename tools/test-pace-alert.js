@@ -63,6 +63,43 @@ t(P.paceAlertItems_([{ name: 'Z', revenue: 0, orders: 0, tongTT: 12, tyLeChot: 0
 it = P.paceAlertItems_([mk('<img src=x onerror=1>', 1e6)], R, { today: TD });
 t(!/<img/.test(it[0].text) && /&lt;img/.test(it[0].text), 'tên sale được ESCAPE');
 
+// ── 3b) ngày bắt đầu nhận tin (Duyên chốt 16/11, ý 5): chia theo ngày làm thực tế ──
+{
+  const sd = m => n => m[n] || '';
+  // vào mùng 3, đào tạo 5 ngày, nhận tin từ mùng 9; kỳ cả tháng 11, hôm nay 30/11 → tính 9..30 = 22 ngày → cần 500tr×22/30 = 366,7tr
+  let r = P.paceAlertItems_([mk('A', 150e6)], R, { today: '2026-11-30', startDateOf: sd({ A: '2026-11-09' }) });
+  t(r.length === 1 && /A 40,9% \(150tr\/366,7tr, từ 9\/11\)/.test(plain(r[0].text)) && /dưới 50%/.test(r[0].text), 'nhận tin từ 9/11: cần 500tr×22/30 = 366,7tr (không phải cả 500tr); hiện "từ 9/11"');
+  r = P.paceAlertItems_([mk('A', 150e6)], R, { today: '2026-11-30' });
+  t(/A 30% \(150tr\/500tr\)/.test(plain(r[0].text)) && !/từ \d/.test(plain(r[0].text)), 'cùng sale KHÔNG có ngày bắt đầu → so với cả tháng 500tr, không hiện "từ"');
+  r = P.paceAlertItems_([mk('A', 150e6)], R, { today: '2026-11-30', startDateOf: sd({ A: '2026-10-20' }) });
+  t(/A 30% \(150tr\/500tr\)/.test(plain(r[0].text)) && !/từ \d/.test(plain(r[0].text)), 'ngày bắt đầu TRƯỚC đầu kỳ → như không có (không hiện "từ")');
+  r = P.paceAlertItems_([mk('A', 150e6)], R, { today: '2026-11-30', startDateOf: sd({ A: '2026-11-01' }) });
+  t(!/từ \d/.test(plain(r[0].text)), 'ngày bắt đầu trùng đúng đầu kỳ → không hiện "từ" thừa');
+  // 2 sale cùng doanh số, 1 người mới nhận tin → chỉ người mới đạt tiến độ
+  r = P.paceAlertItems_([mk('Cu', 130e6), mk('Moi', 130e6)], R, { today: '2026-11-30', startDateOf: sd({ Moi: '2026-11-20' }) });
+  t(r.length === 2 && /dưới 50%/.test(r[0].text) && /Cu 26% \(130tr\/500tr\)/.test(plain(r[0].text)) && /65% – dưới 85%/.test(r[1].text) && /Moi 70,9% \(130tr\/183,3tr, từ 20\/11\)/.test(plain(r[1].text)), 'cùng 130tr: sale cũ 26% (mức 4, so 500tr) còn sale nhận tin 20/11 chỉ cần 183,3tr → 70,9% (mức 2)');
+}
+{
+  const sd = m => n => m[n] || '';
+  let r = P.paceAlertItems_([mk('Moi', 190e6)], R, { today: '2026-11-30', startDateOf: sd({ Moi: '2026-11-20' }) });
+  t(r.length === 0, 'nhận tin 20/11 (11 ngày → cần 183,3tr): chạy 190tr ≥ cần có → KHÔNG báo (trong khi so cả tháng 500tr sẽ báo oan)');
+  r = P.paceAlertItems_([mk('X', 1e6)], R, { today: '2026-11-10', startDateOf: () => '2026-11-15' });
+  t(r.length === 0, 'ngày nhận tin SAU hôm nay → chưa báo tiến độ');
+  r = P.paceAlertItems_([mk('X', 1e6)], R, { today: '2026-11-10', startDateOf: () => '2026-11-09' });
+  t(r.length === 0, 'mới nhận tin 2 ngày (9–10/11 < 3 ngày làm thực tế) → chưa báo');
+  r = P.paceAlertItems_([mk('X', 1e6)], R, { today: '2026-11-11', startDateOf: () => '2026-11-09' });
+  t(r.length === 1, 'đủ 3 ngày làm thực tế (9–11/11) → bắt đầu báo');
+  r = P.paceAlertItems_([mk('X', 1e6)], R, { today: '2026-11-10', startDateOf: () => 'khong-phai-ngay' });
+  t(r.length === 1 && !/từ \d/.test(plain(r[0].text)), 'ngày bắt đầu sai định dạng → bỏ qua, tính từ đầu kỳ');
+  r = P.paceAlertItems_([mk('X', 1e6)], R, { today: '2026-11-10', startDateOf() { throw new Error('x'); } });
+  t(r.length === 1, 'startDateOf ném lỗi → bỏ qua, không văng');
+  r = P.paceAlertItems_([mk('TVx', 5e6)], R, { today: '2026-11-30', isProbation: prob, startDateOf: () => '2026-11-16' });
+  t(r.length === 1 && /TVx 10% \(5tr\/50tr, từ 16\/11\)/.test(plain(r[0].text)), 'thử việc + nhận tin 16/11: cần 100tr×15/30 = 50tr → 5tr = 10% (hiện "từ 16/11")');
+  // nhận tin giữa tháng nhưng xem THÁNG TRƯỚC (đã qua hết) → ngày bắt đầu sau cuối kỳ → không báo
+  r = P.paceAlertItems_([mk('A', 1e6)], { from: '2026-10-01', to: '2026-10-31' }, { today: '2026-11-16', startDateOf: () => '2026-11-09' });
+  t(r.length === 0, 'xem tháng 10 nhưng nhận tin từ 9/11 → không báo (chưa làm trong kỳ đó)');
+}
+
 // ── 4) tỷ lệ chốt ──
 const ppl = [mk('A', 300e6, { tongTT: 100, tyLeChot: 10 }), mk('B', 300e6, { tongTT: 100, tyLeChot: 6 }), mk('C', 300e6, { tongTT: 200, tyLeChot: 9 })];
 t(near(P.paceTeamClose_(ppl), (10 * 100 + 6 * 100 + 9 * 200) / 400), 'TB team gia quyền theo số khách: (10·100+6·100+9·200)/400 = 8,5');

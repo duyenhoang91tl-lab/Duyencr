@@ -7,6 +7,7 @@
    • Tiến độ cần có = mục tiêu × Σ(1/số ngày của tháng đó) trên từng ngày đã qua của kỳ đang xem (cắt ở HÔM NAY). VD tháng 30 ngày, 10 ngày đầu → 10/30 → 500tr cần 166,7tr; chạy 150tr = 90% → cảnh báo.
    • 4 MỨC theo % tiến độ đạt được: 1 = 85–<100 · 2 = 65–<85 · 3 = 50–<65 · 4 = <50. (≥100 → không cảnh báo.)
    • Tỷ lệ chốt: sale thấp hơn tỷ lệ chốt trung bình team (bình quân gia quyền theo số khách tương tác) từ PACE_CLOSE_BELOW_PT điểm % trở lên → cảnh báo.
+   • (Duyên chốt 16/11, ý 5) Tiến độ chia theo NGÀY LÀM THỰC TẾ / tổng ngày tháng: mỗi sale chỉ tính các ngày TỪ ngày bắt đầu nhận tin (opts.startDateOf(tên) → 'YYYY-MM-DD'; không có = tính từ đầu kỳ). VD vào mùng 3, đào tạo 5 ngày, nhận tin từ mùng 9 → chỉ tính từ 9 đến hết tháng (mục tiêu cả tháng × số ngày đó / số ngày tháng). Ngày bắt đầu SAU hôm nay/sau kỳ → chưa báo. Ngày kém hợp lệ → bỏ qua.
    ĐIỀU TÔI TỰ THÊM (hằng ở dưới, đổi được): chưa đủ PACE_MIN_DAYS ngày thì chưa báo tiến độ (ngày 1–2 số nhỏ, báo oan); chỉ xét sale có hoạt động (có đơn/doanh thu/tin nhắn) để không báo tài khoản không bán; tỷ lệ chốt chỉ xét sale ≥ PACE_MIN_TT khách tương tác.
    Test: node tools/test-pace-alert.js. Gắn vào Tổng quan: js/36 proHomeRender_ (nạp SAU js/36 cũng được vì chỉ gọi lúc vẽ). */
 (function () {
@@ -62,23 +63,29 @@
   }
   function names_(arr, fmt) { return arr.slice(0, 3).map(fmt).join(', ') + (arr.length > 3 ? ' …' : ''); }
 
+  function validYmd_(v) { var m = String(v == null ? '' : v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m && !isNaN(dayMs(m[0])) ? m[0] : ''; }
+  function dm_(ymd) { return ymd ? (Number(ymd.slice(8, 10)) + '/' + Number(ymd.slice(5, 7))) : ''; }
+
   // people: [{name, revenue, orders, tongTT, tyLeChot}] · range: {from,to} (YYYY-MM-DD) · opts: {today, isProbation(name)→bool}
   function paceAlertItems_(people, range, opts) {
     opts = opts || {}; var out = [], list = (people || []).filter(function (p) { return p && p.name && active_(p); });
     if (!list.length) return out;
-    var fr = range ? paceFraction_(range.from, range.to, opts.today) : null;
-    if (fr && fr.days >= PACE_MIN_DAYS) {
-      var byLv = { 1: [], 2: [], 3: [], 4: [] };
+    if (range) {
+      var byLv = { 1: [], 2: [], 3: [], 4: [] }, any = false;
       list.forEach(function (p) {
         var prob = false; try { prob = !!(opts.isProbation && opts.isProbation(p.name)); } catch (e) { prob = false; }
+        var st = ''; try { st = validYmd_(opts.startDateOf && opts.startDateOf(p.name)); } catch (e) { st = ''; }
+        var effFrom = (st && st > validYmd_(range.from)) ? st : range.from;                    // chỉ tính từ ngày nhận tin (nếu muộn hơn đầu kỳ)
+        var fr = paceFraction_(effFrom, range.to, opts.today);                                  // null = chưa bắt đầu / kỳ sai
+        if (!fr || fr.days < PACE_MIN_DAYS) return;                                             // chưa đủ ngày LÀM THỰC TẾ của sale này
         var target = prob ? PACE_TARGET_PROBATION : PACE_TARGET_OFFICIAL, pct = pacePct_(p.revenue, target, fr.frac), lv = paceLevel_(pct);
-        if (lv) byLv[lv].push({ name: p.name, pct: pct, rev: Number(p.revenue) || 0, exp: target * fr.frac });
+        if (lv) { any = true; byLv[lv].push({ name: p.name, pct: pct, rev: Number(p.revenue) || 0, exp: target * fr.frac, since: (st && st > validYmd_(range.from)) ? dm_(st) : '' }); }
       });
-      PACE_LEVELS.forEach(function (L) {
+      if (any) PACE_LEVELS.forEach(function (L) {
         var a = byLv[L.lv]; if (!a.length) return;
         a.sort(function (x, y) { return x.pct - y.pct; });
         out.push({ n: a.length, tone: L.tone, go: '', act: '',
-          text: '<b>' + L.icon + ' Doanh số chạy chậm — ' + L.label + '</b>: ' + names_(a, function (x) { return esc(x.name) + ' ' + vn(x.pct, 1) + '% (' + tr(x.rev) + '/' + tr(x.exp) + ')'; }) });
+          text: '<b>' + L.icon + ' Doanh số chạy chậm — ' + L.label + '</b>: ' + names_(a, function (x) { return esc(x.name) + ' ' + vn(x.pct, 1) + '% (' + tr(x.rev) + '/' + tr(x.exp) + (x.since ? ', từ ' + x.since : '') + ')'; }) });
       });
     }
     var avg = paceTeamClose_(list);
