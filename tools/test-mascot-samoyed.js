@@ -119,6 +119,35 @@ let fleeBad = 0;
 ok(fleeBad === 0, 'mascotFlee_ luôn trong biên (' + fleeBad + ' sai)');
 ok(e.win._mascotFlee_(1000, 500, 450, () => 0.5) > 500 && e.win._mascotFlee_(1000, 500, 550, () => 0.5) < 500, 'chạy ngược hướng ong');
 
+// 3e) Nút vườn RIÊNG: tắt vườn → chỉ còn chó (không vẽ hoa/bướm/ong, ong không làm chó giật mình); chó vẫn đi dạo; bật lại thì có lại
+e = makeEnv({ w: 1000, ls: { ome_garden: '0' } });
+ok(e.win._gardenIsOn() === false && e.win._gardenLabel() === '🌼 Bật vườn hoa-bướm-ong', 'ome_garden=0 → vườn tắt, nhãn "Bật"');
+t = 1000; let fillsOff = 0;
+for (let i = 0; i < 100; i++) { t += 40; e.step(t); }
+const fOff = e.calls.draw / Math.max(1, e.calls.clear);   // số nét fill mỗi khung khi chỉ có chó
+e = makeEnv({ w: 1000 }); t = 1000; for (let i = 0; i < 100; i++) { t += 40; e.step(t); }
+const fOn = e.calls.draw / Math.max(1, e.calls.clear);
+ok(fOn > fOff + 40, 'tắt vườn → vẽ ít nét hơn hẳn (' + fOff.toFixed(0) + ' < ' + fOn.toFixed(0) + ' nét/khung)');
+// ong sát chó khi vườn tắt → KHÔNG chạy trốn
+e = makeEnv({ w: 1000, ls: { ome_garden: '0' } }); t = 1000; e.step(t); let ran = false;
+for (let i = 0; i < 1500; i++) {
+  let gg = e.win._mascotState_();
+  if (gg.dog.mode === 'idle') { gg.dog.x = 500; gg.dog.until = 1e9; gg.bees.forEach(b => { b.x = 470; b.y = 66; b.v = 0; }); }
+  t += 40; e.step(t); if (e.win._mascotState_().run) { ran = true; break; }
+}
+ok(!ran, 'vườn tắt → ong sát chó cũng không làm chó giật mình');
+// toggle: lưu '0'/'1', nhãn đổi, toast, KHÔNG đụng ome_mascot
+e = makeEnv({ w: 1000 });
+e.win.toggleGarden();
+ok(e.store.ome_garden === '0' && e.win._gardenIsOn() === false && !('ome_mascot' in e.store), 'toggleGarden tắt → ome_garden=0, không đụng ome_mascot');
+ok(/Đã tắt vườn/.test(e.win.__toast) && e.win._gardenLabel() === '🌼 Bật vườn hoa-bướm-ong', 'toast + nhãn khi tắt vườn');
+ok(e.win._mascotIsOn() === true && e.els[0].style.display !== 'none', 'tắt vườn → chó + canvas vẫn còn');
+e.win.toggleGarden();
+ok(e.store.ome_garden === '1' && e.win._gardenIsOn() === true && /Đã bật vườn/.test(e.win.__toast), 'bật lại vườn');
+// giảm chuyển động: bật/tắt vườn vẽ lại ngay 1 khung (không rAF)
+e = makeEnv({ w: 1000, reduced: true }); const c0 = e.calls.clear; e.win.toggleGarden();
+ok(e.calls.clear === c0 + 1 && e.calls.raf === 0, 'giảm chuyển động: toggle vườn vẽ lại đúng 1 khung, không rAF');
+
 // 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
 let badRange = 0, badIdle = 0, moved = 0;
 [320, 390, 800, 1200, 1920].forEach(w => {
@@ -164,11 +193,14 @@ ok(e.els.length === 1, 'nạp lại không nhân đôi canvas');
 
 // 9) Nối đúng vào menu / trang cấu hình / index.html
 const sn = fs.readFileSync(path.join(root, 'js/29-sidenav.js'), 'utf8');
-ok(/'act:sakura','act:mascot','act:errlog'/.test(sn), 'menu Settings có act:mascot');
+ok(/'act:sakura','act:mascot','act:garden','act:errlog'/.test(sn), 'menu Settings có act:mascot + act:garden');
+const gLine = sn.split('\n').find(l => /^\s*garden:\s*\{/.test(l)) || '';
+ok(/f:'toggleGarden'/.test(gLine) && /open:true/.test(gLine) && !/admin:true/.test(gLine), 'ACTS.garden gọi toggleGarden, mọi vai trò');
 const mLine = sn.split('\n').find(l => /^\s*mascot:\s*\{/.test(l)) || '';
 ok(/f:'toggleMascot'/.test(mLine) && /open:true/.test(mLine) && !/admin:true/.test(mLine), 'ACTS.mascot gọi toggleMascot, mọi vai trò (không admin-only)');
 const cf = fs.readFileSync(path.join(root, 'js/37-fn-configpage.js'), 'utf8');
 ok(/it\('mascot', '🐶 Linh vật Samoyed'\)/.test(cf) && /k === 'mascot'/.test(cf), 'trang Cấu hình có nút + cập nhật nhãn tại chỗ');
+ok(/it\('garden', '🌼 Vườn hoa-bướm-ong'\)/.test(cf) && /k === 'garden'/.test(cf), 'trang Cấu hình có nút vườn + cập nhật nhãn tại chỗ');
 const ix = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 ok((ix.match(/js\/79-mascot-samoyed\.js/g) || []).length === 1, 'index.html nạp js/79 đúng 1 lần');
 ok(ix.indexOf('js/66-sakura-petals.js') < ix.indexOf('js/79-mascot-samoyed.js') && ix.indexOf('js/79-mascot-samoyed.js') < ix.indexOf('js/68-ui-kit.js'), 'js/79 nằm ngay sau js/66, không đổi thứ tự thẻ cũ');
