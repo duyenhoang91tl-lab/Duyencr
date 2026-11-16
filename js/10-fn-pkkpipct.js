@@ -1259,21 +1259,59 @@ function _srEnforceScopeBase_(){
 // de cac man hinh phan biet duoc va bao dung nguyen nhan cho CS, thay vi danh lua la "0 ket qua".
 // Them timeout 55s (AbortController) de khong treo vo han khi GAS xu ly qua lau voi khoang ngay
 // rong (vd loc gop nhieu thang) — qua gio bao loi ro rang kem goi y thu loc tung thang mot.
-async function _srFetch(action, params){
+// TOC DO TAI BAO CAO (Duyen 2026-11-16: "an load hoi lau du chi xem bao cao thang"). NGUYEN NHAN GOC: moi lan bam Loc/doi bao cao deu goi lai GAS tu dau (khong co bo nho dem phia trinh duyet),
+// ke ca khi vua xem xong cung khoang ngay vai giay truoc; 2 lan goi giong het nhau cung luc (vd tab B + the thanh phan) cung bi chay 2 lan.
+// Nay: (1) nho TEXT tra ve cua cac action bao cao nang trong 60s (server cung cache 120s nen khong cu hon); luu text roi JSON.parse moi lan -> moi noi goi nhan ban sao rieng,
+// code sau nay sua duoc ket qua (vd map lai dPos.orders) ma khong lam ban cache hong; (2) cac request GIONG HET dang bay cung luc dung chung 1 lan fetch.
+// Khong cache: loi/{error}, action ghi/cai dat, request co fresh=1. Moi duong GHI (luu/xoa/doi cong tat) goi _srLoad() KHONG tham so = tu xoa cache (xem js/11), chi duong XEM (_srApply/_srSetSub) moi duoc dung cache.
+var _SR_CACHE_ACTIONS_ = { salesReportA:1, salesReportB:1, salesReportC:1, storeCaseReport:1, saleKpiReport:1 };
+var _SR_CACHE_TTL_ = 60000, _SR_CACHE_MAX_ = 14;
+var _srCache_ = {}, _srInflight_ = {};
+function _srCacheClear_(){ _srCache_ = {}; }
+function _srCachePut_(key, txt){
+  _srCache_[key] = { t: Date.now(), txt: txt };
+  var ks = Object.keys(_srCache_);
+  if (ks.length > _SR_CACHE_MAX_) { ks.sort(function(a, b){ return _srCache_[a].t - _srCache_[b].t; }); while (ks.length > _SR_CACHE_MAX_) delete _srCache_[ks.shift()]; }
+}
+// Lay TEXT (co cache/dung chung). Tra {txt} khi co du lieu, {err} khi loi mang/HTTP (loi duoc ghi vao lastFetchError boi _srFetch).
+async function _srFetchText_(url, cacheKey, useCache){
+  if (useCache && cacheKey) {
+    var hit = _srCache_[cacheKey];
+    if (hit && Date.now() - hit.t < _SR_CACHE_TTL_) return { txt: hit.txt, cached: true };
+  }
+  if (cacheKey && _srInflight_[cacheKey]) return _srInflight_[cacheKey];
+  var job = (async function(){
+    var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
+    try {
+      var r = await fetch(url, { redirect:'follow', signal: ac ? ac.signal : undefined });
+      if (timer) clearTimeout(timer);
+      if (!r.ok) return { httpErr: r.status };
+      return { txt: await r.text() };
+    } catch (e) {
+      if (timer) clearTimeout(timer);
+      return { netErr: e };
+    }
+  })();
+  if (cacheKey) { _srInflight_[cacheKey] = job; var clr = function(){ if (_srInflight_[cacheKey] === job) delete _srInflight_[cacheKey]; }; job.then(clr, clr); }
+  return job;
+}
+async function _srFetch(action, params, useCache){
   if (!gsUrl) return null;
   _srState.lastFetchError = '';
   var sep = gsUrl.includes('?') ? '&' : '?';
   var qs = Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]||''); }).join('&');
-  var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
+  var url = gsUrl + sep + 'action=' + action + '&' + qs;
+  var cacheable = !!_SR_CACHE_ACTIONS_[action] && !(params && params.fresh);
+  var cacheKey = cacheable ? url : '';
   try{
-    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow', signal: ac ? ac.signal : undefined });
-    if (timer) clearTimeout(timer);
-    if (!r.ok) {
-      _srState.lastFetchError = 'Server trả về lỗi HTTP ' + r.status + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
+    var got = await _srFetchText_(url, cacheKey, useCache === true && cacheable);
+    if (got.netErr) throw got.netErr;
+    if (got.httpErr) {
+      _srState.lastFetchError = 'Server trả về lỗi HTTP ' + got.httpErr + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
       return null;
     }
-    var txt = await r.text();
+    var txt = got.txt;
     try {
       var _obj = JSON.parse(txt);
       // Máy chủ trả {error:...} (hết phiên / không đủ quyền / lỗi GAS) cho báo cáo doanh số: trước đây giao diện vẽ toàn số 0 vì thiếu field -> trông như "không có đơn".
@@ -1282,6 +1320,7 @@ async function _srFetch(action, params){
         _srState.lastFetchError = 'Máy chủ báo lỗi: ' + _obj.error + (_obj.code ? ' [' + _obj.code + ']' : '') + (_obj.code === 'AUTH' || /đăng nhập|dang nhap/i.test(_obj.error) ? ' — đăng xuất rồi đăng nhập lại.' : '');
         return null;
       }
+      if (cacheable && !got.cached && _obj && typeof _obj === 'object' && !_obj.error) _srCachePut_(cacheKey, txt);
       return _obj;
     } catch (eParse) {
       // GAS thuong tra ve 1 trang HTML loi (vd "Exceeded maximum execution time") thay vi JSON
@@ -1294,7 +1333,6 @@ async function _srFetch(action, params){
       return null;
     }
   } catch(e) {
-    if (timer) clearTimeout(timer);
     _srState.lastFetchError = (e && e.name === 'AbortError')
       ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
       : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
