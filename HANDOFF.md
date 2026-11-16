@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — TRỢ LÝ AI "TÓM TẮT DOANH SỐ KỲ NÀY": TOP 3 TỐT NHẤT + TOP 3 THẤP NHẤT, BỎ 2 CÂU THỪA) — XONG (đã push)
+Duyên (ảnh kỳ 2026-11-01 → 2026-11-30): tóm tắt chỉ hiện top 3 + biểu đồ 5 thanh, kèm câu "(Bảng theo sale đã cộng thêm phần sale đơn quầy …)" và dòng "AI: Quy tắc · Báo cáo B (không dùng AI)". Yêu cầu: tóm tắt top 3 tốt nhất + top 3 kém nhất, bỏ 2 câu đó.
+- ✅ `js/38-pro-dock.js`: hàm mới `proSalesBBestWorst_(rows)` (best = 3 đầu; worst = 3 sale CÓ ĐƠN thấp nhất, xếp tăng dần, KHÔNG lặp người đã nằm trong top 3 → ≤3 sale chỉ có nhóm tốt nhất; 5 sale thì nhóm thấp nhất chỉ 2 người). `proRuleSalesB_` intent `summary`: dòng chữ "Top 3 doanh thu tốt nhất / thấp nhất", bỏ câu đơn quầy. `proRichSalesB_` summary: biểu đồ thanh 2 nhóm có tiêu đề (`{heading}` mới; `proRichHtml_` vẽ `pro-rich-hd`, tiêu đề không tính vào max độ dài thanh). `proAiSendSales_`: tóm tắt gắn `provider:''` → dòng "AI: …" không hiện (render chỉ in khi provider khác rỗng).
+- NGUYÊN NHÂN GỐC/giữ nguyên có chủ ý: chỉ đổi TÓM TẮT. Câu hỏi "Top doanh số" vẫn có ghi chú đơn quầy + dòng "AI: Quy tắc…" như cũ; câu "Ai cần hỗ trợ nhất" (đã có sẵn 5 người thấp nhất) giữ nguyên. Số đơn quầy vẫn được CỘNG vào bảng theo sale (chỉ bỏ câu ghi chú ở tóm tắt).
+- Test: mới `node tools/test-pro-sales-summary-top3.js` (14 ca, dùng đúng ví dụ ảnh: ninhnga99 517.570.167đ / huyenmaii1990 / Thuydinh1995 + 3 sale thấp nhất); sửa `test-pro-leads.js` (summary nay có thêm tiêu đề nhóm → chỉ đếm thanh thật). `test-pro-dock-salesb`, `test-ui-pro-dock`, `test-ui-pro-charts`, icon Samoyed đều đạt. Bump `?v=` js/38 trong index.html.
+- KHÔNG đổi GAS/extension → chỉ Ctrl+F5.
+- [ ] **VIỆC KẾ TIẾP (chờ Duyên):** nếu muốn bỏ luôn dòng "AI: Quy tắc…" + câu đơn quầy ở MỌI câu trả lời Doanh số (không chỉ tóm tắt) thì báo — sửa 1 dòng `provider` ở `proAiSendSales_` + biến `store` trong `proRuleSalesB_`. Nếu muốn "thấp nhất" tính cả sale 0 đơn thì đổi bộ lọc `orders>0` trong `proSalesBBestWorst_`.
+
 ## 2026-11-16 (phiên Claude — ĐỔI MẶT AI = MẶT BÉ SAMOYED) — XONG (đã push); chờ Duyên xem trên máy thật
 Duyên: "làm mặt AI = mặt bé Samoyed luôn nhé". Icon AI (nút nổi `#pro-dock-ai` + tiêu đề khung Trợ lý AI + nút/tiêu đề "AI phân tích team" js/30) từng là mèo máy; nay là MẶT SAMOYED.
 - ✅ `js/38-pro-dock.js` `proCatIconSvg_` vẽ lại: đầu tròn lông trắng xù viền be, 2 tai tam giác đứng nhỏ, mắt hạt đen hơi xếch, mũi đen, "nụ cười Sammy" (khoé miệng cong lên) + lưỡi hồng, má hồng nhạt, vòng cổ bạc hà có THẺ TÊN vàng. Đã render PNG xem thử bằng cairosvg: nhìn rõ là chó Samoyed, không còn ria/ăng-ten mèo.

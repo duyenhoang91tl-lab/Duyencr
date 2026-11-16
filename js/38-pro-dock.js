@@ -154,6 +154,7 @@ function proRichHtml_(rich){
   if (items.length){
     var max = items.reduce(function(m, x){ return Math.max(m, Number(x.value) || 0); }, 0) || 1;
     h += '<div class="pro-rich-bars">' + items.map(function(x){
+      if (x.heading) return '<div class="pro-rich-hd" style="font-weight:600;font-size:12px;margin:6px 0 2px;opacity:.85">' + proEsc_(x.heading) + '</div>';
       var w = Math.max(2, Math.round((Number(x.value) || 0) / max * 100));
       return '<div class="pro-rich-bar"><span class="pro-rich-lb">' + proEsc_(x.label) + '</span><span class="pro-rich-tr"><i style="width:' + w + '%"></i></span><span class="pro-rich-v">' + proEsc_(x.text != null ? x.text : x.value) + '</span></div>';
     }).join('') + '</div>';
@@ -177,7 +178,12 @@ function proRichSalesB_(intent, B){
   var money = proMoney_, rows = B.rows;
   var bars = function(n){ return { items: rows.slice(0, n).map(function(r){ return { label: String(r.name||'').slice(0, 18), value: r.giaTri||0, text: money(r.giaTri) }; }) }; };
   if (intent === 'top') return { bars: bars(10), table: { head: ['Sale', 'Doanh thu', 'Đơn', 'TB/đơn'], rows: rows.slice(0, 10).map(function(r){ return { cells: [r.name, money(r.giaTri), r.orders||0, money(r.orders ? Math.round(r.giaTri/r.orders) : 0)] }; }) } };
-  if (intent === 'summary') return { bars: bars(5) };
+  if (intent === 'summary'){
+    var bw = proSalesBBestWorst_(rows), it = function(r){ return { label: String(r.name||'').slice(0, 18), value: r.giaTri||0, text: money(r.giaTri) }; };
+    var items = [{ heading: 'Top 3 doanh thu tốt nhất' }].concat(bw.best.map(it));
+    if (bw.worst.length) items = items.concat([{ heading: 'Top 3 doanh thu thấp nhất' }], bw.worst.map(it));
+    return { bars: { items: items } };
+  }
   return null;
 }
 function proLeadsIntent_(q){
@@ -565,13 +571,25 @@ function proSalesBIntent_(q){
   if (/\btop\b|cao nhat|dan dau|xep hang|nhieu nhat|tung sale|theo sale|ai ban/.test(n)) return 'top';
   return proIntent_('sales', q);
 }
+// Top 3 cao nhất + top 3 thấp nhất (thấp nhất = sale CÓ đơn, xếp tăng dần; không lặp người đã nằm trong top 3 khi ít sale: ≤3 sale → chỉ có 'best').
+// rows đã sắp giảm dần theo doanh thu (proSalesBBuild_). Dùng chung cho dòng chữ và biểu đồ thanh của TÓM TẮT.
+function proSalesBBestWorst_(rows){
+  rows = rows || [];
+  var best = rows.slice(0, 3), rest = rows.slice(3).filter(function(r){ return (r.orders||0) > 0; });
+  var worst = rest.slice().sort(function(a,b){ return (a.giaTri||0)-(b.giaTri||0); }).slice(0, 3);
+  return { best:best, worst:worst };
+}
 function proRuleSalesB_(intent, B){
   var money = proMoney_, head = 'Báo cáo B (Pos) · '+B.from+' → '+B.to;
   if (!B.orders && !(B.rev>0) && !B.rows.length) return head+':\nKhông có đơn nào trong khoảng này. Chọn kỳ khác ở thanh lọc phía trên (vd Tháng trước).';
   var rows = B.rows, total = rows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
   var line = function(r,i){ return (i+1)+'. '+r.name+' — '+money(r.giaTri)+' · '+(r.orders||0)+' đơn'; };
-  var store = B.storeTotal ? ['(Bảng theo sale đã cộng thêm phần sale đơn quầy '+money(B.storeTotal)+'.)'] : [];
-  if (intent==='summary') return [head+':', 'Doanh thu '+money(B.rev)+' · '+B.orders+' đơn · TB/đơn '+money(B.aov)+' · COD '+money(B.cod)+'.'].concat(rows.length ? ['Top: '+rows.slice(0,3).map(function(r,i){ return (i+1)+'. '+r.name+' ('+money(r.giaTri)+')'; }).join(' · ')] : [], store).join('\n');
+  var store = B.storeTotal ? ['(Bảng theo sale đã cộng thêm phần sale đơn quầy '+money(B.storeTotal)+'.)'] : [];   // chỉ còn dùng ở intent 'top'; TÓM TẮT đã bỏ câu này (Duyên 16/11)
+  if (intent==='summary'){
+    var bw = proSalesBBestWorst_(rows), fmt = function(r,i){ return (i+1)+'. '+r.name+' ('+money(r.giaTri)+')'; };
+    return [head+':', 'Doanh thu '+money(B.rev)+' · '+B.orders+' đơn · TB/đơn '+money(B.aov)+' · COD '+money(B.cod)+'.']
+      .concat(bw.best.length ? ['Top 3 doanh thu tốt nhất: '+bw.best.map(fmt).join(' · ')] : [], bw.worst.length ? ['Top 3 doanh thu thấp nhất: '+bw.worst.map(fmt).join(' · ')] : []).join('\n');
+  }
   if (intent==='top') return [head+' — xếp theo doanh thu:'].concat(rows.slice(0,10).map(line), store).join('\n');
   if (intent==='support'){
     var low = rows.filter(function(r){ return (r.orders||0)>0; }).slice().sort(function(a,b){ return (a.giaTri||0)-(b.giaTri||0); }).slice(0,5);
@@ -634,7 +652,7 @@ async function proAiSendSales_(question, q){
   _proDock.log.pop();
   if (ctx.error){ _proDock.log.push({ role:'bot', text:'⚠ '+ctx.error }); _proDock.busy = false; proAiLogRender_(); return; }
   if (PRO_AI_ENGINE==='rule'){
-    _proDock.log.push({ role:'bot', text:proRuleSalesBAnswer_(question, ctx.raw.B), rich:proRichSalesB_(proSalesBIntent_(question), ctx.raw.B), provider:'Quy tắc · Báo cáo B (không dùng AI)' }); _proDock.busy = false; proAiLogRender_(); return;
+    _proDock.log.push({ role:'bot', text:proRuleSalesBAnswer_(question, ctx.raw.B), rich:proRichSalesB_(proSalesBIntent_(question), ctx.raw.B), provider: proSalesBIntent_(question)==='summary' ? '' : 'Quy tắc · Báo cáo B (không dùng AI)' }); _proDock.busy = false; proAiLogRender_(); return;
   }
   var hist = _proDock.log.slice(0,-1).filter(function(m){ return m.text.indexOf('⏳')!==0; });
   _proDock.log.push({ role:'bot', text:'⏳ Đang hỏi AI…' }); proAiLogRender_();
