@@ -17,7 +17,7 @@ function makeEnv(opts) {
     if (k === 'fill') return () => { calls.draw++; };
     return t[k] !== undefined ? t[k] : () => {};
   }, set(t, k, v) { t[k] = v; return true; } });
-  const mkEl = () => ({ style: {}, setAttribute() {}, appendChild() {}, getContext: () => ctx, id: '', width: 0, height: 0, textContent: '' });
+  const mkEl = () => ({ style: {}, setAttribute() {}, appendChild() {}, getContext: () => ctx, id: '', width: 0, height: 0, textContent: '', getBoundingClientRect: () => ({ left: 0, top: 500, width: opts.w || 1200, height: 112 }) });
   const els = []; let rafCb = null;
   const win = {
     innerWidth: opts.w || 1200, devicePixelRatio: 1, __handlers: {},
@@ -30,14 +30,14 @@ function makeEnv(opts) {
   };
   const doc = {
     hidden: false, body: { appendChild: e => els.push(e) }, head: { appendChild() {} }, documentElement: { clientWidth: opts.w || 1200 },
-    createElement: () => mkEl(), addEventListener() {},
+    createElement: () => mkEl(), __h: {}, addEventListener(n, f) { (doc.__h[n] = doc.__h[n] || []).push(f); },
     getElementById: id => (id === 'pro-tabbar' && opts.tabbar ? { offsetHeight: 38 } : null),
   };
   win.window = win; win.document = doc;
   const sandbox = Object.assign(win, { localStorage: win.localStorage, document: doc, toast: win.toast, console, Math, Date, setTimeout: () => 0, clearTimeout() {} });
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox);
-  return { win: sandbox, store, calls, els, step: ts => { const f = rafCb; rafCb = null; if (f) f(ts); return !!f; } };
+  return { win: sandbox, doc, store, calls, els, step: ts => { const f = rafCb; rafCb = null; if (f) f(ts); return !!f; } };
 }
 
 // 1) Mặc định bật: tạo đúng 1 canvas, không bắt chuột, z-index 249 (dưới cánh đào 250, dưới thanh tab 310)
@@ -147,6 +147,79 @@ ok(e.store.ome_garden === '1' && e.win._gardenIsOn() === true && /Đã bật vư
 // giảm chuyển động: bật/tắt vườn vẽ lại ngay 1 khung (không rAF)
 e = makeEnv({ w: 1000, reduced: true }); const c0 = e.calls.clear; e.win.toggleGarden();
 ok(e.calls.clear === c0 + 1 && e.calls.raf === 0, 'giảm chuyển động: toggle vườn vẽ lại đúng 1 khung, không rAF');
+
+// 3f) BẤM vào chó: hitDog_ thuần + trình nghe pointerdown thật
+const rect = { left: 0, top: 500, width: 1000, height: 112 }, dd = { x: 300 };
+ok(e.win._mascotHit_(300, 582, rect, dd, 1), 'hitDog_: bấm giữa thân → trúng');
+ok(!e.win._mascotHit_(340, 582, rect, dd, 1) && !e.win._mascotHit_(260, 582, rect, dd, 1), 'hitDog_: lệch ngang > 26px → trượt');
+ok(!e.win._mascotHit_(300, 520, rect, dd, 1) && !e.win._mascotHit_(300, 620, rect, dd, 1), 'hitDog_: quá cao/quá thấp → trượt');
+ok(e.win._mascotHit_(300, 582 - 30, rect, dd, 1) && e.win._mascotHit_(300, 582 + 25, rect, dd, 1), 'hitDog_: đầu và chân đều trúng');
+function click(env, x, y, tgtHit, ev) {
+  const hs = env.doc.__h.pointerdown || []; ev = ev || {};
+  ev.clientX = x; ev.clientY = y; ev.target = { closest: () => (tgtHit ? {} : null) };
+  ev.preventDefault = ev.preventDefault || (() => { ev.pd = (ev.pd || 0) + 1; }); ev.stopPropagation = ev.stopPropagation || (() => { ev.sp = (ev.sp || 0) + 1; });
+  hs.forEach(h => h(ev)); return ev;
+}
+e = makeEnv({ w: 1000 }); t = 1000; e.step(t);
+ok((e.doc.__h.pointerdown || []).length === 1, 'đăng ký đúng 1 trình nghe pointerdown');
+g = e.win._mascotState_(); g.dog.mode = 'idle'; g.dog.until = 0.1; g.dog.x = 300;
+let ev1 = click(e, 300, 582, false);
+ok(g.dog.react && /Gâu|Hihi/.test(g.dog.react.txt), 'bấm vào chó → react + lời sủa (' + (g.dog.react && g.dog.react.txt) + ')');
+ok(!ev1.pd && !ev1.sp, 'KHÔNG preventDefault/stopPropagation (không cản thao tác bên dưới)');
+const r0 = g.dog.react; click(e, 300, 582, false);
+ok(g.dog.react === r0, 'đang phản ứng thì bấm tiếp không khởi động lại');
+for (let i = 0; i < 40; i++) { t += 40; e.step(t); }   // 1.6s
+ok(e.win._mascotState_().mode === 'idle', 'đang ngồi: được ở lại chơi, không bỏ đi giữa chừng cú nhảy');
+ok(e.win._mascotState_().dog.react === null, 'phản ứng tự kết thúc sau ~1.1s');
+click(e, 300, 582, true);
+ok(e.win._mascotState_().dog.react === null, 'bấm lên nút/liên kết (closest trúng) → chó KHÔNG phản ứng');
+click(e, 700, 582, false);
+ok(e.win._mascotState_().dog.react === null, 'bấm chỗ khác → không phản ứng');
+e = makeEnv({ w: 1000, reduced: true }); g = e.win._mascotState_(); g.dog.x = 300; click(e, 300, 582, false);
+ok(e.win._mascotState_().dog.react === null, 'giảm chuyển động → bấm chó không phản ứng');
+e = makeEnv({ w: 1000, ls: { ome_mascot: '0' } }); click(e, 300, 582, false);
+ok(e.els.length === 0, 'đã tắt linh vật → không canvas, bấm không lỗi');
+e = makeEnv({ w: 1000 }); t = 1000; e.step(t); g = e.win._mascotState_(); g.dog.x = 300; g.dog.mode = 'idle'; g.dog.until = 1e9;
+e.win.toggleMascot(); click(e, 300, 582, false);
+ok(e.win._mascotState_().dog.react === null, 'vừa tắt linh vật → bấm không phản ứng');
+
+// 3g) Ong ĐẬU hoa: đi tới → đậu đúng đầu hoa → bay tiếp; ong đang đậu KHÔNG dọa chó, ong bay thì có
+function perchEnv() {
+  const env = makeEnv({ w: 1000 }); let tt = 1000; env.step(tt);
+  for (let i = 0; i < 120; i++) { tt += 40; env.step(tt); }   // qua 4s cooldown dọa
+  const gg = env.win._mascotState_(); const nf = gg.flowers;
+  return { env, tt, gg, nf };
+}
+let P = perchEnv(); e = P.env; t = P.tt; g = P.gg;
+ok(g.bees.every(b => b.st === 'fly' || b.st === 'go' || b.st === 'sit'), 'trạng thái ong hợp lệ');
+g = e.win._mascotState_();
+let sat = false;
+g.bees[0].fi = 0; g.bees[0].st = 'go'; g.bees[0].x = 5; g.bees[0].y = 40;
+g.bees[1].x = 900; g.bees[1].y = 10; g.bees[1].st = 'fly';
+for (let i = 0; i < 700 && !sat; i++) { t += 40; e.step(t); if (e.win._mascotState_().bees[0].st === 'sit') sat = true; }
+ok(sat, 'ong chọn hoa → bay tới → đậu (sit) trong < 28s');
+const bSit = e.win._mascotState_().bees[0];
+ok(Math.abs(bSit.a - Math.PI / 2) < 1e-6 && bSit.y > 60 && bSit.y < 112, 'ong đậu: đầu hướng xuống, ở thấp sát hoa (y=' + bSit.y.toFixed(1) + ')');
+let waited = 0, back = false;
+for (let i = 0; i < 160 && !back; i++) { t += 40; e.step(t); waited += 0.04; if (e.win._mascotState_().bees[0].st === 'fly') back = true; }
+ok(back && waited <= 5, 'đậu xong tự bay tiếp sau ≤ 4.5s (' + waited.toFixed(1) + 's)');
+// đậu cạnh chó không làm chó chạy; ong bay sát chó thì có
+function nearDog(state) {
+  const Q = perchEnv(); let tq = Q.tt; const gq = Q.env.win._mascotState_();
+  const last = gq.flowers - 1; gq.bees[0].fi = last; gq.bees[1].x = 100; gq.bees[1].y = 10; gq.bees[1].st = 'fly';
+  gq.dog.mode = 'idle'; gq.dog.until = 1e9; gq.dog.run = false;
+  // đặt chó đúng chỗ hoa cuối: lấy toạ độ qua bee đậu thử 1 khung
+  gq.bees[0].st = 'go'; gq.bees[0].x = 990; gq.bees[0].y = 80;
+  for (let i = 0; i < 400; i++) { tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().bees[0].st === 'sit') break; }
+  const bb = Q.env.win._mascotState_().bees[0]; gq.dog.x = bb.x; gq.dog.mode = 'idle'; gq.dog.until = 1e9;
+  if (state === 'fly') { bb.st = 'fly'; bb.v = 0; bb.a = 0; bb.fi = null; }
+  gq.dog.run = false; gq.dog.react = null; gq.setFlee(0);   // đặt lại cờ chạy/hồi dọa còn sót từ lúc dàn cảnh
+  let ran = false;
+  for (let i = 0; i < 60; i++) { gq.dog.x = bb.x; tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().run) ran = true; if (state === 'fly') { bb.v = 0; } }
+  return ran;
+}
+ok(nearDog('sit') === false, 'ong ĐẬU sát chó → chó không giật mình');
+ok(nearDog('fly') === true, 'đối chứng: ong BAY sát chó → chó giật mình chạy');
 
 // 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
 let badRange = 0, badIdle = 0, moved = 0;
