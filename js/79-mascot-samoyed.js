@@ -11,6 +11,7 @@
 //  (prefers-reduced-motion) → chỉ vẽ MỘT khung tĩnh, không chạy hoạt ảnh. Ẩn khi in.
 //  Tương tác: BẤM vào chó → chó nhảy 2 cái, hiện bong bóng "Gâu!" + vài trái tim (nghe pointerdown ở cấp tài liệu, KHÔNG chặn chuột,
 //  KHÔNG chặn thao tác bên dưới; bấm lên nút/liên kết/ô nhập thì chó không phản ứng; giảm chuyển động thì không phản ứng).
+//  Bướm bay nhấp nhô lên-xuống, thỉnh thoảng ĐẬU lên hoa 3–6 giây (cánh khép/xoè chậm) rồi bay LÊN tiếp.
 //  Ong thỉnh thoảng bay tới một bông hoa, ĐẬU 2.5–4.5 giây rồi bay tiếp; ong đang đậu không làm chó giật mình.
 //  Bật/tắt: ☰ → ⚙ Settings → "🐶 Tắt/Bật linh vật Samoyed" (mọi vai trò); lưu localStorage 'ome_mascot' ('0' = tắt, mặc định bật).
 //  Vườn (hoa + bướm + ong) có nút RIÊNG "🌼 Tắt/Bật vườn hoa-bướm-ong" (localStorage 'ome_garden'): tắt vườn thì chỉ còn chó.
@@ -126,7 +127,8 @@
     butterflies.length = nb;
     while (bees.length < nz) bees.push({ x: rnd(W * 0.4, W), y: rnd(18, CH - 40), a: rnd(0, 6.283), v: rnd(46, 70), ph: rnd(0, 6.283), size: rnd(6, 8) });
     bees.length = nz;
-    bees.forEach(function(b){ b.st = 'fly'; });   // hoa vừa được tạo lại → ong về trạng thái bay tự do
+    bees.forEach(function(b){ b.st = 'fly'; });
+    butterflies.forEach(function(b){ b.st = 'fly'; });   // hoa vừa được tạo lại → ong về trạng thái bay tự do
     butterflies.concat(bees).forEach(function(f){ if (f.x > W) f.x = rnd(0, W); });
   }
 
@@ -148,8 +150,9 @@
 
   function drawButterfly(c, b, t){   // bướm 4 cánh nhiều màu (cánh trên + cánh dưới + chấm + viền), vỗ cánh bằng scale ngang
     var pal = b.pal || [b.color, b.color, '#FFFFFF'], s = b.size * 1.15;
-    var wf = Math.sin(t * 8 + b.ph) * 0.6, k = Math.abs(Math.cos(wf)) * 0.85 + 0.15;   // k = độ xoè cánh 0.15..1
-    c.save(); c.translate(b.x, b.y + Math.sin(t * 3 + b.ph) * 3); c.globalAlpha = 0.95;
+    var sit = b.st === 'sit';   // đậu hoa: vỗ cánh chậm (khép-xoè), thân không nhấp nhô
+    var wf = Math.sin(t * (sit ? 1.7 : 8) + b.ph) * 0.6, k = Math.abs(Math.cos(wf)) * 0.85 + 0.15;   // k = độ xoè cánh 0.15..1
+    c.save(); c.translate(b.x, b.y + (sit ? 0 : Math.sin(t * 3 + b.ph) * 3)); c.globalAlpha = 0.95;
     [1, -1].forEach(function(sd){
       c.save(); c.scale(sd * k, 1);
       c.beginPath(); c.ellipse(-s * 0.55, -s * 0.35, s * 0.95, s * 0.7, -0.35, 0, 6.283); c.fillStyle = pal[0]; c.fill();   // cánh trên
@@ -187,6 +190,30 @@
     f.x += Math.cos(f.a) * f.v * dt; f.y += Math.sin(f.a) * f.v * dt;
     if (f.y < ymin){ f.y = ymin; f.a = -f.a; } else if (f.y > ymax){ f.y = ymax; f.a = -f.a; }
     if (f.x > W + 20) f.x = -20; else if (f.x < -20) f.x = W + 20;
+  }
+  // Bướm: bay lượn NHẤP NHÔ lên-xuống (sóng dọc + được nâng lên khi xuống thấp) → thỉnh thoảng chọn 1 bông hoa bay tới ('go')
+  // → ĐẬU ('sit') 3–6s đung đưa theo hoa, cánh khép/xoè chậm → vỗ cánh bay LÊN ('rise' ~1.2s) rồi lượn tiếp.
+  function butterflyStep(b, dt){
+    var f = b.fi != null ? flowers[b.fi] : null, hd;
+    if (b.st === 'sit' || b.st === 'go'){
+      if (!f){ b.st = 'fly'; b.a = rnd(-2.4, -0.7); return; }   // hoa đã bị tạo lại (đổi cỡ màn hình)
+      hd = flowerHead_(f, clock);
+      if (b.st === 'sit'){
+        b.x = hd.x; b.y = hd.y - 2;
+        if (clock >= b.until){ b.st = 'fly'; b.a = rnd(-2.4, -0.7); b.v = rnd(16, 28); b.rise = clock + 1.2; }   // cất cánh: bay chếch LÊN
+      } else {
+        var dx = hd.x - b.x, dy = (hd.y - 2) - b.y, dist = Math.sqrt(dx * dx + dy * dy), step = 26 * dt;
+        if (dist <= step + 1.2){ b.st = 'sit'; b.until = clock + rnd(3, 6); b.x = hd.x; b.y = hd.y - 2; }
+        else { b.x += dx / dist * step; b.y += dy / dist * step + Math.sin(clock * 5 + b.ph) * 0.25; }
+      }
+      return;
+    }
+    flyStep(b, dt, 12, CH - 44, 2.5);
+    b.y += Math.sin(clock * 2.1 + b.ph) * 13 * dt - 3 * dt;           // sóng dọc: lúc lên lúc xuống, hơi nghiêng lên
+    if (b.rise && clock < b.rise) b.y -= 20 * dt;                      // vừa cất cánh khỏi hoa → bay vút lên nhẹ
+    if (b.y > CH - 70) b.y -= (b.y - (CH - 70)) * 0.9 * dt + 4 * dt;   // xuống thấp quá thì được nâng lên
+    if (b.y < 12) b.y = 12; else if (b.y > CH - 44) b.y = CH - 44;
+    if (flowers.length && Math.random() < 0.16 * dt){ b.fi = (Math.random() * flowers.length) | 0; b.st = 'go'; }   // ~1 lần / 6 giây
   }
   // Ong: bay tự do → thỉnh thoảng chọn 1 bông hoa bay tới ('go') → đậu ('sit') 2.5–4.5s đung đưa theo hoa → bay tiếp.
   function beeStep(b, dt){
@@ -355,7 +382,7 @@
     var k, sc = W < 600 ? 0.82 : 1;
     var garden = gardenOn();
     if (garden){
-      for (k = 0; k < butterflies.length; k++) flyStep(butterflies[k], dt, 12, CH - 44, 2.5);
+      for (k = 0; k < butterflies.length; k++) butterflyStep(butterflies[k], dt);
       for (k = 0; k < bees.length; k++) beeStep(bees[k], dt);
     }
     if (dog.react){ dog.react.t += dt; if (dog.react.t >= 1.1) dog.react = null; }

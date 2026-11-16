@@ -222,6 +222,35 @@ function nearDog(state) {
 ok(nearDog('sit') === false, 'ong ĐẬU sát chó → chó không giật mình');
 ok(nearDog('fly') === true, 'đối chứng: ong BAY sát chó → chó giật mình chạy');
 
+// 3h) BƯỚM: bay nhấp nhô LÊN lẫn xuống (không chỉ chúi xuống), ĐẬU lên hoa rồi bay LÊN tiếp, luôn trong khung
+{
+  const Q = perchEnv(); let tq = Q.tt; const gq = Q.gg;
+  ok(gq.butterflies.every(b => b.st === 'fly' || b.st === 'go' || b.st === 'sit'), 'trạng thái bướm hợp lệ');
+  // (a) ghim bướm ở chế độ bay tự do, đo hướng dịch chuyển dọc từng khung trong 120s
+  let up = 0, down = 0, badB = 0;
+  const prevY = gq.butterflies.map(b => b.y);
+  for (let i = 0; i < 3000; i++) {
+    tq += 40; Q.env.step(tq);
+    gq.butterflies.forEach((b, j) => { if (b.st === 'fly') { const d = b.y - prevY[j]; if (d < -0.01 && d > -5) up++; else if (d > 0.01 && d < 5) down++; } prevY[j] = b.y; if (!isFinite(b.y) || b.y < 0 || b.y > gq.ch || b.x < -21 || b.x > 1021) badB++; });
+  }
+  ok(up > 200 && down > 200, 'bướm bay cả LÊN (' + up + ') lẫn xuống (' + down + ')');
+  ok(up > down * 0.6, 'không chỉ chúi xuống: lên/xuống = ' + (up / down).toFixed(2));
+  ok(badB === 0, 'bướm luôn trong khung suốt 120s (' + badB + ' lần sai)');
+  // (b) ép bướm 0 bay tới hoa 0 → đậu đúng đầu hoa → tự bay LÊN tiếp
+  const bt = gq.butterflies[0]; bt.fi = 0; bt.st = 'go'; bt.x = 5; bt.y = 30;
+  let sat2 = false; for (let i = 0; i < 900 && !sat2; i++) { tq += 40; Q.env.step(tq); if (bt.st === 'sit') sat2 = true; }
+  ok(sat2, 'bướm chọn hoa → bay tới → ĐẬU (sit)');
+  ok(bt.y > 60 && bt.y < 112, 'bướm đậu thấp sát đầu hoa (y=' + bt.y.toFixed(1) + ')');
+  const yS = bt.y; let left = false, minY = yS, w2 = 0;
+  for (let i = 0; i < 260 && !left; i++) { tq += 40; w2 += 0.04; Q.env.step(tq); if (bt.st === 'fly') left = true; }
+  ok(left && w2 >= 2.5 && w2 <= 7, 'đậu 3–6s rồi bay tiếp (' + w2.toFixed(1) + 's)');
+  for (let i = 0; i < 25; i++) { tq += 40; Q.env.step(tq); minY = Math.min(minY, bt.y); }
+  ok(yS - minY > 8, 'vừa cất cánh thì bay LÊN cao hơn chỗ đậu ≥8px (lên ' + (yS - minY).toFixed(1) + 'px)');
+  // (c) hoa bị tạo lại (đổi cỡ màn hình) khi bướm đang đậu → về bay tự do, không kẹt
+  bt.st = 'sit'; bt.fi = 9999; tq += 40; Q.env.step(tq);
+  ok(bt.st === 'fly', 'hoa không còn → bướm về bay tự do');
+}
+
 // 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
 let badRange = 0, badIdle = 0, moved = 0;
 [320, 390, 800, 1200, 1920].forEach(w => {
