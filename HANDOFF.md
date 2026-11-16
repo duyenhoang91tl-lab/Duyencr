@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — APP ANDROID "VIẾT TẮT" 1.25: TÁCH PHẦN TIN NHẮN / HÌNH ẢNH / GHI ÂM + NÚT "+ THÊM TIN NHẮN MẪU") — XONG mục 1,2 (đã push); CÒN mục 4
+NGUYÊN NHÂN GỐC: `SnippetDialog` (MainActivity.kt) vẽ `opts` theo THỨ TỰ trong danh sách nên chữ/hình xen kẽ; nút "+ Nội dung" nằm ở hàng nút CUỐI (cuộn ngang) sau cả chục hình nên như không có; ô chữ không có ✕.
+- ✅ SnippetDialog: 3 phần có tiêu đề + số lượng (💬 Tin nhắn mẫu / 🖼 Hình ảnh / 🎤 Ghi âm), "+ Thêm tin nhắn mẫu" và "+ Thêm hình ảnh" ngay dưới từng phần, ô chữ có ✕. Khi Lưu xếp chữ → hình → ghi âm (mọi nơi dùng đều lọc theo `kindOf`).
+- ✅ Picker.kt: tiêu đề nhóm "💬 Tin nhắn mẫu (n)" / "🖼 Hình ảnh / ghi âm (n)".
+- Bản 1.24 → 1.25 (versionCode 26). Không đổi GAS/extension. ⚠ CHƯA BIÊN DỊCH (không có Android SDK): PHIÊN SAU xem CI "Build Android VietTat" xanh chưa; đỏ thì sửa lỗi biên dịch (chỗ rủi ro: hàm `@Composable fun mediaRow` khai báo cục bộ trong SnippetDialog).
+- [ ] Mục 4 (gửi ảnh không lưu sẵn = "tải ảnh khi cần"): chờ Duyên chốt.
+
 ## 2026-11-16 (phiên Claude — APP ANDROID "VIẾT TẮT": MẪU LẠ LỌT VÀO BẢNG CHỌN + CHỮ MẤT KHI CHÈN CÙNG NHIỀU HÌNH) — XONG mục 3 + lỗi mẫu lạ (đã push); CÒN mục 1,2 (chưa có trong repo), mục 4
 Duyên: (a) chọn ~3 mẫu nhưng lúc chèn lại ra thêm mẫu của nhóm khác; (3) chọn chữ + nhiều hình → Chèn → ô Zalo trống.
 NGUYÊN NHÂN GỐC (a): `Store.match` (Data.kt) gộp chung mục khớp ĐÚNG viết tắt với mục khớp TỪ KHOÁ (keyword bắt đầu bằng chữ đang gõ) → mục nhóm khác chỉ cần có từ khoá trùng đầu là bị `hits.flatMap{options}` đổ vào bảng chọn. Sửa: có mục khớp đúng viết tắt thì CHỈ lấy các mục đó; không có mới dùng từ khoá. (Diag.kt dòng 45 cũng gọi `Store.match` nên tự hưởng.)
