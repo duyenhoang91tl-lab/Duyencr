@@ -300,6 +300,9 @@ function proAiNote_(){ return PRO_AI_ENGINE==='rule' ? 'Trả lời THÔ theo qu
 
 // ── Giao diện (chỉ khi html.ui-pro) ──
 var _proDock = { tabs:[], mode:'', log:[], busy:false, items:{} };
+// Mèo máy "làm việc" khi AI đang trả lời (Duyên chọn 16/11/2026): `busy` là thuộc tính có setter → MỌI chỗ đang gán _proDock.busy = true/false
+// (khoảng 8 chỗ) tự bật/tắt hiệu ứng cho mèo mà KHÔNG phải sửa từng chỗ. Setter lỗi (vd test không có DOM) thì bỏ qua, giá trị vẫn đúng.
+(function(){ var v = !!_proDock.busy; try { Object.defineProperty(_proDock, 'busy', { get: function(){ return v; }, set: function(x){ v = !!x; try { proCatBusy_(v); } catch(e){} }, enumerable: true, configurable: true }); } catch(e){} })();
 function proDockOn_(){ return typeof document!=='undefined' && document.documentElement.classList.contains('ui-pro'); }
 function proTabsLoad_(){ try { var v = JSON.parse(sessionStorage.getItem('pro_tabs')||'[]'); if (Array.isArray(v)) _proDock.tabs = v.filter(function(t){ return t && t.phone; }).slice(-PRO_TABS_MAX); } catch(e){} }
 function proTabsSave_(){ try { sessionStorage.setItem('pro_tabs', JSON.stringify(_proDock.tabs)); } catch(e){} }
@@ -379,7 +382,7 @@ function proCatIconSvg_(px, blink){
   var ears = ear('10,26 13,10 26,16', '14.5,21 15.6,14.5 21,17.5') + ear('54,26 51,10 38,16', '49.5,21 48.4,14.5 43,17.5');
   var whisk = '<g stroke="'+OUT+'" stroke-width="1" stroke-linecap="round"><path d="M16 45 L9.5 43.6M16 47.2 L9.5 48"/><path d="M48 45 L54.5 43.6M48 47.2 L54.5 48"/></g>';
   var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="3" fill="#fff" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="1.1" fill="#4fae9a"/>';
-  var antenna = '<line x1="32" y1="15" x2="32" y2="8.6" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle cx="32" cy="6.6" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.6" r="0.9" fill="#fff"/>';
+  var antenna = '<line x1="32" y1="15" x2="32" y2="8.6" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle class="pro-cat-ant" cx="32" cy="6.6" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.6" r="0.9" fill="#fff"/>';
   return '<svg class="pro-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
     + ears + circles(OUT, 1.2) + circles(FUR, 0) + antenna
     + '<ellipse cx="15.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/><ellipse cx="48.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/>'
@@ -391,6 +394,24 @@ function proCatIconSvg_(px, blink){
 function proCatIcon_(px){
   var rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
   return proCatIconSvg_(px, !rm);
+}
+// Hiệu ứng mèo khi AI đang trả lời: cả con mèo lắc lư nhẹ (vẫy) + bi ăng-ten nhấp nháy cam; giảm chuyển động → KHÔNG lắc,
+// chỉ đổi bi ăng-ten sang màu cam đứng yên (vẫn có tín hiệu "đang bận" mà không chuyển động). Style chèn 1 lần, tự chứa (không đụng css/*).
+function proCatStyle_(){
+  if (document.getElementById('pro-cat-style')) return;
+  var st = document.createElement('style'); st.id = 'pro-cat-style';
+  st.textContent = '@keyframes proCatWag{0%,100%{transform:rotate(-8deg) translateY(0)}25%{transform:rotate(0) translateY(-2px)}50%{transform:rotate(8deg) translateY(0)}75%{transform:rotate(0) translateY(-2px)}}'
+    + '@keyframes proCatGlow{0%,100%{opacity:1}50%{opacity:.3}}'
+    + '.pro-cat-busy .pro-cat{animation:proCatWag .7s ease-in-out infinite;transform-origin:50% 88%}'
+    + '.pro-cat-busy .pro-cat-ant{fill:#ff9800;animation:proCatGlow .7s ease-in-out infinite}'
+    + '@media (prefers-reduced-motion:reduce){.pro-cat-busy .pro-cat,.pro-cat-busy .pro-cat-ant{animation:none}}';
+  document.head.appendChild(st);
+}
+function proCatBusy_(on){
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  ['pro-dock', 'pro-ai'].forEach(function(id){ var el = document.getElementById(id); if (el && el.classList) el.classList.toggle('pro-cat-busy', !!on); });
+  var lg = document.getElementById('pro-ai-log');
+  if (lg){ if (on) lg.setAttribute('aria-busy', 'true'); else lg.removeAttribute('aria-busy'); }
 }
 // Dock phải + panel trợ lý
 function proDockEnsure_(){
@@ -417,6 +438,7 @@ function proDockEnsure_(){
     if (t.closest('#pro-ai-send')) proAiSend_(); };
   document.getElementById('pro-ai-q').onkeydown = function(e){ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); proAiSend_(); } };
   document.addEventListener('keydown', function(e){ if (e.key==='Escape') proAiToggle_(false); });
+  try { proCatStyle_(); proCatBusy_(_proDock.busy); } catch(e){}   // dock được tạo lúc AI đang bận (hiếm) vẫn đồng bộ đúng
 }
 function proOpenCustomer_(phone){ if (!phone || typeof openDp!=='function') return; var ov = document.getElementById('dp-overlay'); if (ov) ov.classList.add('open'); openDp(phone); }   // giống bấm tab hồ sơ ở thanh dưới
 function proAiToggle_(force){

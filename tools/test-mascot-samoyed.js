@@ -210,12 +210,12 @@ function nearDog(state) {
   gq.dog.mode = 'idle'; gq.dog.until = 1e9; gq.dog.run = false;
   // đặt chó đúng chỗ hoa cuối: lấy toạ độ qua bee đậu thử 1 khung
   gq.bees[0].st = 'go'; gq.bees[0].x = 990; gq.bees[0].y = 80;
-  for (let i = 0; i < 400; i++) { tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().bees[0].st === 'sit') break; }
+  for (let i = 0; i < 400; i++) { gq.bees[1].x = 500; gq.bees[1].y = 10; tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().bees[0].st === 'sit') break; }   // ghim ong 2 ở xa: nó bay vòng qua mép màn hình có thể hiện ra sát chó (chó bị ép đứng mép phải, nơi thực tế không tới được)
   const bb = Q.env.win._mascotState_().bees[0]; gq.dog.x = bb.x; gq.dog.mode = 'idle'; gq.dog.until = 1e9;
   if (state === 'fly') { bb.st = 'fly'; bb.v = 0; bb.a = 0; bb.fi = null; }
   gq.dog.run = false; gq.dog.react = null; gq.setFlee(0);   // đặt lại cờ chạy/hồi dọa còn sót từ lúc dàn cảnh
   let ran = false;
-  for (let i = 0; i < 60; i++) { gq.dog.x = bb.x; tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().run) ran = true; if (state === 'fly') { bb.v = 0; } }
+  for (let i = 0; i < 60; i++) { gq.dog.x = bb.x; gq.bees[1].x = 500; gq.bees[1].y = 10; tq += 40; Q.env.step(tq); if (Q.env.win._mascotState_().run) ran = true; if (state === 'fly') { bb.v = 0; } }
   return ran;
 }
 ok(nearDog('sit') === false, 'ong ĐẬU sát chó → chó không giật mình');
