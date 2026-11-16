@@ -361,16 +361,47 @@ function proDockDragInit_(dock){
   dock.addEventListener('pointerup', end); dock.addEventListener('pointercancel', end);
   dock.addEventListener('dblclick', function(){ try { localStorage.removeItem(KEY); } catch(e){} ['left','top','right','bottom','transform'].forEach(function(k){ dock.style.removeProperty(k); }); });   // bấm đúp = về chỗ mặc định
 }
+// ── Icon AI = MÈO MÁY TRẮNG XÙ MẶT TRÒN (Duyên yêu cầu 15/11/2026, vẽ lại 16/11/2026 vì bản đầu méo: tai nhọn cao + thân nhiều cục). ──
+// SVG nội tuyến 64x64, không cần file ảnh. Chỉ vẽ ĐẦU TRÒN to (mặt tròn xinh như chó Samoyed ở js/79): lông trắng xù viền be nhạt
+// (vẽ 2 lượt: viền trước, lông sau), tai tròn nhỏ ép sát đầu, mắt tròn đen to + highlight, má hồng, mũi tí xíu, ria ngắn.
+// Chi tiết "máy" = ăng-ten bi vàng trên đầu + vòng cổ bạc hà có chip tròn. Chớp mắt bằng SMIL (bỏ khi bật "giảm chuyển động").
+function proCatIconSvg_(px, blink){
+  var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffc2cf', CX = 32, CY = 35;
+  var puffs = [[CX,CY,20.5]];
+  for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
+  function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+  function eye(cx){
+    var b = blink ? '<animate attributeName="ry" values="4.4;4.4;0.5;4.4;4.4" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+    return '<ellipse cx="'+cx+'" cy="36" rx="4.1" ry="4.4" fill="#2b2420">'+b+'</ellipse>'
+      + '<circle cx="'+(cx+1.4)+'" cy="34.4" r="1.5" fill="#fff"/><circle cx="'+(cx-1.2)+'" cy="37.8" r="0.7" fill="#fff" opacity=".75"/>';
+  }
+  function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.4" stroke-linejoin="round"/>'; }
+  var ears = ear('10,26 13,10 26,16', '14.5,21 15.6,14.5 21,17.5') + ear('54,26 51,10 38,16', '49.5,21 48.4,14.5 43,17.5');
+  var whisk = '<g stroke="'+OUT+'" stroke-width="1" stroke-linecap="round"><path d="M16 45 L9.5 43.6M16 47.2 L9.5 48"/><path d="M48 45 L54.5 43.6M48 47.2 L54.5 48"/></g>';
+  var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="3" fill="#fff" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="1.1" fill="#4fae9a"/>';
+  var antenna = '<line x1="32" y1="15" x2="32" y2="8.6" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle cx="32" cy="6.6" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.6" r="0.9" fill="#fff"/>';
+  return '<svg class="pro-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+    + ears + circles(OUT, 1.2) + circles(FUR, 0) + antenna
+    + '<ellipse cx="15.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/><ellipse cx="48.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/>'
+    + eye(23) + eye(41)
+    + '<path d="M30.4 42.2 Q32 41 33.6 42.2 Q32.9 44 32 44.1 Q31.1 44 30.4 42.2Z" fill="#ff8fa0"/>'
+    + '<path d="M32 44.1 L32 45.4 M32 45.4 Q30.2 47.4 28 45.9 M32 45.4 Q33.8 47.4 36 45.9" fill="none" stroke="#7a655a" stroke-width="1.1" stroke-linecap="round"/>'
+    + whisk + collar + '</svg>';
+}
+function proCatIcon_(px){
+  var rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
+  return proCatIconSvg_(px, !rm);
+}
 // Dock phải + panel trợ lý
 function proDockEnsure_(){
   if (!proDockOn_() || document.getElementById('pro-dock')) return;
   var dock = document.createElement('div'); dock.id = 'pro-dock';
-  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">🤖</button>';
+  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">' + proCatIcon_(32) + '</button>';
   document.body.appendChild(dock);
   try { proDockDragInit_(dock); } catch(e){ console.warn('[ui-pro] drag', e); }
   dock.querySelector('#pro-dock-ai').onclick = function(){ if (dock._proMovedAt && Date.now()-dock._proMovedAt < 350) return; proAiToggle_(); };   // vừa kéo xong thì không mở panel
   var p = document.createElement('div'); p.id = 'pro-ai';
-  p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
+  p.innerHTML = '<div class="pro-ai-h"><b style="display:inline-flex;align-items:center;gap:6px">' + proCatIcon_(24) + ' Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button><button type="button" data-mode="leads">🧊 Khách cần chăm</button></div>'
     + '<div class="pro-ai-range" id="pro-ai-range" style="display:none"></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
