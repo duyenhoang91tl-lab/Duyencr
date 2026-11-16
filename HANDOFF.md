@@ -16,6 +16,14 @@ Duyên: "ấn load hơi lâu dù chỉ xem báo cáo tháng". NGUYÊN NHÂN GỐ
 - [ ] **VIỆC KẾ TIẾP (bước 2, `js/11-fn-srload.js`):** `_srLoad(useCache)`: `useCache !== true` → `_srCacheClear_()` (mọi đường GHI như lưu/xoá chia tay/đổi công tắc gọi `_srLoad()` không tham số nên luôn lấy số mới); `_srApply` + `_srSetSub` (đường XEM) gọi `_srLoad(true)`; truyền `useCache` cho A/B/C/E/F/G; chạy SONG SONG `storeCaseReport` với `salesReportB` ở B và E. Rồi bước 3: đo PERF GAS (Logger `PERF salesReportB` trong Apps Script → Executions) để xem server tính 1 tháng mất bao lâu; nếu vẫn chậm thì tối ưu `buildSalesReportB_` / `storeCaseReport` (cần deploy lại GAS + đồng bộ khối `gas-code-v9` trong index.html).
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+
+## 2026-11-16 (phiên Claude — 4 BƯỚC LINH VẬT/MÈO MÁY: vườn riêng → chó tương tác → mèo hoạt động khi AI trả lời → đổi 🤖 còn lại) — ĐANG LÀM (mục này cập nhật cuối MỖI bước)
+Duyên: "ok cả 4 hướng"; quy tắc: chia bước nhỏ, mỗi bước xong push main, cuối mỗi bước cập nhật HANDOFF. Nền: chó `js/79`, mèo `proCatIcon_` (js/38; bản vẽ lại trắng xù ở 39db5cf của phiên khác — giữ nguyên API).
+- ✅ **Bước 1 — nút bật/tắt RIÊNG cho vườn:** `js/79` thêm `ome_garden` ('0' = tắt, mặc định bật) + `window.toggleGarden/_gardenLabel/_gardenIsOn`; tắt vườn → không vẽ/không cập nhật hoa-bướm-ong và ong KHÔNG làm chó giật mình (chó vẫn đi dạo). Menu ⚙ Settings `act:garden` (js/29, mọi vai trò) + nút "🌼 Vườn hoa-bướm-ong" ở trang Cấu hình (js/37, nhãn đổi tại chỗ). Tắt CHÓ (`ome_mascot=0`) vẫn ẩn cả canvas nên vườn ẩn theo (chung 1 canvas, cố ý). Giảm chuyển động: bật/tắt vườn vẽ lại đúng 1 khung. Test `test-mascot-samoyed` 56 ca (thêm: menu/config, vẽ ít nét hơn khi tắt, ong không gây chạy trốn khi tắt, toggle không đụng ome_mascot). Bump `?v=` js/29, 37, 79 → 20261116a.
+- ⏳ **Bước 2 (đang làm kế tiếp):** chó tương tác — bấm vào chó thì nhảy/sủa; ong đậu hoa. Không chặn nút/liên kết bên dưới.
+- [ ] Bước 3: mèo máy (js/38) vẫy/nhún khi AI đang trả lời, tắt khi giảm chuyển động.
+- [ ] Bước 4: đổi 🤖 còn lại (tab Zalo AI trong index.html, js/29 "AI phân tích team", js/30, 31, 37, 60) sang mèo, giữ fallback 🤖 nếu hàm chưa nạp.
+
 ## 2026-11-16 (phiên Claude — RÀ LẠI SAU MERGE) — XONG (đã push)
 - Đã xong: R13 (`--vh`), R14 (bấm ô giai đoạn), R15 (thanh tab đáy phủ hết chiều ngang) đều đã trên `main`; ca đỏ `test-narrow-cards` đã được phiên khác sửa (`f8c839a`). Chạy lại sau khi lấy bản mới nhất: cả bộ test xanh.
 - Đang làm: không có việc dở. Mọi mục còn lại cần Duyên.
