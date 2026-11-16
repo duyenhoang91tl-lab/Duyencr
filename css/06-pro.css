@@ -123,7 +123,7 @@ html.ui-pro .pro-bar-n{text-align:right;color:var(--muted);font-variant-numeric:
 html.ui-pro .pro-hide-old{display:none!important;}
 /* P4: thanh tab hồ sơ đang mở + dock phải + trợ lý AI */
 html.ui-pro body.pro-has-tabs{padding-bottom:44px;}
-html.ui-pro #pro-tabbar{position:fixed;left:0;right:84px;bottom:0;height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;overflow-x:auto;white-space:nowrap;z-index:310;background:linear-gradient(90deg,var(--pro-ink),var(--pro-purple));box-shadow:0 -2px 10px rgba(27,23,64,.2);}
+html.ui-pro #pro-tabbar{position:fixed;left:0;right:0;bottom:0;height:38px;display:flex;align-items:center;gap:6px;padding:0 84px 0 10px;box-sizing:border-box;overflow-x:auto;white-space:nowrap;z-index:310;background:linear-gradient(90deg,var(--pro-ink),var(--pro-purple));box-shadow:0 -2px 10px rgba(27,23,64,.2);}
 html.ui-pro #pro-tabbar .pro-tab{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border-radius:8px 8px 0 0;background:rgba(255,255,255,.14);color:#fff;font-size:12.5px;cursor:pointer;flex:none;}
 html.ui-pro #pro-tabbar .pro-tab.on{background:var(--surface);color:var(--pro-ink);font-weight:600;}
 html.ui-pro #pro-tabbar .pro-tab b{width:20px;height:20px;line-height:19px;text-align:center;border-radius:var(--ui-r-round);font-weight:400;opacity:.75;}
