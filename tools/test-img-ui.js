@@ -10,7 +10,10 @@ const zsrc = fs.readFileSync(path.join(__dirname, '..', 'extension-zalo', 'zalo-
 const psrc = fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pancake-content.js'), 'utf8');
 function fnSpan(src, sig) { const i = src.indexOf(sig); if (i < 0) throw new Error('khong thay ' + sig); const st = src.lastIndexOf('\n', i) + 1; let d = 0, k = src.indexOf('{', i); for (let m = k; m < src.length; m++) { if (src[m] === '{') d++; else if (src[m] === '}') { d--; if (d === 0) return src.slice(st, m + 1); } } }
 const constSpan = (src, name) => { const i = src.indexOf('const ' + name); if (i < 0) throw new Error('khong thay const ' + name); const st = src.lastIndexOf('\n', i) + 1; let depth = 0; for (let j = i; j < src.length; j++) { const ch = src[j]; if ('({['.includes(ch)) depth++; else if (')}]'.includes(ch)) depth--; else if (ch === ';' && depth === 0) return src.slice(st, j + 1); } };
-const zchunk = zsrc.slice(zsrc.indexOf('  function _zaiImgStatus_('), zsrc.indexOf('  // ── MAU TIN NHAN TU VAN'));
+const zchunk0 = zsrc.slice(zsrc.indexOf('  function _zaiImgStatus_('), zsrc.indexOf('  // ── MAU TIN NHAN TU VAN'));
+// + chuan hoa loi API cua Zalo (_zaiApiErr_ + ZAI_API_ERR) — cac ham goi {ok,error} goi no
+const zapi = (() => { const a = zsrc.indexOf('  const ZAI_API_ERR'), i = zsrc.indexOf('function _zaiApiErr_('); let d = 0, k = zsrc.indexOf('{', i); for (let m = k; m < zsrc.length; m++) { if (zsrc[m] === '{') d++; else if (zsrc[m] === '}' && --d === 0) return zsrc.slice(a, m + 1); } })();
+const zchunk = zapi + '\n' + zchunk0;
 const pParts = [constSpan(psrc, '_fold_') ? '' : '', fnSpan(psrc, 'function _stripVNlocal_'), constSpan(psrc, '_fold_'), constSpan(psrc, '_vnSort_'), constSpan(psrc, '_itemNames_'), fnSpan(psrc, 'function _parseNumberedList_'), fnSpan(psrc, 'function _splitTopLevel_'), fnSpan(psrc, 'function _parseMaterialTree_')];
 const pstate = psrc.match(/  let _imgFlatItems = null;[\s\S]*?let _imgBld = _imgBldBlank_\(\);\n/)[0];
 const pchunk = pParts.join('\n') + '\n' + pstate + ['initImgSearch_', 'loadImgFlat_', '_bindImgBuilder_', '_loadImgSlot_', 'renderImgDyn_'].map(n => fnSpan(psrc, 'function ' + n)).join('\n');
@@ -83,9 +86,9 @@ const FLAT = { ok: true, items: ITEMS };
   await pick(Z2, 'ten', 'Nhẫn Bạc Trơn'); await pick(P2, 'ten', 'Nhẫn Bạc Trơn'); cmp2('chon ten Nhan Bac Tron (2 size cung link -> 1 anh)'); await sleep(60);
   ok(Z2.dyn.querySelectorAll('.zai-ctkm-item').length === 1, 'trung link anh chi hien 1 the');
   await pick(Z2, 'ten', 'Nhẫn Trơn <b>x</b>'); await pick(P2, 'ten', 'Nhẫn Trơn <b>x</b>'); cmp2('san pham chua co link anh'); ok(/chưa có link ảnh/.test(Z2.dyn.textContent), 'Zalo: bao chua co link anh');
-  await pick(Z2, 'nhom', 'Charm'); await pick(P2, 'nhom', 'Charm'); await pick(Z2, 'ten', 'Charm Rồng'); await pick(P2, 'ten', 'Charm Rồng'); await sleep(60); cmp2('anh bi loi doc', true);   // Pancake: loi doc anh la cau chuan 'Lỗi API' (ddaf130); Zalo van 'Lỗi: <chi tiet>' -> so HTML khong tinh cau loi, kiem tra rieng + canh bao
-  ok(/Khong doc duoc &lt;anh&gt;/.test(P2.dyn.innerHTML), 'Pancake: hien loi doc anh da escape'); if (Z2.norm(Z2.dyn.innerHTML) !== P2.norm(P2.dyn.innerHTML)) console.log('!!   CANH BAO: cau bao loi doc anh cua Zalo CHUA giong Pancake — can lam Zalo song song');
-  ok(/Lỗi: Khong doc duoc <anh>/.test(Z2.dyn.textContent) && !Z2.dyn.querySelector('anh'), 'Zalo: loi doc anh hien nguyen van, da escape');
+  await pick(Z2, 'nhom', 'Charm'); await pick(P2, 'nhom', 'Charm'); await pick(Z2, 'ten', 'Charm Rồng'); await pick(P2, 'ten', 'Charm Rồng'); await sleep(60); cmp2('anh bi loi doc', true);   // Pancake: loi doc anh la cau chuan 'Lỗi API' (ddaf130); Zalo nay cung 'Lỗi API' (_zaiApiErr_) -> mock Pancake tra thang resp nen so HTML khong tinh cau loi, kiem tra rieng
+  ok(/Khong doc duoc &lt;anh&gt;/.test(P2.dyn.innerHTML), 'Pancake: hien loi doc anh da escape'); if (!/Lỗi API\s*$/.test(Z2.dyn.textContent)) console.log('!!   CANH BAO: cau bao loi doc anh cua Zalo CHUA giong Pancake — can lam Zalo song song');
+  ok(/Lỗi API\s*$/.test(Z2.dyn.textContent) && !/Khong doc duoc/.test(Z2.dyn.textContent) && !Z2.dyn.querySelector('anh'), 'Zalo: loi doc anh hien cau chuan "Lỗi API" (_zaiApiErr_, song song Pancake ddaf130), khong lo chi tiet');
   // >6 bien the cung ten: chi hien 6 anh + nhac con bao nhieu bien the
   await pick(Z2, 'nhom', 'Vòng'); await pick(P2, 'nhom', 'Vòng'); await pick(Z2, 'ten', 'Vòng Nhiều'); await pick(P2, 'ten', 'Vòng Nhiều'); await sleep(80); cmp2('8 bien the cung ten');
   ok(Z2.dyn.querySelectorAll('.zai-ctkm-item').length === 6 && /Còn 2 biến thể khác chưa hiện/.test(Z2.dyn.textContent), 'toi da 6 anh + nhac "Con 2 bien the khac"');
