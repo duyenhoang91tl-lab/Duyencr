@@ -25,7 +25,7 @@
 
   var KEY = 'ome_mascot';
   var GKEY = 'ome_garden';   // nút bật/tắt RIÊNG cho vườn (hoa + bướm + ong); '0' = tắt, mặc định bật. Tắt vườn thì ong cũng không làm chó giật mình.
-  var CH = 112;           // chiều cao canvas (px CSS)
+  var CH = 136;           // chiều cao canvas (px CSS) — 112 + 24: chừa chỗ cho bong bóng "Gâu!" khi chó nhảy (trước đây bong bóng bị cắt mép trên)
   var SPEED = 34;         // tốc độ đi dạo (px/giây)
   var RUN = 96;           // tốc độ chạy trốn ong (px/giây)
   var canvas = null, ctx = null, raf = 0, last = 0, W = 0, dpr = 1, rzTimer = 0, clock = 0;
@@ -332,7 +332,7 @@
   }
 
   function drawBark(c, x, y, txt, a){   // bong bóng thoại bo tròn có đuôi nhọn
-    var w = txt.length * 7 + 16, h = 20, r = 8, l = x - w / 2, t = y - h;
+    var w = txt.length * 7 + 16, h = 20, r = 8, l = x - w / 2, t = Math.max(2, y - h);   // kẹp đỉnh ≥ 2: không bao giờ vẽ ra ngoài mép trên canvas (bong bóng bị cắt chữ)
     c.save(); c.globalAlpha = a;
     c.beginPath();
     c.moveTo(l + r, t); c.lineTo(l + w - r, t); c.quadraticCurveTo(l + w, t, l + w, t + r);

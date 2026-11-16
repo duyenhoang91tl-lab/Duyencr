@@ -8,6 +8,13 @@ NGUYÊN NHÂN GỐC: cánh ong vẽ `globalAlpha 0.5` + màu `rgba(200,230,255)`
 - 🧪 Duyên: Ctrl+F5 → nhìn đáy màn hình: cánh ong phải rõ (xanh nhạt có viền), bướm 4 cánh nhiều màu, thỉnh thoảng bướm hạ xuống đậu hoa rồi bay lên. CHỜ ẢNH/ý kiến (cần chỉnh màu, thời gian đậu, tần suất đậu thì báo).
 - [ ] **VIỆC KẾ TIẾP:** không còn việc mở cho mục này. Nếu muốn chỉnh: số bướm (`nb` ở `initScene`), tần suất đậu (`0.16 * dt` ở `butterflyStep`), thời gian đậu (`rnd(3, 6)`), độ đậm cánh ong (`globalAlpha 0.92` + viền `#3F7FBF` ở `drawBee`).
 
+## 2026-11-16 (phiên Claude — CÚN SAMOYED: BONG BÓNG "GÂU!" BỊ MẤT CHỮ) — XONG (đã push); R5a bước 3 làm tiếp ngay sau
+Duyên gửi video quay màn hình (dải cún): bong bóng thoại chỉ lộ nửa dưới, mất chữ.
+NGUYÊN NHÂN GỐC: `js/79` vẽ bong bóng ở y = CH−30−lift−52·s−8 → đỉnh = 2−lift (s=1) hoặc 11−lift (màn hẹp, s=0,82); khi cún nhảy (lift tới 20px) đỉnh nằm NGOÀI canvas (y<0, đo được −18 và −8,6) nên canvas cắt mất phần trên của bong bóng, kèm chữ. Canvas chỉ cao 112px, không chừa chỗ cho cú nhảy.
+- ✅ Sửa: `CH` 112 → 136 (+24px; mọi thứ khác neo theo đáy canvas nên không dịch; bướm/ong bay thêm được 24px phía trên) + `drawBark` kẹp đỉnh bong bóng ≥ 2 (phòng hờ). `?v=` js/79 → 20261116e.
+- Test: `tools/test-mascot-samoyed.js` thêm ca "bong bóng luôn nằm TRONG canvas suốt cú nhảy" ở 2 bề rộng (đã chạy với code CŨ → ĐỎ −18/−8,6; code mới → xanh; 89/89). 3 ca cũ gắn cứng 112 (hitDog_, ong/bướm đậu) nay lấy `ch` thật từ `_mascotState_()` nên đổi CH không làm lệch test.
+- 🧪 Duyên: Ctrl+F5 → bấm vào cún → bong bóng "Gâu!" phải hiện ĐỦ chữ ngay cả lúc cún đang nhảy; thử cả màn hẹp/điện thoại. Không đổi GAS, không cần deploy.
+
 ## 2026-11-16 (phiên Claude — R5a: CHỌN NHIỀU KHÁCH + THAO TÁC HÀNG LOẠT) — BƯỚC 1+2/3 XONG (đã push); đang làm bước 3
 Duyên chốt (16/11): thao tác hàng loạt = **gán CS + đổi tình trạng CS + đổi trạng thái KH**; R5d trùng khách tính theo **SĐT**, khi gộp **giữ TẤT CẢ dữ liệu** (không mất gì). Quy tắc làm việc: mỗi bước 1 file hoàn chỉnh → push main → cập nhật HANDOFF.
 NGUYÊN NHÂN GỐC R5a: Danh sách KH chỉ mở được từng khách; đổi CS/tình trạng/trạng thái cho nhiều khách phải mở hồ sơ từng người.
