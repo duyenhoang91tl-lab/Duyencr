@@ -8074,6 +8074,7 @@ function doPostCore_(e) {
     if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatUsage')          return jsonOut_(vietTatUsage_(data, _tplCaller_(data.token, data.ek, data.by)));   // dong bo so luot dung Viet tat giua cac may (cong don delta, tra ve tong cua rieng nguoi goi)
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
     if (action === 'vietTatUploadAudio')    return jsonOut_(vietTatUploadAudio_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 TEP ghi am co san tu may len Drive (khong can bam ghi am)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
@@ -14310,6 +14311,45 @@ function saveVietTat_(data, caller) {
   var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
   sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson, audsJson]);
   return jsonOut_({ ok: true, id: id });
+}
+// ── LUOT DUNG VIET TAT (2026-11-14, Duyen: "dong bo so luot dung giua cac may") ─────────────────────────────────────────
+// Sort "Dung nhieu nhat" truoc day chi dem trong localStorage cua TUNG MAY. Nay moi nguoi co 1 dong trong sheet 'VietTatUsage' (owner, counts JSON {idMuc: soLuot}, updatedAt):
+// client gui DELTA (so luot moi tu lan dong bo truoc), server CONG DON roi tra ve TONG -> may nao cung thay cung so. Chi cho nguoi da biet ten (dang nhap CRM / ten CS ext); rieng tu tung nguoi (khong ai doc duoc so cua nguoi khac).
+// Khoa script de 2 may cung dong bo khong ghi de nhau. Chong phinh: toi da 200 id/lan, moi id +1000/lan, giu 400 muc dung nhieu nhat. Delta rong = chi KEO tong ve.
+var SH_VIETTAT_USAGE = 'VietTatUsage', VIETTAT_USAGE_HEADERS = ['owner', 'counts', 'updatedAt'];
+var VIETTAT_USAGE_MAX_IDS = 400, VIETTAT_USAGE_MAX_DELTA_IDS = 200, VIETTAT_USAGE_MAX_N = 1000;
+function vietTatUsage_(data, caller) {
+  var name = String((caller && caller.name) || '').trim();
+  if (!name || !_vtKey_(name)) return { ok: false, error: 'Chua biet ban la ai — dang nhap CRM de dong bo so luot dung.', code: 'FORBIDDEN' };
+  var delta = (data && data.delta && typeof data.delta === 'object' && !Array.isArray(data.delta)) ? data.delta : {};
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(8000); } catch (eL) { return { ok: false, error: 'He thong dang ban, thu lai sau.', code: 'BUSY' }; }
+  try {
+    var sh = getSheet_(SH_VIETTAT_USAGE, VIETTAT_USAGE_HEADERS), last = sh.getLastRow(), row = 0, counts = {};
+    if (last >= 2) {
+      var owners = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var i = 0; i < owners.length; i++) { if (_vtSame_(owners[i][0], name)) { row = i + 2; break; } }
+    }
+    if (row) {
+      try { var cur = JSON.parse(String(sh.getRange(row, 2, 1, 1).getValues()[0][0] || '{}')); if (cur && typeof cur === 'object' && !Array.isArray(cur)) counts = cur; } catch (eP) { counts = {}; }
+    }
+    var changed = false;
+    Object.keys(delta).slice(0, VIETTAT_USAGE_MAX_DELTA_IDS).forEach(function (id) {
+      var n = Math.floor(+delta[id]);
+      if (!/^[A-Za-z0-9_.-]{1,60}$/.test(id) || !(n > 0)) return;
+      counts[id] = (Math.floor(+counts[id]) || 0) + Math.min(n, VIETTAT_USAGE_MAX_N); changed = true;
+    });
+    var ids = Object.keys(counts);
+    if (ids.length > VIETTAT_USAGE_MAX_IDS) {
+      ids.sort(function (a, b) { return (+counts[b] || 0) - (+counts[a] || 0); });
+      var keep = {}; ids.slice(0, VIETTAT_USAGE_MAX_IDS).forEach(function (k) { keep[k] = counts[k]; }); counts = keep; changed = true;
+    }
+    if (changed) {
+      var rowVals = [[row ? sh.getRange(row, 1, 1, 1).getValues()[0][0] : name.slice(0, 60), JSON.stringify(counts), Date.now()]];
+      if (row) sh.getRange(row, 1, 1, 3).setValues(rowVals); else sh.appendRow(rowVals[0]);
+    }
+    return { ok: true, counts: counts };
+  } finally { try { lock.releaseLock(); } catch (eR) {} }
 }
 function deleteVietTat_(id, caller) {
   caller = caller || { priv: false, name: '' };
