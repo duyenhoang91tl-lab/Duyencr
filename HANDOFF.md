@@ -1,9 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-11-16 (phiên Claude — RÀ LẠI SAU MERGE) — XONG (đã push)
+- Đã xong: R13 (`--vh`), R14 (bấm ô giai đoạn), R15 (thanh tab đáy phủ hết chiều ngang) đều đã trên `main`; ca đỏ `test-narrow-cards` đã được phiên khác sửa (`f8c839a`). Chạy lại sau khi lấy bản mới nhất: cả bộ test xanh.
+- Đang làm: không có việc dở. Mọi mục còn lại cần Duyên.
+- [ ] **BƯỚC KẾ TIẾP (cần Duyên):** thử trên máy thật R13/R14/R15; R10a/R12a (ảnh); R11a/R11b (nói rõ phạm vi); nội dung "⚠ 2 lỗi" + dòng "Đang gom số liệu".
+
 ## 2026-11-15 (phiên Claude — GHI CHÚ SAU MERGE R13–R15 VỚI 19 COMMIT PHIÊN KHÁC) — ĐỂ Ý
 - Merge `origin/main` vào nhánh (không rebase/force): chỉ `HANDOFF.md` xung đột (2 vùng) → giữ CẢ HAI bên. `index.html` tự gộp, `?v=` của R13–R15 còn nguyên; `gen-dark-theme --check` khớp; syntax mọi js OK.
-- ⚠ **`tools/test-narrow-cards.js` ĐỎ 1 ca — KHÔNG do R13–R15, đỏ y hệt trên `origin/main` nguyên bản:** ca "Viết tắt: 2 cột nút … cùng dạng mới" đòi đúng 2 lần `flex:0 0 auto;margin-left:auto` trong `js/57-viettat.js`, nhưng commit `c508c9e` (Viết tắt: tìm theo tên ảnh / ghi âm đính kèm) đã đổi thẻ nên hiện chỉ còn 1. NGUYÊN NHÂN GỐC: test ghim cấu trúc HTML thẻ cũ. Phiên đã làm `c508c9e` (hoặc phiên kế) cần xem lại: nếu thẻ mới đúng ý thì sửa số đếm/regex trong test; nếu mất 1 cột nút ngoài ý muốn thì khôi phục. Cả bộ còn lại 338/339 đạt.
+- ✅ (ĐÃ XỬ LÝ: phiên khác sửa test ở `f8c839a`, đã chạy lại 16/11 — bộ test xanh) ~~`tools/test-narrow-cards.js` ĐỎ 1 ca~~  — KHÔNG do R13–R15, đỏ y hệt trên `origin/main` nguyên bản:** ca "Viết tắt: 2 cột nút … cùng dạng mới" đòi đúng 2 lần `flex:0 0 auto;margin-left:auto` trong `js/57-viettat.js`, nhưng commit `c508c9e` (Viết tắt: tìm theo tên ảnh / ghi âm đính kèm) đã đổi thẻ nên hiện chỉ còn 1. NGUYÊN NHÂN GỐC: test ghim cấu trúc HTML thẻ cũ. Phiên đã làm `c508c9e` (hoặc phiên kế) cần xem lại: nếu thẻ mới đúng ý thì sửa số đếm/regex trong test; nếu mất 1 cột nút ngoài ý muốn thì khôi phục. Cả bộ còn lại 338/339 đạt.
 - [ ] **VIỆC KẾ TIẾP:** xử lý ca đỏ trên (ưu tiên: kiểm thẻ Viết tắt trên điện thoại hẹp còn đủ nút Sửa/🗑 không).
 
 ## 2026-11-15 (phiên Claude — R15: THANH TAB HỒ SƠ ĐÁY HỤT GÓC PHẢI) — XONG (đã push)
