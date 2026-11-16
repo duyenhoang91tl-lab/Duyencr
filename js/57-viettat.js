@@ -70,10 +70,41 @@ function _vtPushRecent(id) { try { var a = _vtRecent().filter(function (x) { ret
 // ĐẾM LƯỢT DÙNG (2026-11-14): chạm để chép HOẶC gõ tắt rồi Tab/chạm gợi ý trong ô chat đều tính 1 lượt. Lưu localStorage riêng từng máy (key vt_usage {id: số lượt}) — phục vụ sắp xếp "Dùng nhiều nhất".
 var _VT_USAGE_KEY = 'vt_usage', _VT_SORT_KEY = 'vt_sort';
 function _vtUsage() { try { var o = JSON.parse(localStorage.getItem(_VT_USAGE_KEY) || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } }
+var _VT_PENDING_KEY = 'vt_usage_pending', _vtUsageBusy = false, _vtUsageTimer = null, _vtUsagePulled = false;
+// ĐỒNG BỘ giữa các máy (2026-11-14): lượt mới gom vào vt_usage_pending (delta chưa gửi) → gửi action vietTatUsage (server CỘNG DỒN theo tên người dùng, trả về TỔNG) sau 4s kể từ lượt cuối,
+// khi tải xong danh sách (1 lần/phiên để KÉO tổng về), và khi đóng/ẩn tab. Gửi lỗi → giữ nguyên delta, thử lại lần sau (không mất lượt, không lặp vô hạn). vt_usage luôn = tổng server + delta chưa gửi.
+function _vtPending() { try { var o = JSON.parse(localStorage.getItem(_VT_PENDING_KEY) || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } }
+function _vtSavePending(o) { try { localStorage.setItem(_VT_PENDING_KEY, JSON.stringify(o)); } catch (e) {} }
 function _vtNoteUse(id) {
   if (!id) return; _vtPushRecent(id);
-  try { var u = _vtUsage(); u[id] = (+u[id] || 0) + 1; localStorage.setItem(_VT_USAGE_KEY, JSON.stringify(u)); } catch (e) {}
+  try {
+    if (localStorage.getItem(_VT_PENDING_KEY) === null) _vtSavePending(_vtUsage());   // lần đầu có đồng bộ: gửi nốt số lượt cũ đã đếm riêng trên máy này
+    var u = _vtUsage(); u[id] = (+u[id] || 0) + 1; localStorage.setItem(_VT_USAGE_KEY, JSON.stringify(u));
+    var pd = _vtPending(); pd[id] = (+pd[id] || 0) + 1; _vtSavePending(pd);
+  } catch (e) {}
+  clearTimeout(_vtUsageTimer); _vtUsageTimer = setTimeout(vtSyncUsage, 4000);
 }
+function vtSyncUsage() {
+  clearTimeout(_vtUsageTimer);
+  if (_vtUsageBusy || typeof gsUrl === 'undefined' || !gsUrl) return Promise.resolve(false);
+  try { if (localStorage.getItem(_VT_PENDING_KEY) === null) _vtSavePending(_vtUsage()); } catch (e) {}
+  var sent = _vtPending(); _vtUsageBusy = true;
+  return fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'vietTatUsage', delta: sent }) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.ok || !d.counts || typeof d.counts !== 'object') return false;   // chưa đăng nhập / bận / lỗi → giữ delta
+      var cur = _vtPending(), rest = {}; Object.keys(cur).forEach(function (k) { var n = (+cur[k] || 0) - (+sent[k] || 0); if (n > 0) rest[k] = n; });
+      _vtSavePending(rest);
+      var tot = {}; Object.keys(d.counts).forEach(function (k) { tot[k] = +d.counts[k] || 0; }); Object.keys(rest).forEach(function (k) { tot[k] = (tot[k] || 0) + rest[k]; });
+      try { localStorage.setItem(_VT_USAGE_KEY, JSON.stringify(tot)); } catch (e) {}
+      _vtUsagePulled = true; if (_vtSortMode() === 'used') vtRender();
+      return true;
+    })
+    .catch(function () { return false; })
+    .then(function (v) { _vtUsageBusy = false; return v; });
+}
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && Object.keys(_vtPending()).length) vtSyncUsage(); });
+window.addEventListener('pagehide', function () { if (Object.keys(_vtPending()).length) vtSyncUsage(); });
 function _vtSortMode() { try { return localStorage.getItem(_VT_SORT_KEY) === 'used' ? 'used' : 'folder'; } catch (e) { return 'folder'; } }
 function vtSetSort(v) { try { localStorage.setItem(_VT_SORT_KEY, v === 'used' ? 'used' : 'folder'); } catch (e) {} vtRender(); }
 function _vtCopyText(t) {
@@ -248,7 +279,7 @@ function loadVietTat(force) {
   _vtSt.loading = fetch(gsUrl + sep + 'action=vietTat', { redirect: 'follow' }).then(function (r) { return r.json(); }).then(function (d) {
     if (d && d.error) throw new Error(d.error);
     _vtSt.list = (d && Array.isArray(d.snippets)) ? d.snippets : []; _vtSt.canTeam = !!(d && d.canTeam); _vtSt.me = (d && d.me) || ''; _vtSt.at = Date.now(); _vtSt.err = '';
-  }).catch(function (e) { _vtSt.err = String((e && e.message) || e); }).then(function () { _vtSt.loading = null; vtRender(); });
+  }).catch(function (e) { _vtSt.err = String((e && e.message) || e); }).then(function () { _vtSt.loading = null; vtRender(); if (!_vtSt.err && (!_vtUsagePulled || Object.keys(_vtPending()).length)) vtSyncUsage(); });
   return _vtSt.loading;
 }
 
