@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — ẨN/HIỆN CỘT LỌC BÊN TRÁI Ở DANH SÁCH KH) — BƯỚC 1/2 XONG (đã push); đang làm bước 2
+Duyên (gửi ảnh khoanh cột lọc: ô tìm, Lọc theo CS, Loại KH, Phân loại KH, Tình trạng CS): "chỉnh phần menu này khi mở danh sách khách hàng cũng có thể ẩn hoặc hiện như menu chính".
+NGUYÊN NHÂN GỐC: cột lọc `.sidebar` chỉ ẩn được CÙNG LÚC với menu chính (mũi tên `#sh-edge` js/55 → `shell-collapsed`) hoặc là ngăn kéo trên điện thoại; không có nút ẩn/hiện RIÊNG cho cột lọc nên muốn bảng rộng hơn phải thu gọn cả menu chính.
+- ✅ **BƯỚC 1 XONG (đã push)** `css/29-kh-sb-toggle.css` (MỚI, token-only, đã thêm TOKEN_ONLY + sinh lại 99-dark-auto.css): `html.kh-sb-off .app .sidebar{display:none}` chỉ ở >768px (điện thoại giữ ngăn kéo cũ) + kiểu nút `#kh-sb-edge` (mũi tên mép cột lọc, hiện khi có class `is-on`). index.html nạp css/29. Chưa có JS nên CHƯA có nút (không đổi hành vi).
+- [ ] **BƯỚC 2 (đang làm)** `js/85-kh-sb-toggle.js`: tạo nút `#kh-sb-edge` (‹ ẩn / › hiện), lưu localStorage `ome_kh_sb` ('0' = ẩn), chỉ hiện ở tab Danh sách KH (không `body.no-kh-sidebar`/`rpt-mode`/`shell-collapsed`, >768px), đặt sát mép phải cột lọc (hoặc mép trái vùng nội dung khi đang ẩn); hàm thuần `khSbPlan_` + test; kiểm bằng Chromium headless. KHÔNG sửa js/55.
+
 ## 2026-11-16 (phiên Claude — SỬA "DANH SÁCH KH CHỈ HIỂN THỊ 1 KHÁCH") — XONG (đã push); chờ Duyên xem trên máy thật
 Duyên: "fix danh sách khách hàng chỉ hiển thị 1 khách".
 NGUYÊN NHÂN GỐC (lỗi do R5a bước 1, js/82): `csSelInject_` chèn ô tích NGAY SAU `<td class="col-name">`, trước `<div class="cname">` (khối block) → ô tích thành 1 dòng riêng phía trên tên → mỗi dòng cao 78px thay vì ~59px. Bảng ảo (js/02 `_renderVirtualWindow`) tính theo `VT_ROW_H=58` nên sai lệch, và phần đầu trang (Tổng quan + bộ lọc) đã chiếm ~280px nên trên màn hình nhỏ vùng bảng chỉ còn ~1 dòng. Đo bằng Chromium headless (Playwright) với 3.000 khách giả: trước 78px/dòng, sau 59px/dòng (bằng bản không có js/82).

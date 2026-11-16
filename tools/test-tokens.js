@@ -11,7 +11,7 @@ const ok = m => console.log('ok   ' + m), bad = m => { fail++; console.log('FAIL
 const strip = t => t.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // File CSS MỚI chỉ được dùng var(--ui-*) / var(--biến-cũ); THÊM tên file mới vào đây khi tạo (vd '20-kit.css'). 00-tokens.css là nơi duy nhất được khai báo màu.
-const TOKEN_ONLY = ['20-kit.css', '21-task-board.css', '22-sched-calendar.css', '23-overdue-bulk.css', '24-cs-leave.css', '25-report-frame.css', '26-lead-score.css', '27-settings-hub.css', '28-cust-select.css'];
+const TOKEN_ONLY = ['20-kit.css', '21-task-board.css', '22-sched-calendar.css', '23-overdue-bulk.css', '24-cs-leave.css', '25-report-frame.css', '26-lead-score.css', '27-settings-hub.css', '28-cust-select.css', '29-kh-sb-toggle.css'];
 
 const tokens = strip(read('css/00-tokens.css'));
 const base = strip(read('css/01-base.css'));
