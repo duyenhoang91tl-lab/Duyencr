@@ -17,6 +17,9 @@ Gõ từ viết tắt/từ khoá trong bất kỳ ô chat nào (Zalo, Messenger,
 Vẫn tạo được (nút **+**), lưu riêng trong điện thoại, KHÔNG lên CRM. Nút **+ Hình ảnh** / **+ File âm thanh** chọn được **nhiều tệp cùng lúc** (từ bản 1.21). Mục lấy từ CRM có thư mục tên "CRM · …" và bị ghi đè mỗi lần cập nhật.
 Thư mục con trên CRM (vd `Túi tiền/Cổ`, `Túi tiền/Lắc`) hiện thành **dropdown cây mẹ/con** (từ bản 1.22): bấm nút 📁 ở đầu danh sách → ▸/▾ xổ/thu thư mục con, bấm tên = lọc (chọn mẹ gồm cả con cháu); khi thêm/sửa viết tắt chọn thư mục cũng bằng cây này; tạo thư mục con bằng cách gõ `Mẹ › Con` ở "+ Thư mục". Ảnh kèm của mục CRM được tải về khi bấm **☁ CRM** (lần đầu có thể lâu tuỳ số hình) và hiện cùng các lựa chọn chữ. **Tệp ghi âm** đính kèm ở CRM (form Viết tắt → "Chọn tệp ghi âm", ≤10 tệp, mỗi tệp ≤10MB) cũng được tải về cùng lúc và hiện như 🎤 Ghi âm (chèn/chia sẻ giống ghi âm tự tạo); tệp chưa tải được thì bỏ qua, bấm ☁ CRM lần nữa để thử lại.
 
+## Xem & sửa mục lấy từ CRM (từ bản 1.23)
+Bấm vào mục có nhãn **☁ CRM** → hộp mở ra cho xem ĐỦ nội dung: chữ, **hình hiện thu nhỏ**, ghi âm có nút **▶ Nghe**. Sửa được viết tắt/từ khoá/nội dung; bản sửa là **BẢN CÁ NHÂN HOÁ — chỉ trên máy này** (không đổi trên CRM, người khác không bị ảnh hưởng) và được giữ qua mọi lần ☁ CRM. Mục đã cá nhân hoá có nhãn **☁ CRM · ✎ cá nhân hoá** và nút **↩ Khôi phục bản chung từ CRM**. Mục CRM không có nút Xoá và không đổi được thư mục. Nếu mục gốc bị xoá trên CRM, bản của bạn được giữ thành mục riêng ở thư mục "Chung". (Hình/ghi âm chưa tải về máy thì bấm ⋮ › ☁ Cập nhật từ CRM.)
+
 ## Build
 Tự động bằng GitHub Actions (`.github/workflows/build-android.yml`). Tự build trên máy: Android Studio mở thư mục này (hoặc `gradle assembleDebug` với Gradle 8.7 + JDK 17).
 
