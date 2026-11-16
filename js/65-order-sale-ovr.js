@@ -24,6 +24,21 @@ function _osoBuild_(rows){
   });
   return { obj: obj, errors: errors };
 }
+// Gộp JSON {"mã":"tên sale"} vào danh sách dòng: mã trùng (bỏ năm) → ghi đè tên; trả { rows, added, updated, error }. Tên có thể là "a, b" (chia đều, đơn không ghép Base).
+function _osoMergeJson_(rows, text){
+  var t = String(text == null ? '' : text).trim(), obj;
+  if (!t) return { rows: rows, added: 0, updated: 0, error: 'Chưa dán JSON' };
+  try { obj = JSON.parse(t); } catch (e) { return { rows: rows, added: 0, updated: 0, error: 'JSON sai cú pháp: ' + e.message }; }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { rows: rows, added: 0, updated: 0, error: 'Phải là dạng {"162T10/2026":"yenNTH2004", ...}' };
+  var out = (rows || []).map(function(r){ return { code: r.code, name: r.name }; }), idx = {}, added = 0, updated = 0;
+  out.forEach(function(r, i){ var c = _osoNormCode_(r.code); if (c) idx[c.replace(/\/\d{2,4}$/, '')] = i; });
+  Object.keys(obj).forEach(function(k){
+    var c = _osoNormCode_(k); if (!c) return;
+    var key = c.replace(/\/\d{2,4}$/, ''), name = String(obj[k] == null ? '' : obj[k]).trim(); if (!name) return;
+    if (key in idx) { out[idx[key]].name = name; updated++; } else { idx[key] = out.length; out.push({ code: c, name: name }); added++; }
+  });
+  return { rows: out, added: added, updated: updated, error: '' };
+}
 function _osoToRows_(obj){ return Object.keys(obj || {}).map(function(k){ return { code: k, name: String(obj[k] == null ? '' : obj[k]) }; }); }
 
 function _osoEnsure_(){
@@ -34,13 +49,20 @@ function _osoEnsure_(){
     '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #eee"><b style="flex:1">📌 Ép sale theo đơn</b><button type="button" class="btn secondary sm" id="oso-close">✕</button></div>' +
     '<div style="padding:10px 14px;font-size:12px;color:#555;line-height:1.5">Đơn có <b>mã bộ đếm</b> bên dưới sẽ tính <b>100%</b> doanh thu / số đơn / thưởng / hoa hồng cho đúng người ghi, dù Base hoặc thẻ Pos ghi 2 người. Giá trị đơn giữ nguyên. Ví dụ: <code>162T10/2026</code> → <code>yenNTH2004</code>.</div>' +
     '<div id="oso-body" style="padding:0 14px;overflow:auto;flex:1"></div>' +
+    '<div id="oso-imp" style="display:none;padding:0 14px 6px"><textarea id="oso-imp-ta" spellcheck="false" placeholder=\'Dán JSON: {"1339T10/2026":"minhanh99, lanVH1995", ...} rồi bấm Gộp\' style="width:100%;box-sizing:border-box;min-height:90px;font-family:monospace;font-size:12px"></textarea><button type="button" class="btn secondary sm" id="oso-imp-go">Gộp vào danh sách</button></div>' +
     '<div id="oso-err" style="padding:6px 14px;color:#b91c1c;font-size:12px"></div>' +
-    '<div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid #eee"><button type="button" class="btn secondary sm" id="oso-add">+ Thêm dòng</button><span style="flex:1"></span><button type="button" class="btn" id="oso-save">💾 Lưu</button></div></div>';
+    '<div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid #eee"><button type="button" class="btn secondary sm" id="oso-add">+ Thêm dòng</button><button type="button" class="btn secondary sm" id="oso-imp-btn">📥 Dán JSON</button><span style="flex:1"></span><button type="button" class="btn" id="oso-save">💾 Lưu</button></div></div>';
   document.body.appendChild(ov);
   ov.addEventListener('click', function(e){ if (e.target === ov) ov.style.display = 'none'; });
   document.getElementById('oso-close').addEventListener('click', function(){ ov.style.display = 'none'; });
   document.getElementById('oso-add').addEventListener('click', function(){ _osoRead_(); _oso.rows.push({ code: '', name: '' }); _osoRender_(); });
   document.getElementById('oso-save').addEventListener('click', osoSave);
+  document.getElementById('oso-imp-btn').addEventListener('click', function(){ var d = document.getElementById('oso-imp'); d.style.display = d.style.display === 'none' ? 'block' : 'none'; });
+  document.getElementById('oso-imp-go').addEventListener('click', function(){
+    _osoRead_(); var m = _osoMergeJson_(_oso.rows, document.getElementById('oso-imp-ta').value);
+    document.getElementById('oso-err').textContent = m.error || '';
+    if (!m.error) { _oso.rows = m.rows; _osoRender_(); document.getElementById('oso-imp-ta').value = ''; toast('Đã gộp ' + m.added + ' dòng (' + m.updated + ' dòng đổi tên sale) — nhớ bấm Lưu'); }
+  });
   document.getElementById('oso-body').addEventListener('click', function(e){
     var b = e.target.closest('[data-osodel]'); if (!b) return;
     _osoRead_(); _oso.rows.splice(parseInt(b.getAttribute('data-osodel'), 10), 1); _osoRender_();
