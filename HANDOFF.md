@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — DÒNG THỜI GIAN HỒ SƠ THIẾU ĐƠN + CUỘN RIÊNG) — XONG (đã push); chờ Duyên xem trên máy thật
+Duyên (ảnh khách Đặng thị hoa: KPI 9 đơn / 71.494.000đ nhưng Dòng thời gian chỉ (2) = 1 đơn + 1 ghi chú): "lịch sử đơn ở dòng thời gian đúng không? cho cuộn lên được; mục điểm là điểm tích lũy đúng không?"
+NGUYÊN NHÂN GỐC: `proProfileData_` (js/33) lấy đơn từ `_posOrdersCache[phone]` (đơn Pos, đủ) nếu có, không thì `c.orders` (đơn Base, thiếu). Cache Pos CHỈ được tải khi mở tab "Lịch sử" (js/03 `renderHistTab`), nên mở hồ sơ ở tab Chăm sóc thì dòng thời gian chỉ có đơn Base trong khi số đơn/doanh thu ở KPI lấy từ `donStatsByPhone` (đủ). Ngoài ra `proTimeline_` bị cắt 30 mục và `<ul>` không có khung cuộn riêng.
+- ✅ js/33: `proEnsurePosOrders_(phone)` tự gọi `_loadPosOrdersForPhone_` 1 lần/khách rồi vẽ lại hồ sơ khi tải xong (thăm dò 0,5s ≤20s; lỗi → giữ đơn Base như cũ); hồ sơ hiện tối đa 200 mục; `<ul class="pro-tl">` có `max-height:48vh; overflow-y:auto`. js/38, js/48 không đổi. Bump `?v=` js/33 → 20261116a. Test: test-ui-pro-profile đạt + mô phỏng Node (tải đúng 1 lần dù gọi 2 lần; 9 đơn + 1 ghi chú = 10 mục; có khung cuộn).
+- "Điểm" ở Mức quan tâm KHÔNG phải điểm tích lũy: là điểm chấm khách nóng/ấm/nguội theo luật (js/77 `lsScore_`: chăm ≤7/30/60 ngày +3/2/1; mua ≤30/90/180 ngày +3/2/1; lịch hẹn ≤7 ngày +2; hạng Thân thiết/VIP +1; ≥2 đơn +1; ≥6 = Nóng). Khách trên: 2+2+1+1 = 6.
+- Không đổi GAS → không cần deploy; app Android: đóng mở lại / Ctrl+F5.
+- [ ] CHỜ Duyên xem: mở hồ sơ khách nhiều đơn ở tab Chăm sóc → vài giây sau Dòng thời gian phải hiện đủ đơn và cuộn riêng được. Nếu "cuộn lên" ý Duyên là chỗ khác (vd cố định phần đầu hồ sơ) thì báo lại.
+
 ## 2026-11-16 (phiên Claude — ẨN/HIỆN CỘT LỌC BÊN TRÁI Ở DANH SÁCH KH) — BƯỚC 1/2 XONG (đã push); đang làm bước 2
 Duyên (gửi ảnh khoanh cột lọc: ô tìm, Lọc theo CS, Loại KH, Phân loại KH, Tình trạng CS): "chỉnh phần menu này khi mở danh sách khách hàng cũng có thể ẩn hoặc hiện như menu chính".
 NGUYÊN NHÂN GỐC: cột lọc `.sidebar` chỉ ẩn được CÙNG LÚC với menu chính (mũi tên `#sh-edge` js/55 → `shell-collapsed`) hoặc là ngăn kéo trên điện thoại; không có nút ẩn/hiện RIÊNG cho cột lọc nên muốn bảng rộng hơn phải thu gọn cả menu chính.

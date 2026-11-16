@@ -171,7 +171,7 @@ function proTimeline_(notes, scheds, orders, limit){
 }
 function proTimelineHtml_(items, total){
   if (!items.length) return '';
-  return '<details class="pro-tl-d" style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--pro-ink);padding:4px 0">Dòng thời gian ('+total+')</summary><ul class="pro-tl" style="margin-top:8px">'
+  return '<details class="pro-tl-d" style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--pro-ink);padding:4px 0">Dòng thời gian ('+total+')</summary><ul class="pro-tl" style="margin-top:8px;max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">'
     + items.map(function(it){ return '<li class="'+it.kind+'"><span class="t-when">'+proEsc_(it.when)+'</span>'+proEsc_(it.title)+'</li>'; }).join('') + '</ul></details>';
 }
 
@@ -224,6 +224,23 @@ function proProfileData_(c){
   return { care: care, nOrd: nOrd, types: types, mine: mine, orders: orders, notes: notes };
 }
 
+// Dòng thời gian lấy đơn từ _posOrdersCache (đơn Pos, ĐỦ) nếu có, không thì c.orders (đơn Base, thường thiếu). Cache này trước đây CHỈ được tải khi CS mở tab
+// "Lịch sử" (js/03 renderHistTab) → mở hồ sơ ở tab Chăm sóc thì dòng thời gian chỉ thấy 1 đơn Base trong khi KPI báo 9 đơn (số đơn lấy từ donStatsByPhone).
+// Nay tự gọi tải đơn Pos 1 lần/khách rồi vẽ lại hồ sơ khi xong (thăm dò 0,5s, tối đa ~20s). Không tải được → giữ nguyên đơn Base như cũ.
+function proEnsurePosOrders_(phone){
+  try {
+    if (!phone || typeof _loadPosOrdersForPhone_!=='function' || typeof _posOrdersState==='undefined' || _posOrdersState[phone]) return;
+    _loadPosOrdersForPhone_(phone);
+    if (_posOrdersState[phone]!=='loading') return;   // bị bỏ qua (khách chưa có đơn Pos) → không cần chờ
+    var n = 0, tm = setInterval(function(){
+      n++;
+      if (typeof currentPhone!=='undefined' && currentPhone!==phone){ clearInterval(tm); return; }
+      if (_posOrdersState[phone]==='loading' && n<40) return;
+      clearInterval(tm);
+      if (_posOrdersState[phone]==='done' && typeof currentPhone!=='undefined' && currentPhone===phone) { try{ proRenderProfile_(); }catch(e){} }
+    }, 500);
+  } catch(e){ console.warn('[ui-pro] pos orders',e); }
+}
 // ── Gắn vào giao diện ──
 function proRenderProfile_(){
   var host = document.getElementById('dp-pro');
@@ -238,7 +255,8 @@ function proRenderProfile_(){
   }
   var D = proProfileData_(c), care = D.care, nOrd = D.nOrd, types = D.types, mine = D.mine;
   var wasOpen = !!(host.querySelector('details.pro-tl-d') && host.querySelector('details.pro-tl-d').open);
-  var tl = proTimeline_(D.notes, mine, D.orders, 30), tlTotal = D.notes.length + mine.length + D.orders.length;
+  var tl = proTimeline_(D.notes, mine, D.orders, 200), tlTotal = D.notes.length + mine.length + D.orders.length;
+  proEnsurePosOrders_(c.phone);   // đơn Pos chỉ tải khi mở tab Lịch sử → hồ sơ tự tải để dòng thời gian đủ đơn
   var leadHtml = ''; try { if (typeof lsScore_==='function'){ var ls_ = lsScore_(c, mine, Date.now()); leadHtml = proLeadHtml_(ls_, typeof lsNextStep_==='function' ? lsNextStep_(ls_, c) : null); } } catch(e){ leadHtml = ''; }   // R8c
   host.innerHTML = proQuickActionsHtml_(c.phone)
                  + leadHtml
@@ -257,4 +275,4 @@ function proRenderProfile_(){
   if (typeof openDp==='function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
   if (typeof renderDpTab==='function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
 })();
-if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proStageSet_, proStageClick_, proQuickPhone_, proQuickActionsHtml_, proLeadHtml_ };
+if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_, proStageSet_, proStageClick_, proQuickPhone_, proQuickActionsHtml_, proLeadHtml_, proEnsurePosOrders_ };
