@@ -593,7 +593,7 @@ Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2
 
 
 ## 2026-11-03 (phiên 7) — Chỉnh quy tắc CRM để Báo cáo B khớp KT (sheet HUYỀN): BẢNG CHIA BỔ SUNG `acctSplitExtra` — BƯỚC 2/4 đã push (GAS + UI)
-
+- **Sau rebase lần 2:** file UI đổi tên `js/80-acct-split-extra.js` (66 trùng `66-sakura-petals.js` của phiên khác); `gas/*.gs` lệch do gộp → đã chạy lại `node tools/split-gas.js` (--check OK).
 
 ## 2026-11-14 (phiên 62) — NHẮC QUY TRÌNH CHAT: AI quét hội thoại, nhắc sale làm đúng sheet "Kịch bản Chatpage" — BƯỚC 1, 2, 3a XONG (đã push); ĐANG LÀM 3b
 - **Yêu cầu Duyên (18/10):** từ sheet "Kịch bản Chatpage" (https://docs.google.com/spreadsheets/d/1yyOy27HQRQvplhFFDwwZt94J85WK0c5HAen_ouqF2Is, tab Kịch bản/FAQ), để **Pancake AI và CRM quét hội thoại và nhắc sale theo các bước quy trình**. Ví dụ: gửi hình ảnh kèm ghi âm; báo giá phải kèm CTKM nếu có; lên được đơn thì hướng dẫn khách gửi size tay. Thiết kế + bảng quy tắc + cấu hình đầy đủ: **`docs/NHAC-QUY-TRINH-CHAT.md`** (đọc file này trước).

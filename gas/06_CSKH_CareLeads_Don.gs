@@ -674,7 +674,7 @@ function readDonChiTiet_() {
   // posRow = so dong THAT trong sheet "dữ liệu đơn" (header o dong 1) — de ke toan do lai tung don (Bao cao L). Chi gan o day
   // (khong sua _donConvertRows_ dung chung voi Supabase backfill). Cache cu <=90s chua co posRow thi chi hien trong tam.
   var out = conv.items.map(function (it) { var o = it.obj; o.posRow = it.srcRow; return o; });
-  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), DON_CACHE_TTL_); } catch (eCache) {}
   return out;
 }
 
