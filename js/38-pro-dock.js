@@ -395,6 +395,15 @@ function proCatIcon_(px){
   var rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
   return proCatIconSvg_(px, !rm);
 }
+// Mèo NHÚNG TRONG DÒNG CHỮ (nút/tiêu đề/nhãn "🤖 ..." ở các màn khác): trả về HTML <span> inline-block px×px chứa mèo, hoặc '🤖' nếu hàm vẽ chưa nạp / lỗi (an toàn khi js/38 nạp sau
+// các file gọi — chỉ gọi lúc chạy, không lúc nạp). Gắn khoảng cách phải 5px như dấu cách sau emoji; SVG gốc display:block nên bọc span để nằm cùng hàng chữ (vertical-align hạ nhẹ).
+function proCatTag_(px){
+  px = Math.max(10, Math.min(64, +px || 16));
+  try {
+    if (typeof proCatIcon_ !== 'function') return '🤖';
+    return '<span class="pro-cat-tag" aria-hidden="true" style="display:inline-block;width:' + px + 'px;height:' + px + 'px;vertical-align:-' + Math.round(px * 0.22) + 'px;margin-right:5px">' + proCatIcon_(px) + '</span>';
+  } catch (e) { return '🤖'; }
+}
 // Hiệu ứng mèo khi AI đang trả lời: cả con mèo lắc lư nhẹ (vẫy) + bi ăng-ten nhấp nháy cam; giảm chuyển động → KHÔNG lắc,
 // chỉ đổi bi ăng-ten sang màu cam đứng yên (vẫn có tín hiệu "đang bận" mà không chuyển động). Style chèn 1 lần, tự chứa (không đụng css/*).
 function proCatStyle_(){
