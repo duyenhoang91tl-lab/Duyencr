@@ -592,8 +592,12 @@ Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2
 
 
 
-## 2026-11-03 (phiên 7) — Chỉnh quy tắc CRM để Báo cáo B khớp KT (sheet HUYỀN): BẢNG CHIA BỔ SUNG `acctSplitExtra` — BƯỚC 2/4 đã push (GAS + UI)
+## 2026-11-03 (phiên 7) — Chỉnh quy tắc CRM để Báo cáo B khớp KT (sheet HUYỀN): BẢNG CHIA BỔ SUNG `acctSplitExtra` — XONG 4/4 (file dữ liệu đã gửi Duyên; CHỜ Duyên dán vào CRM)
 - **Sau rebase lần 2:** file UI đổi tên `js/80-acct-split-extra.js` (66 trùng `66-sakura-petals.js` của phiên khác); `gas/*.gs` lệch do gộp → đã chạy lại `node tools/split-gas.js` (--check OK).
+- **Script + dữ liệu:** `tools/bonus-t10/build_acct_extra.py <file KT> <ra.txt>` sinh `DAN_VAO_CRM_T10.txt` (không commit): KHỐI 1 = `acctSplitExtra` 5 dòng (17T10 ×2 theo KT 14.058.000/3.350.000; 268T10 = 10.780.000 Ninh+Ngà chia đều + 4.180.000 Ngà; 1162T10 COD 5.664.000 thuyha88); KHỐI 2 = `orderSaleOverride` 93 đơn bảo hành KT thêm thẻ (vd "minhanh99, lanVH1995"). Tự kiểm: 93/93 đơn (Pos − tiền trả trước) chia đều theo thẻ = dòng KT; test GAS thật `test-acct-extra.js` thêm ca orderSaleOverride "a, b" (chia 1.965.000/1.965.000).
+- **VIỆC DUYÊN LÀM:** Ctrl+F5 → Cài đặt team → "🧮 Chia đơn theo KT (bổ sung)" dán KHỐI 1 → Kiểm tra → Lưu; "📌 Ép sale theo đơn" → 📥 Dán JSON KHỐI 2 → Gộp → Lưu (giữ các dòng 162T10/430T10 đã có); rồi Báo cáo B bấm Lọc lại so với KT.
+- **CÒN LỆCH, CHƯA SỬA (chờ Duyên):** (a) 6 đơn bảo hành KT không trừ/ trừ khác "tiền trả trước": 423T10 (CRM 1.135.000 vs KT 1.035.000), 113T10 (1.360.000 vs 1.060.000), 332T10 / 292T10 / 12T10 (KT không trừ 20.000), 9T10 (trả trước = đủ giá trị 1.400.000 → CRM 0, KT 1.400.000) — tổng CRM thấp hơn KT 1.060.000đ; (b) 914T10 (5.850.000): KT thêm thẻ trangbeCSKH1995 cạnh linhNM1995 (±2.925.000) — Duyên chưa quyết; (c) BH386T10/2026/6190 giữ theo Pos → CRM ra 4.150.000 (6.150.000 − trả trước 2.000.000), KT 1.550.000; (d) 268T10: Duyên gõ "10tr790k" (cộng 14.970.000 ≠ Pos 14.960.000) → dùng 10.780.000, cần xác nhận; (e) đơn quầy M44707/M44756 đi qua Báo cáo L (30%), không có dòng Pos nên không nằm trong bảng bổ sung.
+
 
 ## 2026-11-14 (phiên 62) — NHẮC QUY TRÌNH CHAT: AI quét hội thoại, nhắc sale làm đúng sheet "Kịch bản Chatpage" — BƯỚC 1, 2, 3a XONG (đã push); ĐANG LÀM 3b
 - **Yêu cầu Duyên (18/10):** từ sheet "Kịch bản Chatpage" (https://docs.google.com/spreadsheets/d/1yyOy27HQRQvplhFFDwwZt94J85WK0c5HAen_ouqF2Is, tab Kịch bản/FAQ), để **Pancake AI và CRM quét hội thoại và nhắc sale theo các bước quy trình**. Ví dụ: gửi hình ảnh kèm ghi âm; báo giá phải kèm CTKM nếu có; lên được đơn thì hướng dẫn khách gửi size tay. Thiết kế + bảng quy tắc + cấu hình đầy đủ: **`docs/NHAC-QUY-TRINH-CHAT.md`** (đọc file này trước).
