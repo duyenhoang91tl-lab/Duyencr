@@ -6,7 +6,7 @@ const src = fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8');
 const cut = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i) throw new Error('không tìm thấy khối ' + a); return src.slice(i, j); };
 const { JSDOM } = require('jsdom');
 const w = new JSDOM('<body></body>', { runScripts: 'outside-only' }).window;
-w.eval(cut('function proCatIconSvg_', '// Hiệu ứng mèo khi AI đang trả lời:'));
+w.eval(cut('function proCatIconSvg_', '// Hiệu ứng khi AI đang trả lời:'));
 let h = w.eval('proCatTag_(16)');
 ok(/^<span class="pro-cat-tag"/.test(h) && /<svg class="pro-cat"/.test(h) && h.indexOf('🤖') < 0, 'px=16 → span bọc SVG mèo, không còn 🤖');
 w.document.body.innerHTML = '<button>' + h + 'Phân tích</button>';
@@ -19,7 +19,7 @@ ok(w.eval('proCatTag_(1)').indexOf('width:10px') > 0 && w.eval('proCatTag_(999)'
 ok(!/pro-cat-ant/.test('') && /pro-cat-ant/.test(h), 'có bi ăng-ten để hiệu ứng "bận" áp được nếu cha có pro-cat-busy');
 // Fallback: hàm vẽ chưa nạp
 const w2 = new JSDOM('<body></body>', { runScripts: 'outside-only' }).window;
-w2.eval(cut('function proCatTag_', '// Hiệu ứng mèo khi AI đang trả lời:'));
+w2.eval(cut('function proCatTag_', '// Hiệu ứng khi AI đang trả lời:'));
 ok(w2.eval('proCatTag_(16)') === '🤖', 'chưa nạp proCatIcon_ → fallback 🤖');
 w.eval('proCatIcon_ = function(){ throw new Error("x"); }');
 ok(w.eval('proCatTag_(16)') === '🤖', 'proCatIcon_ ném lỗi → fallback 🤖, không làm hỏng màn gọi');
