@@ -84,4 +84,22 @@ const many=Array.from({length:5},(_,i)=>M('S'+i,1e6,30,100)), pm=Array.from({len
 ok(A(many,pm)[0].n===5&&A(many,pm)[0].text.includes('…'),'>3 người → liệt kê 3 + "…" nhưng n = 5');
 ok(m.proRecoItems_([],'2026-11-15',[],0,A(cur,prev)).length===2,'mục cảnh báo xuất hiện trong khuyến nghị, không còn "xong việc"');
 }
+// R4c (16/11): proPaceAlerts_ chọn luật cảnh báo — tiến độ (js/81) khi có, luật cũ khi thiếu
+{
+const PA=m.proPaceAlerts_, P81=require('../js/81-pace-alert.js'), D={from:'2026-11-01',to:'2026-11-30'}, TD='2026-11-10';
+const pp=(n,rev,extra)=>Object.assign({name:n,revenue:rev,orders:1,tongTT:0,tyLeChot:null},extra||{});
+global.paceAlertItems_=P81.paceAlertItems_;
+let r=PA('all',[pp('An',150e6)],D,TD,null,null,()=>false);
+ok(r.length===1&&r[0].text.includes('An 90%'),'có js/81: An 150tr/500tr (10/30 ngày) → cảnh báo tiến độ mức 1, KHÔNG cần dữ liệu kỳ trước');
+r=PA('all',[pp('TV1',20e6)],D,TD,null,null,n=>n==='TV1');
+ok(r.length===1&&r[0].text.includes('TV1 60%'),'isProbation → mục tiêu 100tr (20tr/33,3tr = 60%)');
+ok(PA('self',[pp('An',1e6)],D,TD,null,null,()=>false).length===0&&PA('self',[pp('An',1e6)],D,TD,[pp('An',9e6)],null,()=>false).length===0,'chế độ cá nhân (self) → không cảnh báo');
+ok(Array.isArray(PA('all',[pp('An',500e6)],D,'',null,null,()=>false)),'today rỗng → lấy ngày VN, không lỗi');
+ok(/^\d{4}-\d{2}-\d{2}$/.test(m.proTodayVn_()),'proTodayVn_ trả YYYY-MM-DD');
+delete global.paceAlertItems_;
+const M2=(n,rev,tl,tt)=>({name:n,revenue:rev,tyLeChot:tl,tongTT:tt});
+r=PA('all',[M2('An',10e6,29,100)],D,TD,[M2('An',20e6,30,100)],null,()=>false);
+ok(r.length===1&&r[0].text.includes('so kỳ trước'),'THIẾU js/81 + có kỳ trước → quay về luật cũ (tụt so kỳ trước)');
+ok(PA('all',[M2('An',10e6,29,100)],D,TD,null,null,()=>false).length===0,'THIẾU js/81 + chưa có kỳ trước → không cảnh báo');
+}
 process.exit(bad?1:0);
