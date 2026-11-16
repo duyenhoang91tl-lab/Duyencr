@@ -345,8 +345,7 @@ function splitFixList_(p, user) {
       posVal: Math.round(posVal), the: theNames, base: base, baseSum: Math.round(baseSum), lechTien: lechTien, lechSale: lechSale, current: cur, tong: Math.round(tot) });
   });
   rows.sort(function (a, b) { return Math.abs(b.lechTien) - Math.abs(a.lechTien); });
-  var shadowed = []; try { shadowed = _loadAcctSplit_().crmShadowed || []; } catch (eSh) {}   // ma da luu chia tay trong CRM nhung file ke toan da co dong cung ma -> khong co hieu luc
-  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows, shadowed: shadowed };
+  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows, overrides: (function () { try { return _loadAcctSplit_().crmOverrides || []; } catch (eO) { return []; } })() };
 }
 function splitDoGet_(action, p) {
   try {

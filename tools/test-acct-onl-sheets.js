@@ -66,9 +66,7 @@ ok(g(B, 'anhtrinh1995') === 1000000 && g(B, 'quaySale') === 0, 'tab "quầy t10"
 B = run([don('777T10/2026', 'anhtrinh1995', 2000000)], ALL);
 ok(g(B, 'anhtrinh1995') === 2000000 && B.totalGiaTri === 2000000, 'dong onl thieu tong (777T10) bi bo qua, don KHONG bi mat doanh thu');
 B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], ALL, [{ code: '17T10/2026', sales: ['huyenmaii1990'], tong: 1000000 }]);
-ok(g(B, 'ninhnga99') === 14058000 && g(B, 'huyenmaii1990') === 3350000, 'FILE KE TOAN (tab onl) THANG bang CRM (acctSplitExtra) khi cung ma (Duyen chot 2026-11-15)');
-B = run([don('999T10/2026', 'anhtrinh1995', 1000000)], ALL, [{ code: '999T10/2026', sales: ['huyenmaii1990'], tong: 1000000 }]);
-ok(g(B, 'huyenmaii1990') === 1000000 && g(B, 'anhtrinh1995') === 0, 'don KE TOAN CHUA GHI: bang CRM cua admin van co hieu luc');
+ok(g(B, 'huyenmaii1990') === 1000000 && g(B, 'ninhnga99') === 0, 'bang CRM (acctSplitExtra) thang tab onl khi cung ma');
 B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], [mkSheet('Sheet1', [HEAD.concat(['Xác nhận'])].concat([[1, 'Fb', 'ninhnga99', '', 5000000, '', '17T10/2026', '', 'x']]))]);
 ok(g(B, 'ninhnga99') === 5000000, 'khong co tab onl => doc tab dau tien nhu cu (legacy)');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK'); process.exit(fails ? 1 : 0);
