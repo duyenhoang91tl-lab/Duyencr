@@ -82,6 +82,7 @@ ok(tiny === 0, 'không có bước nhảy tức thời (' + tiny + ' khung)');
 e = makeEnv({ w: 1000 });
 let st0 = e.win._mascotState_();
 ok(st0.flowers >= 8 && st0.flowers <= 28, 'số hoa trong [8,28]: ' + st0.flowers);
+ok(st0.butterflies.every(b => Array.isArray(b.pal) && b.pal.length === 3) && new Set(st0.butterflies.map(b => b.pal[0])).size === st0.butterflies.length, 'bướm nhiều màu: mỗi con 1 bộ màu (cánh trên/dưới/chấm) khác nhau');
 ok(st0.butterflies.length === 4 && st0.bees.length === 2, 'desktop: 4 bướm + 2 ong (' + st0.butterflies.length + '/' + st0.bees.length + ')');
 let bad = 0, flyMoved = 0; const b0 = { x: st0.bees[0].x, y: st0.bees[0].y }; t = 1000;
 for (let i = 0; i < 4000; i++) {

@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — VƯỜN HOA-BƯỚM-ONG: CÁNH ONG RÕ HƠN, BƯỚM NHIỀU MÀU, BƯỚM BAY LÊN + ĐẬU HOA) — BƯỚC 1/2 XONG (đã push); đang làm bước 2
+Duyên: "tăng màu cánh ong nhìn rõ hơn; cánh bướm nhiều màu hơn; bướm bay nhẹ lên chứ không chỉ bay xuống; bướm đậu được lên hoa". File: `js/79-mascot-samoyed.js` (+ `tools/test-mascot-samoyed.js`, `?v=` js/79 trong index.html).
+NGUYÊN NHÂN GỐC: cánh ong vẽ `globalAlpha 0.5` + màu `rgba(200,230,255)` gần như trùng nền sáng của CRM nên không thấy; bướm chỉ có 1 màu/con (5 màu pastel, 2 cánh cùng 1 elip) và dùng chung `flyStep` (dội trần/sàn bằng `a=-a`, không có xu hướng bay lên), không có trạng thái đậu như ong.
+- ✅ **BƯỚC 1 XONG (đã push)**: cánh ong gần đục (alpha 0.92), to hơn, viền xanh `#3F7FBF`. Bướm 4 cánh (cánh trên + cánh dưới + chấm + viền + râu), 10 bộ màu `BPAL` (mỗi con 1 bộ `b.pal`, giữ `BCOL`/`b.color` cho tương thích). Test mascot 78 ca (thêm: mỗi bướm 1 bộ màu khác nhau). KHÔNG đổi GAS/extension → chỉ Ctrl+F5.
+- [ ] **BƯỚC 2 (đang làm)**: bướm bay nhấp nhô LÊN-xuống (thêm sóng dọc + lực nâng khi thấp) và ĐẬU lên hoa (state `fly → go → sit`, tái dùng `flowerHead_`, đậu 3–6s, cánh khép/vỗ chậm khi đậu, rồi bay LÊN); tạo lại hoa khi đổi cỡ màn hình → bướm về `fly`; thêm ca test như test ong đậu (mục 3g).
+
 ## 2026-11-16 (phiên Claude — R5a: CHỌN NHIỀU KHÁCH + THAO TÁC HÀNG LOẠT) — BƯỚC 1+2/3 XONG (đã push); đang làm bước 3
 Duyên chốt (16/11): thao tác hàng loạt = **gán CS + đổi tình trạng CS + đổi trạng thái KH**; R5d trùng khách tính theo **SĐT**, khi gộp **giữ TẤT CẢ dữ liệu** (không mất gì). Quy tắc làm việc: mỗi bước 1 file hoàn chỉnh → push main → cập nhật HANDOFF.
 NGUYÊN NHÂN GỐC R5a: Danh sách KH chỉ mở được từng khách; đổi CS/tình trạng/trạng thái cho nhiều khách phải mở hồ sơ từng người.
