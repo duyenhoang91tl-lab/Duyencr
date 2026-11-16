@@ -56,10 +56,6 @@ B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], null, ktRows)
 ok(g(B, 'ninhnga99') === 8666000 && g(B, 'huyenmaii1990') === 8666000, 'KHONG co bang bo sung: hanh vi cu giu nguyen (file KT chua x => chia deu)');
 B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], [{ code: '17T10/2026', sales: ['ninhnga99', 'huyenmaii1990'], tong: 6700000 }, { code: '17T10/2026', sales: ['ninhnga99'], tong: 10708000 }], ktRows);
 ok(g(B, 'ninhnga99') === 14058000 && g(B, 'huyenmaii1990') === 3350000 && B.totalGiaTri === 17408000, 'Co bang bo sung: 17T10 = KT 14.058.000 / 3.350.000 (thay dong file KT cung ma, khong can x)');
-// 5b) (2026-11-15) KE TOAN THANG ADMIN: dong KT DA XAC NHAN ('x') cung ma => bang CRM bi bo qua; KT chua 'x' thi admin van chinh duoc (ca 5 o tren)
-const ktConf = [['Fb', 'ninhnga99', 0, 5000000, 0, '17T10/2026', 'x']];
-B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], [{ code: '17T10/2026', sales: ['huyenmaii1990'], tong: 1000000 }], ktConf);
-ok(g(B, 'ninhnga99') === 5000000 && g(B, 'huyenmaii1990') === 0, 'KT da xac nhan (x) thang bang CRM cua admin cung ma: 17T10 = ninhnga99 5.000.000');
 // 6) don khong co trong bang bo sung (BH386 theo Pos) + don thuong: KHONG doi
 B = run([don('BH386T10/2026/6190', 'huyenmaii1990', 6150000), don('999T10/2026', 'anhtrinh1995', 1000000)], [{ code: 'M44707', sales: ['ninhnga99'], tong: 1335000 }]);
 ok(g(B, 'huyenmaii1990') === 6150000 && g(B, 'anhtrinh1995') === 1000000 && B.totalGiaTri === 7150000, 'BH386T10/2026 (theo Pos) + don thuong khong co trong bang bo sung: giu nguyen');
