@@ -4,6 +4,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-16 (phiên Claude — VẼ LẠI MÈO MÁY: TRẮNG XÙ MẶT TRÒN GIỐNG SAMOYED) — XONG (đã push)
+NGUYÊN NHÂN GỐC bản 15/11 "méo mó": `proCatIconSvg_` (js/38) vẽ cả thân với 9 cục lông kích thước khác nhau + tai nhọn cao + màu xanh-xám nên đầu dẹt/lệch, không ra mặt tròn như chó Samoyed. Bản mới: CHỈ vẽ ĐẦU TRÒN to — 1 vòng tròn lõi + 16 cục lông đều quanh viền (tính bằng vòng lặp, đối xứng), lông TRẮNG viền be nhạt (2 lượt như chó), tai tam giác bo tròn ép sát đầu, mắt tròn đen to + highlight, má hồng, mũi tí xíu, ria ngắn; giữ chi tiết "máy" (ăng-ten bi vàng, vòng cổ bạc hà + chip) và chớp mắt SMIL (tắt khi giảm chuyển động). Vẫn là hình vector nội tuyến (cùng kiểu vẽ vector như chó, không file ảnh) nên nét sắc ở 24/32px.
+- ✅ `js/38-pro-dock.js` (chỉ thân hàm `proCatIconSvg_`; `proCatIcon_`, nút dock, tiêu đề khung AI không đổi). Test `node tools/test-ai-cat-icon.js` 20/20 (cần jsdom). Đã render PNG kiểm hình. Bump `?v=` js/38 → 20261116a. KHÔNG đổi GAS/extension/APK → chỉ Ctrl+F5.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 xem nút AI. Nếu muốn: tai tròn hơn/nhỏ hơn, thêm lưỡi/đuôi, màu vòng cổ, hoặc vẽ hẳn bằng canvas (cần đổi nút thành `<canvas>` + vẽ lại khi đổi kích thước).
+
 ## 2026-11-15 (phiên làm việc — 🐱 ICON AI = MÈO MÁY ANH LÔNG DÀI) — XONG
 Duyên: đổi icon AI thành "mèo máy" dễ thương bông bông, phong cách giống chó Samoyed, mèo Anh lông dài. (Yêu cầu đầu là Doraemon → KHÔNG làm vì nhân vật có bản quyền; chốt dùng mèo máy NGUYÊN TÁC tự thiết kế, không chuông/vòng cổ đỏ/túi thần kỳ.)
 - ✅ `js/38-pro-dock.js`: `proCatIconSvg_(px, blink)` + `proCatIcon_(px)` — SVG nội tuyến 64x64 (không file ảnh): lông xù xanh-xám có viền nhạt (vẽ 2 lượt như chó), tai hồng, mắt đồng to + highlight, má hồng, ria, ăng-ten bi vàng + vòng cổ bạc hà có chip tròn (chi tiết "máy"). Chớp mắt bằng SMIL, tắt khi `prefers-reduced-motion`. Dùng ở 2 chỗ: nút nổi `#pro-dock-ai` (32px) và tiêu đề khung "Trợ lý AI" (24px). Các 🤖 khác trong app (tab Zalo AI, AI phân tích team…) KHÔNG đụng (quy tắc 14).
