@@ -30,6 +30,9 @@ function _scErrHint(msg) {
   var m = String(msg || '');
   if (/urlfetch|qua nhieu|too many|quota|han muc/i.test(m)) return 'Hôm nay máy chủ đã hết lượt gọi dịch vụ ngoài (UrlFetch) nên chưa đọc được hộp thư. Hạn mức tự làm mới khoảng 14h (giờ VN) — báo quản trị nếu cần xử lý ngay.';
   if (/AUTH|dang nhap|đăng nhập/i.test(m)) return 'Phiên đăng nhập có thể đã hết hạn — đăng xuất rồi đăng nhập lại.';
+  if (/quá thời gian cho phép|quá chậm/i.test(m)) return 'Máy chủ đang bận — đợi vài chục giây rồi bấm Thử lại. Nếu lặp lại nhiều lần, báo admin kiểm tra Apps Script (Executions).';
+  if (/hết hạn mức/i.test(m)) return 'Hạn mức tự làm mới khoảng 14h (giờ VN) — báo quản trị nếu cần xử lý ngay.';
+  if (/yêu cầu đăng nhập Google|trang lỗi thay vì dữ liệu|HTTP \d{3}/i.test(m)) return 'Báo admin: mở Apps Script → Executions xem lỗi dòng gần nhất, và kiểm tra đã Deploy bản mới (Manage deployments → New version).';
   if (/ket noi|kết nối|502|Failed to fetch/i.test(m)) return 'Kiểm tra mạng rồi bấm Thử lại.';
   return '';
 }
@@ -65,11 +68,11 @@ async function scLoadList() {
   if (_sc.loading) { _sc.again = true; return; }   // đổi bộ lọc/tìm kiếm khi đang tải dở -> tải lại ngay sau đó (không bỏ rơi lần đổi)
   _sc.loading = true;
   try {
-    var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '') + _scFilterQuery_()), { redirect: 'follow' })).json();
+    var j = await _pkcFetchJson_(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '') + _scFilterQuery_()));
     if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được hộp thư.'); _scStatus(); return; }
     _pkcAuthShown = false; _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs); _pkSeenApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
-  } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
+  } catch (e) { _sc.err = _pkcErrText_(e); _scStatus(); }
   finally { _sc.loading = false; if (_sc.again) { _sc.again = false; scLoadList(); } }
 }
 // ═══ BỘ LỌC + THƯ MỤC (18/10/2026) — cả hai MẶC ĐỊNH ẨN, bấm nút mới hiện ═══
@@ -190,7 +193,7 @@ function _scDiagBox(txt) {
   if (!el) {
     el = document.createElement('div'); el.id = 'sc-diag';
     el.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(20,20,10,.5);display:flex;align-items:center;justify-content:center;padding:14px';
-    el.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(720px,100%);max-height:92vh;display:flex;flex-direction:column;padding:14px 16px;gap:8px;box-shadow:var(--shadow-md)">'
+    el.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(720px,100%);max-height:calc(var(--vh,1vh)*92);display:flex;flex-direction:column;padding:14px 16px;gap:8px;box-shadow:var(--shadow-md)">'
       + '<div style="display:flex;align-items:center;gap:8px"><b style="flex:1">🔍 Chẩn đoán hội thoại Pancake</b><button class="btn sm" id="sc-diag-copy">Sao chép</button><button class="btn sm" id="sc-diag-x">Đóng</button></div>'
       + '<textarea id="sc-diag-t" readonly style="flex:1;min-height:320px;font:12px/1.4 monospace;width:100%;box-sizing:border-box"></textarea></div>';
     document.body.appendChild(el);
@@ -256,13 +259,13 @@ async function scLoadMsgs(full) {
   var id = _sc.active; if (!id) return;
   try {
     var after = (!full && _sc.after[id]) ? '&after=' + encodeURIComponent(_sc.after[id]) : '';
-    var j = await (await fetch(_pkcUrl('action=pkChatConv&conv=' + encodeURIComponent(id) + after), { redirect: 'follow' })).json();
+    var j = await _pkcFetchJson_(_pkcUrl('action=pkChatConv&conv=' + encodeURIComponent(id) + after));
     if (id !== _sc.active) return;
     if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được tin nhắn.'); _scStatus(); return; }
     _sc.err = ''; if (full) { _sc.msgs[id] = {}; _sc.after[id] = ''; }
     (j.messages || []).forEach(function (m) { (_sc.msgs[id] = _sc.msgs[id] || {})[m.id] = m; if (m.at && (!_sc.after[id] || m.at > _sc.after[id])) _sc.after[id] = m.at; });
     _scRenderMsgs(full);
-  } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
+  } catch (e) { _sc.err = _pkcErrText_(e); _scStatus(); }
 }
 function _scRenderMsgs(forceBottom) {
   var box = document.getElementById('sc-msgs'); if (!box) return;

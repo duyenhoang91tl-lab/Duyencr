@@ -469,6 +469,11 @@ function _loadAcctSplit_() {
     // Gop bang chia bo sung cua CRM: dong bo sung THAY cac dong cung ma trong file ke toan (khop ca khi khac nam /2026); bang CRM (Settings) thang tab onl neu cung ma.
     var crmEx = _loadAcctExtra_(), crmNy = {};
     crmEx.forEach(function(rw) { crmNy[_acctCodeNoYear_(rw.code)] = true; });
+    // Mac dinh lay theo KE TOAN; admin luu dong trong CRM thi DE len (Duyen chot lai 2026-11-16). out.crmOverrides = ma dang de len dong ke toan (de giao dien bao 'dang de len ke toan').
+    var ktNy = {}; out.crmOverrides = [];
+    sheetEx.forEach(function(rw) { ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    rowsRaw.forEach(function(rw) { if (rw.code && rw.confirmed) ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    crmEx.forEach(function(rw) { if (ktNy[_acctCodeNoYear_(rw.code)] && out.crmOverrides.indexOf(rw.code) === -1) out.crmOverrides.push(rw.code); });
     var exRows = sheetEx.filter(function(rw) { return !crmNy[_acctCodeNoYear_(rw.code)]; }).concat(crmEx);
     out.exCount = exRows.length; out.exByCode = {}; out.exByCodeNoYear = {};
     if (exRows.length) {

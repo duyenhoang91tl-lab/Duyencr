@@ -704,7 +704,7 @@ function openHKhMapModal_(){
   var old = document.getElementById('h-khmap-modal'); if (old) old.remove();
   var m = document.createElement('div'); m.id = 'h-khmap-modal';
   m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
-  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:86vh;overflow:auto">'+
+  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:calc(var(--vh,1vh)*86);overflow:auto">'+
     '<div style="font-weight:700;margin-bottom:6px">⚙ Trạng thái KH tự nhảy theo Tình trạng CS</div>'+
     '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
     groups.map(function(g, i){

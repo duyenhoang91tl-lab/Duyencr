@@ -110,6 +110,19 @@ function lsSummary_(customers, byPhone, nowTs, topN){
   out.riskTop = risk.slice(0, n); out.hotTop = hot.slice(0, n);
   return out;
 }
+// R8f: khối chữ "MỨC QUAN TÂM" nhét vào NGỮ CẢNH của trợ lý khi PRO_AI_ENGINE='ai' (js/38 proCustomerContext_). NGUYÊN NHÂN GỐC: AI thật chỉ thấy
+// tên/hạng/số đơn/lịch/ghi chú nên tự đoán "khách nóng hay nguội" khác với điểm CS đang thấy ở cột Mức + hồ sơ 360° → gợi ý hành động lệch nhau.
+// Ở đây đưa NGUYÊN điểm + mức + lý do + ngưỡng + việc nên làm (đều do quy tắc js/77 tính, không phải AI đoán) để AI diễn giải thay vì tự chấm lại.
+// s = lsScore_(...), st = lsNextStep_(s, c) (có thể null). Không chứa SĐT/tên (chỉ số ngày, điểm, nhãn); trả '' nếu không có điểm.
+function lsAiBlock_(s, st){
+  if (!s || !s.level) return '';
+  var lv = (LS_LEVEL_LABEL[s.level] || s.level).toUpperCase();
+  var out = ['Mức quan tâm (hệ thống chấm theo quy tắc, KHÔNG phải AI đoán): ' + lv + ' · ' + (s.score == null ? '?' : s.score) + ' điểm' + (s.risk ? ' · SẮP MẤT (nguội, đã từng mua)' : '')];
+  if (s.reasons && s.reasons.length) out.push('Lý do: ' + s.reasons.slice(0, 6).join('; '));
+  out.push('Ngưỡng: NÓNG ≥' + LS_HOT_MIN + ' điểm, ẤM ≥' + LS_WARM_MIN + ', còn lại NGUỘI; ép NGUỘI nếu quá ' + LS_COLD_DAYS + ' ngày chưa chăm và không có lịch sắp tới');
+  if (st && st.text) out.push('Việc nên làm tiếp (gợi ý theo quy tắc): ' + st.text + (st.why ? ' — vì ' + st.why : ''));
+  return out.join('\n');
+}
 
 // ════════════════════════════════════════════════════════════════════
 //  R8b (GIAO DIỆN) — LỌC DANH SÁCH THEO MỨC + THANH BÁO "ĐANG LỌC". Cần trình duyệt (các hàm dưới đều tự thoát nếu thiếu DOM/dữ liệu).
@@ -153,4 +166,55 @@ function lsOpenList_(mode){
 }
 function lsClearListFilter_(){ _lsListFilter = ''; if (typeof applyFilters === 'function') applyFilters(); lsBarSync_(); }
 
-if (typeof module !== 'undefined' && module.exports){ module.exports = { lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, lsSchedByPhone_: lsSchedByPhone_, lsSummary_: lsSummary_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }
+// ════════════════════════════════════════════════════════════════════
+//  R8e (GIAO DIỆN) — CỘT "MỨC" (🔥Nóng / 🌤Ấm / 🧊Nguội + điểm) TRONG BẢNG DANH SÁCH KH, bấm ↕ ở tiêu đề để xếp.
+//  Duyên chốt 15/11: có cột Mức; các ngưỡng 7/30/60, 6/3, 90/180 GIỮ NGUYÊN như đã đặt ở đầu file.
+//  _lsLevelSortDir: 0 tắt · -1 nóng trước (điểm cao trước) · 1 nguội trước. Loại trừ nhau với sắp xếp "Ngày mua gần nhất"/"Lần tác động".
+//  Hiệu năng: bảng là virtual (chỉ vẽ ~vài chục dòng) nên chỉ chấm điểm dòng đang vẽ; lịch gom theo SĐT 1 lần và cache 5 giây
+//  (lịch đánh dấu xong không đổi số lượng/_dataVersion nên không thể chỉ dựa vào khoá đếm). Xếp theo mức chấm cả danh sách đang lọc 1 lần.
+// ════════════════════════════════════════════════════════════════════
+var _lsLevelSortDir = 0;
+var _lsByPhoneCache = { key: '', by: null };
+var LS_LEVEL_TONE = { hot: 'success', warm: 'warning', cold: 'danger' };
+var LS_LEVEL_ICON = { hot: '🔥', warm: '🌤', cold: '🧊' };
+function lsEsc_(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); }
+function lsSchedMap_(nowTs){
+  var sch = (typeof schedules !== 'undefined' && schedules) ? schedules : [];
+  var key = [sch.length, (typeof _dataVersion !== 'undefined' ? _dataVersion : 0), Math.floor((nowTs || Date.now()) / 5000)].join('#');
+  if (_lsByPhoneCache.key === key && _lsByPhoneCache.by) return _lsByPhoneCache.by;
+  var by = lsSchedByPhone_(sch); _lsByPhoneCache = { key: key, by: by }; return by;
+}
+function lsRowScore_(c, nowTs){ var now = nowTs || Date.now(); return lsScore_(c, (lsSchedMap_(now)[c && c.phone]) || [], now); }
+// HTML ô "Mức" của 1 khách (s = kết quả lsScore_). Chip dùng ui-kit (js/68) nếu có; di chuyển chuột để xem LÝ DO (không hộp đen).
+function lsLevelCellHtml_(s){
+  if (!s || !s.level) return '<span style="color:var(--hint);font-size:11px">—</span>';
+  var txt = LS_LEVEL_ICON[s.level] + ' ' + s.label + ' · ' + s.score, tone = LS_LEVEL_TONE[s.level];
+  var chip = (typeof uiChip_ === 'function') ? uiChip_(txt, { tone: tone }) : '<span class="ls-lv ls-lv-' + s.level + '">' + lsEsc_(txt) + '</span>';
+  var risk = s.risk ? ((typeof uiChip_ === 'function') ? uiChip_('Sắp mất', { tone: 'danger', solid: true }) : '<span class="ls-lv ls-lv-cold">Sắp mất</span>') : '';
+  return '<span class="ls-lv-cell" title="' + lsEsc_(s.label + ' (điểm ' + s.score + '): ' + (s.reasons || []).join('; ')) + '">' + chip + (risk ? '<br>' + risk : '') + '</span>';
+}
+// Xếp list TẠI CHỖ theo mức: dir -1 = nóng → ấm → nguội (cùng mức: điểm cao trước, rồi doanh thu cao trước); dir 1 = ngược lại.
+function lsLevelSortList_(list, dir, nowTs){
+  list = list || [];
+  var now = nowTs || Date.now(), by = lsSchedMap_(now), ord = { hot: 0, warm: 1, cold: 2 }, k = dir === 1 ? -1 : 1;
+  var rows = list.map(function(c){ var s = lsScore_(c, by[c.phone] || [], now); return { c: c, o: ord[s.level], p: s.score }; });
+  rows.sort(function(a, b){ return k * ((a.o - b.o) || (b.p - a.p) || ((b.c.totalRevenue || 0) - (a.c.totalRevenue || 0))); });
+  for (var i = 0; i < rows.length; i++) list[i] = rows[i].c;
+  return list;
+}
+function lsResetLevelSort_(){
+  if (!_lsLevelSortDir) return; _lsLevelSortDir = 0;
+  var ic = (typeof document !== 'undefined') ? document.getElementById('level-sort-icon') : null; if (ic) ic.textContent = '↕';
+}
+function lsToggleLevelSort_(){
+  _lsLevelSortDir = _lsLevelSortDir === 0 ? -1 : _lsLevelSortDir === -1 ? 1 : 0;
+  var ic = (typeof document !== 'undefined') ? document.getElementById('level-sort-icon') : null;
+  if (ic) ic.textContent = _lsLevelSortDir === -1 ? '↓' : _lsLevelSortDir === 1 ? '↑' : '↕';
+  if (_lsLevelSortDir !== 0 && typeof document !== 'undefined') {   // chỉ 1 cột xếp tại 1 thời điểm (cùng quy ước toggleLastPosSort/toggleLastActSort)
+    try { _lastPosSortDir = 0; _lastActSortDir = 0; } catch (e) {}
+    var a = document.getElementById('lastpos-sort-icon'), b = document.getElementById('lastact-sort-icon'); if (a) a.textContent = '↕'; if (b) b.textContent = '↕';
+  }
+  if (typeof applyFilters === 'function') applyFilters();
+}
+
+if (typeof module !== 'undefined' && module.exports){ module.exports = { lsLevelCellHtml_: lsLevelCellHtml_, lsLevelSortList_: lsLevelSortList_, lsRowScore_: lsRowScore_, lsToggleLevelSort_: lsToggleLevelSort_, lsResetLevelSort_: lsResetLevelSort_,lsDaysBetween_: lsDaysBetween_, lsUpcoming_: lsUpcoming_, lsScore_: lsScore_, lsRank_: lsRank_, lsAtRisk_: lsAtRisk_, lsNextStep_: lsNextStep_, lsSchedByPhone_: lsSchedByPhone_, lsSummary_: lsSummary_, lsAiBlock_: lsAiBlock_, LS_COLD_DAYS: LS_COLD_DAYS, lsFilterSet_: lsFilterSet_, lsFilterPass_: lsFilterPass_, lsOpenList_: lsOpenList_, lsClearListFilter_: lsClearListFilter_ }; }

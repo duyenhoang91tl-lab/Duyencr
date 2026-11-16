@@ -34,6 +34,18 @@ html.ui-pro .pro-stage>li{position:relative;flex:1 0 110px;height:34px;line-heig
 html.ui-pro .pro-stage>li:first-child{margin-left:0;padding-left:14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);}
 html.ui-pro .pro-stage>li.done{background:var(--pro-green);color:#fff;}
 html.ui-pro .pro-stage>li.cur{background:var(--pro-blue);color:#fff;font-weight:600;}
+/* R14: ô giai đoạn bấm được (CS bấm để đổi Tình trạng CS); ô nhóm có mũi tên ▾ và mở hàng mục con bên dưới */
+html.ui-pro .pro-stage-wrap{margin:0 0 12px;}
+html.ui-pro .pro-stage-wrap>.pro-stage{margin-bottom:0;}
+html.ui-pro .pro-stage>li[data-pro-stage-val],html.ui-pro .pro-stage>li[data-pro-stage-grp]{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+html.ui-pro .pro-stage>li[data-pro-stage-val]:hover,html.ui-pro .pro-stage>li[data-pro-stage-grp]:hover{filter:brightness(.94);}
+html.ui-pro .pro-stage>li[data-pro-stage-val]:focus-visible,html.ui-pro .pro-stage>li[data-pro-stage-grp]:focus-visible{outline:2px solid var(--pro-blue);outline-offset:-2px;}
+html.ui-pro .pro-stage>li[data-pro-stage-grp]::after{content:" \25BE";opacity:.65;}
+html.ui-pro .pro-stage-sub{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;}
+html.ui-pro .pro-stage-sub[hidden]{display:none;}
+html.ui-pro .pro-stage-opt{font:inherit;font-size:12.5px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--border-md,#d4d0e0);background:var(--surface,#fff);color:var(--text,#111);cursor:pointer;}
+html.ui-pro .pro-stage-opt:hover{background:var(--surface2,#f3f4f6);}
+html.ui-pro .pro-stage-opt.cur{background:var(--pro-blue);border-color:var(--pro-blue);color:#fff;font-weight:600;}
 /* Dòng thời gian (ghi chú / lịch hẹn / đơn hàng) */
 html.ui-pro .pro-tl{position:relative;margin:0;padding:0 0 0 22px;list-style:none;}
 html.ui-pro .pro-tl::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--pro-line);}
@@ -111,7 +123,7 @@ html.ui-pro .pro-bar-n{text-align:right;color:var(--muted);font-variant-numeric:
 html.ui-pro .pro-hide-old{display:none!important;}
 /* P4: thanh tab hồ sơ đang mở + dock phải + trợ lý AI */
 html.ui-pro body.pro-has-tabs{padding-bottom:44px;}
-html.ui-pro #pro-tabbar{position:fixed;left:0;right:84px;bottom:0;height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;overflow-x:auto;white-space:nowrap;z-index:310;background:linear-gradient(90deg,var(--pro-ink),var(--pro-purple));box-shadow:0 -2px 10px rgba(27,23,64,.2);}
+html.ui-pro #pro-tabbar{position:fixed;left:0;right:0;bottom:0;height:38px;display:flex;align-items:center;gap:6px;padding:0 84px 0 10px;box-sizing:border-box;overflow-x:auto;white-space:nowrap;z-index:310;background:linear-gradient(90deg,var(--pro-ink),var(--pro-purple));box-shadow:0 -2px 10px rgba(27,23,64,.2);}
 html.ui-pro #pro-tabbar .pro-tab{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border-radius:8px 8px 0 0;background:rgba(255,255,255,.14);color:#fff;font-size:12.5px;cursor:pointer;flex:none;}
 html.ui-pro #pro-tabbar .pro-tab.on{background:var(--surface);color:var(--pro-ink);font-weight:600;}
 html.ui-pro #pro-tabbar .pro-tab b{width:20px;height:20px;line-height:19px;text-align:center;border-radius:var(--ui-r-round);font-weight:400;opacity:.75;}
@@ -211,7 +223,7 @@ html.ui-pro .khd-wrap{padding:10px 12px;}
 html.ui-pro .khd-title{font-weight:600;color:var(--pro-ink);font-size:13.5px;margin-bottom:8px;}
 html.ui-pro .khd-title span{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px;}
 html.ui-pro .khd{display:flex;flex-direction:column;border:1px solid var(--pro-line);border-radius:var(--ui-r-xl);overflow:hidden;background:var(--surface);}
-html.ui-pro .khd-log{height:340px;max-height:52vh;overflow-y:auto;padding:10px;background:#f4f1ec;display:flex;flex-direction:column;gap:6px;}
+html.ui-pro .khd-log{height:340px;max-height:calc(var(--vh,1vh)*52);overflow-y:auto;padding:10px;background:#f4f1ec;display:flex;flex-direction:column;gap:6px;}
 html.ui-pro #sc-pane-discuss .khd-log{height:calc(100vh - 330px);min-height:220px;}
 html.ui-pro .khd-m{display:flex;}
 html.ui-pro .khd-m.out{justify-content:flex-end;}
@@ -263,3 +275,16 @@ html.ui-pro .pro-qa-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
 html.ui-pro .pro-qa{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:1 1 auto;min-height:36px;padding:6px 12px;border:1px solid var(--border-md);border-radius:999px;background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap;}
 html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color:var(--ui-brand,var(--green));}
 @media (max-width:640px){html.ui-pro .pro-qa{min-height:44px;}}
+
+/* FIX 15/11 (ảnh/video Duyên: hồ sơ khách "c Trang" không kéo xuống để nhập/chỉnh thông tin, "khoá cứng").
+   NGUYÊN NHÂN GỐC: .dp là cột flex cao đúng bằng màn hình + overflow:hidden (css/01) và CHỈ .dp-body cuộn; khối #dp-pro phía trên (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Việc tiếp theo)
+   không co được nên trên điện thoại .dp-body chỉ còn ~100px (form nằm trong khung tí hon) và phần trên không cuộn được. Màn hẹp: cả ngăn #dp cuộn dọc, .dp-body hết cuộn riêng (cao theo nội dung),
+   thanh tiêu đề (tên + nút ✕) dính trên cùng để luôn đóng được, chừa đáy cho thanh tab hồ sơ (pro-has-tabs, 44px) khỏi che ô cuối. Ngưỡng 640 = MOBILE_FIT_MAX_W (js/59). */
+@media (max-width:640px){
+  html.ui-pro #dp{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  html.ui-pro #dp .dp-hdr{position:sticky;top:0;z-index:3;background:var(--surface)}
+  html.ui-pro #dp .dp-body{flex:none;overflow:visible;padding-bottom:72px}
+  /* FIX 16/11: thanh tab (Chăm sóc · Lịch hẹn · Lịch sử đơn · Tổng quan…) bị ÉP CÒN ~12px nên biến mất trên điện thoại → không vào được tab Lịch sử đơn (nơi có khung 🎁 Tích điểm).
+     NGUYÊN NHÂN GỐC: .dp-tabs có overflow-x:auto (css/01) nên min-height = 0 và flex-shrink = 1; #dp là cột flex cao cố định, #dp-pro (cao, không co được) chiếm chỗ → chỉ .dp-tabs bị co. Đo Chromium: 12px → 36px sau khi flex:none. */
+  html.ui-pro #dp .dp-tabs{flex:none}
+}

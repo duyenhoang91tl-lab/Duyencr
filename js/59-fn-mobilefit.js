@@ -17,6 +17,12 @@ function mobileFitAppH_(width, innerH, headerH, bottomPad){
   var v = ih - hh - bp;
   return v >= 80 ? v : null;
 }
+// Biến CSS --vh = 1% chiều cao màn hình THẬT (px). NGUYÊN NHÂN GỐC: WebView app Android có lúc kẹt đơn vị vh = 0 nên mọi hộp `max-height:NNvh` bị ép còn ~phần đệm (1 dải trắng mỏng, xem ảnh 15/11 19:53).
+// Nay các hộp dùng max-height:calc(var(--vh,1vh)*NN): có biến thì theo innerHeight thật, chưa đặt/chưa đo được thì rơi về 1vh như cũ. Đặt ở MỌI độ rộng màn (vh vốn dùng cả trên máy tính).
+function mobileFitVhPx_(innerH){
+  var ih = Math.round(Number(innerH));
+  return ih >= 120 ? (ih / 100) : null;   // chưa có kích thước (0/NaN/<120) → không đặt, dùng 1vh
+}
 function mobileFitApply(){
   var root = document.documentElement, hd = document.querySelector('header'), app = document.querySelector('.app');
   var hh = hd ? hd.offsetHeight : 0, v = mobileFitHeaderH_(window.innerWidth || 0, hh);
@@ -24,6 +30,8 @@ function mobileFitApply(){
   // NGUYÊN NHÂN GỐC "trang bị đẩy lên ~43px khi mở bảng chi tiết khách" (file Quét trang 27/10: html y=-43, scrollH 765 > 722): css/06 đặt body.pro-has-tabs{padding-bottom:44px}
   // trong khi .app đã cao đúng (innerHeight − thanh trên) → tổng cao hơn màn hình 44px, trang cuộn được và bị trượt lên. Trừ phần padding đó khỏi chiều cao .app.
   var bp = 0; try { bp = parseFloat(getComputedStyle(document.body).paddingBottom) || 0; } catch (e) {}
+  var vh = mobileFitVhPx_(window.innerHeight || 0);
+  if (vh === null) root.style.removeProperty('--vh'); else root.style.setProperty('--vh', vh + 'px');
   var a = mobileFitAppH_(window.innerWidth || 0, window.innerHeight || 0, hh, bp);
   if (app) { if (a === null) app.style.removeProperty('height'); else app.style.setProperty('height', a + 'px', 'important'); }
   return v;
@@ -41,4 +49,4 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') (function(
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module !== 'undefined' && module.exports) module.exports = { mobileFitHeaderH_: mobileFitHeaderH_, mobileFitAppH_: mobileFitAppH_, MOBILE_FIT_MAX_W: MOBILE_FIT_MAX_W };
+if (typeof module !== 'undefined' && module.exports) module.exports = { mobileFitHeaderH_: mobileFitHeaderH_, mobileFitAppH_: mobileFitAppH_, mobileFitVhPx_: mobileFitVhPx_, MOBILE_FIT_MAX_W: MOBILE_FIT_MAX_W };

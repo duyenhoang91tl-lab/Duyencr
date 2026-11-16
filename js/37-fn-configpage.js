@@ -97,7 +97,7 @@ function _cfgHubGroups_(){
     { icon:'🗂', title:'Dữ liệu khách hàng', desc:'Trạng thái, trường tự tạo, hạng khách và khuyến mãi.', items:[ it('cstatus', '⚙ Tình trạng chăm sóc'), it('khstatus', '⚙ Trạng thái KH'), it('cfield', '➕ Trường tự tạo'), it('tier', '🏅 Cấu hình hạng KH'), it('promo', '🎁 Cấu hình khuyến mãi') ] },
     { icon:'🔁', title:'Quy trình & mẫu tin', desc:'Quy trình công việc, mẫu hỏi thăm, mẫu sinh nhật.', items:[ it('taskflow', '🧩 Quy trình công việc'), it('futpl', '📨 Mẫu hỏi thăm tự động'), it('bday', '🎂 Mẫu sinh nhật') ] },
     { icon:'🧾', title:'Nhật ký & hệ thống', desc:'Ai đổi gì, lỗi trên máy này, dọn dữ liệu đã nạp trên máy.', items:[ { key:'audit', label:'🧾 Nhật ký thay đổi' }, it('errlog', '🐞 Nhật ký lỗi (máy này)'), it('clear', '🧹 Xóa data trên máy', 'danger') ] },
-    { icon:'🎨', title:'Giao diện & trợ giúp', desc:'Chế độ sáng/tối, hiệu ứng, hướng dẫn sử dụng.', items:[ it('theme', '🌙 Chế độ tối'), it('sakura', '🌸 Cánh đào rơi'), it('help', '❓ Hướng dẫn sử dụng') ] }
+    { icon:'🎨', title:'Giao diện & trợ giúp', desc:'Chế độ sáng/tối, hiệu ứng, hướng dẫn sử dụng.', items:[ it('theme', '🌙 Chế độ tối'), it('sakura', '🌸 Cánh đào rơi'), it('mascot', '🐶 Linh vật Samoyed'), it('garden', '🌼 Vườn hoa-bướm-ong'), it('help', '❓ Hướng dẫn sử dụng') ] }
   ];
 }
 // Nút trong trung tâm lối tắt: giữ đúng hành vi các mục cũ (Phòng ban qua _cfgGoDept, Nhật ký qua _cfgGoTab('audit')); mục còn lại gọi đúng hàm của menu bên trái (window._SN_ACTS, js/29-sidenav.js).
@@ -108,7 +108,7 @@ function _shRun_(k){
     var a = (window._SN_ACTS || {})[k], fn = a && window[a.f];
     if (typeof fn !== 'function'){ toast('Chức năng chưa sẵn sàng'); return; }
     fn(a.arg);
-    if (k === 'theme' || k === 'sakura'){   // nhãn đổi theo trạng thái (sáng/tối, bật/tắt) → cập nhật ngay đúng nút này, KHÔNG vẽ lại cả trang (tránh mất chữ đang gõ ở ô khác)
+    if (k === 'theme' || k === 'sakura' || k === 'mascot' || k === 'garden'){   // nhãn đổi theo trạng thái (sáng/tối, bật/tắt) → cập nhật ngay đúng nút này, KHÔNG vẽ lại cả trang (tránh mất chữ đang gõ ở ô khác)
       var b = document.querySelector('.sh-item[data-sh="' + k + '"]');
       if (b) b.textContent = (typeof a.t === 'function' ? a.t() : a.t);
     }

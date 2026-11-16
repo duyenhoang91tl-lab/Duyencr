@@ -4,7 +4,7 @@
 .cl-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--ui-sp-2);padding:var(--ui-sp-2) var(--ui-sp-4);font-family:var(--ui-font)}
 .cl-modal{width:460px;font-family:var(--ui-font);color:var(--ui-text)}
 .cl-head{padding:var(--ui-sp-3) var(--ui-sp-4);font-size:var(--ui-fs-md);font-weight:var(--ui-fw-semibold);border-bottom:1px solid var(--ui-border-md)}
-.cl-body{display:flex;flex-direction:column;gap:var(--ui-sp-3);padding:var(--ui-sp-4);max-height:70vh;overflow:auto}
+.cl-body{display:flex;flex-direction:column;gap:var(--ui-sp-3);padding:var(--ui-sp-4);max-height:calc(var(--vh,1vh)*70);overflow:auto}
 .cl-f{display:flex;flex-direction:column;gap:var(--ui-sp-1);font-size:var(--ui-fs-sm);color:var(--ui-text-muted)}
 .cl-f i{font-style:normal;color:var(--ui-text-hint)}
 .cl-f select,.cl-f input[type=date]{padding:6px 8px;font-family:var(--ui-font);font-size:var(--ui-fs-base);color:var(--ui-text);background:var(--ui-surface);border:1px solid var(--ui-border-md);border-radius:var(--ui-r-md)}

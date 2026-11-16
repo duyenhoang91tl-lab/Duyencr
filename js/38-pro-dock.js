@@ -21,7 +21,7 @@ function proDmyDate_(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d
 var PRO_RATING_LABEL = { tot:'Làm tốt', trungbinh:'Trung bình', kem:'Cần cải thiện', chuadu:'Chưa đủ dữ liệu' };
 
 // Ngữ cảnh 1 khách (KHÔNG có SĐT). c: {name,tier,careStatus}; D: kết quả proProfileData_; days/rev tính sẵn.
-function proCustomerContext_(c, D, days, rev, now){
+function proCustomerContext_(c, D, days, rev, now, leadBlock){
   var tl = proTimeline_(D.notes, D.mine, D.orders, 60), by = { note:[], sched:[], order:[] };
   tl.forEach(function(it){ if (by[it.kind] && by[it.kind].length<5) by[it.kind].push('- '+(it.when?it.when+' · ':'')+proClip_(it.title, it.kind==='note'?200:120)); });
   var today = proDmyDate_(now||new Date());
@@ -29,10 +29,11 @@ function proCustomerContext_(c, D, days, rev, now){
     return '- '+proDmy_(x.date)+' · '+proClip_(x.label,40)+(x.note?': '+proClip_(x.note,80):'')+(x.state==='over'?' [QUÁ HẠN]':x.state==='today'?' [HÔM NAY]':''); });
   return ['LOẠI: một khách hàng (đã ẩn SĐT). Hôm nay: '+today,
     'Tên: '+proClip_(c.name||'(chưa có tên)',60)+' | Hạng: '+proClip_(c.tier||'—',20)+' | Tình trạng CS: '+proClip_((D.care&&D.care.status)||c.careStatus||'chưa gán',60),
-    'Số đơn: '+(D.nOrd||0)+' | Doanh thu: '+proMoney_(rev)+' | Ngày từ đơn cuối: '+(days===null||days===undefined?'chưa có đơn':days),
-    'Lịch hẹn chưa xong:'+(pend.length?'\n'+pend.join('\n'):' (không có)'),
+    'Số đơn: '+(D.nOrd||0)+' | Doanh thu: '+proMoney_(rev)+' | Ngày từ đơn cuối: '+(days===null||days===undefined?'chưa có đơn':days)]
+    .concat(leadBlock ? [proScrub_(leadBlock)] : [])   // R8f: mức quan tâm do js/77 chấm (đặt trước lịch/ghi chú để khi prompt bị cắt đuôi vẫn còn)
+    .concat(['Lịch hẹn chưa xong:'+(pend.length?'\n'+pend.join('\n'):' (không có)'),
     'Ghi chú gần nhất:'+(by.note.length?'\n'+by.note.join('\n'):' (không có)'),
-    'Đơn gần nhất:'+(by.order.length?'\n'+by.order.join('\n'):' (không có)')].join('\n');
+    'Đơn gần nhất:'+(by.order.length?'\n'+by.order.join('\n'):' (không có)')]).join('\n');
 }
 function proYmdOf_(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 // Ngữ cảnh doanh số theo PHẠM VI người dùng được xem (s = _ovScope(d), d = dữ liệu orgOverview)
@@ -153,6 +154,7 @@ function proRichHtml_(rich){
   if (items.length){
     var max = items.reduce(function(m, x){ return Math.max(m, Number(x.value) || 0); }, 0) || 1;
     h += '<div class="pro-rich-bars">' + items.map(function(x){
+      if (x.heading) return '<div class="pro-rich-hd" style="font-weight:600;font-size:12px;margin:6px 0 2px;opacity:.85">' + proEsc_(x.heading) + '</div>';
       var w = Math.max(2, Math.round((Number(x.value) || 0) / max * 100));
       return '<div class="pro-rich-bar"><span class="pro-rich-lb">' + proEsc_(x.label) + '</span><span class="pro-rich-tr"><i style="width:' + w + '%"></i></span><span class="pro-rich-v">' + proEsc_(x.text != null ? x.text : x.value) + '</span></div>';
     }).join('') + '</div>';
@@ -176,7 +178,12 @@ function proRichSalesB_(intent, B){
   var money = proMoney_, rows = B.rows;
   var bars = function(n){ return { items: rows.slice(0, n).map(function(r){ return { label: String(r.name||'').slice(0, 18), value: r.giaTri||0, text: money(r.giaTri) }; }) }; };
   if (intent === 'top') return { bars: bars(10), table: { head: ['Sale', 'Doanh thu', 'Đơn', 'TB/đơn'], rows: rows.slice(0, 10).map(function(r){ return { cells: [r.name, money(r.giaTri), r.orders||0, money(r.orders ? Math.round(r.giaTri/r.orders) : 0)] }; }) } };
-  if (intent === 'summary') return { bars: bars(5) };
+  if (intent === 'summary'){
+    var bw = proSalesBBestWorst_(rows), it = function(r){ return { label: String(r.name||'').slice(0, 18), value: r.giaTri||0, text: money(r.giaTri) }; };
+    var items = [{ heading: 'Top 3 doanh thu tốt nhất' }].concat(bw.best.map(it));
+    if (bw.worst.length) items = items.concat([{ heading: 'Top 3 doanh thu thấp nhất' }], bw.worst.map(it));
+    return { bars: { items: items } };
+  }
   return null;
 }
 function proLeadsIntent_(q){
@@ -299,6 +306,9 @@ function proAiNote_(){ return PRO_AI_ENGINE==='rule' ? 'Trả lời THÔ theo qu
 
 // ── Giao diện (chỉ khi html.ui-pro) ──
 var _proDock = { tabs:[], mode:'', log:[], busy:false, items:{} };
+// Mèo máy "làm việc" khi AI đang trả lời (Duyên chọn 16/11/2026): `busy` là thuộc tính có setter → MỌI chỗ đang gán _proDock.busy = true/false
+// (khoảng 8 chỗ) tự bật/tắt hiệu ứng cho mèo mà KHÔNG phải sửa từng chỗ. Setter lỗi (vd test không có DOM) thì bỏ qua, giá trị vẫn đúng.
+(function(){ var v = !!_proDock.busy; try { Object.defineProperty(_proDock, 'busy', { get: function(){ return v; }, set: function(x){ v = !!x; try { proCatBusy_(v); } catch(e){} }, enumerable: true, configurable: true }); } catch(e){} })();
 function proDockOn_(){ return typeof document!=='undefined' && document.documentElement.classList.contains('ui-pro'); }
 function proTabsLoad_(){ try { var v = JSON.parse(sessionStorage.getItem('pro_tabs')||'[]'); if (Array.isArray(v)) _proDock.tabs = v.filter(function(t){ return t && t.phone; }).slice(-PRO_TABS_MAX); } catch(e){} }
 function proTabsSave_(){ try { sessionStorage.setItem('pro_tabs', JSON.stringify(_proDock.tabs)); } catch(e){} }
@@ -360,16 +370,84 @@ function proDockDragInit_(dock){
   dock.addEventListener('pointerup', end); dock.addEventListener('pointercancel', end);
   dock.addEventListener('dblclick', function(){ try { localStorage.removeItem(KEY); } catch(e){} ['left','top','right','bottom','transform'].forEach(function(k){ dock.style.removeProperty(k); }); });   // bấm đúp = về chỗ mặc định
 }
+// ── Icon AI = MẶT BÉ CHÓ SAMOYED (Duyên yêu cầu 16/11/2026: "mặt AI = mặt bé Samoyed"; trước đó là mèo máy trắng xù). ──
+// TÊN HÀM/CLASS CŨ GIỮ NGUYÊN (proCatIconSvg_/proCatIcon_/proCatTag_/proCatBusy_, class pro-cat + pro-cat-ant) vì ~10 chỗ + 4 test đang gọi; đổi tên
+// chỉ tăng rủi ro bỏ sót. SVG nội tuyến 64x64, không cần file ảnh. Đặc trưng Samoyed: đầu tròn lông trắng xù viền be nhạt (vẽ 2 lượt: viền trước,
+// lông sau), 2 tai tam giác đứng nhỏ bo tròn, mắt hạt đen nhỏ hơi xếch, mũi đen, và "nụ cười Sammy" (khoé miệng cong lên) + lưỡi hồng.
+// Chi tiết còn lại: vòng cổ bạc hà có THẺ TÊN vàng (class pro-cat-ant — khi AI bận thẻ chuyển cam, thay cho bi ăng-ten của bản mèo). Chớp mắt bằng SMIL (bỏ khi bật "giảm chuyển động").
+function proCatIconSvg_(px, blink){
+  var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffd6cf', CX = 32, CY = 35;
+  var puffs = [[CX,CY,20.5]];
+  for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
+  function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+  function eye(cx, tilt){
+    var b = blink ? '<animate attributeName="ry" values="3.6;3.6;0.5;3.6;3.6" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+    return '<ellipse cx="'+cx+'" cy="32.5" rx="3.1" ry="3.6" fill="#2b2420" transform="rotate('+tilt+' '+cx+' 32.5)">'+b+'</ellipse>'
+      + '<circle cx="'+(cx+1.1)+'" cy="31.2" r="1.2" fill="#fff"/>';
+  }
+  function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.2" stroke-linejoin="round"/>'; }
+  var ears = ear('12,27 16,13.5 27,18', '16,22 17,17 21.6,19') + ear('52,27 48,13.5 37,18', '48,22 47,17 42.4,19');
+  var muzzle = '<ellipse cx="32" cy="42" rx="9.5" ry="7" fill="#f6efe6"/>';
+  var nose = '<path d="M29.2 38.6 Q32 37.2 34.8 38.6 Q34 41.6 32 41.8 Q30 41.6 29.2 38.6Z" fill="#2b2420"/><circle cx="31" cy="38.9" r="0.7" fill="#fff" opacity=".7"/>';
+  var smile = '<path d="M32 41.8 L32 43.4 M32 43.4 Q29.6 46.6 26.2 43 M32 43.4 Q34.4 46.6 37.8 43" fill="none" stroke="#5a4a42" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  var tongue = '<path d="M29.8 45.4 Q32 52 34.2 45.4 Q32 46.6 29.8 45.4Z" fill="#ff8fa6" stroke="#e5637f" stroke-width=".8" stroke-linejoin="round"/><path d="M32 46.2 L32 49" stroke="#e5637f" stroke-width=".7" stroke-linecap="round"/>';
+  var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle class="pro-cat-ant" cx="32" cy="59.8" r="3" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="58.8" r="0.9" fill="#fff"/>';
+  return '<svg class="pro-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+    + ears + circles(OUT, 1.2) + circles(FUR, 0)
+    + '<ellipse cx="14.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/><ellipse cx="49.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/>'
+    + muzzle + eye(23, -8) + eye(41, 8) + nose + smile + tongue + collar + '</svg>';
+}
+function proCatIcon_(px){
+  var rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
+  return proCatIconSvg_(px, !rm);
+}
+// Icon AI (Samoyed) NHÚNG TRONG DÒNG CHỮ (nút/tiêu đề/nhãn "🤖 ..." ở các màn khác): trả về HTML <span> inline-block px×px chứa mèo, hoặc '🤖' nếu hàm vẽ chưa nạp / lỗi (an toàn khi js/38 nạp sau
+// các file gọi — chỉ gọi lúc chạy, không lúc nạp). Gắn khoảng cách phải 5px như dấu cách sau emoji; SVG gốc display:block nên bọc span để nằm cùng hàng chữ (vertical-align hạ nhẹ).
+function proCatTag_(px){
+  px = Math.max(10, Math.min(64, +px || 16));
+  try {
+    if (typeof proCatIcon_ !== 'function') return '🤖';
+    return '<span class="pro-cat-tag" aria-hidden="true" style="display:inline-block;width:' + px + 'px;height:' + px + 'px;vertical-align:-' + Math.round(px * 0.22) + 'px;margin-right:5px">' + proCatIcon_(px) + '</span>';
+  } catch (e) { return '🤖'; }
+}
+// Điền mèo vào các ô giữ chỗ trong HTML TĨNH: <span class="ai-cat-slot" data-px="16">🤖 </span> (vd tab "Zalo AI" ở index.html). Chưa có mèo/lỗi → giữ nguyên 🤖. Gọi nhiều lần vẫn an toàn.
+function proCatFill_(root){
+  if (typeof document === 'undefined') return 0;
+  var base = root || document, n = 0, slots = base.querySelectorAll ? base.querySelectorAll('.ai-cat-slot:not([data-filled])') : [];
+  for (var i = 0; i < slots.length; i++){
+    var el = slots[i], h = proCatTag_(+el.getAttribute('data-px') || 16);
+    if (h && h.charAt(0) === '<'){ el.innerHTML = h; el.setAttribute('data-filled', '1'); n++; }
+  }
+  return n;
+}
+// Hiệu ứng khi AI đang trả lời: cả mặt Samoyed lắc lư nhẹ (như vẫy đầu) + thẻ tên ở vòng cổ nhấp nháy cam (class pro-cat-ant); giảm chuyển động → KHÔNG lắc,
+// chỉ đổi thẻ tên sang màu cam đứng yên (vẫn có tín hiệu "đang bận" mà không chuyển động). Style chèn 1 lần, tự chứa (không đụng css/*).
+function proCatStyle_(){
+  if (document.getElementById('pro-cat-style')) return;
+  var st = document.createElement('style'); st.id = 'pro-cat-style';
+  st.textContent = '@keyframes proCatWag{0%,100%{transform:rotate(-8deg) translateY(0)}25%{transform:rotate(0) translateY(-2px)}50%{transform:rotate(8deg) translateY(0)}75%{transform:rotate(0) translateY(-2px)}}'
+    + '@keyframes proCatGlow{0%,100%{opacity:1}50%{opacity:.3}}'
+    + '.pro-cat-busy .pro-cat{animation:proCatWag .7s ease-in-out infinite;transform-origin:50% 88%}'
+    + '.pro-cat-busy .pro-cat-ant{fill:#ff9800;animation:proCatGlow .7s ease-in-out infinite}'
+    + '@media (prefers-reduced-motion:reduce){.pro-cat-busy .pro-cat,.pro-cat-busy .pro-cat-ant{animation:none}}';
+  document.head.appendChild(st);
+}
+function proCatBusy_(on){
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  ['pro-dock', 'pro-ai'].forEach(function(id){ var el = document.getElementById(id); if (el && el.classList) el.classList.toggle('pro-cat-busy', !!on); });
+  var lg = document.getElementById('pro-ai-log');
+  if (lg){ if (on) lg.setAttribute('aria-busy', 'true'); else lg.removeAttribute('aria-busy'); }
+}
 // Dock phải + panel trợ lý
 function proDockEnsure_(){
   if (!proDockOn_() || document.getElementById('pro-dock')) return;
   var dock = document.createElement('div'); dock.id = 'pro-dock';
-  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">🤖</button>';
+  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">' + proCatIcon_(32) + '</button>';
   document.body.appendChild(dock);
   try { proDockDragInit_(dock); } catch(e){ console.warn('[ui-pro] drag', e); }
   dock.querySelector('#pro-dock-ai').onclick = function(){ if (dock._proMovedAt && Date.now()-dock._proMovedAt < 350) return; proAiToggle_(); };   // vừa kéo xong thì không mở panel
   var p = document.createElement('div'); p.id = 'pro-ai';
-  p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
+  p.innerHTML = '<div class="pro-ai-h"><b style="display:inline-flex;align-items:center;gap:6px">' + proCatIcon_(24) + ' Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button><button type="button" data-mode="leads">🧊 Khách cần chăm</button></div>'
     + '<div class="pro-ai-range" id="pro-ai-range" style="display:none"></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
@@ -385,6 +463,7 @@ function proDockEnsure_(){
     if (t.closest('#pro-ai-send')) proAiSend_(); };
   document.getElementById('pro-ai-q').onkeydown = function(e){ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); proAiSend_(); } };
   document.addEventListener('keydown', function(e){ if (e.key==='Escape') proAiToggle_(false); });
+  try { proCatStyle_(); proCatBusy_(_proDock.busy); } catch(e){}   // dock được tạo lúc AI đang bận (hiếm) vẫn đồng bộ đúng
 }
 function proOpenCustomer_(phone){ if (!phone || typeof openDp!=='function') return; var ov = document.getElementById('dp-overlay'); if (ov) ov.classList.add('open'); openDp(phone); }   // giống bấm tab hồ sơ ở thanh dưới
 function proAiToggle_(force){
@@ -416,7 +495,9 @@ function proAiContext_(){
     var c = (typeof allCustomers!=='undefined' && typeof currentPhone!=='undefined') ? allCustomers.find(function(x){ return x.phone===currentPhone; }) : null;
     if (!c) return { error:'Chưa mở khách nào — mở hồ sơ một khách rồi hỏi lại.' };
     var D = proProfileData_(c), days = proDaysSinceLastOrder_(c.orders, new Date()), rev = _custRev_(c), now = new Date();
-    return { text: proCustomerContext_(c, D, days, rev, now), raw: { c:c, D:D, days:days, rev:rev, now:now } };
+    var leadBlock = '';
+    try { if (typeof lsRowScore_==='function' && typeof lsAiBlock_==='function'){ var ls = lsRowScore_(c, now.getTime()); leadBlock = lsAiBlock_(ls, typeof lsNextStep_==='function' ? lsNextStep_(ls, c) : null); } } catch(e){ leadBlock = ''; }
+    return { text: proCustomerContext_(c, D, days, rev, now, leadBlock), raw: { c:c, D:D, days:days, rev:rev, now:now } };
   }
   var d = (typeof _ov!=='undefined' && _ov) ? _ov.data : null;
   if (!d || typeof _ovScope!=='function') return { error:'Chưa có số liệu doanh số — mở màn 🏠 Tổng quan để tải trước, rồi hỏi lại.' };
@@ -500,13 +581,25 @@ function proSalesBIntent_(q){
   if (/\btop\b|cao nhat|dan dau|xep hang|nhieu nhat|tung sale|theo sale|ai ban/.test(n)) return 'top';
   return proIntent_('sales', q);
 }
+// Top 3 cao nhất + top 3 thấp nhất (thấp nhất = sale CÓ đơn, xếp tăng dần; không lặp người đã nằm trong top 3 khi ít sale: ≤3 sale → chỉ có 'best').
+// rows đã sắp giảm dần theo doanh thu (proSalesBBuild_). Dùng chung cho dòng chữ và biểu đồ thanh của TÓM TẮT.
+function proSalesBBestWorst_(rows){
+  rows = rows || [];
+  var best = rows.slice(0, 3), rest = rows.slice(3).filter(function(r){ return (r.orders||0) > 0; });
+  var worst = rest.slice().sort(function(a,b){ return (a.giaTri||0)-(b.giaTri||0); }).slice(0, 3);
+  return { best:best, worst:worst };
+}
 function proRuleSalesB_(intent, B){
   var money = proMoney_, head = 'Báo cáo B (Pos) · '+B.from+' → '+B.to;
   if (!B.orders && !(B.rev>0) && !B.rows.length) return head+':\nKhông có đơn nào trong khoảng này. Chọn kỳ khác ở thanh lọc phía trên (vd Tháng trước).';
   var rows = B.rows, total = rows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
   var line = function(r,i){ return (i+1)+'. '+r.name+' — '+money(r.giaTri)+' · '+(r.orders||0)+' đơn'; };
-  var store = B.storeTotal ? ['(Bảng theo sale đã cộng thêm phần sale đơn quầy '+money(B.storeTotal)+'.)'] : [];
-  if (intent==='summary') return [head+':', 'Doanh thu '+money(B.rev)+' · '+B.orders+' đơn · TB/đơn '+money(B.aov)+' · COD '+money(B.cod)+'.'].concat(rows.length ? ['Top: '+rows.slice(0,3).map(function(r,i){ return (i+1)+'. '+r.name+' ('+money(r.giaTri)+')'; }).join(' · ')] : [], store).join('\n');
+  var store = B.storeTotal ? ['(Bảng theo sale đã cộng thêm phần sale đơn quầy '+money(B.storeTotal)+'.)'] : [];   // chỉ còn dùng ở intent 'top'; TÓM TẮT đã bỏ câu này (Duyên 16/11)
+  if (intent==='summary'){
+    var bw = proSalesBBestWorst_(rows), fmt = function(r,i){ return (i+1)+'. '+r.name+' ('+money(r.giaTri)+')'; };
+    return [head+':', 'Doanh thu '+money(B.rev)+' · '+B.orders+' đơn · TB/đơn '+money(B.aov)+' · COD '+money(B.cod)+'.']
+      .concat(bw.best.length ? ['Top 3 doanh thu tốt nhất: '+bw.best.map(fmt).join(' · ')] : [], bw.worst.length ? ['Top 3 doanh thu thấp nhất: '+bw.worst.map(fmt).join(' · ')] : []).join('\n');
+  }
   if (intent==='top') return [head+' — xếp theo doanh thu:'].concat(rows.slice(0,10).map(line), store).join('\n');
   if (intent==='support'){
     var low = rows.filter(function(r){ return (r.orders||0)>0; }).slice().sort(function(a,b){ return (a.giaTri||0)-(b.giaTri||0); }).slice(0,5);
@@ -569,7 +662,7 @@ async function proAiSendSales_(question, q){
   _proDock.log.pop();
   if (ctx.error){ _proDock.log.push({ role:'bot', text:'⚠ '+ctx.error }); _proDock.busy = false; proAiLogRender_(); return; }
   if (PRO_AI_ENGINE==='rule'){
-    _proDock.log.push({ role:'bot', text:proRuleSalesBAnswer_(question, ctx.raw.B), rich:proRichSalesB_(proSalesBIntent_(question), ctx.raw.B), provider:'Quy tắc · Báo cáo B (không dùng AI)' }); _proDock.busy = false; proAiLogRender_(); return;
+    _proDock.log.push({ role:'bot', text:proRuleSalesBAnswer_(question, ctx.raw.B), rich:proRichSalesB_(proSalesBIntent_(question), ctx.raw.B), provider: proSalesBIntent_(question)==='summary' ? '' : 'Quy tắc · Báo cáo B (không dùng AI)' }); _proDock.busy = false; proAiLogRender_(); return;
   }
   var hist = _proDock.log.slice(0,-1).filter(function(m){ return m.text.indexOf('⏳')!==0; });
   _proDock.log.push({ role:'bot', text:'⏳ Đang hỏi AI…' }); proAiLogRender_();
@@ -621,4 +714,5 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
+try { proCatFill_(); if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', function(){ try { proCatFill_(); } catch (e) {} }); } catch (e) {}
 if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };

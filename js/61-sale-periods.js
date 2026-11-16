@@ -109,7 +109,7 @@ function openSalePeriodsModal(name){
   if (!m){
     m = document.createElement('div'); m.id = 'sp-modal';
     m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483000;align-items:center;justify-content:center';
-    m.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(860px,96vw);max-height:90vh;overflow:auto;padding:16px"><div id="sp-body"></div></div>';
+    m.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(860px,96vw);max-height:calc(var(--vh,1vh)*90);overflow:auto;padding:16px"><div id="sp-body"></div></div>';
     document.body.appendChild(m);
   }
   _renderSalePeriodsModal_();

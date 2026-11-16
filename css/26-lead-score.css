@@ -16,3 +16,7 @@ html.ui-pro #pro-ai .pro-rich-table{width:100%;border-collapse:collapse;font-siz
 html.ui-pro #pro-ai .pro-rich-table th,html.ui-pro #pro-ai .pro-rich-table td{padding:var(--ui-sp-1) var(--ui-sp-2);border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
 html.ui-pro #pro-ai .pro-rich-table th{color:var(--muted);font-weight:var(--ui-fw-semibold);white-space:nowrap}
 html.ui-pro #pro-ai .pro-rich-link{border:0;background:none;padding:0;color:var(--ui-brand);font:inherit;text-align:left;cursor:pointer;text-decoration:underline}
+/* R8e — cột "Mức" nóng/ấm/nguội trong bảng Danh sách KH (js/77 lsLevelCellHtml_). TOKEN-ONLY. */
+.col-level{width:112px;}
+#main-table td.col-level .ui-chip{white-space:nowrap}
+#main-table td.col-level .ls-lv-cell{display:inline-block;line-height:1.9}

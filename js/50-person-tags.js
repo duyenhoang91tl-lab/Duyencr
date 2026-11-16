@@ -79,7 +79,7 @@ async function openPersonTagsModal(name){
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:12px';
     document.body.appendChild(ov);
   }
-  ov.innerHTML = '<div style="background:var(--bg,#fff);color:inherit;border-radius:12px;padding:16px;width:520px;max-width:100%;max-height:90vh;overflow:auto">Đang tải danh sách thẻ…</div>';
+  ov.innerHTML = '<div style="background:var(--bg,#fff);color:inherit;border-radius:12px;padding:16px;width:520px;max-width:100%;max-height:calc(var(--vh,1vh)*90);overflow:auto">Đang tải danh sách thẻ…</div>';
   ov.style.display = 'flex';
   _ptModal.cands = await _ptLoadCandidates();
   _ptRender();

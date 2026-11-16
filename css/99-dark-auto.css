@@ -1,5 +1,5 @@
 /* TỰ SINH bởi tools/gen-dark-theme.js — ĐỪNG SỬA TAY (sửa tool rồi chạy lại: node tools/gen-dark-theme.js). Chỉ có hiệu lực ở chế độ tối.
-   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 10-medialib.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, 17-reports-pro.css, 18-list-pro.css, 20-kit.css, 21-task-board.css, 22-sched-calendar.css, 23-overdue-bulk.css, 24-cs-leave.css, 25-report-frame.css, 26-lead-score.css, 27-settings-hub.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
+   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 10-medialib.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, 17-reports-pro.css, 18-list-pro.css, 20-kit.css, 21-task-board.css, 22-sched-calendar.css, 23-overdue-bulk.css, 24-cs-leave.css, 25-report-frame.css, 26-lead-score.css, 27-settings-hub.css, 28-cust-select.css, 29-kh-sb-toggle.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
 /* ── 01-base.css ── */
 html[data-theme="dark"] .btn.secondary:hover{background:#18293f!important}
 html[data-theme="dark"] .assign-badge-pill.has-assign{background:#3f3718!important;color:#edab82!important;border-color:#655a34!important}
@@ -98,6 +98,8 @@ html[data-theme="dark"] tr[data-drill]:hover td{background:var(--surface2,var(--
 html[data-theme="dark"].ui-pro{--pro-line:var(--border-md)!important;--pro-grey:var(--surface3)!important}
 html[data-theme="dark"].ui-pro .pro-card-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro .pro-stage>li{color:var(--muted)!important}
+html[data-theme="dark"].ui-pro .pro-stage-opt{border-color:var(--border-md)!important;background:var(--surface,var(--surface))!important;color:var(--text,var(--text))!important}
+html[data-theme="dark"].ui-pro .pro-stage-opt:hover{background:var(--surface2,var(--surface2))!important}
 html[data-theme="dark"].ui-pro .pro-next .n-pct{color:#7fd98a!important}
 html[data-theme="dark"].ui-pro .pro-next .n-act{color:#7eb0ff!important}
 html[data-theme="dark"].ui-pro .pro-gauge text.g-v{fill:var(--text)!important}
@@ -221,6 +223,8 @@ html[data-theme="dark"] #qs-input::placeholder{color:var(--muted)!important}
 /* ── 25-report-frame.css ── */
 /* ── 26-lead-score.css ── */
 /* ── 27-settings-hub.css ── */
+/* ── 28-cust-select.css ── */
+/* ── 29-kh-sb-toggle.css ── */
 /* ── <style> trong index.html ── */
 html[data-theme="dark"] #boot-splash i{border-top-color:var(--border-md)!important}
 html[data-theme="dark"] .ev-spin{color:#a992dd!important}

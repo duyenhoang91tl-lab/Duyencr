@@ -49,7 +49,7 @@
 .rl-copy{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 12px;font-size:var(--ui-fs-base);color:var(--rl-mut)}
 .rl-copy .rl-in{width:auto;min-width:140px}
 /* ma trận */
-.rl-scroll{overflow:auto;background:#fff;border:1px solid var(--rl-line);border-radius:var(--ui-r-xl);max-height:68vh}
+.rl-scroll{overflow:auto;background:#fff;border:1px solid var(--rl-line);border-radius:var(--ui-r-xl);max-height:calc(var(--vh,1vh)*68)}
 .rl-mx{border-collapse:separate;border-spacing:0;width:100%;min-width:860px}
 .rl-mx thead th{position:sticky;top:0;background:#f8fafc;z-index:2;border-bottom:1px solid var(--rl-line);padding:10px 12px;text-align:center;font-weight:600;font-size:var(--ui-fs-base)}
 .rl-mx thead th.rl-feat{text-align:left;z-index:4}
@@ -82,7 +82,7 @@
 /* quyền từng người */
 .rl-two{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
 .rl-pl{background:#fff;border:1px solid var(--rl-line);border-radius:var(--ui-r-xl);padding:10px;position:sticky;top:64px}
-.rl-plist{max-height:62vh;overflow:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.rl-plist{max-height:calc(var(--vh,1vh)*62);overflow:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px}
 .rl-pi{text-align:left;border:1px solid transparent;background:none;border-radius:var(--ui-r-md);padding:8px 10px;cursor:pointer;font:inherit;color:var(--rl-ink)}
 .rl-pi:hover{background:#f8fafc}
 .rl-pi.on{background:#eff6ff;border-color:#bfdbfe}

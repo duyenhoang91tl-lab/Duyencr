@@ -326,6 +326,30 @@ async function splitFixSave_(i){
     splitFixLoad_();
   }catch(e){ toast('❌ Chưa lưu được: ' + (e && e.message || e)); }
 }
+function splitFixEditSaved_(code){
+  var f = _srState.fix; if (!f) return; var ny = splitFixCodeNy_(code);
+  var rows = (f.extra||[]).filter(function(x){ return x && splitFixCodeNy_(x.code) === ny; });
+  f.ovCode = code; f.ovText = rows.map(function(r){ return (r.sales||[]).join(', ') + ' = ' + Math.round(r.tong||0); }).join('\n');
+  _splitFixRerender_(); var el = document.getElementById('sr-fix-ovc'); if (el && el.scrollIntoView) el.scrollIntoView({ block:'center' });
+}
+async function splitFixSaveCode_(){
+  var f = _srState.fix; if (!f) return;
+  var ce = document.getElementById('sr-fix-ovc'), te = document.getElementById('sr-fix-ovt');
+  var code = String((ce && ce.value) || '').trim().toUpperCase(), t = (te && te.value) || '';
+  f.ovCode = code; f.ovText = t;
+  if (!code) { toast('❌ Nhập mã đơn (vd 17T10/2026 hoặc M44707)'); return; }
+  var p = splitFixParseLines_(t);
+  if (p.errors.length) { toast('❌ ' + p.errors[0]); return; }
+  if (!p.rows.length) { toast('❌ Chưa có dòng chia nào'); return; }
+  if (typeof confirm==='function' && !confirm('Chỉnh đè đơn ' + code + '?\n\nTổng ' + splitMoney_(p.total) + '.\nSố này sẽ ưu tiên hơn cả số trong file kế toán (xoá dòng ở danh sách "đang lưu" để quay về kế toán).')) return;
+  try{
+    var cur = await _splitFixGetExtra_();
+    await _splitFixPutExtra_(splitFixMergeExtra_(cur, code, p.rows));
+    f.ovCode = ''; f.ovText = ''; toast('✅ Đã lưu chỉnh đè ' + code + ' — đang tính lại báo cáo');
+    if (typeof _srLoad==='function') _srLoad();
+    splitFixLoad_();
+  }catch(e){ toast('❌ Chưa lưu được: ' + (e && e.message || e)); }
+}
 async function splitFixDelete_(code){
   if (typeof confirm==='function' && !confirm('Xoá chia tay đơn ' + code + ' khỏi bảng CRM? (đơn quay về tự động theo Base; dòng ở tab onl của kế toán không bị xoá)')) return;
   try{
@@ -358,10 +382,19 @@ function splitFixPanelHtml_(){
   });
   var ex = {}; (f.extra||[]).forEach(function(x){ if (!x || !x.code) return; var k = splitFixCodeNy_(x.code); (ex[k] = ex[k] || { code: x.code, rows: [] }).rows.push(x); });
   var keys = Object.keys(ex);
+  h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>✏️ Chỉnh đè 1 đơn theo mã</b> <span style="font-size:12px;color:var(--text-muted)">(kể cả đơn đã có ở file kế toán — số bạn nhập sẽ ưu tiên hơn kế toán)</span>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;margin:6px 0"><input id="sr-fix-ovc" type="text" placeholder="Mã đơn, vd 17T10/2026 hoặc M44707" value="' + splitEsc_(f.ovCode||'') + '" style="padding:6px;border:1px solid var(--border);border-radius:6px;width:230px">'
+    + '<textarea id="sr-fix-ovt" rows="3" placeholder="sale1, sale2 = 5000000&#10;sale1 = 2000000" style="width:100%;max-width:360px;font-family:monospace;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px">' + splitEsc_(f.ovText||'') + '</textarea>'
+    + '<button type="button" class="btn sm primary" onclick="splitFixSaveCode_()">💾 Lưu chỉnh đè</button></div></div>';
   h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>Chia tay đang lưu trong CRM</b> (' + keys.length + ' đơn)' + (f.extraErr ? ' <span style="color:' + splitErrColor_() + '">— không đọc được bảng</span>' : '') + '</div>';
+  // Ưu tiên (Duyên chốt lại 16/11): MẶC ĐỊNH lấy theo file kế toán; dòng admin lưu ở đây ĐÈ LÊN kế toán cùng mã. Server trả d.overrides = mã đang đè lên dòng kế toán.
+  var over = {}; ((f.data && f.data.overrides) || []).forEach(function(c){ over[splitFixCodeNy_(c)] = true; });
+  h += '<div style="font-size:12px;color:var(--text-muted);margin:4px 0">Mặc định đơn lấy theo <b>file kế toán</b>; dòng lưu ở đây (chỉ admin) sẽ <b>đè lên</b> số kế toán của đúng đơn đó, đơn nào chưa có thì tự ghép Base theo tỷ lệ Pos. Xoá dòng để đơn quay về số kế toán.</div>';
   keys.forEach(function(k){
     var g = ex[k];
     h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;font-size:12px"><b>' + splitEsc_(g.code) + '</b><span>' + g.rows.map(function(r){ return splitEsc_((r.sales||[]).join(', ')) + ' = ' + splitMoney_(r.tong); }).join(' · ') + '</span>'
+      + (over[k] ? '<span class="split-fix-override" style="color:' + splitToneColor_('warning', '#b36b00') + '">✏️ đang đè lên số file kế toán</span>' : '')
+      + '<button type="button" class="btn sm" data-code="' + splitEsc_(g.code) + '" onclick="splitFixEditSaved_(this.getAttribute(\'data-code\'))">Sửa</button>'
       + '<button type="button" class="btn sm" data-code="' + splitEsc_(g.code) + '" onclick="splitFixDelete_(this.getAttribute(\'data-code\'))">Xoá</button></div>';
   });
   return h + '</div>';

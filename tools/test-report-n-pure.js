@@ -28,7 +28,7 @@ const rbEnd = rb.indexOf('\n}\n'); ok(rbEnd > 0, 'tach duoc than _srRenderB');
 ok(!rb.slice(0, rbEnd).includes('_srPurePanelHtml_'), '_srRenderB khong con goi bang thuan (da tach)');
 ok(/else if \(_srState\.bView === 'pure'\)\s*\{\s*[^}]*_srRenderPure_\(_srState\.dataB\)/.test(j11), 'renderSalesReportTab: bView pure => _srRenderPure_(dataB)');
 ok(/function _srRenderPure_\(d\)\{[^}]*_srPurePanelHtml_\(d\)/.test(j11), '_srRenderPure_ ve bang thuan');
-ok(/function _srSetSub\(sub\)\{ _srApplySub_\(sub\); _srLoad\(\); \}/.test(j11), '_srSetSub dung _srApplySub_');
+ok(/function _srSetSub\(sub\)\{ _srApplySub_\(sub\); _srLoad\(true\); \}/.test(j11), '_srSetSub dung _srApplySub_ (duong XEM: _srLoad(true) de dung cache 60s)');
 ok(/var cur = _srCurCode_\(\);/.test(j11), 'o chon bao cao dung _srCurCode_');
 ok((j11.match(/_srPurePanelHtml_\(/g) || []).length === 2, 'chi con dinh nghia + 1 noi goi (trong _srRenderPure_)');
 console.log('REPORT N PURE TESTS PASSED');

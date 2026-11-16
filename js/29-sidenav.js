@@ -40,9 +40,9 @@
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:ordersale','act:acct'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:ordersale','act:splitextra','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:sakura','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:sakura','act:mascot','act:garden','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
@@ -51,6 +51,8 @@
     help:       { t:'❓ Hướng dẫn sử dụng', f:'openHelpModal', open:true },
     theme:      { t:function(){ return (typeof _themeIsDark==='function' && _themeIsDark()) ? '☀ Chế độ sáng' : '🌙 Chế độ tối'; }, f:'toggleTheme', open:true },
     sakura:     { t:function(){ return (typeof _sakuraLabel==='function') ? _sakuraLabel() : '🌸 Cánh đào rơi'; }, f:'toggleSakura', open:true },
+    mascot:     { t:function(){ return (typeof _mascotLabel==='function') ? _mascotLabel() : '🐶 Linh vật Samoyed'; }, f:'toggleMascot', open:true },
+    garden:     { t:function(){ return (typeof _gardenLabel==='function') ? _gardenLabel() : '🌼 Vườn hoa-bướm-ong'; }, f:'toggleGarden', open:true },
     errlog:     { t:'🐞 Nhật ký lỗi (máy này)', f:'openErrLogModal', admin:true },
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
@@ -58,6 +60,7 @@
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
     salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
     ordersale:  { t:'📌 Ép sale theo đơn', f:'openOrderSaleOvrModal', admin:true },
+    splitextra: { t:'🧮 Chia đơn theo KT (bổ sung)', f:'openAcctExtraModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },

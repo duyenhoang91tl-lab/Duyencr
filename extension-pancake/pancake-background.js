@@ -1046,6 +1046,18 @@ function buildPrompt(payload) {
   if (payload.stonePref) lines.push(`Loại đá khách hỏi: ${payload.stonePref}`);
   const custBlock = lines.length ? `[KH] ${lines.join(" | ")}\n` : "";
 
+  // Khong co tin nhan nao (CS chi go san pham vao o "Ngu canh / San pham"): soan tin tu van ve
+  // chinh san pham do — dua ten san pham len [Yeu cau] de GAS loc tu khoa tra cuu dung chu.
+  if (!msgText.trim() && context) {
+    return (
+      custBlock +
+      `[Kênh] ${platformLabel}\n` +
+      `[Yêu cầu] Tư vấn sản phẩm: ${context}\n` +
+      `[Giọng văn] ${tone}\n` +
+      `Soạn 1 tin nhắn tư vấn về sản phẩm trên (dùng thông tin trong dữ liệu sản phẩm nếu có), ngắn gọn, tiếng Việt tự nhiên.`
+    );
+  }
+
   return (
     custBlock +
     `[Kênh] ${platformLabel}\n` +

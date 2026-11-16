@@ -247,7 +247,7 @@ function _bdOpenOrder(counter){
   m.id = 'bd-order-modal';
   m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) _bdCloseOrder(); };
-  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:calc(var(--vh,1vh)*86);overflow:auto;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:15px">📦 Thông tin đơn '+esc(counter)+'</b><button class="btn sm" onclick="_bdCloseOrder()">✕ Đóng</button></div>'+
     _bdOrderModalHtml_(x)+'</div>';
   document.body.appendChild(m);

@@ -50,7 +50,7 @@
 .tc-comp{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);align-items:flex-end}
 .tc-comp textarea{flex:1;resize:none;border:1px solid var(--border-md);border-radius:var(--r);padding:8px 10px;font:inherit;font-size:13.5px;max-height:120px;background:var(--surface);color:var(--text)}
 .tc-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center;padding:14px}
-.tc-box{background:var(--surface);border-radius:var(--rlg);padding:16px;width:420px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:8px}
+.tc-box{background:var(--surface);border-radius:var(--rlg);padding:16px;width:420px;max-width:100%;max-height:calc(var(--vh,1vh)*88);overflow-y:auto;box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:8px}
 .tc-box h3{font-size:15px;margin-bottom:2px}
 .tc-box input[type=text],.tc-box input:not([type]),.tc-usearch{width:100%;border:1px solid var(--border-md);border-radius:var(--rsm);padding:7px 9px;font:inherit;font-size:13px}
 .tc-opt{font-size:12.5px;display:flex;gap:6px;align-items:center}

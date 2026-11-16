@@ -134,7 +134,7 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 .table-wrap{flex:1;overflow:auto;overflow-x:scroll;}
 /* ── DATA ASSIGNMENT ── */
 .assign-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:600;display:none;align-items:center;justify-content:center;}
-.reminder-panel{position:fixed;right:16px;bottom:16px;width:330px;max-width:92vw;max-height:62vh;background:var(--surface);border:1px solid var(--border-md);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,0.24);z-index:550;display:flex;flex-direction:column;overflow:hidden;font-size:12px;}
+.reminder-panel{position:fixed;right:16px;bottom:16px;width:330px;max-width:92vw;max-height:calc(var(--vh,1vh)*62);background:var(--surface);border:1px solid var(--border-md);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,0.24);z-index:550;display:flex;flex-direction:column;overflow:hidden;font-size:12px;}
 .rp-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--green);color:#fff;font-weight:600;flex-shrink:0;}
 .rp-hbtn{background:rgba(255,255,255,0.22);color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:5px;}
 .rp-hbtn:hover{background:rgba(255,255,255,0.35);}
@@ -151,7 +151,7 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 .reminder-bell{position:fixed;right:16px;bottom:16px;width:52px;height:52px;border-radius:50%;background:var(--green);color:#fff;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.28);cursor:pointer;font-size:21px;z-index:550;display:none;align-items:center;justify-content:center;}
 .reminder-bell .rb-count{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:10px;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:700;}
 .assign-modal-overlay.open{display:flex;}
-.assign-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.2);width:700px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}
+.assign-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.2);width:700px;max-width:96vw;max-height:calc(var(--vh,1vh)*88);display:flex;flex-direction:column;overflow:hidden;}
 .assign-modal-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .assign-modal-title{font-size:14px;font-weight:700;}
 .assign-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2);}
@@ -210,8 +210,8 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 #task-modal-overlay .assign-modal{
   width:100vw;
   max-width:100vw;
-  height:100vh;
-  max-height:100vh;
+  height:calc(var(--vh,1vh)*100);
+  max-height:calc(var(--vh,1vh)*100);
   border-radius:0;
   box-shadow:none;
 }
@@ -330,7 +330,7 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 /* Modal quản lý Nick Zalo */
 .nz-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center;}
 .nz-modal-overlay.open{display:flex;}
-.nz-modal{background:var(--surface);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.22);width:400px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.nz-modal{background:var(--surface);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.22);width:400px;max-width:94vw;max-height:calc(var(--vh,1vh)*80);display:flex;flex-direction:column;overflow:hidden;}
 .nz-modal-hdr{padding:13px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .nz-modal-title{font-size:13px;font-weight:700;color:var(--text);}
 .nz-modal-body{flex:1;overflow-y:auto;padding:14px 16px;}
@@ -539,7 +539,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 /* ── ADVANCED FILTER MODAL ── */
 .adv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:500;display:none;align-items:flex-start;justify-content:center;padding-top:40px;}
 .adv-modal-overlay.open{display:flex;}
-.adv-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.18);width:620px;max-width:95vw;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;}
+.adv-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.18);width:620px;max-width:95vw;max-height:calc(var(--vh,1vh)*80);overflow:hidden;display:flex;flex-direction:column;}
 .adv-modal-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .adv-modal-title{font-size:14px;font-weight:700;}
 .adv-modal-body{padding:14px 18px;overflow-y:auto;flex:1;}
@@ -664,7 +664,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 /* Generic modal reuse for role + team forms */
 .v9-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.42);z-index:700;display:none;align-items:center;justify-content:center;padding:16px;}
 .v9-modal-overlay.open{display:flex;}
-.v9-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.22);width:460px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+.v9-modal{background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 40px rgba(0,0,0,0.22);width:460px;max-width:96vw;max-height:calc(var(--vh,1vh)*90);display:flex;flex-direction:column;overflow:hidden;}
 .v9-modal-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .v9-modal-title{font-size:14px;font-weight:700;}
 .v9-modal-body{padding:16px 18px;overflow-y:auto;}
@@ -877,7 +877,7 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 .pkc-convs{display:flex;flex-wrap:wrap;gap:6px;}
 .pkc-chip{padding:3px 10px;border:1px solid var(--border);border-radius:14px;font-size:11px;color:var(--muted);cursor:pointer;background:var(--surface);}
 .pkc-chip.on{background:var(--green,#1a6b45);border-color:var(--green,#1a6b45);color:#fff;}
-.pkc-msgs{max-height:50vh;min-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg,#f6f6f4);border:1px solid var(--border);border-radius:10px;}
+.pkc-msgs{max-height:calc(var(--vh,1vh)*50);min-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg,#f6f6f4);border:1px solid var(--border);border-radius:10px;}
 .pkc-day{align-self:center;font-size:10px;color:var(--muted);margin:4px 0;}
 .pkc-m{display:flex;flex-direction:column;max-width:82%;}
 .pkc-m.in{align-self:flex-start;} .pkc-m.out{align-self:flex-end;align-items:flex-end;}
@@ -928,7 +928,7 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 }
 .sc-back{display:none;} @media (max-width:760px){.sc-back{display:inline-flex;}}
 /* Gợi ý tin nhắn trong khung chat (js/20 tplChatToggle): ô gợi ý nằm ngay trên ô soạn tin, cuộn riêng */
-.tpl-chat-panel{max-height:42vh;overflow-y:auto;padding:8px;border-top:1px solid var(--border);background:var(--surface2);}
+.tpl-chat-panel{max-height:calc(var(--vh,1vh)*42);overflow-y:auto;padding:8px;border-top:1px solid var(--border);background:var(--surface2);}
 .tpl-chat-panel .zai-input{width:100%;}
 
 /* ── Công việc kiểu Base (js/44, js/45): quy trình / giai đoạn / duyệt / thảo luận ── */

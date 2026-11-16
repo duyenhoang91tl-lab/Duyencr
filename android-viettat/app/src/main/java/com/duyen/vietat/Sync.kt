@@ -150,6 +150,7 @@ object Crm {
             "Đã cập nhật từ CRM ($n mục: chung $teamN, riêng $mineN" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") +
                 (if (audIds.isNotEmpty()) ", ${audFiles.size} ghi âm" else "") + (if (audFailed > 0) ", $audFailed ghi âm lỗi" else "") + ")" +
                 (if (n == 0) " ⚠ CRM chưa có mục viết tắt nào cho bạn (tạo ở CRM → Zalo AI → ⌨️ Viết tắt)" else "") +
+                (if (Store.orphaned > 0) " ℹ ${Store.orphaned} mục bạn đã cá nhân hoá không còn trên CRM → đã GIỮ thành mục riêng (thư mục Chung)" else "") +
                 (if (n > 0 && mineN == 0) " ⚠ Chưa thấy mục RIÊNG của \"${name(c)}\": nếu bạn đã lưu mục riêng trên CRM thì Tên CS (☁ CRM) chưa giống tên tài khoản CRM" else "")
         } catch (e: Exception) {
             "Lỗi cập nhật CRM: ${e.message}"

@@ -160,12 +160,12 @@ function doGetCore_(e) {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
       // 100KB nen payload nay (5 map theo SDT) gan nhu chac chan THAT BAI AM THAM -> khong bao gio duoc cache. Nay doc 1 LAN roi
-      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL 90s bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
+      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL DON_CACHE_TTL_ (600s) bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
       var cachedDP = _cacheGetBig_('don_phones_v6');
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
       var rowsDP = readDonChiTiet_();
       var resDP = { phones: readDonPhones_(rowsDP), saleByPhone: getDonSaleByPhone_(rowsDP), orderCountByPhone: getDonOrderCountByPhone_(rowsDP), lastDateByPhone: getDonLastDateByPhone_(rowsDP), statsByPhone: getDonStatsByPhone_(rowsDP) };
-      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), 90); } catch(ec) {}
+      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
     }
 

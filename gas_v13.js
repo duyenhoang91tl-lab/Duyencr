@@ -281,6 +281,10 @@ function _colLetter_(n) {
 
 // ─── CACHE LON: chia manh de vuot gioi han ~100KB/1 key cua CacheService ─────────────
 // (danh muc gia day du co the vuot 100KB nen cache.put 1 key se bi bo qua am tham)
+// TTL (giay) cua cache TOAN BO sheet don Pos: 'donChiTiet_v4' (readDonChiTiet_) va 'don_phones_v6' (action donPhones) — PHAI dung chung 1 hang so vi hai key xoa cung luc.
+// 2026-11-16 (Duyen: "an load bao cao hoi lau du chi xem thang"): 90s -> 600s. NGUYEN NHAN GOC cham: moi khi cache het han, buildSalesReportB_/E/F/G doc + doi + JSON.stringify TOAN BO lich su sheet Pos
+// (khong phu thuoc "chi xem 1 thang"). Nhap file / xoa trung / sua o qua he thong da removeAll(['donChiTiet_v4_n','don_phones_v6_n']) nen so khong cu; CHI sua tay truc tiep tren sheet Pos moi phai cho toi 10 phut.
+var DON_CACHE_TTL_ = 600;
 function _cachePutBig_(key, str, ttl) {
   try {
     var cache = CacheService.getScriptCache();
@@ -2667,12 +2671,12 @@ function doGetCore_(e) {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
       // 100KB nen payload nay (5 map theo SDT) gan nhu chac chan THAT BAI AM THAM -> khong bao gio duoc cache. Nay doc 1 LAN roi
-      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL 90s bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
+      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL DON_CACHE_TTL_ (600s) bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
       var cachedDP = _cacheGetBig_('don_phones_v6');
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
       var rowsDP = readDonChiTiet_();
       var resDP = { phones: readDonPhones_(rowsDP), saleByPhone: getDonSaleByPhone_(rowsDP), orderCountByPhone: getDonOrderCountByPhone_(rowsDP), lastDateByPhone: getDonLastDateByPhone_(rowsDP), statsByPhone: getDonStatsByPhone_(rowsDP) };
-      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), 90); } catch(ec) {}
+      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
     }
 
@@ -4901,7 +4905,7 @@ function readDonChiTiet_() {
   // posRow = so dong THAT trong sheet "dữ liệu đơn" (header o dong 1) — de ke toan do lai tung don (Bao cao L). Chi gan o day
   // (khong sua _donConvertRows_ dung chung voi Supabase backfill). Cache cu <=90s chua co posRow thi chi hien trong tam.
   var out = conv.items.map(function (it) { var o = it.obj; o.posRow = it.srcRow; return o; });
-  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), DON_CACHE_TTL_); } catch (eCache) {}
   return out;
 }
 
@@ -6249,6 +6253,11 @@ function _loadAcctSplit_() {
     // Gop bang chia bo sung cua CRM: dong bo sung THAY cac dong cung ma trong file ke toan (khop ca khi khac nam /2026); bang CRM (Settings) thang tab onl neu cung ma.
     var crmEx = _loadAcctExtra_(), crmNy = {};
     crmEx.forEach(function(rw) { crmNy[_acctCodeNoYear_(rw.code)] = true; });
+    // Mac dinh lay theo KE TOAN; admin luu dong trong CRM thi DE len (Duyen chot lai 2026-11-16). out.crmOverrides = ma dang de len dong ke toan (de giao dien bao 'dang de len ke toan').
+    var ktNy = {}; out.crmOverrides = [];
+    sheetEx.forEach(function(rw) { ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    rowsRaw.forEach(function(rw) { if (rw.code && rw.confirmed) ktNy[_acctCodeNoYear_(rw.code)] = true; });
+    crmEx.forEach(function(rw) { if (ktNy[_acctCodeNoYear_(rw.code)] && out.crmOverrides.indexOf(rw.code) === -1) out.crmOverrides.push(rw.code); });
     var exRows = sheetEx.filter(function(rw) { return !crmNy[_acctCodeNoYear_(rw.code)]; }).concat(crmEx);
     out.exCount = exRows.length; out.exByCode = {}; out.exByCodeNoYear = {};
     if (exRows.length) {
@@ -8068,6 +8077,7 @@ function doPostCore_(e) {
     if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatUsage')          return jsonOut_(vietTatUsage_(data, _tplCaller_(data.token, data.ek, data.by)));   // dong bo so luot dung Viet tat giua cac may (cong don delta, tra ve tong cua rieng nguoi goi)
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
     if (action === 'vietTatUploadAudio')    return jsonOut_(vietTatUploadAudio_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 TEP ghi am co san tu may len Drive (khong can bam ghi am)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
@@ -8238,6 +8248,33 @@ function syncZaloFriendStatus_(rows, dryRun) {
       if (phoneCol[i][0]) index[normPhone_(String(phoneCol[i][0]))] = i + 2;
     }
   }
+  // Toi uu (2026-11-15): truoc day moi dong quet doc 2-3 o rieng (getRange(..).getValue()) va ghi 3-4 o rieng -> 100 dong = 500+ lan goi Sheet, de qua
+  // thoi gian Apps Script ("Failed to fetch"). Nay doc 3 cot C (zalo), Q (nickZalos), S (zaloSetBy) DUNG 1 LAN moi cot, kiem tra tren bo nho,
+  // roi chi ghi cac o thay doi, gom cac dong LIEN NHAU thanh 1 lan setValues (khong bao gio nhieu lan goi hon cach cu).
+  var colZalo = null, colNick = null, colSetBy = null;
+  if (lastRow >= 2) {
+    var _rd = function (c) { return sh.getRange(2, c, lastRow - 1, 1).getValues(); };
+    colZalo = _rd(3); colSetBy = _rd(19);
+    if (!dryRun && rows.some(function (r) { return r && String(r.nick || '').trim(); })) colNick = _rd(17); // chi doc cot Q khi co dong gui kem nick
+  }
+  var pend = {}; // cot -> { so dong: gia tri moi }
+  var _put = function (col, rowNum, val, cache) {
+    (pend[col] = pend[col] || {})[rowNum] = val;
+    if (cache && rowNum - 2 < cache.length) cache[rowNum - 2][0] = val; // cung 1 SDT lap lai trong 1 lan gui: dong sau thay gia tri moi
+  };
+  var _flush = function () {
+    Object.keys(pend).forEach(function (c) {
+      var rowsN = Object.keys(pend[c]).map(Number).sort(function (a, b) { return a - b; });
+      var i = 0;
+      while (i < rowsN.length) {
+        var j = i;
+        while (j + 1 < rowsN.length && rowsN[j + 1] === rowsN[j] + 1) j++;
+        var vals = []; for (var k = i; k <= j; k++) vals.push([pend[c][rowsN[k]]]);
+        sh.getRange(rowsN[i], Number(c), vals.length, 1).setValues(vals);
+        i = j + 1;
+      }
+    });
+  };
 
   if (dryRun) {
     var conflicts = [];
@@ -8247,9 +8284,9 @@ function syncZaloFriendStatus_(rows, dryRun) {
       var rn = phoneC ? index[phoneC] : undefined;
       if (!phoneC || rn === undefined) continue;
       // Chi doc 2 o can thiet (zalo + zaloSetBy) cho dong nay, khong doc ca dong/ca sheet
-      var oldZalo = sh.getRange(rn, 3).getValue() || '';
+      var oldZalo = (colZalo && colZalo[rn - 2] ? colZalo[rn - 2][0] : '') || '';
       if (!oldZalo || oldZalo === (rc.zalo || '')) continue; // chua tung ghi, hoac gia tri khong doi -> khong tinh la xung dot
-      var oldSetByRaw = sh.getRange(rn, 19).getValue();
+      var oldSetByRaw = colSetBy && colSetBy[rn - 2] ? colSetBy[rn - 2][0] : '';
       var oldSetBy = null;
       try { oldSetBy = JSON.parse(oldSetByRaw || 'null'); } catch (e) { oldSetBy = null; }
       var oldCs = oldSetBy ? (oldSetBy.cs || '') : '';
@@ -8281,11 +8318,11 @@ function syncZaloFriendStatus_(rows, dryRun) {
       // Truoc day ham nay luon ghi lai cot 'updated' (O) cho MOI dong duoc quet, ke ca khi
       // trang thai zalo khong doi gi ca -> Sasum tuong lam la "khach vua co cap nhat moi"
       // moi lan CS chi don gian mo lai doan chat / bam quet man hinh, gay bao dong gia.
-      var curZalo = sh.getRange(rowNum, 3).getValue() || '';
+      var curZalo = (colZalo && colZalo[rowNum - 2] ? colZalo[rowNum - 2][0] : '') || '';
       var nickAlreadyThere = true;
       var curNzRaw = '';
       if (nick) {
-        curNzRaw = sh.getRange(rowNum, 17).getValue();
+        curNzRaw = colNick && colNick[rowNum - 2] ? colNick[rowNum - 2][0] : '';
         var nzChk = [];
         try { nzChk = JSON.parse(curNzRaw || '[]'); } catch (e) { nzChk = []; }
         if (!Array.isArray(nzChk)) nzChk = [];
@@ -8296,16 +8333,16 @@ function syncZaloFriendStatus_(rows, dryRun) {
         continue;
       }
       // Chi ghi dung 3 vung o thay doi cua dong nay: zalo(C), updated(O), zaloSetBy(S) [+ nickZalos(Q) neu co nick moi]
-      if (curZalo !== zaloStatus) sh.getRange(rowNum, 3).setValue(zaloStatus);
-      sh.getRange(rowNum, 15).setValue(now);
+      if (curZalo !== zaloStatus) _put(3, rowNum, zaloStatus, colZalo);
+      _put(15, rowNum, now, null);
       if (nick && !nickAlreadyThere) {
         var nz = [];
         try { nz = JSON.parse(curNzRaw || '[]'); } catch (e) { nz = []; }
         if (!Array.isArray(nz)) nz = [];
         nz.push(nick);
-        sh.getRange(rowNum, 17).setValue(JSON.stringify(nz));
+        _put(17, rowNum, JSON.stringify(nz), colNick);
       }
-      sh.getRange(rowNum, 19).setValue(setBy);
+      _put(19, rowNum, setBy, colSetBy);
       updated++; touchedRows.push(rowNum);
     } else {
       var newRow = careRow_({ phone: phone, zalo: zaloStatus, nickZalos: nick ? [nick] : [], zaloSetBy: setBy });
@@ -8317,6 +8354,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
     }
   }
 
+  _flush();
   if (newRows.length) {
     sh.getRange(lastRow + 1, 1, newRows.length, W).setValues(newRows);
   }
@@ -8587,9 +8625,17 @@ function _autoDedupExactRowsInSheet_(sh, width) {
   if (!toDelete.length) return { deleted: 0, groupCount: 0 };
   toDelete.sort(function (a, b) { return b - a; }); // xoa tu duoi len tren, tranh lech chi so
   var deleted = 0;
-  toDelete.forEach(function (rowIdx) {
-    try { sh.deleteRow(rowIdx); deleted++; } catch (e) {}
-  });
+  // Toi uu (2026-11-15): truoc day deleteRow tung dong (hang tram dong trung = hang tram lan goi Sheet, de qua thoi gian); nay gom cac dong LIEN NHAU
+  // thanh 1 lan deleteRows (van xoa tu duoi len; loi cum nao thi thu xoa tung dong trong cum do nhu cu).
+  var ri2 = 0;
+  while (ri2 < toDelete.length) {
+    var rj2 = ri2;
+    while (rj2 + 1 < toDelete.length && toDelete[rj2 + 1] === toDelete[rj2] - 1) rj2++;
+    var cnt2 = rj2 - ri2 + 1, first2 = toDelete[rj2];
+    try { sh.deleteRows(first2, cnt2); deleted += cnt2; }
+    catch (e0) { for (var q2 = ri2; q2 <= rj2; q2++) { try { sh.deleteRow(toDelete[q2]); deleted++; } catch (e) {} } }
+    ri2 = rj2 + 1;
+  }
   return { deleted: deleted, groupCount: groupCount };
 }
 var SH_AUTO_DEDUP_LOG = 'Nhật ký xoá trùng tự động';
@@ -13154,12 +13200,14 @@ function readNotifications_(username) {
 function markNotifRead_(username, ids, all) {
   var sh = getCrmSS_().getSheetByName(SH_NOTIF);
   if (!sh || sh.getLastRow() < 2) return { ok: true, marked: 0 };
-  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, now = new Date().toISOString();
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, hit = [], now = new Date().toISOString();
   (ids || []).forEach(function (x) { want[String(x)] = 1; });
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0] || v[i][9] || String(v[i][1]).toLowerCase() !== un) continue;
-    if (all || want[String(v[i][0])]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    if (all || want[String(v[i][0])]) { hit.push(i + 1); n++; }
   }
+  // Toi uu (2026-11-15): truoc day setValue tung dong (bam "doc tat ca" voi 200 thong bao = 200 lan goi Sheet); nay 1 lan RangeList cho moi dong can danh dau.
+  if (hit.length) sh.getRangeList(hit.map(function (r) { return 'J' + r; })).setValue(now);
   return { ok: true, marked: n };
 }
 function saveTaskComment_(c) {
@@ -14266,6 +14314,45 @@ function saveVietTat_(data, caller) {
   var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
   sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson, audsJson]);
   return jsonOut_({ ok: true, id: id });
+}
+// ── LUOT DUNG VIET TAT (2026-11-14, Duyen: "dong bo so luot dung giua cac may") ─────────────────────────────────────────
+// Sort "Dung nhieu nhat" truoc day chi dem trong localStorage cua TUNG MAY. Nay moi nguoi co 1 dong trong sheet 'VietTatUsage' (owner, counts JSON {idMuc: soLuot}, updatedAt):
+// client gui DELTA (so luot moi tu lan dong bo truoc), server CONG DON roi tra ve TONG -> may nao cung thay cung so. Chi cho nguoi da biet ten (dang nhap CRM / ten CS ext); rieng tu tung nguoi (khong ai doc duoc so cua nguoi khac).
+// Khoa script de 2 may cung dong bo khong ghi de nhau. Chong phinh: toi da 200 id/lan, moi id +1000/lan, giu 400 muc dung nhieu nhat. Delta rong = chi KEO tong ve.
+var SH_VIETTAT_USAGE = 'VietTatUsage', VIETTAT_USAGE_HEADERS = ['owner', 'counts', 'updatedAt'];
+var VIETTAT_USAGE_MAX_IDS = 400, VIETTAT_USAGE_MAX_DELTA_IDS = 200, VIETTAT_USAGE_MAX_N = 1000;
+function vietTatUsage_(data, caller) {
+  var name = String((caller && caller.name) || '').trim();
+  if (!name || !_vtKey_(name)) return { ok: false, error: 'Chua biet ban la ai — dang nhap CRM de dong bo so luot dung.', code: 'FORBIDDEN' };
+  var delta = (data && data.delta && typeof data.delta === 'object' && !Array.isArray(data.delta)) ? data.delta : {};
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(8000); } catch (eL) { return { ok: false, error: 'He thong dang ban, thu lai sau.', code: 'BUSY' }; }
+  try {
+    var sh = getSheet_(SH_VIETTAT_USAGE, VIETTAT_USAGE_HEADERS), last = sh.getLastRow(), row = 0, counts = {};
+    if (last >= 2) {
+      var owners = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var i = 0; i < owners.length; i++) { if (_vtSame_(owners[i][0], name)) { row = i + 2; break; } }
+    }
+    if (row) {
+      try { var cur = JSON.parse(String(sh.getRange(row, 2, 1, 1).getValues()[0][0] || '{}')); if (cur && typeof cur === 'object' && !Array.isArray(cur)) counts = cur; } catch (eP) { counts = {}; }
+    }
+    var changed = false;
+    Object.keys(delta).slice(0, VIETTAT_USAGE_MAX_DELTA_IDS).forEach(function (id) {
+      var n = Math.floor(+delta[id]);
+      if (!/^[A-Za-z0-9_.-]{1,60}$/.test(id) || !(n > 0)) return;
+      counts[id] = (Math.floor(+counts[id]) || 0) + Math.min(n, VIETTAT_USAGE_MAX_N); changed = true;
+    });
+    var ids = Object.keys(counts);
+    if (ids.length > VIETTAT_USAGE_MAX_IDS) {
+      ids.sort(function (a, b) { return (+counts[b] || 0) - (+counts[a] || 0); });
+      var keep = {}; ids.slice(0, VIETTAT_USAGE_MAX_IDS).forEach(function (k) { keep[k] = counts[k]; }); counts = keep; changed = true;
+    }
+    if (changed) {
+      var rowVals = [[row ? sh.getRange(row, 1, 1, 1).getValues()[0][0] : name.slice(0, 60), JSON.stringify(counts), Date.now()]];
+      if (row) sh.getRange(row, 1, 1, 3).setValues(rowVals); else sh.appendRow(rowVals[0]);
+    }
+    return { ok: true, counts: counts };
+  } finally { try { lock.releaseLock(); } catch (eR) {} }
 }
 function deleteVietTat_(id, caller) {
   caller = caller || { priv: false, name: '' };
@@ -21257,7 +21344,7 @@ function splitFixList_(p, user) {
       posVal: Math.round(posVal), the: theNames, base: base, baseSum: Math.round(baseSum), lechTien: lechTien, lechSale: lechSale, current: cur, tong: Math.round(tot) });
   });
   rows.sort(function (a, b) { return Math.abs(b.lechTien) - Math.abs(a.lechTien); });
-  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows };
+  return { ok: true, from: r.from, to: r.to, total: total, truncated: total > rows.length, rows: rows, overrides: (function () { try { return _loadAcctSplit_().crmOverrides || []; } catch (eO) { return []; } })() };
 }
 function splitDoGet_(action, p) {
   try {
