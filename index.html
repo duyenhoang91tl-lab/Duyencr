@@ -856,8 +856,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <span class="vt-tree-wrap"><button type="button" class="assign-input" id="vt-nf-btn" onclick="vtToggleTree('f')" style="font-size:12px;padding:4px 8px;cursor:pointer;text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lọc theo thư mục — chọn thư mục mẹ sẽ gồm cả thư mục con">🗂 Tất cả thư mục ▾</button><div id="vt-nf-panel" class="vt-tree-panel" hidden></div></span>
+          <select id="vt-sort" class="assign-input" onchange="vtSetSort(this.value)" title="Cách sắp xếp danh sách" style="font-size:12px;padding:4px 8px"><option value="folder">🗂 Theo thư mục</option><option value="used">🔥 Dùng nhiều nhất</option></select>
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
-          <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
+          <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung / tên ảnh..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
           <input type="file" id="vt-imp-file" accept=".json,.zip,application/json,application/zip" data-vt="off" style="display:none" onchange="vtImportFile(this.files[0]); this.value=''">
           <button class="btn sm" onclick="document.getElementById('vt-imp-file').click()" title="Chọn file data.json hoặc .zip xuất từ app Viết Tắt cũ (Chrome/Android)">📥 Nhập từ app Viết Tắt cũ</button>
@@ -876,6 +877,8 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <input id="vt-f-abbr" class="zai-input" placeholder="Viết tắt (1 từ, VD: ch)" maxlength="30" style="width:150px">
             <input id="vt-f-keyword" class="zai-input" placeholder="Từ khoá, cách nhau dấu phẩy (VD: chào, xin chào) — gõ đầu từ khoá cũng gợi ý" style="flex:1;min-width:220px">
           </div>
+          <div id="vt-f-abbrmsg" style="font-size:11.5px;margin:-4px 0 8px"></div>
+          <div id="vt-f-kwmsg" style="font-size:11.5px;margin:-4px 0 8px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
             <span class="vt-tree-wrap"><button type="button" class="btn sm" id="vt-np-btn" onclick="vtToggleTree('p')" title="Chọn thư mục có sẵn (mẹ/con) hoặc tạo thư mục mới">📂 Chọn / tạo thư mục ▾</button><div id="vt-np-panel" class="vt-tree-panel" hidden></div></span>
@@ -883,6 +886,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
           <div id="vt-f-opts"></div>
+          <details id="vt-f-media" style="margin:6px 0 4px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent,#1e66f5);padding:8px 0">🖼 Ảnh &amp; 🎤 ghi âm kèm theo <span id="vt-f-mediasum" style="font-weight:400;color:var(--muted)">(không bắt buộc)</span></summary>
           <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🖼 Ảnh kèm theo</b> <span id="vt-f-imgcount"></span> — tối đa <b>50 ảnh</b> cho mỗi mục. Thêm ảnh bằng 1 trong 2 cách: <b>(1)</b> dán link <b>Google Drive</b> (ảnh hoặc thư mục, mỗi dòng 1 link; thư mục lấy tối đa 50 ảnh đầu theo tên) để dùng ảnh ĐÃ CÓ, không tải lại — ảnh phải chia sẻ cho tài khoản chạy GAS hoặc "ai có link"; <b>(2)</b> <b>📷 Chọn ảnh từ máy / điện thoại</b> — chọn nhiều ảnh 1 lúc (máy tính, iPhone/iPad, Android), ảnh tự nén nhỏ trước khi tải lên. Khi gõ tắt, nội dung chèn trước rồi ảnh dán lần lượt. Nhớ bấm <b>Lưu</b> sau khi thêm ảnh.</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
             <input type="file" id="vt-f-files" accept="image/*" multiple data-vt="off" style="display:none" onchange="vtUploadFiles(this.files); this.value=''">
@@ -900,6 +904,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div id="vt-f-audmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
           <div id="vt-f-auds" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+          </details>
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
             <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
             <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
@@ -1782,21 +1787,21 @@ function openBcLogModal(phone){
 <script src="js/34-fn-todaytasks.js"></script>
 <script src="js/35-fn-deptsettings.js?v=20261115g"></script>
 <script src="js/36-fn-homechips.js?v=20261115f"></script>
-<script src="js/37-fn-configpage.js"></script>
+<script src="js/37-fn-configpage.js?v=20261115a"></script>
 <script src="js/39-fn-buyfilter.js"></script>
 <script src="js/40-fn-carepage.js?v=20261115g"></script>
 <script src="js/41-fn-stageboard.js?v=20261115g"></script>
 <script src="js/42-fn-homesummary.js"></script>
 <script src="js/43-fn-uxtools.js?v=20261115g"></script>
 <script src="js/30-fn-teamanalysis.js"></script>
-<script src="js/29-sidenav.js?v=20261026a"></script>
+<script src="js/29-sidenav.js?v=20261115a"></script>
 <script src="js/31-fn-orgoverview.js"></script>
 <script src="js/32-fn-furesult.js?v=20261115g"></script>
 <script src="js/33-fn-tierconfig.js"></script>
 <script src="js/33-pro-profile.js?v=20261115h"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
-<script src="js/38-pro-dock.js?v=20261115f"></script>
+<script src="js/38-pro-dock.js?v=20261115g"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
 <script src="js/41-fn-pkchat.js?v=20261101a"></script>
@@ -1811,7 +1816,7 @@ function openBcLogModal(phone){
 <script src="js/48-filter-presets.js?v=20261110a"></script>
 <script src="js/48-pro-chatinfo.js?v=20261115h"></script>
 <script src="js/49-pro-discuss.js"></script>
-<script src="js/50-split-orders.js?v=20261024e"></script>
+<script src="js/50-split-orders.js?v=20261115i"></script>
 <script src="js/50-person-tags.js?v=20261115g"></script>
 <script src="js/51-demo-guard.js"></script>
 <script src="js/52-fn-salematch.js"></script>
@@ -1832,6 +1837,7 @@ function openBcLogModal(phone){
 <script src="js/65-order-sale-ovr.js?v=20261115g"></script>
 <script src="js/67-report-k.js?v=20261115c"></script>
 <script src="js/66-sakura-petals.js?v=20261104a"></script>
+<script src="js/79-mascot-samoyed.js?v=20261115b"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
 <script src="js/68-ui-kit.js?v=20261115a"></script>
 <script src="js/69-pro-smart-search.js?v=20261115a"></script>
 <script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->

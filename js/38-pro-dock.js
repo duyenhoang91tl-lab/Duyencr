@@ -361,16 +361,45 @@ function proDockDragInit_(dock){
   dock.addEventListener('pointerup', end); dock.addEventListener('pointercancel', end);
   dock.addEventListener('dblclick', function(){ try { localStorage.removeItem(KEY); } catch(e){} ['left','top','right','bottom','transform'].forEach(function(k){ dock.style.removeProperty(k); }); });   // bấm đúp = về chỗ mặc định
 }
+// ── Icon AI = MÈO MÁY ANH LÔNG DÀI (Duyên yêu cầu 15/11/2026; nhân vật do mình tự thiết kế, cùng phong cách bông xù với chó Samoyed ở js/79). ──
+// SVG nội tuyến 64x64, không cần file ảnh: lông xù xanh-xám (mèo Anh lông dài) có viền nhạt, mắt đồng to, má hồng, ria,
+// chi tiết "máy" = ăng-ten bi vàng trên đầu + vòng cổ xanh bạc hà có chip tròn. Chớp mắt bằng SMIL (bỏ khi bật "giảm chuyển động").
+function proCatIconSvg_(px, blink){
+  var FUR = '#cfd8e3', OUT = '#8fa0b5', EAR = '#ffb8c6';
+  var puffs = [[32,36,19],[15,40,8],[49,40,8],[22,50,7.5],[42,50,7.5],[32,53,8.5],[23,22,7],[41,22,7],[32,19,7.5]];
+  function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+  function eye(cx){
+    var b = blink ? '<animate attributeName="ry" values="4.6;4.6;0.6;4.6;4.6" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+    return '<ellipse cx="'+cx+'" cy="35" rx="4.3" ry="4.6" fill="#f2b04a">'+b+'</ellipse>'
+      + '<ellipse cx="'+cx+'" cy="35.4" rx="2.3" ry="3.5" fill="#2b2118"/><circle cx="'+(cx+1.3)+'" cy="33.6" r="1.3" fill="#fff"/><circle cx="'+(cx-1)+'" cy="37" r="0.6" fill="#fff" opacity=".7"/>';
+  }
+  var ears = '<g stroke="'+OUT+'" stroke-width="2.4" stroke-linejoin="round"><polygon points="13,27 17,5 32,18" fill="'+FUR+'"/><polygon points="51,27 47,5 32,18" fill="'+FUR+'"/></g>'
+    + '<polygon points="17,22 19.5,10.5 27,18.5" fill="'+EAR+'"/><polygon points="47,22 44.5,10.5 37,18.5" fill="'+EAR+'"/>';
+  var whisk = '<g stroke="'+OUT+'" stroke-width="1" stroke-linecap="round" opacity=".85"><path d="M22 44 L7 41.5M22 46 L7 47M23 48 L9 52"/><path d="M42 44 L57 41.5M42 46 L57 47M41 48 L55 52"/></g>';
+  var collar = '<rect x="20" y="52.5" width="24" height="5" rx="2.5" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="58.2" r="3" fill="#fff" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="58.2" r="1.1" fill="#4fae9a"/>';
+  var antenna = '<line x1="32" y1="17" x2="32" y2="8.5" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle cx="32" cy="6.4" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.4" r="0.9" fill="#fff"/>';
+  return '<svg class="pro-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+    + ears + circles(OUT, 1.3) + circles(FUR, 0) + antenna
+    + '<ellipse cx="14" cy="40" rx="3" ry="2" fill="#ff7a96" opacity=".3"/><ellipse cx="50" cy="40" rx="3" ry="2" fill="#ff7a96" opacity=".3"/>'
+    + eye(24) + eye(40)
+    + '<path d="M30.2 41.3 Q32 40 33.8 41.3 Q33 43.4 32 43.6 Q31 43.4 30.2 41.3Z" fill="#ff8fa0"/>'
+    + '<path d="M32 43.6 L32 45 M32 45 Q30 47.2 27.6 45.6 M32 45 Q34 47.2 36.4 45.6" fill="none" stroke="#6b5a4e" stroke-width="1.1" stroke-linecap="round"/>'
+    + whisk + collar + '</svg>';
+}
+function proCatIcon_(px){
+  var rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){}
+  return proCatIconSvg_(px, !rm);
+}
 // Dock phải + panel trợ lý
 function proDockEnsure_(){
   if (!proDockOn_() || document.getElementById('pro-dock')) return;
   var dock = document.createElement('div'); dock.id = 'pro-dock';
-  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">🤖</button>';
+  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">' + proCatIcon_(32) + '</button>';
   document.body.appendChild(dock);
   try { proDockDragInit_(dock); } catch(e){ console.warn('[ui-pro] drag', e); }
   dock.querySelector('#pro-dock-ai').onclick = function(){ if (dock._proMovedAt && Date.now()-dock._proMovedAt < 350) return; proAiToggle_(); };   // vừa kéo xong thì không mở panel
   var p = document.createElement('div'); p.id = 'pro-ai';
-  p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
+  p.innerHTML = '<div class="pro-ai-h"><b style="display:inline-flex;align-items:center;gap:6px">' + proCatIcon_(24) + ' Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button><button type="button" data-mode="leads">🧊 Khách cần chăm</button></div>'
     + '<div class="pro-ai-range" id="pro-ai-range" style="display:none"></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'

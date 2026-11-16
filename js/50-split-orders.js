@@ -359,9 +359,13 @@ function splitFixPanelHtml_(){
   var ex = {}; (f.extra||[]).forEach(function(x){ if (!x || !x.code) return; var k = splitFixCodeNy_(x.code); (ex[k] = ex[k] || { code: x.code, rows: [] }).rows.push(x); });
   var keys = Object.keys(ex);
   h += '<div style="border-top:2px solid var(--border);padding-top:10px;margin-top:6px"><b>Chia tay đang lưu trong CRM</b> (' + keys.length + ' đơn)' + (f.extraErr ? ' <span style="color:' + splitErrColor_() + '">— không đọc được bảng</span>' : '') + '</div>';
+  // Ưu tiên (Duyên chốt 15/11): FILE KẾ TOÁN thắng bảng chia tay của admin khi cùng mã đơn → server trả d.shadowed = mã đang bị file kế toán che.
+  var shadow = {}; ((f.data && f.data.shadowed) || []).forEach(function(c){ shadow[splitFixCodeNy_(c)] = true; });
+  h += '<div style="font-size:12px;color:var(--text-muted);margin:4px 0">Thứ tự áp dụng: <b>file kế toán</b> (đã xác nhận) → chia tay của admin ở đây → tự ghép Base theo tỷ lệ Pos. Đơn đã có dòng ở file kế toán thì số kế toán được dùng, dòng lưu ở đây không có hiệu lực.</div>';
   keys.forEach(function(k){
     var g = ex[k];
     h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;font-size:12px"><b>' + splitEsc_(g.code) + '</b><span>' + g.rows.map(function(r){ return splitEsc_((r.sales||[]).join(', ')) + ' = ' + splitMoney_(r.tong); }).join(' · ') + '</span>'
+      + (shadow[k] ? '<span class="split-fix-shadow" style="color:' + splitErrColor_() + '">⚠ File kế toán đã có đơn này → số kế toán được dùng, dòng này không có hiệu lực</span>' : '')
       + '<button type="button" class="btn sm" data-code="' + splitEsc_(g.code) + '" onclick="splitFixDelete_(this.getAttribute(\'data-code\'))">Xoá</button></div>';
   });
   return h + '</div>';

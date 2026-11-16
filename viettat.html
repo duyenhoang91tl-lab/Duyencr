@@ -166,6 +166,7 @@ function matches(s, q) {
   var f = fold(q);
   if (fold(s.abbr).indexOf(f) === 0) return true;
   if (String(s.keyword || '').split(',').some(function (k) { k = fold(k); return k && k.indexOf(f) === 0; })) return true;
+  if (f.length >= 3 && (s.images || []).some(function (im) { return fold(im.name).indexOf(f) >= 0; })) return true;   // tìm theo TÊN ẢNH đính kèm
   return f.length >= 3 && (s.options || []).some(function (o) { return fold(o).indexOf(f) >= 0; });
 }
 

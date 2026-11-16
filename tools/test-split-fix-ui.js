@@ -32,6 +32,10 @@ ctx._srState.fix = { edits: {}, data: { ok: true, total: 1, rows: [ROW] }, extra
 let h = vm.runInContext('splitFixPanelHtml_()', ctx);
 ok(/10T10\/2026/.test(h) && /11T10\/2026/.test(h) && /line-through/.test(h) && /Khach &lt;A&gt;/.test(h) && /An = 8000000/.test(h), 'panel: hien ma don, don goc Base (don bi loai gach ngang), khach da escape, chia hien tai');
 ok(/Chia tay đang lưu trong CRM<\/b> \(1 đơn\)/.test(h) && /ninhnga99, huyenmaii1990 = 6\.700\.000/.test(h), 'panel: liet ke chia tay dang luu (gop 2 dong cung ma = 1 don)');
+ok(!/split-fix-shadow/.test(h) && /file kế toán<\/b> \(đã xác nhận\)/.test(h), 'panel: ghi thu tu ap dung (file ke toan truoc), chua co dong bi che');
+ctx._srState.fix.data.shadowed = ['17T10'];
+ok(/split-fix-shadow/.test(vm.runInContext('splitFixPanelHtml_()', ctx)), 'panel: dong luu bi file ke toan che (khop ma bo nam) hien canh bao khong co hieu luc');
+delete ctx._srState.fix.data.shadowed;
 ctx._srIsAdmin_ = () => false; ok(vm.runInContext('splitFixPanelHtml_()', ctx) === '', 'khong phai admin => khong hien panel'); ctx._srIsAdmin_ = () => true;
 vm.runInContext('splitFixEdit_(0, "An = 9000000\\nBinh = 3000000")', ctx);
 ok(/khớp/.test(vm.runInContext('splitFixSumHtml_(0)', ctx)), 'sua dong: tong 12tr = Pos => "khop"');

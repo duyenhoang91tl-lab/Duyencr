@@ -20,7 +20,9 @@ const DET = { from: '2026-11-01', to: '2026-11-15', summary: { posOrders: 1, pos
 const run = (src, kit) => { const c = mk(src, kit); return { p: c.splitDetailPanelHtml_({ tab: 'pos', sale: 'A', data: DET }), f: c.splitFixPanelHtml_(), fe: (c._srState.fix.err = 'Lỗi <x>', c.splitFixPanelHtml_()) }; };
 const text = h => h.replace(/<[^>]+>/g, '|').replace(/[🔴🟢⚪]/gu, '').split('|').map(x => x.trim()).filter(Boolean);
 const a = run(old, false), b0 = run(cur, false), b = run(cur, true);
-for (const k of ['p', 'f', 'fe']) t(a[k] === b0[k], k + ': thiếu js/68 → HTML y hệt bản cũ');
+// 15/11: bảng Sửa lệch thêm 1 dòng ghi chú thứ tự ưu tiên (file kế toán → admin → Base) — chủ ý thêm, cắt riêng dòng đó rồi mới so với bản cũ.
+const noNote = h => h.replace(/<div style="font-size:12px;color:var\(--text-muted\);margin:4px 0">Thứ tự áp dụng:[\s\S]*?<\/div>/, '');
+for (const k of ['p', 'f', 'fe']) t(a[k] === noNote(b0[k]), k + ': thiếu js/68 → HTML y hệt bản cũ (trừ dòng ghi chú ưu tiên)');
 for (const k of ['p', 'f', 'fe']) { const miss = text(a[k]).filter(x => !text(b[k]).includes(x)); t(!miss.length, k + ': qua ui-kit đủ chữ/số bản cũ' + (miss.length ? ' — THIẾU: ' + miss.join(' | ') : '')); }
 t(/ui-tone-danger[^>]*><i class="ui-dot"><\/i>2 đơn LỆCH Base/.test(b.p) && /ui-tone-success[^>]*><i class="ui-dot"><\/i>3 khớp/.test(b.p) && /ui-tone-neutral[^>]*><i class="ui-dot"><\/i>4 không có đơn Base/.test(b.p), 'tóm tắt đối chiếu: 3 chip đỏ/xanh/xám');
 t(/\(1 đơn đối chiếu theo gợi ý SĐT/.test(b.p), 'giữ dòng chú gợi ý SĐT');

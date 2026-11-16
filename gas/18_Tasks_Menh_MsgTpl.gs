@@ -228,12 +228,14 @@ function readNotifications_(username) {
 function markNotifRead_(username, ids, all) {
   var sh = getCrmSS_().getSheetByName(SH_NOTIF);
   if (!sh || sh.getLastRow() < 2) return { ok: true, marked: 0 };
-  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, now = new Date().toISOString();
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, hit = [], now = new Date().toISOString();
   (ids || []).forEach(function (x) { want[String(x)] = 1; });
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0] || v[i][9] || String(v[i][1]).toLowerCase() !== un) continue;
-    if (all || want[String(v[i][0])]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    if (all || want[String(v[i][0])]) { hit.push(i + 1); n++; }
   }
+  // Toi uu (2026-11-15): truoc day setValue tung dong (bam "doc tat ca" voi 200 thong bao = 200 lan goi Sheet); nay 1 lan RangeList cho moi dong can danh dau.
+  if (hit.length) sh.getRangeList(hit.map(function (r) { return 'J' + r; })).setValue(now);
   return { ok: true, marked: n };
 }
 function saveTaskComment_(c) {
