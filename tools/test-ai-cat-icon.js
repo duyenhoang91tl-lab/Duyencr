@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Icon AI = mèo máy Anh lông dài (js/38-pro-dock.js: proCatIconSvg_/proCatIcon_). SVG tự vẽ, nội tuyến.
+// Icon AI = mèo máy trắng xù mặt tròn (js/38-pro-dock.js: proCatIconSvg_/proCatIcon_). SVG tự vẽ, nội tuyến.
 const fs = require('fs'), path = require('path'), vm = require('vm'), root = path.join(__dirname, '..');
 let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
 const src = fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8');

@@ -391,6 +391,7 @@ function doPostCore_(e) {
     if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatUsage')          return jsonOut_(vietTatUsage_(data, _tplCaller_(data.token, data.ek, data.by)));   // dong bo so luot dung Viet tat giua cac may (cong don delta, tra ve tong cua rieng nguoi goi)
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
     if (action === 'vietTatUploadAudio')    return jsonOut_(vietTatUploadAudio_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 TEP ghi am co san tu may len Drive (khong can bam ghi am)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
