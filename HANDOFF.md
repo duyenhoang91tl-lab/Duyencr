@@ -1,5 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — APP ANDROID "VIẾT TẮT": MẪU LẠ LỌT VÀO BẢNG CHỌN + CHỮ MẤT KHI CHÈN CÙNG NHIỀU HÌNH) — XONG mục 3 + lỗi mẫu lạ (đã push); CÒN mục 1,2 (chưa có trong repo), mục 4
+Duyên: (a) chọn ~3 mẫu nhưng lúc chèn lại ra thêm mẫu của nhóm khác; (3) chọn chữ + nhiều hình → Chèn → ô Zalo trống.
+NGUYÊN NHÂN GỐC (a): `Store.match` (Data.kt) gộp chung mục khớp ĐÚNG viết tắt với mục khớp TỪ KHOÁ (keyword bắt đầu bằng chữ đang gõ) → mục nhóm khác chỉ cần có từ khoá trùng đầu là bị `hits.flatMap{options}` đổ vào bảng chọn. Sửa: có mục khớp đúng viết tắt thì CHỈ lấy các mục đó; không có mới dùng từ khoá. (Diag.kt dòng 45 cũng gọi `Store.match` nên tự hưởng.)
+NGUYÊN NHÂN GỐC (3): mở bộ chọn ảnh làm Zalo mất/xoá ô soạn tin nên chữ `replaceTail` vừa chèn biến mất. Sửa: `ExpanderService.restoreTextLater` — giữ chữ trong clipboard, chờ quay lại đúng app chat với ô soạn TRỐNG rồi SET_TEXT (không được thì DÁN); hết ~90s thì báo "chữ đã sao chép".
+- Phiên bản app 1.24 (versionCode 25). Không đổi GAS/extension. ⚠ CHƯA BIÊN DỊCH (không có Android SDK): PHIÊN SAU xem CI "Build Android VietTat" xanh chưa.
+- ⚠ Mục 1+2 (tách Tin nhắn/Hình ảnh/Ghi âm + nút "+ Thêm tin nhắn mẫu" trong SnippetDialog, tiêu đề nhóm trong Picker) KHÔNG có trong repo (commit phiên trước không lên) → [ ] làm lại: SnippetDialog (MainActivity.kt) vẽ theo thứ tự danh sách nên chữ/hình xen kẽ, nút "+ Nội dung" nằm cuối hàng nút cuộn ngang; ô chữ chưa có ✕.
+- [ ] Thử trên máy thật: gõ tắt → chọn 3 mẫu → Chèn chỉ ra đúng 3; chọn chữ + nhiều hình → chữ xuất hiện lại sau khi bộ chọn ảnh đóng.
+- [ ] Mục 4 (gửi ảnh không lưu sẵn): Android không cho app tự gửi ảnh; chỉ "tải ảnh khi cần" rồi dán/mở bộ chọn. Chờ Duyên chốt.
+
 ## 2026-11-16 (phiên Claude — THANH TAB HỒ SƠ KHÁCH BIẾN MẤT TRÊN ĐIỆN THOẠI → "MẤT" ĐIỂM TÍCH LŨY) — XONG (đã push); chờ Duyên xem
 Duyên (video khách Phan Thị Tùng, 8 đơn): "khách này cũng không có phần điểm tích lũy".
 NGUYÊN NHÂN GỐC: khung "🎁 Tích điểm" nằm ở tab "Lịch sử đơn" (js/03 renderHistTab → `_ptsBoxHtml_` js/05), nhưng thanh tab `.dp-tabs` bị ÉP CÒN ~12px trên điện thoại nên không bấm được tab đó. `.dp-tabs` có `overflow-x:auto` (css/01:909) → min-height 0 + flex-shrink 1; `#dp` là cột flex cao cố định (css/06 khối FIX 15/11) và `#dp-pro` cao không co được → chỉ `.dp-tabs` bị co. Dựng lại bằng Chromium (Playwright, CSS thật): 12px → 36px sau sửa.
