@@ -25,7 +25,7 @@ function csSelState_(list) {
   for (var i = 0; i < L.length; i++) if (L[i] && csSelHas_(L[i].phone)) n++;
   return n === 0 ? 'none' : (n === L.length ? 'all' : 'some');
 }
-// Thao tác hàng loạt do các bước sau đăng ký: { id, label, run(phones[]) }
+// Thao tác hàng loạt do các bước sau đăng ký: { id, label, run(phones[]), visible()? } (visible trả false → ẩn nút, vd CS thường không được gán CS)
 function csSelAddAction_(a) {
   if (!a || !a.id || typeof a.run !== 'function') return;
   _csSel.actions = _csSel.actions.filter(function (x) { return x.id !== a.id; });
@@ -53,8 +53,9 @@ function csSelSync_() {
   if (!n) { bar.className = ''; bar.innerHTML = ''; return; }
   var h = '<span class="cs-sel-n">' + n + ' khách đã chọn</span>';
   if (list.length && n < list.length) h += '<button type="button" class="btn sm secondary" data-cs-act="all">Chọn tất cả ' + list.length + ' đang lọc</button>';
-  _csSel.actions.forEach(function (a) { h += '<button type="button" class="btn sm" data-cs-act="run:' + a.id + '">' + a.label + '</button>'; });
-  if (!_csSel.actions.length) h += '<span class="cs-sel-hint">(thao tác hàng loạt sẽ có ở bước sau)</span>';
+  var acts = _csSel.actions.filter(function (a) { try { return !a.visible || a.visible(); } catch (e) { return false; } });
+  acts.forEach(function (a) { h += '<button type="button" class="btn sm" data-cs-act="run:' + a.id + '">' + a.label + '</button>'; });
+  if (!acts.length) h += '<span class="cs-sel-hint">(thao tác hàng loạt sẽ có ở bước sau)</span>';
   h += '<button type="button" class="btn sm secondary" data-cs-act="clear">Bỏ chọn</button>';
   bar.innerHTML = h; bar.className = 'is-open';
 }
