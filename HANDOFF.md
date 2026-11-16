@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — THANH TAB HỒ SƠ KHÁCH BIẾN MẤT TRÊN ĐIỆN THOẠI → "MẤT" ĐIỂM TÍCH LŨY) — XONG (đã push); chờ Duyên xem
+Duyên (video khách Phan Thị Tùng, 8 đơn): "khách này cũng không có phần điểm tích lũy".
+NGUYÊN NHÂN GỐC: khung "🎁 Tích điểm" nằm ở tab "Lịch sử đơn" (js/03 renderHistTab → `_ptsBoxHtml_` js/05), nhưng thanh tab `.dp-tabs` bị ÉP CÒN ~12px trên điện thoại nên không bấm được tab đó. `.dp-tabs` có `overflow-x:auto` (css/01:909) → min-height 0 + flex-shrink 1; `#dp` là cột flex cao cố định (css/06 khối FIX 15/11) và `#dp-pro` cao không co được → chỉ `.dp-tabs` bị co. Dựng lại bằng Chromium (Playwright, CSS thật): 12px → 36px sau sửa.
+- ✅ css/06-pro.css: trong @media (max-width:640px) thêm `html.ui-pro #dp .dp-tabs{flex:none}`. Bump `?v=` css/06 → 20261116a. Test tokens/dark-theme/mobile-fit/ui-pro-profile đạt. Không đổi GAS.
+- [ ] CHỜ Duyên: Ctrl+F5/mở lại app → hồ sơ khách phải thấy thanh tab → "Lịch sử đơn" → khung 🎁 Tích điểm.
+- [ ] ĐANG HỞ (cần Duyên chốt): `_ptsOfCustomer_(c)` (js/05) tính điểm từ `c.orders` (đơn Base) chứ KHÔNG phải đơn Pos (`_posOrdersCache`) → khách nhiều đơn Pos có thể bị tính thiếu điểm. Hỏi Duyên: điểm nên tính trên đơn Pos hay Base? Chưa sửa.
+
 ## 2026-11-16 (phiên Claude — DÒNG THỜI GIAN HỒ SƠ THIẾU ĐƠN + CUỘN RIÊNG) — XONG (đã push); chờ Duyên xem trên máy thật
 Duyên (ảnh khách Đặng thị hoa: KPI 9 đơn / 71.494.000đ nhưng Dòng thời gian chỉ (2) = 1 đơn + 1 ghi chú): "lịch sử đơn ở dòng thời gian đúng không? cho cuộn lên được; mục điểm là điểm tích lũy đúng không?"
 NGUYÊN NHÂN GỐC: `proProfileData_` (js/33) lấy đơn từ `_posOrdersCache[phone]` (đơn Pos, đủ) nếu có, không thì `c.orders` (đơn Base, thiếu). Cache Pos CHỈ được tải khi mở tab "Lịch sử" (js/03 `renderHistTab`), nên mở hồ sơ ở tab Chăm sóc thì dòng thời gian chỉ có đơn Base trong khi số đơn/doanh thu ở KPI lấy từ `donStatsByPhone` (đủ). Ngoài ra `proTimeline_` bị cắt 30 mục và `<ul>` không có khung cuộn riêng.
