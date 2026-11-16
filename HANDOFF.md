@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-16 (phiên Claude — TĂNG TỐC TẢI BÁO CÁO, BƯỚC 3/3: ĐIỀU TRA PHÍA GAS — CHƯA SỬA GÌ, CHỜ ĐO/QUYẾT ĐỊNH CỦA DUYÊN)
+Chỉ ĐỌC `gas_v13.js`, không đổi code (logic tiền phức tạp + mỗi lần sửa phải deploy tay nên không sửa khi chưa đo). Phát hiện:
+- `buildSalesReportB_` (dòng ~6400) mỗi lần cache hết hạn gọi `readDonChiTiet_()` (~4890): đọc TOÀN BỘ sheet "dữ liệu đơn" A:T (mọi tháng) + `_donConvertRows_` + `JSON.stringify` toàn bộ rồi mới lọc theo ngày. Chi phí tỉ lệ với TOÀN BỘ lịch sử, KHÔNG phụ thuộc "chỉ xem 1 tháng". Cache `donChiTiet_v4` (và `don_phones_v6`, xoá cùng lúc) chỉ sống 90 giây → xem lại sau >90s là đọc lại cả sheet.
+- Khi có đơn mang mã bộ đếm (đơn ghép), `_readBaseRowsByCounterCodes_` (~5879) đọc 7–8 cột × TOÀN BỘ sheet "DT TỔNG" mỗi lần, KHÔNG có cache.
+- Các đường GHI qua import/xoá/sửa ô (dòng ~8765, 8807, 9084, 9109, 9258, 15758) đã `removeAll(['donChiTiet_v4_n','don_phones_v6_n'])` → nâng TTL không làm số cũ sau khi nhập file. Chỉ sửa tay trực tiếp trên sheet mới phải chờ hết TTL.
+- [ ] **ĐỀ XUẤT (chờ Duyên đồng ý):** (1) nâng TTL `donChiTiet_v4` + `don_phones_v6` từ 90s → 600s (đổi ĐỒNG THỜI cả 2 vì code giả định cùng TTL, xem comment ~2668–2670; đánh đổi: sửa tay trực tiếp trên sheet Pos có thể chậm tới 10 phút mới lên báo cáo); (2) thêm cache cho `_readBaseRowsByCounterCodes_` (khoá theo tập mã + cờ withProduct, xoá cùng lúc khi ghi DT TỔNG). Sau khi sửa gas_v13.js: Duyên deploy tay (Apps Script → Deploy → Manage deployments → New version) + đồng bộ khối `gas-code-v9` trong index.html cho khớp 100%.
+- [ ] Hoặc đo trước: Apps Script → Executions → log `PERF salesReportB ... buildMs=... totalMs=...` (1 lần ngay sau >90s không dùng và 1 lần xem lại liền) để biết đọc sheet hay tính toán chiếm nhiều hơn.
+
 ## 2026-11-16 (phiên Claude — TĂNG TỐC TẢI BÁO CÁO, BƯỚC 2/3: BẬT CACHE CHO ĐƯỜNG XEM + CHẠY SONG SONG B/E) — XONG (đã push)
 - ✅ `js/11-fn-srload.js` (`?v=20261116a`): `_srLoad(useCache)`. `useCache !== true` → `_srCacheClear_()` rồi lấy số MỚI: mọi đường GHI (lưu/xoá chia tay, công tắc ghép, tỷ lệ chia, chốt tháng…) đang gọi `_srLoad()` không tham số nên không bao giờ thấy số cũ sau khi sửa. Chỉ đường XEM `_srApply` (nút Lọc/đổi kỳ/đổi bộ lọc) và `_srSetSub` (đổi báo cáo) gọi `_srLoad(true)` → dùng cache 60s. Truyền cờ cho A/B/C(2 request làm nóng + request chính)/E/F/G. L (`fresh=1`), M, K, H không đổi.
 - ✅ Báo cáo B và E: `storeCaseReport` nay chạy SONG SONG với `salesReportB` (trước đó nối tiếp: B xong mới gọi store → cộng dồn thời gian). Lỗi store vẫn KHÔNG làm hỏng B/E; lỗi của chính B/E được giữ đúng (trước đây request store sau ghi đè `lastFetchError`).
