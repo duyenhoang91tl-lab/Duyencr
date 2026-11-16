@@ -1,7 +1,7 @@
 // Test _srFetch: loi may chu cua bao cao salesReport* phai bao thang (khong ve toan so 0). Chay: node tools/test-srfetch-error.js
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'js/10-fn-pkkpipct.js'), 'utf8');
-const i = src.indexOf('async function _srFetch(action, params){'), j = src.indexOf('// Dung chung cho MOI man hinh bao cao');
+const i = src.indexOf('var _SR_CACHE_ACTIONS_'), j = src.indexOf('// Dung chung cho MOI man hinh bao cao');
 let reply; const ctx = { gsUrl: 'https://gs/exec', _srState: {}, AbortController, setTimeout, clearTimeout, encodeURIComponent, fetch: async () => ({ ok: true, text: async () => reply }) };
 vm.createContext(ctx); vm.runInContext(src.slice(i, j), ctx);
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } console.log('OK   ' + m); };
