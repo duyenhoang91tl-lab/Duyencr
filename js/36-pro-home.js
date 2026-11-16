@@ -89,13 +89,31 @@ function proAlertItems_(curPeople, prevPeople, norm){
   mk(cls, 'sale tụt tỷ lệ chốt ≥'+PRO_CLOSE_DROP_PT+' điểm', ' điểm');
   return out;
 }
+// R4c đợt 2 (16/11/2026): ngày bắt đầu NHẬN TIN của 1 sale = mốc để chia mục tiêu theo ngày làm thực tế. Tra tài khoản chứa tên (qua MỌI tên cùng người, như _saleStartDate_ js/12):
+// "Ngày nhận tin" (startDate) → "Ngày vào" (joinDate) → _saleStartDate_ (ngày bắt đầu tính thưởng của mốc Thử việc). Không có gì / sai định dạng → '' (tính từ đầu kỳ như cũ). Không bao giờ ném lỗi.
+function proKpiStartOf_(name){
+  try {
+    if (!name) return '';
+    var ymd = function(v){ var m = String(v == null ? '' : v).match(/^\d{4}-\d{2}-\d{2}/); return m ? m[0] : ''; };
+    if (typeof accounts !== 'undefined' && accounts && typeof _cfgAliasesOf === 'function' && typeof _acctNamesOf === 'function'){
+      var al = _cfgAliasesOf(name);
+      for (var i = 0; i < accounts.length; i++){
+        var ns = _acctNamesOf(accounts[i]), hit = false;
+        for (var j = 0; j < al.length && !hit; j++) if (ns.indexOf(al[j]) !== -1) hit = true;
+        if (hit){ var v = ymd(accounts[i].startDate) || ymd(accounts[i].joinDate); if (v) return v; break; }
+      }
+    }
+    if (typeof _saleStartDate_ === 'function') return ymd(_saleStartDate_(name));
+  } catch(e){}
+  return '';
+}
 // R4c (16/11/2026, Duyên chốt): cảnh báo theo TIẾN ĐỘ MỤC TIÊU THÁNG + tỷ lệ chốt thấp hơn TB team (js/81 paceAlertItems_) — KHÔNG cần dữ liệu kỳ trước.
 // Thiếu js/81 → luật cũ (tụt so kỳ trước, proAlertItems_, cần prevPeople). Chế độ cá nhân ('self') không báo (đã có đồng hồ + mũi tên trên thẻ số).
 // today rỗng (chưa có _remDateStr) → lấy ngày giờ Việt Nam; KHÔNG để rỗng vì khi đó tiến độ tính cả tháng và mọi sale bị báo oan.
 function proTodayVn_(){ return new Date(Date.now() + 7*3600*1000).toISOString().slice(0,10); }
-function proPaceAlerts_(mode, people, d, today, prevPeople, norm, isProb){
+function proPaceAlerts_(mode, people, d, today, prevPeople, norm, isProb, startOf){
   if (mode === 'self') return [];
-  if (typeof paceAlertItems_ === 'function') return paceAlertItems_(people, { from:d && d.from, to:d && d.to }, { today: today || proTodayVn_(), isProbation: isProb });
+  if (typeof paceAlertItems_ === 'function') return paceAlertItems_(people, { from:d && d.from, to:d && d.to }, { today: today || proTodayVn_(), isProbation: isProb, startDateOf: startOf });
   return prevPeople ? proAlertItems_(people, prevPeople, norm) : [];
 }
 var PRO_UNREPLIED_CAP = 100;   // = limit của pkChatInbox_ khi có bộ lọc (gas_v13.js)
@@ -186,7 +204,7 @@ function proHomeRender_(){
   var today_ = typeof _remDateStr==='function' ? _remDateStr() : '';
   var range_ = proPrevRange_(d.from, d.to, today_), pe_ = range_ ? _proPrev[range_.from+'|'+range_.to] : null, pd_ = pe_ && pe_.d ? pe_.d : null, ps_ = null, alerts_ = [];
   if (pd_){ try { ps_ = _ovScope(pd_); } catch(e){ ps_ = null; } }   // chỉ còn dùng cho mũi tên "so kỳ trước" của R4b
-  try { alerts_ = proPaceAlerts_(s.mode, s.people, d, today_, ps_ ? ps_.people : null, typeof _ovN==='function' ? _ovN : null, function(n){ return typeof _saleChannelOf_==='function' && _saleChannelOf_(n)==='probation'; }); } catch(e){ alerts_ = []; }
+  try { alerts_ = proPaceAlerts_(s.mode, s.people, d, today_, ps_ ? ps_.people : null, typeof _ovN==='function' ? _ovN : null, function(n){ return typeof _saleChannelOf_==='function' && _saleChannelOf_(n)==='probation'; }, proKpiStartOf_); } catch(e){ alerts_ = []; }
   // R8b: khách sắp mất (cache theo số khách trong phạm vi + phiên bản dữ liệu + ngày + số lịch → đổi kỳ/vẽ lại Tổng quan không quét lại)
   try {
     if (typeof lsAtRisk_ === 'function'){
@@ -216,4 +234,4 @@ function proHomeRender_(){
     _ovRender._proHome = true;
   }
 })();
-if (typeof module!=='undefined') module.exports = { proGaugeHtml_, proStatusBarsHtml_, proRecoItems_, proRecoHtml_, proHomeHtml_, PRO_UNREPLIED_CAP, proPrevRange_, proDeltaPct_, proDeltaPts_, proDeltaHtml_, proAlertItems_, proPaceAlerts_, proTodayVn_ };
+if (typeof module!=='undefined') module.exports = { proGaugeHtml_, proStatusBarsHtml_, proRecoItems_, proRecoHtml_, proHomeHtml_, PRO_UNREPLIED_CAP, proPrevRange_, proDeltaPct_, proDeltaPts_, proDeltaHtml_, proAlertItems_, proPaceAlerts_, proTodayVn_, proKpiStartOf_ };

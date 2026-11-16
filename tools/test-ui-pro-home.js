@@ -102,4 +102,28 @@ r=PA('all',[M2('An',10e6,29,100)],D,TD,[M2('An',20e6,30,100)],null,()=>false);
 ok(r.length===1&&r[0].text.includes('so kỳ trước'),'THIẾU js/81 + có kỳ trước → quay về luật cũ (tụt so kỳ trước)');
 ok(PA('all',[M2('An',10e6,29,100)],D,TD,null,null,()=>false).length===0,'THIẾU js/81 + chưa có kỳ trước → không cảnh báo');
 }
+// R4c đợt 2 (16/11): ngày nhận tin của từng sale → mục tiêu chia theo ngày làm thực tế
+{
+const K=m.proKpiStartOf_, P81=require('../js/81-pace-alert.js');
+const A=n=>({names:n}); // tài khoản giả: _acctNamesOf trả đúng mảng tên
+global._acctNamesOf=a=>a.names; global._cfgAliasesOf=n=>n==='Hà'||n==='Ha Nguyen'?['Hà','Ha Nguyen']:[n];
+global.accounts=[Object.assign(A(['Hà','Ha Nguyen']),{startDate:'2026-11-09',joinDate:'2026-11-03'}),Object.assign(A(['Bình']),{joinDate:'2026-11-05'}),Object.assign(A(['Chi']),{startDate:'khong-hop-le'}),Object.assign(A(['Dũng']),{})];
+ok(K('Hà')==='2026-11-09','ưu tiên "Ngày nhận tin" (startDate 9/11) hơn "Ngày vào" (joinDate 3/11)');
+ok(K('Ha Nguyen')==='2026-11-09','tra theo MỌI tên cùng người (bí danh)');
+ok(K('Bình')==='2026-11-05','không có startDate → dùng "Ngày vào" (joinDate)');
+ok(K('Chi')===''&&K('Dũng')==='','startDate sai định dạng / không có ngày nào → "" (tính từ đầu kỳ)');
+ok(K('Người lạ')===''&&K('')===''&&K(null)==='','tên không có trong tài khoản / rỗng → ""');
+global._saleStartDate_=n=>n==='Dũng'?'2026-11-12 08:00':'';
+ok(K('Dũng')==='2026-11-12'&&K('Chi')==='','không có ngày ở tài khoản → dự phòng _saleStartDate_ (bonusFrom thử việc), cắt còn YYYY-MM-DD');
+global._acctNamesOf=()=>{throw new Error('boom')};
+ok(K('Hà')==='','tra cứu ném lỗi → "" (không văng)');
+global._acctNamesOf=a=>a.names;
+// ghép với proPaceAlerts_: sale nhận tin 9/11 chạy 150tr hôm 30/11 → cần 366,7tr (không phải 500tr)
+global.paceAlertItems_=P81.paceAlertItems_;
+const r=m.proPaceAlerts_('all',[{name:'Hà',revenue:150e6,orders:1,tongTT:0,tyLeChot:null}],{from:'2026-11-01',to:'2026-11-30'},'2026-11-30',null,null,()=>false,K);
+ok(r.length===1&&r[0].text.replace(/<[^>]+>/g,'').includes('Hà 40,9% (150tr/366,7tr, từ 9/11)'),'proPaceAlerts_ + proKpiStartOf_: Hà nhận tin 9/11 → cần 500tr×22/30 = 366,7tr, hiện "từ 9/11"');
+const r2=m.proPaceAlerts_('all',[{name:'Hà',revenue:150e6,orders:1,tongTT:0,tyLeChot:null}],{from:'2026-11-01',to:'2026-11-30'},'2026-11-30',null,null,()=>false);
+ok(r2[0].text.replace(/<[^>]+>/g,'').includes('Hà 30% (150tr/500tr)'),'không truyền startOf → so cả tháng 500tr như bản trước (tương thích)');
+delete global.paceAlertItems_; delete global.accounts; delete global._acctNamesOf; delete global._cfgAliasesOf; delete global._saleStartDate_;
+}
 process.exit(bad?1:0);
