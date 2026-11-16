@@ -23,7 +23,7 @@ ok(X.proRichHtml_({ table: { head: ['a'], rows: [] } }) === '', 'bảng không c
 const B = { from: '2026-11-01', to: '2026-11-15', rev: 30e6, orders: 6, aov: 5e6, cod: 0, storeTotal: 0, storeOrders: 0, rows: [{ name: 'An', giaTri: 20e6, orders: 4 }, { name: 'Bình', giaTri: 10e6, orders: 2 }] };
 let r = X.proRichSalesB_('top', B);
 ok(r.bars.items.length === 2 && r.table.rows.length === 2 && r.table.rows[0].cells[0] === 'An' && r.table.rows[0].cells[3] === '5.000.000đ', 'sales top: có biểu đồ + bảng (Sale/Doanh thu/Đơn/TB đơn)');
-ok(X.proRichSalesB_('summary', B).bars.items.length === 2 && !X.proRichSalesB_('summary', B).table, 'sales summary: chỉ biểu đồ');
+ok(X.proRichSalesB_('summary', B).bars.items.filter(function (x) { return !x.heading; }).length === 2 && !X.proRichSalesB_('summary', B).table, 'sales summary: chỉ biểu đồ (2 thanh thật; thêm tiêu đề nhóm "Top 3 tốt nhất" từ 16/11)');
 ok(X.proRichSalesB_('support', B) === null && X.proRichSalesB_('top', { rows: [] }) === null && X.proRichSalesB_('top', null) === null, 'intent khác / không có dòng / null → không có phần trực quan');
 ok(/Báo cáo B/.test(X.proRuleSalesBAnswer_('top sale', B)), 'chữ trả lời Báo cáo B (hàm cũ) không đổi');
 

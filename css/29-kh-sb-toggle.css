@@ -1,0 +1,8 @@
+/* Ẩn/hiện cột lọc bên trái của Danh sách KH (js/85-kh-sb-toggle.js). TOKEN-ONLY: chỉ dùng var(--ui-*) / biến cũ, không màu cứng.
+   Chỉ áp dụng trên màn hình rộng (>768px); điện thoại giữ ngăn kéo "Menu / Bộ lọc" có sẵn (toggleSidebar). */
+#kh-sb-edge{display:none;position:fixed;top:calc(50% + 64px);transform:translateY(-50%);z-index:640;width:18px;height:52px;padding:0;border:1px solid var(--border);border-left:none;border-radius:0 var(--ui-r-md) var(--ui-r-md) 0;background:var(--surface);color:var(--text);font-size:var(--ui-fs-xl);line-height:1;cursor:pointer;box-shadow:var(--ui-shadow-md);opacity:.85}
+#kh-sb-edge:hover,#kh-sb-edge:focus-visible{opacity:1;background:var(--ui-brand);color:var(--surface)}
+#kh-sb-edge.is-on{display:block}
+@media (min-width:769px){html.kh-sb-off .app .sidebar{display:none}}
+@media (max-width:768px){#kh-sb-edge{display:none!important}}
+@media print{#kh-sb-edge{display:none!important}}

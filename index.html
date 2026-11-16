@@ -1293,7 +1293,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/25-report-frame.css?v=20261115e"><!-- R7a: khuôn chung báo cáo (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/26-lead-score.css?v=20261115c"><!-- R8b: thanh đang lọc theo mức khách (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/27-settings-hub.css?v=20261115f"><!-- R9a: trung tâm lối tắt cài đặt (chỉ var(--ui-*)) -->
-<link rel="stylesheet" href="css/99-dark-auto.css?v=20261115h"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
+<link rel="stylesheet" href="css/28-cust-select.css?v=20261116b"><!-- R5a: chọn nhiều khách (chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/29-kh-sb-toggle.css?v=20261116a"><!-- ẩn/hiện cột lọc Danh sách KH (js/85; chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/99-dark-auto.css?v=20261116a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
@@ -1801,11 +1803,11 @@ function openBcLogModal(phone){
 <script src="js/33-pro-profile.js?v=20261115h"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
-<script src="js/38-pro-dock.js?v=20261116c"></script>
+<script src="js/38-pro-dock.js?v=20261116e"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js?v=20261101a"></script>
-<script src="js/42-fn-socialchat.js?v=20261115g"></script>
+<script src="js/41-fn-pkchat.js?v=20261116a"></script>
+<script src="js/42-fn-socialchat.js?v=20261116a"></script>
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/48-fn-medialib.js?v=20261113e"></script>
 <script src="js/43-teamchat.js?v=20261101a"></script>
@@ -1837,7 +1839,7 @@ function openBcLogModal(phone){
 <script src="js/65-order-sale-ovr.js?v=20261115g"></script>
 <script src="js/67-report-k.js?v=20261115c"></script>
 <script src="js/66-sakura-petals.js?v=20261104a"></script>
-<script src="js/79-mascot-samoyed.js?v=20261116b"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
+<script src="js/79-mascot-samoyed.js?v=20261116e"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
 <script src="js/68-ui-kit.js?v=20261115a"></script>
 <script src="js/69-pro-smart-search.js?v=20261115a"></script>
 <script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
@@ -1849,6 +1851,10 @@ function openBcLogModal(phone){
 <script src="js/76-report-frame.js?v=20261115e"></script><!-- R7a: uiReportFrame_ khuôn chung báo cáo (chưa áp báo cáo nào; R7b áp từng cái) -->
 <script src="js/77-lead-score.js?v=20261115f"></script><!-- R8a: chấm điểm khách nóng/ấm/nguội (logic thuần, nguội = quá 60 ngày chưa chăm; R8b/c/d gắn giao diện) -->
 <script src="js/78-settings-hub.js?v=20261115f"></script><!-- R9a: uiSettingsHub_ trung tâm lối tắt cài đặt (dùng ở js/37 trang ⚙ Cấu hình) -->
+<script src="js/80-acct-split-extra.js?v=20261105a"></script>
+<script src="js/81-pace-alert.js?v=20261116a"></script><!-- R4c: paceAlertItems_ cảnh báo tiến độ doanh số tháng + tỷ lệ chốt thấp hơn TB team (hàm thuần; gắn vào Tổng quan ở js/36 bước sau) -->
+<script src="js/82-cust-select.js?v=20261116c"></script><!-- R5a bước 1: chọn nhiều khách ở Danh sách KH (bọc _rowHtml/renderTable, không sửa js/02) -->
+<script src="js/83-cust-bulk-cs.js?v=20261116a"></script><!-- R5a bước 2: Gán CS hàng loạt cho khách đã chọn (dùng _applyCareCSToAssigned js/07) -->
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
