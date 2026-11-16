@@ -10,6 +10,8 @@
 //  Nhẹ: vẽ ~30 khung/giây, tự dừng khi tab bị ẩn. Tôn trọng "giảm chuyển động" của hệ điều hành
 //  (prefers-reduced-motion) → chỉ vẽ MỘT khung tĩnh, không chạy hoạt ảnh. Ẩn khi in.
 //  Bật/tắt: ☰ → ⚙ Settings → "🐶 Tắt/Bật linh vật Samoyed" (mọi vai trò); lưu localStorage 'ome_mascot' ('0' = tắt, mặc định bật).
+//  Vườn (hoa + bướm + ong) có nút RIÊNG "🌼 Tắt/Bật vườn hoa-bướm-ong" (localStorage 'ome_garden'): tắt vườn thì chỉ còn chó.
+//  (Tắt chó thì cả canvas ẩn — vườn nằm chung canvas nên cũng ẩn theo.)
 //  GỠ HẲN: xoá thẻ <script src="js/79-mascot-samoyed.js"> trong index.html + mục act:mascot ở js/29-sidenav.js
 //  + mục it('mascot') / điều kiện k === 'mascot' ở js/37-fn-configpage.js + file này.
 // ════════════════════════════════════════════════════════════════════
@@ -18,6 +20,7 @@
   if (window.__mascotLoaded) return; window.__mascotLoaded = true;
 
   var KEY = 'ome_mascot';
+  var GKEY = 'ome_garden';   // nút bật/tắt RIÊNG cho vườn (hoa + bướm + ong); '0' = tắt, mặc định bật. Tắt vườn thì ong cũng không làm chó giật mình.
   var CH = 112;           // chiều cao canvas (px CSS)
   var SPEED = 34;         // tốc độ đi dạo (px/giây)
   var RUN = 96;           // tốc độ chạy trốn ong (px/giây)
@@ -28,6 +31,7 @@
   var BCOL = ['#FF8A65', '#CE93D8', '#81D4FA', '#FFD54F', '#A5D6A7'];
 
   function isOn(){ try { return localStorage.getItem(KEY) !== '0'; } catch(e){ return true; } }
+  function gardenOn(){ try { return localStorage.getItem(GKEY) !== '0'; } catch(e){ return true; } }
   function reduced(){ try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; } }
   function rnd(a, b){ return a + Math.random() * (b - a); }
 
@@ -253,11 +257,12 @@
     if (!ctx) return;
     ctx.clearRect(0, 0, W, CH);
     var i;
-    for (i = 0; i < flowers.length; i++) drawFlower(ctx, flowers[i], clock);
+    var g = gardenOn();
+    if (g) for (i = 0; i < flowers.length; i++) drawFlower(ctx, flowers[i], clock);
     drawSamoyed(ctx, clock, { x: dog.x, y: CH - 30, facing: dog.facing, walking: dog.mode === 'walk', run: dog.run, s: W < 600 ? 0.82 : 1 });
     drawHearts(ctx);
-    for (i = 0; i < butterflies.length; i++) drawButterfly(ctx, butterflies[i], clock);
-    for (i = 0; i < bees.length; i++) drawBee(ctx, bees[i], clock);
+    if (g) for (i = 0; i < butterflies.length; i++) drawButterfly(ctx, butterflies[i], clock);
+    if (g) for (i = 0; i < bees.length; i++) drawBee(ctx, bees[i], clock);
   }
 
   function startIdle(){
@@ -280,10 +285,13 @@
       dog.facing = p.target >= dog.x ? 1 : -1;
     }
     var k, sc = W < 600 ? 0.82 : 1;
-    for (k = 0; k < butterflies.length; k++) flyStep(butterflies[k], dt, 12, CH - 44, 2.5);
-    for (k = 0; k < bees.length; k++) flyStep(bees[k], dt, 16, CH - 34, 6);
+    var garden = gardenOn();
+    if (garden){
+      for (k = 0; k < butterflies.length; k++) flyStep(butterflies[k], dt, 12, CH - 44, 2.5);
+      for (k = 0; k < bees.length; k++) flyStep(bees[k], dt, 16, CH - 34, 6);
+    }
     fleeCool -= dt;
-    if (dog.mode === 'idle' && fleeCool <= 0){   // ong bay sát chó → giật mình chạy trốn (như màn "chó chạy trốn ong")
+    if (garden && dog.mode === 'idle' && fleeCool <= 0){   // ong bay sát chó → giật mình chạy trốn (như màn "chó chạy trốn ong")
       for (k = 0; k < bees.length; k++){
         if (Math.abs(bees[k].x - dog.x) < 58 * sc && Math.abs(bees[k].y - (CH - 46)) < 46){
           dog.target = mascotFlee_(W, dog.x, bees[k].x, Math.random); dog.nextIdle = 5 + rnd(0, 7);
@@ -336,6 +344,14 @@
     try { localStorage.setItem(KEY, on ? '1' : '0'); } catch(e){}
     if (on) start(); else stop(true);
     if (typeof toast === 'function') toast(on ? '🐶 Đã bật linh vật Samoyed' : 'Đã tắt linh vật Samoyed');
+  };
+  window._gardenIsOn = gardenOn;
+  window._gardenLabel = function(){ return gardenOn() ? '🌼 Tắt vườn hoa-bướm-ong' : '🌼 Bật vườn hoa-bướm-ong'; };
+  window.toggleGarden = function(){
+    var on = !gardenOn();
+    try { localStorage.setItem(GKEY, on ? '1' : '0'); } catch(e){}
+    if (canvas && !raf && isOn()) draw();   // đang đứng yên (giảm chuyển động / tab ẩn) → vẽ lại ngay để thấy thay đổi
+    if (typeof toast === 'function') toast(on ? '🌼 Đã bật vườn hoa-bướm-ong' : 'Đã tắt vườn hoa-bướm-ong');
   };
   window._mascotPlan_ = mascotPlan_;   // chỉ để test
   window._mascotFlee_ = mascotFlee_;
