@@ -69,7 +69,7 @@
     var box = document.getElementById('pos-diag-box');
     if (box) { box.style.display = box.style.display === 'none' ? '' : 'none'; return; }
     box = document.createElement('div'); box.id = 'pos-diag-box';
-    box.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:9999;width:min(560px,94vw);max-height:80vh;overflow:auto;background:var(--card,#fff);color:var(--text,#111);border:1px solid var(--border,#ccc);border-radius:10px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:12px';
+    box.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:9999;width:min(560px,94vw);max-height:calc(var(--vh,1vh)*80);overflow:auto;background:var(--card,#fff);color:var(--text,#111);border:1px solid var(--border,#ccc);border-radius:10px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:12px';
     var d0 = (document.getElementById('ymf-date-from') || {}).value || new Date().toISOString().slice(0, 10);
     var cs0 = ''; try { cs0 = (typeof _csFilterList === 'function' && _csFilterList()[0]) || ''; } catch (e) {}
     box.innerHTML = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>🔍 Đối soát POS</b><input type="date" id="pd-date" value="' + esc_(d0) + '"><input id="pd-sale" placeholder="CS (trống = mọi sale)" value="' + esc_(cs0) + '" style="min-width:140px">' +

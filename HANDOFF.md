@@ -1,5 +1,17 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — R5a BƯỚC 3/3: ĐỔI TRẠNG THÁI HÀNG LOẠT `js/84-cust-bulk-status.js`) — XONG (đã push); chờ Duyên thử máy thật
+Duyên chốt lại 17/11: làm R5a, thao tác hàng loạt = **Gán CS** (bước 2, đã có) + **Đổi trạng thái** (bước này). Gửi tin hàng loạt / Xuất CSV hàng loạt: KHÔNG làm.
+NGUYÊN NHÂN GỐC (R5a): đổi Tình trạng CS / Trạng thái KH cho nhiều khách phải mở hồ sơ từng người.
+- ✅ `js/84-cust-bulk-status.js` (MỚI, nạp sau js/82; `index.html` `?v=20261117a`; không thêm CSS — dùng lại class `cl-*`/`cs-sel-hint`): nút **🏷 Đổi trạng thái** trên thanh chọn khách → hộp thoại 2 ô **Tình trạng CS** + **Trạng thái KH** (để trống = giữ nguyên) + XEM TRƯỚC "N/M khách sẽ được đổi (từ: …)" + "Bỏ qua: đã đúng · ngoài phạm vi · không tìm thấy".
+- Quy tắc (cùng `saveCare` js/03): đổi Tình trạng CS mà KHÔNG chọn KH → KH **tự nhảy** theo `_hAutoKh_` (không có quy tắc → giữ KH cũ); chọn KH tay → ưu tiên. Không chọn gì → 0 dòng (không vô tình xoá). **Không có nhóm "Chốt"** trong danh sách (`_hIsChot_`) vì chốt phải nhập doanh thu đơn ở hồ sơ từng khách. Mọi vai trò dùng được nhưng chỉ khách trong `_inUserScope`.
+- Ghi theo lô: `careData[ph]` + `updated`, `c.careStatus`/`_lastActionDate` qua `_assignCustMap()` (KHÔNG gọi `_touchCare` vì nó quét 136k khách cho từng SĐT), `saveLS('ome_care')`, `queueCareSync` từng SĐT (lô sẵn có), `applyFilters` 1 lần, **1 dòng nhật ký tổng `bulk_status`** (không 1 dòng/khách vì `auditLog` cắt ở 2000 dòng).
+- Test `node tools/test-cust-bulk-status.js` 28 ca (hàm thuần + jsdom + 136k khách lập kế hoạch). Cả bộ **371 test PASS**; `build-dist` OK.
+- Kèm theo (không liên quan R5a): sửa 3 chỗ `max-height:NNvh` trần đang làm ĐỎ `test-vh-var` trên main (`js/33-pro-profile.js:174`, `js/80-acct-split-extra.js:61`, `js/86-pos-diag.js:72` → `calc(var(--vh,1vh)*N)`, bump `?v=`), và commit lại `css/99-dark-auto.css` (build-dist sinh lại 2 dòng bị thiếu).
+- Không đổi GAS/extension → KHÔNG cần deploy; chỉ Ctrl+F5.
+- 🧪 Duyên: Ctrl+F5 → Danh sách KH → tích 2–3 khách → "Đổi trạng thái" → chọn Tình trạng CS → xem trước → Đổi → mở hồ sơ 1 khách xem tình trạng + KH đã đổi (KH nhảy theo tình trạng). Thử chọn KH tay. Kiểm "Chốt" không có trong danh sách.
+- [ ] **VIỆC KẾ TIẾP:** R5a còn **cột tuỳ chỉnh** + **lọc đã lưu** (Duyên chọn R5a gồm 3 ý: cột tuỳ chỉnh, lọc đã lưu, chọn nhiều — mới xong "chọn nhiều + hàng loạt"). Cần kiểm trước: `js/48-filter-presets.js` đã có lọc đã lưu cho Danh sách KH chưa (R5b?) rồi mới làm cột tuỳ chỉnh. Sau đó R5d (khách trùng theo SĐT, giữ TẤT CẢ dữ liệu khi gộp; bước 1 chỉ phát hiện).
+
 ## 2026-11-17 (phiên Claude — TỔNG KẾT BÀN GIAO: R5c + SỬA TEST HỎNG) — KHÔNG CÒN VIỆC DỞ CỦA PHIÊN NÀY
 - ✅ **R5c Tìm kiếm thông minh — XONG, đã push, chờ Duyên thử:** `js/69-pro-smart-search.js` (tên bỏ dấu + mọi từ, SĐT `0912 345 678`/`0912.345.678`/`+84…`, hộp gợi ý `#cust-suggest` ↑↓ Enter mở hồ sơ) nối vào `applyFilters` (js/02) + `exportCSV` (js/05); test `tools/test-ui-pro-smartsearch.js` 45 ca. Chi tiết ở mục "R5c" bên dưới.
 - ✅ **Sửa 18 test hỏng sẵn — XONG:** đợt 1 (8 test) do phiên này, đợt 2 (10 test + 2 lỗi sản phẩm thật: dòng "Chưa loại nguồn nào." gắn nhầm `guide-text`; Báo cáo K rơi nhầm vào menu lọc B) do phiên khác làm trùng và push trước. Bản của phiên này cho đợt 2 để ở nhánh local, KHÔNG push (trùng). Bộ test xanh trên `main`.

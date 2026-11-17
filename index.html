@@ -1800,7 +1800,7 @@ function openBcLogModal(phone){
 <script src="js/31-fn-orgoverview.js?v=20261116a"></script>
 <script src="js/32-fn-furesult.js?v=20261115g"></script>
 <script src="js/33-fn-tierconfig.js"></script>
-<script src="js/33-pro-profile.js?v=20261116a"></script>
+<script src="js/33-pro-profile.js?v=20261117a"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
 <script src="js/38-pro-dock.js?v=20261116f"></script>
@@ -1851,12 +1851,13 @@ function openBcLogModal(phone){
 <script src="js/76-report-frame.js?v=20261115e"></script><!-- R7a: uiReportFrame_ khuôn chung báo cáo (chưa áp báo cáo nào; R7b áp từng cái) -->
 <script src="js/77-lead-score.js?v=20261115f"></script><!-- R8a: chấm điểm khách nóng/ấm/nguội (logic thuần, nguội = quá 60 ngày chưa chăm; R8b/c/d gắn giao diện) -->
 <script src="js/78-settings-hub.js?v=20261115f"></script><!-- R9a: uiSettingsHub_ trung tâm lối tắt cài đặt (dùng ở js/37 trang ⚙ Cấu hình) -->
-<script src="js/80-acct-split-extra.js?v=20261105a"></script>
+<script src="js/80-acct-split-extra.js?v=20261117a"></script>
 <script src="js/81-pace-alert.js?v=20261116a"></script><!-- R4c: paceAlertItems_ cảnh báo tiến độ doanh số tháng + tỷ lệ chốt thấp hơn TB team (hàm thuần; gắn vào Tổng quan ở js/36 bước sau) -->
 <script src="js/82-cust-select.js?v=20261116c"></script><!-- R5a bước 1: chọn nhiều khách ở Danh sách KH (bọc _rowHtml/renderTable, không sửa js/02) -->
 <script src="js/83-cust-bulk-cs.js?v=20261116a"></script><!-- R5a bước 2: Gán CS hàng loạt cho khách đã chọn (dùng _applyCareCSToAssigned js/07) -->
+<script src="js/84-cust-bulk-status.js?v=20261117a"></script><!-- R5a bước 3: Đổi trạng thái (Tình trạng CS / Trạng thái KH) hàng loạt cho khách đã chọn; KH tự nhảy như hồ sơ; không cho chọn nhóm Chốt -->
 <script src="js/85-kh-sb-toggle.js?v=20261116a"></script><!-- ẩn/hiện cột lọc Danh sách KH (nút #kh-sb-edge, lưu ome_kh_sb; css/29); gỡ = xoá dòng này + link css/29 -->
-<script src="js/86-pos-diag.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 8: nut admin Doi soat POS (donDayDiag, chi doc)-->
+<script src="js/86-pos-diag.js?v=20261117b"></script><!-- Danh sach KH khop don POS, buoc 8: nut admin Doi soat POS (donDayDiag, chi doc)-->
 <script src="js/88-pos-orders.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 2: tai + giu don POS theo tung don (GAS donDaily), chi RAM; boc syncFromGS; go = xoa dong nay -->
 <script src="js/89-pos-customers.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 3: them khach chi co o POS (js/02 buildCustomers goi posCustomersInject_); nap SAU js/88, TRUOC js/90; go = xoa dong nay (hook trong js/02 tu bo qua) -->
 <script src="js/90-pos-filter.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 4: loc ngay + CS theo don POS cung luc (boc applyFilters, tam thoi ymList/csSet roi tra lai); nap SAU js/88; go = xoa dong nay -->
