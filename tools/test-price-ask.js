@@ -127,5 +127,23 @@ ok(X.proIntent_('sales', 'tóm tắt doanh số') === 'summary' && X.proIntent_(
   fetchImpl = async () => ({ json: async () => ({ ok: false, error: 'Bang gia (DANH_MUC) dang rong' }) });
   log = await ask('price', 'giá a'); ok(/^⚠ Bang gia/.test(log[1].text) && !D.busy, 'loi backend hien ⚠, khong ket busy');
   D.mode = 'price'; D.log = []; D.busy = true; fetches.length = 0; el('pro-ai-q').value = 'giá x'; await X.proAiSend_(); ok(fetches.length === 0, 'dang ban: khong gui trung');
-  console.log('ALL PRICE-ASK TESTS PASSED');
+  // ── Duyen 17/11/2026: "Lắc cỏ 4 lá" / "Lắc cỏ bốn lá tám bi vàng" khong ra SP du bang gia co "TRANG SỨC LẮC CÓ 4 LÁ" (bang gia that, dong 217-251) ──
+{
+  const R = (ten, cl, ks, g) => ({ 'Nhóm': 'LẮC', 'Tên thương mại': ten, 'Tên sản phẩm': ten, 'Chất liệu': cl, 'Kiểu/Size': ks, 'Giá thường': g });
+  const cat4 = [
+    R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', 'MẢNH', '8.050'), R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', '8 BI VÀNG/ 4 VIÊN ĐÁ', '8.650'), R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', 'XOẮN (NHẢ HẠNH PHÚC)', '9.650'),
+    R('TRANG SỨC LẮC HỒ LY BABY 8 BI VÀNG/ 4 VIÊN ĐÁ', '', '8 BI VÀNG/ 4 VIÊN ĐÁ', '9.950'), R('TRANG SỨC LẮC TỲ HƯU THIÊN LỘC 8 BI VÀNG / 4 VIÊN ĐÁ', 'VÀNG 10K', '8 BI VÀNG/ 4 VIÊN ĐÁ', '9.250'),
+    R('TRANG SỨC LẮC NGỌC TAM HỶ', 'VÀNG 10K', 'LAM THỦY', '9.150'), R('TRANG SỨC LẮC TÚI TIỀN', 'VÀNG 10K', 'MẢNH', '7.550'),
+  ];
+  const e4 = makeEnv({ cat: cat4 });
+  let q = e4.run("priceAsk_('Lắc cỏ 4 lá')");
+  ok(q.ok && q.found && /LẮC CÓ 4 LÁ/.test(q.text) && /8\.650/.test(q.text) && /8\.050/.test(q.text) && !/HỒ LY|NGỌC TAM HỶ|TÚI TIỀN/.test(q.text), '"Lắc cỏ 4 lá" -> dung SP CÓ 4 LÁ, du 3 bien the, khong lan SP khac: ' + JSON.stringify(q).slice(0, 200));
+  q = e4.run("priceAsk_('Lắc cỏ bốn lá tám bi vàng bao nhiêu tiền')");
+  ok(q.found && /LẮC CÓ 4 LÁ/.test(q.text) && /8\.650/.test(q.text) && !/NGỌC TAM HỶ|HỒ LY/.test(q.text), '"bốn lá tám bi vàng": so chu -> so, ra CÓ 4 LÁ (khong ra Hồ Ly/Tam Hỷ): ' + JSON.stringify(q).slice(0, 200));
+  q = e4.run("priceAsk_('giá lắc tỳ hưu thiên lộc')"); ok(q.found && /TỲ HƯU THIÊN LỘC/.test(q.text) && /9\.250/.test(q.text), 'cau hoi cu (ten dai) van ra dung');
+  q = e4.run("priceAsk_('giá lắc')"); ok(q.ok && !q.found, 'chi 1 tu "lac": khong bao gia vo doan');
+  q = e4.run("priceAsk_('lắc ngọc tam hỷ')"); ok(q.found && /NGỌC TAM HỶ/.test(q.text) && /9\.150/.test(q.text), '"tam" khong dau van la Tam Hy (khong bi doi thanh 8)');
+  ok(e4.run("_priceNumWords_('Lắc cỏ BỐN lá, tám bi và mười viên; hai năm')") === 'lắc cỏ 4 lá, 8 bi và 10 viên; hai 5', '_priceNumWords_ chi doi bon/tam/muoi/nam... co dau, khong dung hai/ba');
+}
+console.log('ALL PRICE-ASK TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });

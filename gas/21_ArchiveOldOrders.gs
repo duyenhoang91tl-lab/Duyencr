@@ -179,7 +179,7 @@ function archiveOldOrders_(opts) {
       sbMarkOrdersDirty_('dt', 'archive'); sbMarkOrdersDirty_('don', 'archive');   // Supabase buoc 4b: archive xoa dong khoi Sheet
       try {
         var cache = CacheService.getScriptCache();
-        cache.removeAll(['srptOptions_v3', 'orders_v1_n', 'donChiTiet_v4_n', 'don_phones_v6_n']);
+        cache.removeAll(['srptOptions_v3', 'orders_v1_n', 'donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']);
       } catch (ec) {}
     }
   } finally { if (lock) lock.releaseLock(); }

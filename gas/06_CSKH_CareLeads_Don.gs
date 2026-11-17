@@ -377,6 +377,45 @@ function addCareLead_(data) {
   return jsonOut_({ ok: true, found: rowIdx > 0 });
 }
 
+// ── DON POS THEO TUNG DON cho client (HANDOFF 2026-11-16 "Danh sach KH khop don POS", BUOC 1) ──
+// NGUYEN NHAN GOC can action nay: action donPhones chi cho client tap SDT + sale "tung co" + 1 ngay moi nhat/SDT + doanh thu CA DOI, nen client
+// KHONG the loc Danh sach KH theo ngay/sale cua TUNG don POS (khach chi co o POS khong len danh sach, loc CS lech loc ngay, doanh thu khong theo sale dang loc).
+// TAI DUNG, KHONG viet lai quy tac: moi don lay tu buildSalesReportB_ (Bao cao B) nen tu dong dung cung: tach the (_donSaleNamesFromThe_, gop 1 nguoi nhieu ten),
+// loai don Huy/Hoan/Da hoan/Dang hoan (_donHasExcludedStatus_), gop don POS tach (_mergeTachDon_), ghep Base / file ke toan / Quay 30-70 va chia doanh thu cho tung sale (bs/bsx).
+// Moi dong: [phone chuan hoa (normPhone_, da xu ly SDT thieu so 0), 'YYYY-MM-DD', 'ten khach', [sale...], doanhThuCaDon, [[sale, phanChia]...]].
+// phanChia = DUNG so Bao cao B ghi cho sale do (da nhan ty le Quay 30/70) nen tong phanChia cua 1 sale trong ky = so cua sale do o bang "Theo Sale".
+// skipped = { noPhone, noPhoneRev, noDate, noDateRev }: don co o Bao cao B nhung khong co SDT / khong doc duoc ngay nen KHONG gan vao khach duoc; rows + skipped = DUNG tong don cua Bao cao B.
+// Luu y: sale/kenh admin da AN (hiddenSales/hiddenChannels) bi Bao cao B bo — don do cung khong co o day (dung y admin).
+function _donDailyRows_(orders, skipped) {   // skipped (tuy chon) = { noPhone, noPhoneRev, noDate, noDateRev }: dem don Bao cao B CO nhung khong gan duoc vao khach — de client doi chieu tong (Buoc 6) khop 100% voi Bao cao B
+  var out = [], sk = skipped || {};
+  sk.noPhone = sk.noPhone || 0; sk.noPhoneRev = sk.noPhoneRev || 0; sk.noDate = sk.noDate || 0; sk.noDateRev = sk.noDateRev || 0;
+  (orders || []).forEach(function(o) {
+    var rv = Math.round(Number(o && o.giaTriSauGiam) || 0);
+    var ph = normPhone_(String((o && o.soDienThoai) || ''));
+    if (!ph) { sk.noPhone++; sk.noPhoneRev += rv; return; }
+    var dt = parseVNDate_(o.ngayTaoDon);
+    var ds = dt ? _vnYmd_(dt) : '';
+    if (!ds) { sk.noDate++; sk.noDateRev += rv; return; }
+    var shares = [];
+    (o.bsx || []).forEach(function(x) {
+      if (!x || !x[0] || x[0] === '(chưa gán sale)') return;
+      shares.push([String(x[0]), Number(x[1]) || 0]);
+    });
+    out.push([ph, ds, String(o.khachHang || '').trim(), shares.map(function(x) { return x[0]; }), Math.round(Number(o.giaTriSauGiam) || 0), shares]);
+  });
+  return out;
+}
+function buildDonDaily_(days) {
+  var n = Math.floor(Number(days));
+  if (!(n >= 1)) n = 90;
+  if (n > 400) n = 400;
+  var to = _vnYmd_(new Date()), from = _vnYmd_(new Date(Date.now() - (n - 1) * 86400000));
+  var rep = buildSalesReportB_({ dateFrom: from, dateTo: to });
+  var skipped = {};
+  var rows = _donDailyRows_(rep && rep.orders, skipped);
+  return { ok: true, ver: 'donDaily-v1', days: n, from: from, to: to, n: rows.length, skipped: skipped, rows: rows };
+}
+
 // ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
 // man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
 function readDonPhones_(rows) {
@@ -562,6 +601,31 @@ function getDonLastDateByPhone_(rows) {
     if (!map[ph] || iso > map[ph]) map[ph] = iso;
   }
   return map;
+}
+
+// CHAN DOAN Danh sach KH vs POS (BUOC 0 ke hoach "Danh sach KH khop don POS", HANDOFF.md): liet ke don POS (sheet "dữ liệu đơn") cua 1 NGAY,
+// tuy chon chi nhung don co sale do trong cot The (tach bang _donSaleNamesFromThe_ — dung quy tac nhu Bao cao B). CHI DOC.
+// Tra { ok, date, sale, orders, phones, revenue (chi don KHONG bi loai), items:[{phone, rawPhone, name, the, sales[], rev, status, excluded}] } (toi da 800 dong).
+function donDayDiag_(dateIso, sale) {
+  var d = String(dateIso == null ? '' : dateIso).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { ok: false, error: 'date phai dang YYYY-MM-DD' };
+  var want = _normTxt_(String(sale == null ? '' : sale).trim());
+  var rows = readDonChiTiet_(), items = [], seen = {}, nPhones = 0, rev = 0, orders = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var dt = parseVNDate_(r.ngayTaoDon);
+    if (!dt || _vnYmd_(dt) !== d) continue;
+    var names = _donSaleNamesFromThe_(r.theSale);
+    if (want && names.map(_normTxt_).indexOf(want) === -1) continue;
+    var ph = normPhone_(String(r.soDienThoai || ''));
+    var ex = _donHasExcludedStatus_(r.trangThai);
+    var v = Number(r.giaTriSauGiam) || 0;
+    orders++;
+    if (!ex) rev += v;
+    if (ph && !seen[ph]) { seen[ph] = 1; nPhones++; }
+    if (items.length < 800) items.push({ phone: ph, rawPhone: String(r.soDienThoai || ''), name: String(r.khachHang || ''), the: String(r.theSale || ''), sales: names, rev: v, status: String(r.trangThai || ''), excluded: !!ex });
+  }
+  return { ok: true, date: d, sale: String(sale || ''), orders: orders, phones: nPhones, revenue: rev, items: items };
 }
 
 // Chuyen cac dong tho cua "dữ liệu đơn" thanh object don (TACH TU readDonChiTiet_ 2026-10-09 de Supabase backfill/doc dung CHUNG 1 logic —

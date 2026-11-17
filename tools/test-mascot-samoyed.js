@@ -10,10 +10,10 @@ const SRC = fs.readFileSync(path.join(root, 'js/79-mascot-samoyed.js'), 'utf8');
 function makeEnv(opts) {
   opts = opts || {};
   const store = Object.assign({}, opts.ls || {});
-  const calls = { draw: 0, clear: 0, raf: 0, text: 0 };
+  const calls = { draw: 0, clear: 0, raf: 0, text: 0, texts: [] };
   const ctx = new Proxy({}, { get(t, k) {
     if (k === 'clearRect') return () => { calls.clear++; };
-    if (k === 'fillText') return () => { calls.text++; };
+    if (k === 'fillText') return (tx, x, y) => { calls.text++; calls.texts.push({ tx: String(tx), x, y }); };
     if (k === 'fill') return () => { calls.draw++; };
     return t[k] !== undefined ? t[k] : () => {};
   }, set(t, k, v) { t[k] = v; return true; } });
@@ -82,6 +82,7 @@ ok(tiny === 0, 'không có bước nhảy tức thời (' + tiny + ' khung)');
 e = makeEnv({ w: 1000 });
 let st0 = e.win._mascotState_();
 ok(st0.flowers >= 8 && st0.flowers <= 28, 'số hoa trong [8,28]: ' + st0.flowers);
+ok(st0.butterflies.every(b => Array.isArray(b.pal) && b.pal.length === 3) && new Set(st0.butterflies.map(b => b.pal[0])).size === st0.butterflies.length, 'bướm nhiều màu: mỗi con 1 bộ màu (cánh trên/dưới/chấm) khác nhau');
 ok(st0.butterflies.length === 4 && st0.bees.length === 2, 'desktop: 4 bướm + 2 ong (' + st0.butterflies.length + '/' + st0.bees.length + ')');
 let bad = 0, flyMoved = 0; const b0 = { x: st0.bees[0].x, y: st0.bees[0].y }; t = 1000;
 for (let i = 0; i < 4000; i++) {
@@ -149,11 +150,13 @@ e = makeEnv({ w: 1000, reduced: true }); const c0 = e.calls.clear; e.win.toggleG
 ok(e.calls.clear === c0 + 1 && e.calls.raf === 0, 'giảm chuyển động: toggle vườn vẽ lại đúng 1 khung, không rAF');
 
 // 3f) BẤM vào chó: hitDog_ thuần + trình nghe pointerdown thật
-const rect = { left: 0, top: 500, width: 1000, height: 112 }, dd = { x: 300 };
-ok(e.win._mascotHit_(300, 582, rect, dd, 1), 'hitDog_: bấm giữa thân → trúng');
-ok(!e.win._mascotHit_(340, 582, rect, dd, 1) && !e.win._mascotHit_(260, 582, rect, dd, 1), 'hitDog_: lệch ngang > 26px → trượt');
-ok(!e.win._mascotHit_(300, 520, rect, dd, 1) && !e.win._mascotHit_(300, 620, rect, dd, 1), 'hitDog_: quá cao/quá thấp → trượt');
-ok(e.win._mascotHit_(300, 582 - 30, rect, dd, 1) && e.win._mascotHit_(300, 582 + 25, rect, dd, 1), 'hitDog_: đầu và chân đều trúng');
+const CHT = e.win._mascotState_().ch;   // chiều cao canvas thật (không gắn cứng: đổi CH ở js/79 không làm test lệch)
+const CYT = 500 + CHT - 30;             // y tâm chó = top + CH - 30
+const rect = { left: 0, top: 500, width: 1000, height: CHT }, dd = { x: 300 };
+ok(e.win._mascotHit_(300, CYT, rect, dd, 1), 'hitDog_: bấm giữa thân → trúng');
+ok(!e.win._mascotHit_(340, CYT, rect, dd, 1) && !e.win._mascotHit_(260, CYT, rect, dd, 1), 'hitDog_: lệch ngang > 26px → trượt');
+ok(!e.win._mascotHit_(300, CYT - 62, rect, dd, 1) && !e.win._mascotHit_(300, CYT + 38, rect, dd, 1), 'hitDog_: quá cao/quá thấp → trượt');
+ok(e.win._mascotHit_(300, CYT - 30, rect, dd, 1) && e.win._mascotHit_(300, CYT + 25, rect, dd, 1), 'hitDog_: đầu và chân đều trúng');
 function click(env, x, y, tgtHit, ev) {
   const hs = env.doc.__h.pointerdown || []; ev = ev || {};
   ev.clientX = x; ev.clientY = y; ev.target = { closest: () => (tgtHit ? {} : null) };
@@ -163,10 +166,10 @@ function click(env, x, y, tgtHit, ev) {
 e = makeEnv({ w: 1000 }); t = 1000; e.step(t);
 ok((e.doc.__h.pointerdown || []).length === 1, 'đăng ký đúng 1 trình nghe pointerdown');
 g = e.win._mascotState_(); g.dog.mode = 'idle'; g.dog.until = 0.1; g.dog.x = 300;
-let ev1 = click(e, 300, 582, false);
+let ev1 = click(e, 300, CYT, false);
 ok(g.dog.react && /Gâu|Hihi/.test(g.dog.react.txt), 'bấm vào chó → react + lời sủa (' + (g.dog.react && g.dog.react.txt) + ')');
 ok(!ev1.pd && !ev1.sp, 'KHÔNG preventDefault/stopPropagation (không cản thao tác bên dưới)');
-const r0 = g.dog.react; click(e, 300, 582, false);
+const r0 = g.dog.react; click(e, 300, CYT, false);
 ok(g.dog.react === r0, 'đang phản ứng thì bấm tiếp không khởi động lại');
 for (let i = 0; i < 40; i++) { t += 40; e.step(t); }   // 1.6s
 ok(e.win._mascotState_().mode === 'idle', 'đang ngồi: được ở lại chơi, không bỏ đi giữa chừng cú nhảy');
@@ -199,7 +202,7 @@ g.bees[1].x = 900; g.bees[1].y = 10; g.bees[1].st = 'fly';
 for (let i = 0; i < 700 && !sat; i++) { t += 40; e.step(t); if (e.win._mascotState_().bees[0].st === 'sit') sat = true; }
 ok(sat, 'ong chọn hoa → bay tới → đậu (sit) trong < 28s');
 const bSit = e.win._mascotState_().bees[0];
-ok(Math.abs(bSit.a - Math.PI / 2) < 1e-6 && bSit.y > 60 && bSit.y < 112, 'ong đậu: đầu hướng xuống, ở thấp sát hoa (y=' + bSit.y.toFixed(1) + ')');
+ok(Math.abs(bSit.a - Math.PI / 2) < 1e-6 && bSit.y > CHT - 52 && bSit.y < CHT, 'ong đậu: đầu hướng xuống, ở thấp sát hoa (y=' + bSit.y.toFixed(1) + ')');
 let waited = 0, back = false;
 for (let i = 0; i < 160 && !back; i++) { t += 40; e.step(t); waited += 0.04; if (e.win._mascotState_().bees[0].st === 'fly') back = true; }
 ok(back && waited <= 5, 'đậu xong tự bay tiếp sau ≤ 4.5s (' + waited.toFixed(1) + 's)');
@@ -220,6 +223,35 @@ function nearDog(state) {
 }
 ok(nearDog('sit') === false, 'ong ĐẬU sát chó → chó không giật mình');
 ok(nearDog('fly') === true, 'đối chứng: ong BAY sát chó → chó giật mình chạy');
+
+// 3h) BƯỚM: bay nhấp nhô LÊN lẫn xuống (không chỉ chúi xuống), ĐẬU lên hoa rồi bay LÊN tiếp, luôn trong khung
+{
+  const Q = perchEnv(); let tq = Q.tt; const gq = Q.gg;
+  ok(gq.butterflies.every(b => b.st === 'fly' || b.st === 'go' || b.st === 'sit'), 'trạng thái bướm hợp lệ');
+  // (a) ghim bướm ở chế độ bay tự do, đo hướng dịch chuyển dọc từng khung trong 120s
+  let up = 0, down = 0, badB = 0;
+  const prevY = gq.butterflies.map(b => b.y);
+  for (let i = 0; i < 3000; i++) {
+    tq += 40; Q.env.step(tq);
+    gq.butterflies.forEach((b, j) => { if (b.st === 'fly') { const d = b.y - prevY[j]; if (d < -0.01 && d > -5) up++; else if (d > 0.01 && d < 5) down++; } prevY[j] = b.y; if (!isFinite(b.y) || b.y < 0 || b.y > gq.ch || b.x < -21 || b.x > 1021) badB++; });
+  }
+  ok(up > 200 && down > 200, 'bướm bay cả LÊN (' + up + ') lẫn xuống (' + down + ')');
+  ok(up > down * 0.6, 'không chỉ chúi xuống: lên/xuống = ' + (up / down).toFixed(2));
+  ok(badB === 0, 'bướm luôn trong khung suốt 120s (' + badB + ' lần sai)');
+  // (b) ép bướm 0 bay tới hoa 0 → đậu đúng đầu hoa → tự bay LÊN tiếp
+  const bt = gq.butterflies[0]; bt.fi = 0; bt.st = 'go'; bt.x = 5; bt.y = 30;
+  let sat2 = false; for (let i = 0; i < 900 && !sat2; i++) { tq += 40; Q.env.step(tq); if (bt.st === 'sit') sat2 = true; }
+  ok(sat2, 'bướm chọn hoa → bay tới → ĐẬU (sit)');
+  ok(bt.y > CHT - 52 && bt.y < CHT, 'bướm đậu thấp sát đầu hoa (y=' + bt.y.toFixed(1) + ')');
+  const yS = bt.y; let left = false, minY = yS, w2 = 0;
+  for (let i = 0; i < 260 && !left; i++) { tq += 40; w2 += 0.04; Q.env.step(tq); if (bt.st === 'fly') left = true; }
+  ok(left && w2 >= 2.5 && w2 <= 7, 'đậu 3–6s rồi bay tiếp (' + w2.toFixed(1) + 's)');
+  for (let i = 0; i < 25; i++) { tq += 40; Q.env.step(tq); minY = Math.min(minY, bt.y); }
+  ok(yS - minY > 8, 'vừa cất cánh thì bay LÊN cao hơn chỗ đậu ≥8px (lên ' + (yS - minY).toFixed(1) + 'px)');
+  // (c) hoa bị tạo lại (đổi cỡ màn hình) khi bướm đang đậu → về bay tự do, không kẹt
+  bt.st = 'sit'; bt.fi = 9999; tq += 40; Q.env.step(tq);
+  ok(bt.st === 'fly', 'hoa không còn → bướm về bay tự do');
+}
 
 // 4) mascotPlan_: luôn trong [44, w-140], thời gian nghỉ 5..12, đụng mép thì quay lại — thử nhiều seed + nhiều bề rộng
 let badRange = 0, badIdle = 0, moved = 0;
@@ -277,4 +309,49 @@ ok(/it\('garden', '🌼 Vườn hoa-bướm-ong'\)/.test(cf) && /k === 'garden'/
 const ix = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 ok((ix.match(/js\/79-mascot-samoyed\.js/g) || []).length === 1, 'index.html nạp js/79 đúng 1 lần');
 ok(ix.indexOf('js/66-sakura-petals.js') < ix.indexOf('js/79-mascot-samoyed.js') && ix.indexOf('js/79-mascot-samoyed.js') < ix.indexOf('js/68-ui-kit.js'), 'js/79 nằm ngay sau js/66, không đổi thứ tự thẻ cũ');
+// BONG BÓNG "Gâu!" KHÔNG ĐƯỢC BỊ CẮT (Duyên 16/11: tin nhắn của cún bị mất chữ). NGUYÊN NHÂN GỐC: bong bóng vẽ ở y = CH-30-lift-52*s-8 (đỉnh = 2-lift khi s=1)
+// nên khi chó nhảy (lift tới 20px) đỉnh bong bóng nằm NGOÀI canvas (y<0) → mất nửa trên (kể cả chữ). Nay canvas cao hơn + drawBark kẹp đỉnh ≥ 2.
+[1000, 500].forEach((W0) => {
+  const eb = makeEnv({ w: W0 }); let tb = 1000; eb.step(tb);
+  const gb = eb.win._mascotState_(); gb.dog.mode = 'idle'; gb.dog.until = 99; gb.dog.x = Math.min(300, W0 / 2);
+  gb.dog.react = { t: 0, txt: 'Gâu gâu!' }; eb.calls.texts.length = 0;
+  for (let i = 0; i < 30; i++) { tb += 40; eb.step(tb); }
+  const bark = eb.calls.texts.filter((q) => q.tx === 'Gâu gâu!');
+  const minTop = bark.length ? Math.min.apply(null, bark.map((q) => q.y - 14)) : NaN;
+  ok(bark.length > 10 && minTop >= 0, 'bong bóng "Gâu gâu!" luôn nằm TRONG canvas suốt cú nhảy (W=' + W0 + ', đỉnh thấp nhất y=' + minTop.toFixed(1) + ' ≥ 0, ' + bark.length + ' khung)');
+});
+// 3f) CHUỒN CHUỒN (Duyên 17/11: "thêm vài con chuồn chuồn bay nữa"): số lượng theo màn, trong khung 160s không NaN,
+// có cả bay nhanh lẫn LƠ LỬNG, bay nhanh hơn bướm, không đậu hoa, KHÔNG làm chó giật mình, tắt vườn thì không bay, vẽ không lỗi.
+[[1200, 3], [500, 2]].forEach(([W0, n0]) => {
+  const ed = makeEnv({ w: W0 }); let td = 1000; ed.step(td);
+  const gd = ed.win._mascotState_();
+  ok(gd.dragonflies.length === n0, 'W=' + W0 + ': ' + n0 + ' chuồn chuồn (có ' + gd.dragonflies.length + ')');
+  ok(new Set(gd.dragonflies.map(d => d.pal[0])).size === n0, 'W=' + W0 + ': mỗi chuồn chuồn 1 màu thân khác nhau');
+  gd.setFlee(1e9);   // chặn chó chạy trốn ong để đo riêng chuồn chuồn
+  let badD = 0, hov = 0, fly = 0, dist = 0, nf = 0; const pv = gd.dragonflies.map(d => ({ x: d.x, y: d.y }));
+  for (let i = 0; i < 1600; i++) {
+    td += 100; ed.step(td);
+    gd.dragonflies.forEach((d, j) => {
+      if (!isFinite(d.x) || !isFinite(d.y) || !isFinite(d.a) || d.y < 0 || d.y > gd.ch || d.x < -21 || d.x > W0 + 21) badD++;
+      if (d.st === 'hover') hov++; else if (d.st === 'fly') { fly++; const dx = d.x - pv[j].x, dy = d.y - pv[j].y; if (Math.abs(dx) < 60) { dist += Math.sqrt(dx * dx + dy * dy); nf++; } } else badD++;
+      pv[j] = { x: d.x, y: d.y };
+    });
+  }
+  ok(badD === 0, 'W=' + W0 + ': chuồn chuồn luôn trong khung 160s, trạng thái chỉ fly/hover, không NaN (' + badD + ' lần sai)');
+  ok(hov > 40 && fly > 400, 'W=' + W0 + ': có cả LƠ LỬNG (' + hov + ') lẫn bay (' + fly + ')');
+  const spd = dist / nf / 0.1;
+  ok(spd > 40 && spd < 100, 'W=' + W0 + ': tốc độ bay trung bình ~' + spd.toFixed(0) + 'px/s (nhanh hơn bướm 16-28)');
+});
+{
+  const ef = makeEnv(); let tf = 1000; ef.step(tf);
+  const gf = ef.win._mascotState_(); gf.dog.mode = 'idle'; gf.dog.until = 1e9; gf.dog.x = 300; gf.setFlee(0);
+  gf.bees.forEach(b => { b.x = -500; b.y = 20; b.v = 0; b.st = 'sit'; b.until = 1e9; b.fi = 0; });   // ong đậu xa → không dọa chó
+  gf.dragonflies.forEach(d => { d.x = 300; d.y = gf.ch - 46; d.st = 'hover'; d.until = 1e9; });   // 3 chuồn chuồn lơ lửng ngay sát chó
+  for (let i = 0; i < 20; i++) { tf += 100; ef.step(tf); }
+  ok(gf.dog.mode === 'idle' && !gf.dog.run, 'chuồn chuồn bay sát chó KHÔNG làm chó giật mình (chỉ ong mới dọa)');
+  ef.store['ome_garden'] = '0'; const hb = ef.calls.draw;
+  const eg = makeEnv({ ls: { ome_garden: '0' } }); eg.step(1000); const gg = eg.win._mascotState_(); const x0 = gg.dragonflies.map(d => d.x + ',' + d.y).join('|');
+  for (let i = 0; i < 20; i++) eg.step(1000 + (i + 1) * 100);
+  ok(gg.dragonflies.map(d => d.x + ',' + d.y).join('|') === x0, 'tắt vườn → chuồn chuồn đứng yên (không cập nhật)');
+}
 console.log('PASS', pass, 'FAIL', fail); process.exit(fail ? 1 : 0);

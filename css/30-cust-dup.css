@@ -1,0 +1,14 @@
+/* R5d bước 1: bảng xem KHÁCH TRÙNG SĐT (js/87-cust-dup.js, chỉ admin). Chỉ dùng var(--ui-*). */
+.cd-modal-in{width:min(1040px,96vw)}
+.cd-note{padding:var(--ui-sp-3);font-size:var(--ui-fs-sm);line-height:1.5;color:var(--ui-text);background:var(--ui-info-soft);border:1px solid var(--ui-border);border-radius:var(--ui-r-md)}
+.cd-ok{padding:var(--ui-sp-3);font-size:var(--ui-fs-base);color:var(--ui-text)}
+.cd-err{padding:var(--ui-sp-3);font-size:var(--ui-fs-sm);color:var(--ui-danger);background:var(--ui-danger-soft);border:1px solid var(--ui-danger-line);border-radius:var(--ui-r-md)}
+.cd-group{border:1px solid var(--ui-border);border-radius:var(--ui-r-md);background:var(--ui-surface)}
+.cd-gh{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);padding:var(--ui-sp-2) var(--ui-sp-3);font-size:var(--ui-fs-sm);border-bottom:1px solid var(--ui-border);color:var(--ui-text)}
+.cd-gh .btn{margin-left:auto}
+.cd-scroll{overflow-x:auto}
+.cd-t{width:100%;border-collapse:collapse;font-size:var(--ui-fs-xs);color:var(--ui-text)}
+.cd-t th{padding:var(--ui-sp-1) var(--ui-sp-2);text-align:left;color:var(--ui-text-muted);font-weight:var(--ui-fw-semibold);white-space:nowrap;border-bottom:1px solid var(--ui-border)}
+.cd-t td{padding:var(--ui-sp-1) var(--ui-sp-2);border-bottom:1px solid var(--ui-border);vertical-align:top;word-break:break-word}
+.cd-t tr.cd-keep td{background:var(--ui-info-soft);font-weight:var(--ui-fw-semibold)}
+@media (max-width:640px){.cd-modal-in{width:98vw}.cd-gh .btn{margin-left:0}}

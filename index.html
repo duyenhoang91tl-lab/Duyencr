@@ -411,7 +411,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="tab" data-bar-id="tab-schedule" data-bar-home=".tabs" onclick="switchTab('schedule',this)">Lịch chăm sóc <span class="tab-badge" id="tb-sched">0</span></div>
       <div class="tab" data-bar-id="tab-overdue" data-bar-home=".tabs" onclick="switchTab('overdue',this)">Quá hạn <span class="tab-badge" id="tb-over" style="background:#fee2e2;color:#991b1b">0</span></div>
       <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
-      <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
+      <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)"><span class="ai-cat-slot" data-px="16">🤖 </span>Zalo AI</div>
       <div class="tab" data-bar-id="tab-chat" data-bar-home=".tabs" onclick="switchTab('chat',this)">💬 Chat</div>
       <div class="tab" data-bar-id="tab-media" data-bar-home=".tabs" onclick="switchTab('media',this)">🖼️ Thư viện</div>
       <div class="tab" data-bar-id="tab-teamchat" data-bar-home=".tabs" onclick="switchTab('teamchat',this)">💬 Chat nội bộ <span class="tab-badge" id="tb-teamchat" style="display:none">0</span></div>
@@ -977,10 +977,10 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 
 <script src="js/01-fn-splitmulti.js?v=20261112a"></script>
-<script src="js/02-fn-showrowerrorbanner.js"></script>
+<script src="js/02-fn-showrowerrorbanner.js?v=20261117c"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
-<script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261112a"></script>
-<script src="js/05-fn-saveeditphone.js?v=20261115g"></script>
+<script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261117a"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261116a"></script>
 <script src="js/06-main-renew-sources.js?v=20261115e"></script>
 
 <!-- ASSIGN DATA MODAL -->
@@ -1058,7 +1058,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js?v=20261115e"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261117a"></script>
 <script src="js/09-fn-deleteteam.js?v=20261029a"></script>
 <script src="js/10-fn-pkkpipct.js?v=20261116a"></script>
 <script src="js/11-fn-srload.js?v=20261116a"></script>
@@ -1269,7 +1269,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261115g">
-<link rel="stylesheet" href="css/06-pro.css?v=20261115i">
+<link rel="stylesheet" href="css/06-pro.css?v=20261116a">
 <link rel="stylesheet" href="css/07-teamchat.css?v=20261115g">
 <link rel="stylesheet" href="css/08-kho.css?v=20261115g">
 <link rel="stylesheet" href="css/09-profile.css">
@@ -1293,7 +1293,10 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/25-report-frame.css?v=20261115e"><!-- R7a: khuôn chung báo cáo (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/26-lead-score.css?v=20261115c"><!-- R8b: thanh đang lọc theo mức khách (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/27-settings-hub.css?v=20261115f"><!-- R9a: trung tâm lối tắt cài đặt (chỉ var(--ui-*)) -->
-<link rel="stylesheet" href="css/99-dark-auto.css?v=20261115h"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
+<link rel="stylesheet" href="css/28-cust-select.css?v=20261116b"><!-- R5a: chọn nhiều khách (chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/29-kh-sb-toggle.css?v=20261116a"><!-- ẩn/hiện cột lọc Danh sách KH (js/85; chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/30-cust-dup.css?v=20261117a"><!-- R5d bước 1: bảng xem khách trùng SĐT (js/87; chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/99-dark-auto.css?v=20261116a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
@@ -1795,17 +1798,17 @@ function openBcLogModal(phone){
 <script src="js/43-fn-uxtools.js?v=20261115g"></script>
 <script src="js/30-fn-teamanalysis.js?v=20261116a"></script>
 <script src="js/29-sidenav.js?v=20261116a"></script>
-<script src="js/31-fn-orgoverview.js"></script>
+<script src="js/31-fn-orgoverview.js?v=20261116a"></script>
 <script src="js/32-fn-furesult.js?v=20261115g"></script>
 <script src="js/33-fn-tierconfig.js"></script>
-<script src="js/33-pro-profile.js?v=20261115h"></script>
+<script src="js/33-pro-profile.js?v=20261117a"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
-<script src="js/38-pro-dock.js?v=20261116e"></script>
+<script src="js/38-pro-dock.js?v=20261116f"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js?v=20261101a"></script>
-<script src="js/42-fn-socialchat.js?v=20261115g"></script>
+<script src="js/41-fn-pkchat.js?v=20261116a"></script>
+<script src="js/42-fn-socialchat.js?v=20261116a"></script>
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/48-fn-medialib.js?v=20261113e"></script>
 <script src="js/43-teamchat.js?v=20261101a"></script>
@@ -1825,11 +1828,11 @@ function openBcLogModal(phone){
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
 <script src="js/59-fn-mobilefit.js?v=20261115g"></script>
-<script src="js/57-viettat.js?v=20261115i"></script>
+<script src="js/57-viettat.js?v=20261116a"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-conn-diag.js?v=20261115g"></script>
 <script src="js/59-report-drill.js?v=20261115g"></script>
-<script src="js/60-team-bonus.js?v=20261113b"></script>
+<script src="js/60-team-bonus.js?v=20261116a"></script>
 <script src="js/61-recon-export.js?v=20261105b"></script>
 <script src="js/62-sale-channel-periods.js?v=20261102h"></script>
 <script src="js/63-fn-saleincome.js?v=20261103e"></script>
@@ -1837,7 +1840,7 @@ function openBcLogModal(phone){
 <script src="js/65-order-sale-ovr.js?v=20261115g"></script>
 <script src="js/67-report-k.js?v=20261115c"></script>
 <script src="js/66-sakura-petals.js?v=20261104a"></script>
-<script src="js/79-mascot-samoyed.js?v=20261116b"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
+<script src="js/79-mascot-samoyed.js?v=20261117a"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
 <script src="js/68-ui-kit.js?v=20261115a"></script>
 <script src="js/69-pro-smart-search.js?v=20261115a"></script>
 <script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
@@ -1849,8 +1852,20 @@ function openBcLogModal(phone){
 <script src="js/76-report-frame.js?v=20261115e"></script><!-- R7a: uiReportFrame_ khuôn chung báo cáo (chưa áp báo cáo nào; R7b áp từng cái) -->
 <script src="js/77-lead-score.js?v=20261115f"></script><!-- R8a: chấm điểm khách nóng/ấm/nguội (logic thuần, nguội = quá 60 ngày chưa chăm; R8b/c/d gắn giao diện) -->
 <script src="js/78-settings-hub.js?v=20261115f"></script><!-- R9a: uiSettingsHub_ trung tâm lối tắt cài đặt (dùng ở js/37 trang ⚙ Cấu hình) -->
-<script src="js/80-acct-split-extra.js?v=20261105a"></script>
+<script src="js/80-acct-split-extra.js?v=20261117a"></script>
 <script src="js/81-pace-alert.js?v=20261116a"></script><!-- R4c: paceAlertItems_ cảnh báo tiến độ doanh số tháng + tỷ lệ chốt thấp hơn TB team (hàm thuần; gắn vào Tổng quan ở js/36 bước sau) -->
+<script src="js/82-cust-select.js?v=20261116c"></script><!-- R5a bước 1: chọn nhiều khách ở Danh sách KH (bọc _rowHtml/renderTable, không sửa js/02) -->
+<script src="js/83-cust-bulk-cs.js?v=20261116a"></script><!-- R5a bước 2: Gán CS hàng loạt cho khách đã chọn (dùng _applyCareCSToAssigned js/07) -->
+<script src="js/84-cust-bulk-status.js?v=20261117a"></script><!-- R5a bước 3: Đổi trạng thái (Tình trạng CS / Trạng thái KH) hàng loạt cho khách đã chọn; KH tự nhảy như hồ sơ; không cho chọn nhóm Chốt -->
+<script src="js/85-kh-sb-toggle.js?v=20261116a"></script><!-- ẩn/hiện cột lọc Danh sách KH (nút #kh-sb-edge, lưu ome_kh_sb; css/29); gỡ = xoá dòng này + link css/29 -->
+<script src="js/86-pos-diag.js?v=20261117b"></script><!-- Danh sach KH khop don POS, buoc 8: nut admin Doi soat POS (donDayDiag, chi doc)-->
+<script src="js/87-cust-dup.js?v=20261117a"></script><!-- R5d bước 1: nút admin "🔎 Khách trùng" (CHỈ XEM) — gọi GAS findDuplicateCustomers; gỡ = xoá dòng này + css/30 -->
+<script src="js/88-pos-orders.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 2: tai + giu don POS theo tung don (GAS donDaily), chi RAM; boc syncFromGS; go = xoa dong nay -->
+<script src="js/89-pos-customers.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 3: them khach chi co o POS (js/02 buildCustomers goi posCustomersInject_); nap SAU js/88, TRUOC js/90; go = xoa dong nay (hook trong js/02 tu bo qua) -->
+<script src="js/90-pos-filter.js?v=20261117b"></script><!-- Danh sach KH khop don POS, buoc 4: loc ngay + CS theo don POS cung luc (boc applyFilters, tam thoi ymList/csSet roi tra lai); nap SAU js/88; go = xoa dong nay -->
+<script src="js/91-pos-revenue.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 5: cot Don/DT = ca doi + phan cua CS/ngay dang loc (boc applyFilters ngoai js/90)-->
+<script src="js/92-pos-recon.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 6: thanh doi soat Khop POS / Lech POS duoi thanh cong cu (chi doc, boc applyFilters ngoai cung)-->
+<script src="js/93-combo-tab.js?v=20261117b"></script><!-- COMBO co san, buoc 3/6: tab Combo tra cuu (GAS comboList); nap SAU js/40 (registerExtraTab); go = xoa dong nay + them 'combo' trong js/29 -->
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

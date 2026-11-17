@@ -670,7 +670,7 @@ function _impPosCleanup_(sheetKey, sh, preferRows) {
     r.deleted = x.deleted; r.updatedCells = x.updatedCells;
     if (x.deleted || x.updatedCells) {
       sbMarkOrdersDirty_('don', 'posDedup');
-      try { CacheService.getScriptCache().removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); } catch (ec) {}
+      try { CacheService.getScriptCache().removeAll(['donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']); } catch (ec) {}
       _autoDedupLog_(DON_CHITIET_SHEET, x.deleted);
     }
   } catch (e) { try { Logger.log('_impPosCleanup_ loi: ' + e); } catch (e2) {} }
@@ -712,7 +712,7 @@ function onChangeDedupTrigger_(e) {
       // 90s TTL du sheet Pos vua bi xoa dong trung, khien bao cao B/E/F/G co the tam thoi van hien
       // dong da bi xoa. _cacheGetBig_ chi can mat key "<key>_n" la coi nhu cache rong (xem ham do),
       // nen chi can xoa dung '_n' cua key HIEN TAI 'donChiTiet_v4' la du, khong can xoa tung manh.
-      if (resPos.deleted || resPos.updatedCells) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      if (resPos.deleted || resPos.updatedCells) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
       if (resBase.deleted) cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
     } catch (ecCache) {}
   } finally {
@@ -989,7 +989,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
     SpreadsheetApp.flush();
   }
   if (!toWrite.length) {
-    if (updatedRows) { sbMarkOrdersDirty_(sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'import'); try { var c0 = CacheService.getScriptCache(); if (sheetName === DON_CHITIET_SHEET) c0.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); else c0.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (e0) {} }
+    if (updatedRows) { sbMarkOrdersDirty_(sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'import'); try { var c0 = CacheService.getScriptCache(); if (sheetName === DON_CHITIET_SHEET) c0.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']); else c0.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (e0) {} }
     var batchId0 = updatedRows ? _impBatchLog_(sheetName, sheetKey, 0, [], updLogFrom, updLogCount, who) : '';
     var ddPos0 = _impPosCleanup_(sheetKey, sh, matchedRows);   // 2026-10-22: Pos -> don them don trung con sot (khac nhau chi o STT/Trang thai/Ghi chu), ke ca khi khong co dong moi
     return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: ddPos0.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId0 });
@@ -1014,7 +1014,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
 
   try {
     var cache = CacheService.getScriptCache();
-    if (sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']);
+    if (sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']);
     else cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
   } catch (ec) {}
 
@@ -1163,7 +1163,7 @@ function _impUndoLocked_(batchId, dryRun, who) {
   batch.sheet.getRange(batch.row, IMPORT_BATCH_HEADERS.indexOf('trangThai') + 1, 1, 3).setValues([['da-hoan-tac', now, who || '']]);
   SpreadsheetApp.flush();
   sbMarkOrdersDirty_(batch.sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'importUndo');
-  try { var cache = CacheService.getScriptCache(); if (batch.sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); else cache.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (ec) {}
+  try { var cache = CacheService.getScriptCache(); if (batch.sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n', 'don_daily_v1_n']); else cache.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (ec) {}
   info.deleted = loc.rows.length; info.restoredCells = rs.plan.length;
   return info;
 }

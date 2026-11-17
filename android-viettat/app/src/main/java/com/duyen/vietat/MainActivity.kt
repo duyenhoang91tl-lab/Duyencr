@@ -320,31 +320,50 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
                 else OutlinedButton({ pickFolderDlg = true }, Modifier.fillMaxWidth()) {
                     Text("📁 " + (Store.folders.firstOrNull { it.id == folder }?.name ?: "Chung") + "  ▾", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                opts.forEachIndexed { i, o ->
-                    if (kindOf(o) != null) {
-                        // XEM đủ: hình hiện thu nhỏ, ghi âm có nút ▶ Nghe (trước đây chỉ có nhãn chữ nên không biết bên trong là gì).
-                        val isImg = kindOf(o) == "img"
-                        val mname = mediaNameOf(o)
-                        val mf = File(Store.mediaDir, mname)
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Text("${i + 1}. ${labelOf(o)}", Modifier.weight(1f))
-                                if (!isImg && mf.exists()) TextButton({ togglePlay(mname) }) { Text(if (playing == mname) "■ Dừng" else "▶ Nghe") }
-                                TextButton({ if (playing == mname) stopPlay(); opts.removeAt(i) }) { Text("✕") }
-                            }
-                            if (isImg) {
-                                val bmp = remember(o) { thumb(mf.absolutePath) }
-                                if (bmp != null) Image(bmp, null, Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = ContentScale.Fit)
-                                else Text("(hình chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
-                            } else if (!mf.exists()) Text("(tệp ghi âm chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
+                // NGUYÊN NHÂN GỐC (Duyên 16/11) "không thấy nút thêm tin nhắn" + "chữ lẫn hình khó xem": trước đây vẽ theo THỨ TỰ trong danh sách nên chữ/hình xen kẽ,
+                // còn nút "+ Nội dung" nằm ở hàng nút CUỐI (cuộn ngang) sau cả chục hình. Nay chia 3 phần có tiêu đề + số lượng, nút thêm nằm ngay dưới từng phần, ô chữ có ✕.
+                val textIdx = opts.indices.filter { kindOf(opts[it]) == null }
+                val imgIdx = opts.indices.filter { kindOf(opts[it]) == "img" }
+                val audIdx = opts.indices.filter { kindOf(opts[it]) == "aud" }
+
+                @Composable
+                fun mediaRow(i: Int, o: String) {
+                    // XEM đủ: hình hiện thu nhỏ, ghi âm có nút ▶ Nghe.
+                    val isImg = kindOf(o) == "img"
+                    val mname = mediaNameOf(o)
+                    val mf = File(Store.mediaDir, mname)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text(labelOf(o), Modifier.weight(1f))
+                            if (!isImg && mf.exists()) TextButton({ togglePlay(mname) }) { Text(if (playing == mname) "■ Dừng" else "▶ Nghe") }
+                            TextButton({ if (playing == mname) stopPlay(); opts.removeAt(i) }) { Text("✕") }
                         }
-                    } else OutlinedTextField(o, { opts[i] = it }, label = { Text("Nội dung ${i + 1}") },
-                        supportingText = { if (i == 0) Text("Biến: {ngày} {giờ} {thứ} {ngày mai} · {tên} = tên khách, tự lấy từ màn hình (hoặc gõ: viết tắt + tên) · {tên đầy đủ}") },
-                        modifier = Modifier.fillMaxWidth())
+                        if (isImg) {
+                            val bmp = remember(o) { thumb(mf.absolutePath) }
+                            if (bmp != null) Image(bmp, null, Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = ContentScale.Fit)
+                            else Text("(hình chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
+                        } else if (!mf.exists()) Text("(tệp ghi âm chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
+
+                Text("💬 Tin nhắn mẫu (${textIdx.size})", style = MaterialTheme.typography.titleSmall)
+                textIdx.forEachIndexed { k, i ->
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.Top) {
+                        OutlinedTextField(opts[i], { opts[i] = it }, label = { Text("Nội dung ${k + 1}") },
+                            supportingText = { if (k == 0) Text("Biến: {ngày} {giờ} {thứ} {ngày mai} · {tên} = tên khách, tự lấy từ màn hình (hoặc gõ: viết tắt + tên) · {tên đầy đủ}") },
+                            modifier = Modifier.weight(1f))
+                        TextButton({ opts.removeAt(i) }) { Text("✕") }
+                    }
+                }
+                OutlinedButton({ opts.add("") }, Modifier.fillMaxWidth()) { Text("+ Thêm tin nhắn mẫu") }
+
+                Text("🖼 Hình ảnh (${imgIdx.size})", style = MaterialTheme.typography.titleSmall)
+                imgIdx.forEach { i -> mediaRow(i, opts[i]) }
+                OutlinedButton({ pickImg.launch("image/*") }, Modifier.fillMaxWidth()) { Text("+ Thêm hình ảnh") }
+
+                Text("🎤 Ghi âm / âm thanh (${audIdx.size})", style = MaterialTheme.typography.titleSmall)
+                audIdx.forEach { i -> mediaRow(i, opts[i]) }
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    TextButton({ opts.add("") }) { Text("+ Nội dung") }
-                    TextButton({ pickImg.launch("image/*") }) { Text("+ Hình ảnh") }
                     TextButton({
                         if (rec != null) stopRec()
                         else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRec()
@@ -357,7 +376,7 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
         confirmButton = {
             TextButton({
                 if (rec != null) stopRec()
-                val n = Snippet(s.id.ifEmpty { UUID.randomUUID().toString() }, folder, abbr.trim(), kw.trim(), opts.filter { it.isNotBlank() }, System.currentTimeMillis())
+                val n = Snippet(s.id.ifEmpty { UUID.randomUUID().toString() }, folder, abbr.trim(), kw.trim(), opts.filter { it.isNotBlank() }.let { l -> l.filter { kindOf(it) == null } + l.filter { kindOf(it) == "img" } + l.filter { kindOf(it) == "aud" } }, System.currentTimeMillis())
                 if (n.abbr.isNotEmpty() && n.options.isNotEmpty()) {
                     if (crm) Store.savePersonal(n)   // mục CRM → bản cá nhân hoá (☁ CRM áp lại, không bị ghi đè)
                     else {

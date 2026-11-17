@@ -148,6 +148,55 @@ function _teamMemberSet(team){
 // boi dau phay) VA tren "dữ liệu đơn" (tra theo SDT qua donSaleByPhone) thanh 1 Set duy nhat.
 // Dung lam "CS phu trach" cho csSet — _inUserScope/cac bo loc theo CS deu doc tu day, nen chi
 // can sua o 1 cho nay la moi noi dung csSet deu tu dong duoc gom du 3 nguon.
+// ── CS CHUẨN (Duyên 17/11): "biichnguyen1993" và "Biichnguyen1993" là CÙNG 1 người nhưng dữ liệu gốc ghi 2 kiểu hoa/thường nên "Lọc theo CS"
+// hiện thành 2 mục (602 + 364 KH) và cột CS phụ trách hiện 2 chip. Gộp theo tên KHÔNG phân biệt hoa/thường về 1 tên chuẩn:
+// ưu tiên đúng kiểu viết trong tên sale của TÀI KHOẢN, không có thì kiểu xuất hiện nhiều nhất (hòa → kiểu viết hoa chữ đầu).
+// Chỉ gộp khác hoa/thường; tên khác hẳn (thuydinh95 / Thuydinh1995) vẫn do "1 người = nhiều tên" (_personAliases) lo như cũ.
+// Không sửa dữ liệu trên Sheet — chỉ chuẩn hoá phía trình duyệt (tập CS của khách + danh sách lọc).
+var _csCanonMap = {};   // tên viết thường -> tên chuẩn (chỉ chứa tên có >1 kiểu viết)
+function _csCanonName_(n){
+  n = String(n == null ? '' : n).trim(); if (!n) return n;
+  var c = _csCanonMap[n.toLowerCase()];
+  return c || n;
+}
+// spellCount: { 'biichnguyen1993': {'biichnguyen1993':602,'Biichnguyen1993':364}, ... } -> dựng _csCanonMap
+function _csCanonBuild_(spellCount){
+  var acctSpell = {};
+  if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){
+    if (!a) return;
+    ((typeof _acctNamesOf === 'function') ? _acctNamesOf(a) : []).forEach(function(x){ x = String(x || '').trim(); var k = x.toLowerCase(); if (x && !acctSpell[k]) acctSpell[k] = x; });
+  });
+  var map = {};
+  Object.keys(spellCount).forEach(function(k){
+    var sp = Object.keys(spellCount[k]); if (sp.length < 2) return;
+    var best = acctSpell[k] && sp.indexOf(acctSpell[k]) !== -1 ? acctSpell[k] : null;
+    if (!best) {
+      sp.sort(function(a, b){
+        var d = spellCount[k][b] - spellCount[k][a]; if (d) return d;
+        var ua = /^[A-ZÀ-Ỹ]/.test(a) ? 1 : 0, ub = /^[A-ZÀ-Ỹ]/.test(b) ? 1 : 0; if (ua !== ub) return ub - ua;
+        return a < b ? -1 : 1;
+      });
+      best = sp[0];
+    }
+    map[k] = best;
+  });
+  _csCanonMap = map;
+  return map;
+}
+// Chuỗi CS (có thể nhiều tên cách nhau dấu phẩy, vd CS chăm sóc) -> đổi kiểu viết về tên chuẩn, bỏ trùng, giữ thứ tự.
+function _csCanonText_(str){
+  var seen = {}, out = [];
+  String(str == null ? '' : str).split(',').forEach(function(x){ x = _csCanonName_(x); if (x && !seen[x]) { seen[x] = 1; out.push(x); } });
+  return out.join(', ');
+}
+// Chuẩn hoá 1 Set tên CS tại chỗ (đổi kiểu viết khác chuẩn về tên chuẩn). Trả true nếu có đổi.
+function _csCanonSet_(set){
+  if (!set || !set.size) return false;
+  var changed = false, add = [];
+  set.forEach(function(v){ var c = _csCanonMap[String(v).toLowerCase()]; if (c && c !== v) { add.push([v, c]); } });
+  add.forEach(function(p){ set.delete(p[0]); set.add(p[1]); changed = true; });
+  return changed;
+}
 function _buildCsSet_(orders, phone){
   var set = new Set();
   (orders||[]).forEach(function(o){
@@ -162,6 +211,7 @@ function _buildCsSet_(orders, phone){
   if (typeof careLeads !== 'undefined' && careLeads && phone && careLeads[phone] && careLeads[phone].cs) {
     String(careLeads[phone].cs).split(',').forEach(function(n){ n = n.trim(); if (n) set.add(n); });
   }
+  _csCanonSet_(set);   // gộp kiểu viết hoa/thường về CS chuẩn (xem _csCanonBuild_)
   return set;
 }
 function _heldBy(c){

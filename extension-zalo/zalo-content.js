@@ -1628,6 +1628,16 @@
   // khi GAS cu chua co danh muc phang), ctkmCatalog (CTKM theo san pham, cache 10 phut). Gia theo "Loai da" (Mac dinh/SAPHIA/RUBY, nho theo may qua chrome.storage.local).
   // Ma ham ben duoi DAN XUAT CO HOC tu Pancake. Khac biet: "Loai da" o Zalo hien trong khoi gia; ket qua tab "Go tim" CHUA doi gia theo loai da (gap — xem KB 08).
   const ZAI_FLAT_TTL_MS = 15 * 60 * 1000;
+  // MOI loi API/GAS cua cac ham goi {ok,error} (_zaiBldCall_/_zaiImgCall_/_zaiTplCall_/_zaiFetchCsStats_) hien cho CS DUY NHAT 1 cau "Lỗi API" — y het Pancake AI (normalizeApiResp_,
+  // Duyen 22/10/2026, quy tac song song). Chi tiet goc nam o errorRaw + Console (F12). Giu nguyen: ma noi bo GAS_NO_FLAT/GAS_NO_CTKM (code so khop chuoi), thieu URL GAS / chua chon CS / thieu link anh (CS can biet phai lam gi).
+  // KHONG ap cho cac cho goi GAS truc tiep co logic dua vao chuoi loi goc (thu lai khi 429, goi y deploy khi 'Unknown action'...).
+  const ZAI_API_ERR = 'Lỗi API';
+  function _zaiApiErr_(tag, raw) {
+    raw = String(raw || '');
+    if (/GAS_NO_FLAT|GAS_NO_CTKM|GAS_NO_COMBO|Chưa cài đặt URL|Chưa chọn CS|Thiếu link ảnh/i.test(raw)) return { ok: false, error: raw };
+    try { console.warn('[Zalo AI] ' + ZAI_API_ERR + ' —', tag, raw); } catch (_) {}
+    return { ok: false, error: ZAI_API_ERR, errorRaw: raw };
+  }
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
   // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
   // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
@@ -1646,14 +1656,17 @@
       let url;
       if (type === 'GET_PRICE_FLAT') url = GAS_URL + sep + 'action=priceCatalogFlat';
       else if (type === 'GET_CTKM') url = GAS_URL + sep + 'action=ctkmCatalog';
+      else if (type === 'GET_COMBOS') url = GAS_URL + sep + 'action=comboList';
       else { const q = p?.q || ''; url = GAS_URL + sep + 'action=priceSearch' + (q ? '&q=' + encodeURIComponent(q) : ''); }
       const res = await fetch(url, { redirect: 'follow' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       if (type === 'GET_PRICE_FLAT') { if (!Array.isArray(data.items)) throw new Error('GAS_NO_FLAT'); return { ok: true, data: { items: data.items } }; }
       if (type === 'GET_CTKM') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_CTKM'); return { ok: true, data: { rows: data.rows } }; }
+      // GAS ban cu chua co comboList tra {} (khong co rows) -> bao rieng GAS_NO_COMBO de client an khoi combo, khong bao loi om
+      if (type === 'GET_COMBOS') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_COMBO'); return { ok: true, data: { rows: data.rows } }; }
       return { ok: true, data: { rows: data.rows || [], total: data.total || 0 } };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
   // Chuyen che do trong khoi gia: "🔎 Go tim" <-> "🧩 Soan don (chon tung buoc)"
   function bindPriceModeZai_() {
@@ -1685,6 +1698,7 @@
     });
   }
     const ZAI_CTKM_TTL_MS = 15 * 60 * 1000;
+  const ZAI_COMBO_TTL_MS = 5 * 60 * 1000;   // combo doi gia/han thuong xuyen hon CTKM -> cache ngan (y het Pancake pkCombos)
 
   const _zaiBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
@@ -1712,6 +1726,10 @@
   let _zaiCtkmRows = null;
 
   let _zaiCtkmLoading = false;
+
+  let _zaiComboRows = null;      // null = chua tai; [] = khong co / GAS cu (an khoi)
+
+  let _zaiComboLoading = false;
 
   let _zaiBld = _zaiBldBlank_();
 
@@ -1745,9 +1763,11 @@
         <div class="zai-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
           <input type="text" id="zaib-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
         <div id="zaib-msg" class="zai-price-loading" style="display:none"></div>
+        <div id="zaib-combo"></div>
         <div id="zaib-dyn"></div>`;
       host.querySelector('#zaib-q').addEventListener('input', (e) => {
         _zaiBld = Object.assign(_zaiBldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        renderBuilderCombosZai_();
         if (_zaiFlatMode === 'live') {
           clearTimeout(_zaiLiveTimer);
           _zaiLiveTimer = setTimeout(() => _zaiLiveSearch_(_zaiBld.q), 350);
@@ -1759,7 +1779,72 @@
     }
     if (_zaiFlatItems === null && !_zaiFlatLoading) loadFlatZai_();
     if (_zaiCtkmRows === null && !_zaiCtkmLoading) loadCtkmZai_();
+    if (_zaiComboRows === null && !_zaiComboLoading) loadCombosZai_();
+    renderBuilderCombosZai_();
     renderBuilderDynZai_();
+  }
+
+  // ── COMBO CÓ SẴN (sheet COMBO, GAS comboList) — y hệt Pancake AI (quy tắc song song): tải combo ĐANG ÁP DỤNG, lọc theo ô gõ tên, "+ Thêm combo" → thêm cả bộ vào giỏ ──
+  function loadCombosZai_() {
+    if (_zaiComboLoading || _zaiComboRows !== null) return;
+    _zaiComboLoading = true;
+    chrome.storage.local.get(['zaiCombos'], (res) => {
+      const c = res && res.zaiCombos;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < ZAI_COMBO_TTL_MS) {
+        _zaiComboRows = c.rows; _zaiComboLoading = false; renderBuilderCombosZai_(); return;
+      }
+      _zaiBldCall_('GET_COMBOS').then((resp) => {
+        _zaiComboLoading = false;
+        // GAS cũ / chưa có sheet / lỗi mạng → coi như KHÔNG có combo (ẩn khối), không chặn luồng lên đơn.
+        _zaiComboRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows.filter((r) => r && r.usable) : [];
+        if (_zaiComboRows.length) { try { chrome.storage.local.set({ zaiCombos: { ts: Date.now(), rows: _zaiComboRows } }); } catch (e) {} }
+        renderBuilderCombosZai_();
+      });
+    });
+  }
+  const _zaiComboVndOf_ = (c) => Number(c.priceVnd) || 0;
+  const _zaiFmtVnd_ = (n) => (Number(n) || 0).toLocaleString('vi-VN') + 'đ';
+  function _zaiComboMatches_(rows, q) {
+    const words = _zaiItemFold_(q).split(' ').filter(Boolean);
+    if (!words.length) return rows;
+    return rows.filter((c) => {
+      const h = _zaiItemFold_([c.code, c.name, c.keywords, c.itemsText].join(' '));
+      return words.every((w) => h.indexOf(w) !== -1);
+    });
+  }
+  function renderBuilderCombosZai_() {
+    const host = document.getElementById('zaib-combo');
+    if (!host) return;
+    if (!Array.isArray(_zaiComboRows) || !_zaiComboRows.length) { host.innerHTML = ''; return; }
+    const hits = _zaiComboMatches_(_zaiComboRows, _zaiBld.q);
+    const MAX = 5;
+    let html = `<div class="zai-builder-ctkm-box"><div class="zai-builder-ctkm-title">🎁 Combo có sẵn (${hits.length}/${_zaiComboRows.length} đang áp dụng${_zaiItemFold_(_zaiBld.q) ? ' — khớp "' + escAttrZai_(_zaiBld.q) + '"' : ''}):</div>`;
+    if (!hits.length) html += '<div class="zai-builder-ctkm-row">Không có combo nào khớp từ khoá.</div>';
+    hits.slice(0, MAX).forEach((c) => {
+      const items = (c.items || []).map((it) => (Number(it.qty) > 1 ? it.qty + ' x ' : '') + it.name + [it.chatLieu, it.size].filter(Boolean).map((v) => ' · ' + v).join('')).join('; ');
+      html += `<div class="zai-builder-ctkm-row"><b>${escAttrZai_(c.name)}</b> — ${escAttrZai_(_zaiFmtVnd_(_zaiComboVndOf_(c)))}${c.statusLabel ? ' · ' + escAttrZai_(c.statusLabel) : ''}<br>${escAttrZai_(items)}${c.note ? '<br><i>' + escAttrZai_(c.note) + '</i>' : ''}<br>` +
+        `<input type="number" min="1" value="1" class="zaib-combo-qty" data-code="${escAttrZai_(c.code)}" style="width:52px" title="Số bộ combo" /> ` +
+        `<button type="button" class="zai-price-addbtn zaib-combo-add" data-code="${escAttrZai_(c.code)}">+ Thêm combo</button></div>`;
+    });
+    if (hits.length > MAX) html += `<div class="zai-builder-ctkm-row">…còn ${hits.length - MAX} combo nữa — gõ thêm ở ô tìm để lọc.</div>`;
+    html += '</div>';
+    host.innerHTML = html;
+    host.querySelectorAll('.zaib-combo-add').forEach((btn) => btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      const combo = _zaiComboRows.find((x) => String(x.code) === code);
+      if (!combo) return;
+      const qEl = Array.from(host.querySelectorAll('.zaib-combo-qty')).find((el) => el.getAttribute('data-code') === code);
+      addComboToCartZai_(combo, Math.max(1, Math.floor(Number(qEl && qEl.value) || 1)));
+    }));
+  }
+  // Thêm cả combo vào giỏ: 1 dòng TIÊU ĐỀ mang GIÁ COMBO (× số bộ) + mỗi món 1 dòng giá 0đ (SL = SL món × số bộ) → tổng đơn = đúng giá combo,
+  // vẫn đủ món để CS chọn chất liệu/size/màu từng món như bình thường.
+  function addComboToCartZai_(combo, qty) {
+    const items = Array.isArray(combo.items) ? combo.items : [];
+    if (!items.length || !(_zaiComboVndOf_(combo) > 0)) { _zaiCartStatus_('⚠ Combo "' + (combo.name || '') + '" thiếu món hoặc giá — kiểm tra sheet COMBO.'); return; }
+    addToCartZai_({ name: '🎁 Combo ' + combo.name + (combo.code ? ' (' + combo.code + ')' : ''), note: 'Gồm ' + items.length + ' món ở các dòng dưới (giá đã tính vào dòng này)', price: _zaiComboVndOf_(combo), qty });
+    items.forEach((it) => addToCartZai_({ name: it.name, note: 'Thuộc combo ' + combo.name, price: 0, chatLieu: it.chatLieu || '', size: it.size || '', qty: Math.max(1, Number(it.qty) || 1) * qty }));
+    _zaiCartStatus_('✅ Đã thêm combo "' + combo.name + '" (' + items.length + ' món) vào đơn.');
   }
 
   function loadFlatZai_() {
@@ -1783,7 +1868,7 @@
           _zaiSetBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
         } else {
           _zaiFlatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
-          _zaiSetBldMsg_('Lỗi tải danh mục: ' + escAttrZai_(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+          _zaiSetBldMsg_(escAttrZai_(resp?.error || ZAI_API_ERR) + ' — chuyển tab rồi quay lại để thử lại.');
         }
         renderBuilderDynZai_();
       });
@@ -1843,7 +1928,7 @@
     if (_zaiItemFold_(q).length < 2) { _zaiFlatItems = []; renderBuilderDynZai_(); return; }
     _zaiBldCall_('GET_PRICE', { q }).then((resp) => {
       if (q !== _zaiBld.q) return; // đã gõ tiếp, bỏ kết quả cũ
-      if (!resp?.ok) { _zaiSetBldMsg_('Lỗi tìm: ' + escAttrZai_(resp?.error || 'không rõ')); return; }
+      if (!resp?.ok) { _zaiSetBldMsg_(escAttrZai_(resp?.error || ZAI_API_ERR)); return; }
       _zaiFlatItems = (resp.data.rows || []).map(_zaiNormPriceRow_).filter((it) => it.t || it.m);
       renderBuilderDynZai_();
     });
@@ -2018,6 +2103,7 @@
       _zaiBld = _zaiBldBlank_();
       const q = document.getElementById('zaib-q'); if (q) q.value = '';
       if (_zaiFlatMode === 'live') _zaiFlatItems = [];
+      renderBuilderCombosZai_();   // ô gõ vừa xoá trắng → danh sách combo về đủ
       renderBuilderDynZai_();
     });
   }
@@ -2039,7 +2125,7 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || (type === 'GET_DRIVE_IMAGE' ? 'Không đọc được ảnh.' : 'Không tải được danh sách sản phẩm.'));
       return { ok: true, data: type === 'GET_DRIVE_IMAGE' ? data : { items: data.items || [] } };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
     function _zaiLocalStripVN_(s) {
     if (!s) return '';
@@ -2157,7 +2243,7 @@
         _zaiImgFlatItems = resp.data.items || [];
       } else {
         _zaiImgFlatItems = [];
-        if (dyn) dyn.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không tải được danh mục')}</div>`;
+        if (dyn) dyn.innerHTML = `<div class="zai-ctkm-loading">${escAttrZai_(resp?.error || ZAI_API_ERR)}</div>`;
         return;
       }
       renderImgDynZai_();
@@ -2178,7 +2264,7 @@
     _zaiImgCall_('GET_DRIVE_IMAGE', { link }).then((resp) => {
       const slot = document.getElementById(`zaiimg-slot-${i}`);
       if (!slot) return;
-      if (!resp?.ok) { slot.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      if (!resp?.ok) { slot.innerHTML = `<div class="zai-ctkm-loading">${escAttrZai_(resp?.error || ZAI_API_ERR)}</div>`; return; }
       const data = resp.data;
       if (data.image && data.image.base64) {
         slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb" />` +
@@ -2341,7 +2427,7 @@
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       return { ok: true, data };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
   async function loadMsgTemplatesZai_() {
     const box = document.getElementById('zai-tpl-result');
@@ -2455,7 +2541,7 @@
       b.disabled = true;
       _zaiTplCall_('DELETE_MESSAGE_TEMPLATE', { id: t.id, createdBy: _currentCS || '' }).then((resp) => {
         if (resp?.ok) { _zaiTplStatus_('Đã xoá mẫu.'); loadMsgTemplatesZai_(); }
-        else { b.disabled = false; _zaiTplStatus_('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; _zaiTplStatus_(resp?.error || ZAI_API_ERR); }
       });
     }));
   }
@@ -2544,7 +2630,7 @@
       }).then((resp) => {
         // Server tra status: 'approved' khi admin da dang nhap o Cai dat extension (kem token) -> dung duoc ngay; con lai 'pending' (cho admin duyet).
         if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_(resp.data && resp.data.status === 'approved' ? 'Đã lưu mẫu — dùng được ngay (admin không cần duyệt).' : 'Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_(resp?.error || ZAI_API_ERR); }
       });
     });
   }
@@ -2559,10 +2645,10 @@
       const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=csStats&cs=' + encodeURIComponent(cs) +
         '&dateFrom=' + encodeURIComponent(dateFrom || '') + '&dateTo=' + encodeURIComponent(dateTo || ''), { redirect: 'follow' });
       const data = await res.json();
-      if (data.error) return { ok: false, error: String(data.error) };
-      if (data.ok === false) return { ok: false, error: 'Không tính được số liệu.' };
+      if (data.error) return _zaiApiErr_('csStats', data.error);
+      if (data.ok === false) return _zaiApiErr_('csStats', 'Không tính được số liệu.');
       return { ok: true, data };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_("csStats", e && e.message || e); }
   }
   const _ZAI_STATS_RANGES_ = [
     { v: 'today', l: 'Hôm nay' }, { v: 'yesterday', l: 'Hôm qua' }, { v: 'thisWeek', l: 'Tuần này' }, { v: 'lastWeek', l: 'Tuần trước' },
@@ -2636,7 +2722,7 @@
       _zaiStatsState.loading = false;
       if (!resp?.ok) {
         _zaiStatsState.data = null;
-        resEl.innerHTML = `<div class="zai-stats-note zai-stats-err">⚠️ ${escHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        resEl.innerHTML = `<div class="zai-stats-note zai-stats-err">⚠️ ${escHtml(resp?.error || ZAI_API_ERR)}</div>`;
         return;
       }
       _zaiStatsState.data = resp.data;

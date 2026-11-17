@@ -1,0 +1,72 @@
+#!/usr/bin/env node
+// Test R5a bước 3: Đổi trạng thái hàng loạt (js/84-cust-bulk-status.js). Chạy: NODE_PATH=<jsdom> node tools/test-cust-bulk-status.js
+const fs = require('fs'), path = require('path');
+const ROOT = path.join(__dirname, '..');
+let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
+const src84 = fs.readFileSync(path.join(ROOT, 'js', '84-cust-bulk-status.js'), 'utf8'), src82 = fs.readFileSync(path.join(ROOT, 'js', '82-cust-select.js'), 'utf8');
+const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const B = require(path.join(ROOT, 'js', '84-cust-bulk-status.js'));
+const isChot = (v) => /chot/i.test(String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+const CARE_TREE = [{ label: 'Chưa liên hệ', value: 'Chưa liên hệ' }, { label: 'Quan tâm', children: [{ label: 'Hỏi giá', value: 'Hỏi giá' }, { label: 'Hẹn gọi lại', value: 'Hẹn gọi lại' }] }, { label: 'Chốt', children: [{ label: 'Đã chốt', value: 'Đã chốt' }] }];
+const L = B.bsLeaves_(CARE_TREE, isChot);
+ok(L.map((x) => x.value).join() === 'Chưa liên hệ,Hỏi giá,Hẹn gọi lại', 'danh sach: bo nhom Chot (khong cho doi hang loat sang Chot)');
+ok(L[1].label === 'Quan tâm - Hỏi giá' && L[0].label === 'Chưa liên hệ', 'nhan dang \"Me - Con\" nhu ho so');
+ok(B.bsLeaves_(CARE_TREE, null).length === 4, 'khong co bo loc chot -> du 4 gia tri');
+const cust = { 1: { phone: '1' }, 2: { phone: '2' }, 3: { phone: '3' }, 4: { phone: '4' }, 5: { phone: '5' } };
+const care = { 1: { status: 'Hỏi giá', khStatus: 'Nóng' }, 2: { status: 'Chưa liên hệ' }, 3: { status: 'Hẹn gọi lại', khStatus: 'Ấm' }, 4: { status: 'Hỏi giá', khStatus: 'Nóng' } };
+const look = (p) => cust[p] || null, scope = (c) => c.phone !== '5', auto = (s) => ({ 'Hỏi giá': 'Nóng', 'Hẹn gọi lại': 'Ấm', 'Chưa liên hệ': '' }[s] || '');
+let P = B.bsPlan_(['1', '2', '3', '4', '5', '9'], 'Hỏi giá', '', look, care, scope, auto);
+ok(P.rows.map((r) => r.phone).join() === '2,3', 'doi tinh trang sang Hoi gia: chi khach 2 va 3 thay doi');
+ok(P.same === 2 && P.noScope === 1 && P.notFound === 1, 'bo qua: 2 da dung (1,4), 1 ngoai pham vi (5), 1 khong thay (9)');
+ok(P.rows[0].toKh === 'Nóng' && P.rows[0].fromKh === '', 'khach 2 (chua co KH): KH TU NHAY theo tinh trang = Nong');
+ok(P.rows[1].toKh === 'Nóng' && P.rows[1].fromKh === 'Ấm', 'khach 3: KH tu nhay Am -> Nong theo quy tac (giong ho so)');
+P = B.bsPlan_(['2'], 'Chưa liên hệ', '', look, care, scope, auto);
+ok(P.rows.length === 0 && P.same === 1, 'khong doi gi (cung tinh trang, KH khong co quy tac) -> bo qua');
+P = B.bsPlan_(['3'], 'Chưa liên hệ', '', look, care, scope, auto);
+ok(P.rows[0].toKh === 'Ấm', 'tinh trang khong co quy tac tu nhay -> GIU KH cu (Am), khong xoa');
+P = B.bsPlan_(['1', '2'], '', 'Lạnh', look, care, scope, auto);
+ok(P.rows.length === 2 && P.rows.every((r) => r.toKh === 'Lạnh') && P.rows[0].toStatus === 'Hỏi giá' && P.rows[1].toStatus === 'Chưa liên hệ', 'chi doi KH: tinh trang CS giu nguyen');
+P = B.bsPlan_(['1', '2'], 'Hẹn gọi lại', 'Lạnh', look, care, scope, auto);
+ok(P.rows.every((r) => r.toKh === 'Lạnh' && r.toStatus === 'Hẹn gọi lại'), 'chon ca 2: KH chon tay uu tien hon tu nhay');
+ok(B.bsPlan_(['1', '2'], '', '', look, care, scope, auto).rows.length === 0, 'khong chon gi -> KHONG co dong nao (tranh vo tinh xoa trang thai)');
+P = B.bsPlan_(['1', '2', '3'], 'Hỏi giá', '', look, care, scope, auto);
+ok(/Tình trạng CS → Hỏi giá \(từ: /.test(B.bsSummary_(P)) && /KH \(tự theo tình trạng\)/.test(B.bsSummary_(P)), 'tom tat co tinh trang + KH tu theo');
+const big = {}, ph = []; for (let i = 0; i < 136000; i++) { big[i] = { phone: String(i) }; ph.push(String(i)); }
+let t0 = Date.now(); const PB = B.bsPlan_(ph, 'Hỏi giá', '', (p) => big[p], {}, () => true, auto); const dt = Date.now() - t0;
+ok(PB.rows.length === 136000 && dt < 1500, 'ke hoach 136k khach nhanh (' + dt + 'ms)');
+let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('(bo qua jsdom)'); }
+if (JSDOM) {
+  const dom = new JSDOM('<table><thead><tr><th id="th-name"><div class="th-inner">K</div></th></tr></thead><tbody id="table-body"></tbody></table>', { runScripts: 'outside-only' });
+  const w = dom.window, toasts = [], audits = [], synced = [], saved = [], tick = { filters: 0, stats: 0 };
+  w.currentUser = { role: 'cs', name: 'An' }; w.careData = JSON.parse(JSON.stringify(care)); w.gsUrl = 'https://x';
+  w.toast = (m) => toasts.push(m); w.logAudit = (a, p, o, n) => audits.push([a, p, o, n]);
+  w._customerByPhone = look; w._inUserScope = scope; w.CARE_STATUS_TREE = CARE_TREE; w.CUSTOMER_STATUS_TREE = [{ label: 'Nóng', value: 'Nóng' }, { label: 'Ấm', value: 'Ấm' }, { label: 'Lạnh', value: 'Lạnh' }];
+  w._hIsChot_ = isChot; w._hAutoKh_ = auto; w.saveLS = (k) => saved.push(k); w._invalidateFilterCache = () => {}; w.queueCareSync = (p) => synced.push(p);
+  w.updateStats = () => tick.stats++; w.updateSidebarBadges = () => {}; w.applyFilters = () => tick.filters++;
+  w.allCustomers = [cust[1], cust[2], cust[3], cust[4]]; w._assignCustMap = () => new Map(w.allCustomers.map((c) => [c.phone, c]));
+  w._vt = { list: [{ phone: '2' }, { phone: '3' }] }; w._rowHtml = (c) => '<tr data-phone="' + c.phone + '"><td class="col-name">' + c.phone + '</td></tr>';
+  w._renderVirtualWindow = () => { w.document.getElementById('table-body').innerHTML = w._vt.list.map((c) => w._rowHtml(c)).join(''); };
+  w.renderTable = (l) => { w._vt.list = l; w._renderVirtualWindow(); };
+  w.eval(src82); w.eval(src84); w.renderTable(w._vt.list);
+  const D = w.document; D.querySelectorAll('.cs-sel-box').forEach((b) => b.click());
+  const bar = D.getElementById('cs-selbar'), btn = bar.querySelector('[data-cs-act="run:bulk-status"]');
+  ok(!!btn && /Đổi trạng thái/.test(btn.textContent), 'CS thuong cung thay nut \"Doi trang thai\" (chi tac dong khach trong pham vi)');
+  btn.click();
+  const m = D.getElementById('bs-modal'); ok(!!m && /2 khách đã chọn/.test(m.textContent), 'mo hop thoai cho 2 khach');
+  ok(m.querySelector('[data-bs="go"]').disabled === true, 'chua chon gi -> nut Doi bi khoa');
+  const optsSt = Array.from(m.querySelectorAll('#bs-st option')).map((o) => o.value);
+  ok(optsSt.join() === ',Chưa liên hệ,Hỏi giá,Hẹn gọi lại' && !optsSt.includes('Đã chốt'), 'o Tinh trang CS: co dung cac gia tri, KHONG co \"Da chot\"');
+  const sel = m.querySelector('#bs-st'); sel.value = 'Hỏi giá'; sel.dispatchEvent(new w.Event('change'));
+  ok(/2<\/b> \/ 2 khách sẽ được đổi/.test(m.querySelector('#bs-preview').innerHTML) && !m.querySelector('[data-bs="go"]').disabled, 'xem truoc: 2/2 khach; nut Doi bat');
+  ok(/tự nhảy theo Tình trạng CS/.test(m.querySelector('#bs-preview').textContent), 'xem truoc nhac KH tu nhay');
+  m.querySelector('[data-bs="go"]').click();
+  ok(w.careData['2'].status === 'Hỏi giá' && w.careData['2'].khStatus === 'Nóng' && w.careData['3'].status === 'Hỏi giá' && w.careData['3'].khStatus === 'Nóng', 'careData cap nhat: status + KH tu nhay');
+  ok(!!w.careData['2'].updated && cust[2].careStatus === 'Hỏi giá' && cust[2]._lastActionDate > 0, 'danh dau thoi gian tac dong + dong bo khach trong bo nho');
+  ok(w.careData['1'].status === 'Hỏi giá' && w.careData['4'].khStatus === 'Nóng', 'khach khong chon KHONG bi dung toi');
+  ok(synced.join() === '2,3' && saved.includes('ome_care') && tick.filters === 1 && tick.stats === 1, 'queueCareSync dung 2 khach, luu local, ve lai 1 lan');
+  ok(audits.length === 1 && audits[0][0] === 'bulk_status' && /2\/2 khách/.test(audits[0][2]), 'nhat ky 1 dong tong (khong 1 dong/khach de khoi tran 2000 dong)');
+  ok(!D.getElementById('bs-modal') && !bar.classList.contains('is-open') && toasts.some((t) => /Đã đổi trạng thái 2 khách/.test(t)), 'dong hop thoai, bo chon, bao da doi');
+}
+ok(/js\/84-cust-bulk-status\.js/.test(idx) && idx.indexOf('js/84-cust-bulk-status.js') > idx.indexOf('js/82-cust-select.js'), 'index.html nap js/84 sau js/82');
+ok(!/function saveCare\b/.test(src84) && /queueCareSync/.test(src84) && !/allCustomers\.find\(/.test(src84), 'khong viet lai saveCare, dung queueCareSync, khong quet allCustomers.find cho tung SDT');
+console.log(fail ? '\nFAILED ' + fail : '\nALL CUST-BULK-STATUS TESTS PASSED'); process.exit(fail ? 1 : 0);

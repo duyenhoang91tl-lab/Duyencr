@@ -286,6 +286,8 @@ function buildCustomers() {
       };
     });
   }
+  // Khach chi co o POS (dữ liệu đơn): js/89 thêm vào customerMap SAU mọi nguồn khác (SĐT đã có khách thì giữ nguyên) — Danh sách KH khớp đơn POS, bước 3/7
+  if (typeof posCustomersInject_ === 'function') { try { posCustomersInject_(customerMap); } catch (e) { console.warn('posCustomersInject_', e); } }
   allCustomers = Object.values(customerMap).map(c => {
     // TONG DON / TONG DOANH THU: KH da co don POS -> theo POS (chuan, bo don hoan); chua co Pos -> theo Base nhu cu. Phan hang KH tinh tu rev nay.
     const tot = _custOrderCount_(c);
@@ -888,7 +890,7 @@ function _rowHtml(c) {
   const csBadges = csNames.slice(0,3).map(n=>`<span class="cs-badge">${esc(n)}</span>`).join('');
   const csExtra = csNames.length>3?`<span class="cs-badge">+${csNames.length-3}</span>`:'';
   const csHtml = csNames.length ? `<div class="cs-badge-wrap">${csBadges}${csExtra}</div>` : '<span style="color:var(--hint);font-size:11px">—</span>';
-  const careCSHtml = c.careCS ? `<span class="cs-badge" style="background:var(--green-bg);color:var(--green)">${esc(c.careCS)}</span>` : '<span style="color:var(--hint);font-size:11px">—</span>';
+  const careCSHtml = c.careCS ? `<span class="cs-badge" style="background:var(--green-bg);color:var(--green)">${esc(typeof _csCanonText_==='function' ? _csCanonText_(c.careCS) : c.careCS)}</span>` : '<span style="color:var(--hint);font-size:11px">—</span>';
   const srcTags = c.sources.slice(0,2).map(x=>`<span class="btag">${esc(x)}</span>`).join('');
   const srcExtra = c.sources.length>2?`<span class="btag">+${c.sources.length-2}</span>`:'';
   // Ghi chú gần nhất (cache để khỏi sort lại mỗi lần scroll)
@@ -955,7 +957,7 @@ function _rowHtml(c) {
     <td class="col-level" style="${levelDisp}">${levelHtml}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
-    <td class="col-order"><span style="font-weight:600">${c.totalOrders}</span><span style="color:var(--muted);font-size:11px"> / ${fmtVND(c.totalRevenue)}</span></td>
+    <td class="col-order">${(typeof posRevCellHtml_==='function' && posRevCellHtml_(c)) || ('<span style="font-weight:600">' + c.totalOrders + '</span><span style="color:var(--muted);font-size:11px"> / ' + fmtVND(c.totalRevenue) + '</span>')}</td>
     <td class="col-product"><div class="btags">${brandTags}${extra}</div></td>
     <td class="col-cs">${csHtml}</td>
     <td class="col-carecs">${careCSHtml}</td>

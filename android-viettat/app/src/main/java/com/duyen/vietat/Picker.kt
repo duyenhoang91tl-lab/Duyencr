@@ -173,9 +173,15 @@ class Picker(
         col.addView(title)
 
         val list = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(2), dp(10), dp(84)) }
-        options.indices.filter { kindOf(options[it]) == null }.forEach { list.addView(textCard(it, options[it])) }
+        fun header(t: String) = TextView(ctx).apply { text = t; textSize = 13f; setTextColor(cSub); typeface = Typeface.DEFAULT_BOLD; setPadding(dp(4), dp(8), dp(4), dp(2)) }
+        val textIdx = options.indices.filter { kindOf(options[it]) == null }
+        val mediaIdx = options.indices.filter { kindOf(options[it]) != null }
+        // Tách 2 nhóm có tiêu đề + số lượng để biết ngay có những mẫu chữ nào / hình nào (Duyên 16/11).
+        if (textIdx.isNotEmpty()) list.addView(header("💬 Tin nhắn mẫu (${textIdx.size})"))
+        textIdx.forEach { list.addView(textCard(it, options[it])) }
         val cell = (ctx.resources.displayMetrics.widthPixels - dp(20) - dp(8)) / 3
-        options.indices.filter { kindOf(options[it]) != null }.chunked(3).forEach { idx ->
+        if (mediaIdx.isNotEmpty()) list.addView(header("🖼 Hình ảnh / ghi âm (${mediaIdx.size})"))
+        mediaIdx.chunked(3).forEach { idx ->
             val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
             idx.forEachIndexed { c, i -> row.addView(tile(i, options[i], cell, c)) }
             list.addView(row)
