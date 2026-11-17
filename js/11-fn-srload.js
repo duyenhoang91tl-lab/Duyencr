@@ -1,4 +1,8 @@
-async function _srLoad(){
+// useCache===true CHI cho duong XEM (bam Loc/doi bao cao: _srApply, _srSetSub) -> duoc dung bo nho dem 60s cua _srFetch (js/10).
+// Moi duong GHI (luu/xoa chia tay, doi cong tat, chot thang...) goi _srLoad() KHONG tham so => xoa cache va lay so moi, nen khong bao gio thay so cu sau khi vua sua.
+async function _srLoad(useCache){
+  var UC = (useCache === true);
+  if (!UC && typeof _srCacheClear_ === 'function') _srCacheClear_();
   if (_srState.sub === 'H'){
     // H tinh hoan toan client (assignHistory + careData) — khong goi GAS; chi keo so don/doanh thu nhap tay cua cac thang trong khoang.
     if (_srState.hDateQuick && _srState.hDateQuick !== 'custom'){
@@ -19,7 +23,7 @@ async function _srLoad(){
       dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(','),
       sanPham: _srState.aSanPham || '',
       byCreator: _srState.byCreator ? '1' : ''
-    });
+    }, UC);
   } else if (_srState.sub === 'B') {
     // Duyen 2026-11-09: Bao cao B mo lan DAU ma chua chon ngay (dateFrom/dateTo rong) = tinh TOAN BO don tu truoc toi nay -> vuot 55s cua _srFetch, bao "signal is aborted" va khong ra gi.
     // Lan dau trong phien tu dat "Thang nay" (nhu cac bao cao khac nguoi dung hay xem); sau do neu Duyen CHU DONG xoa ngay de xem tat ca thi ton trong (khong ep lai).
@@ -30,21 +34,24 @@ async function _srLoad(){
         if (rBm) { _srState.dateFrom = rBm.from; _srState.dateTo = rBm.to; _srState.dateQuick = 'thisMonth'; renderSalesReportTab(); }
       }
     }
+    // Chay SONG SONG salesReportB va storeCaseReport (truoc day cho B xong roi moi goi store -> cong don thoi gian). Loi/thieu quyen o store KHONG lam hong B (nhu cu).
+    _srState.dataBStore = null;
+    var _wantStoreB = (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_());
+    var _pStoreB = _wantStoreB
+      ? _srFetch('storeCaseReport', { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, sale: (_srState.bSale||[]).join(',') }, UC).catch(function(){ return null; })
+      : Promise.resolve(null);
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(','),
       sanPham: _srState.bSanPham || '',
       careStatus: (_srState.bCareStatus||[]).join(','), khStatus: (_srState.bKhStatus||[]).join(','),
       zaloStatus: (_srState.bZaloStatus||[]).join(','), nickZalo: _srState.bNickZalo || ''
-    });
+    }, UC);
     // Phan Sale 30% DON QUAY (Bao cao L) gop vao bieu do/bang "Theo Sale" cho du doanh thu sale (Duyen 2026-11-03); loi/thieu quyen KHONG lam hong Bao cao B.
-    _srState.dataBStore = null;
-    if (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) {
-      try {
-        var dStoreB = await _srFetch('storeCaseReport', { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, sale: (_srState.bSale||[]).join(',') });
-        if (dStoreB && dStoreB.ok !== false && !dStoreB.error) _srState.dataBStore = dStoreB;
-      } catch (eStoreB) { /* bo qua: B van hien thi doanh thu Pos nhu cu */ }
-    }
+    var _lastErrB = _srState.lastFetchError;   // loi cua chinh B (request store chay song song cung ghi lastFetchError nen chup lai ngay khi B xong)
+    var dStoreB = await _pStoreB;
+    if (dStoreB && dStoreB.ok !== false && !dStoreB.error) _srState.dataBStore = dStoreB;
+    _srState.lastFetchError = _srState.dataB ? '' : _lastErrB;   // B co du lieu thi khong hien loi cua store; B hong thi giu dung loi cua B
   } else if (_srState.sub === 'C') {
     // C tính theo Pos = tính 2 kỳ (mỗi kỳ chạy Báo cáo B, chậm): bắn 2 request SONG SONG để backend tính + cache từng kỳ, rồi mới lấy kết quả (1 request nối tiếp 2 kỳ vượt 55s → treo "Đang tải").
     // Bỏ qua lỗi ở bước này; request chính bên dưới tự tính lại nếu cache không có.
@@ -56,7 +63,7 @@ async function _srLoad(){
         customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
         sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','), sanPham: _srState.cSanPham || '', byCreator: ''
       };
-      try { await Promise.all(['cur', 'prev'].map(function(pt){ return _srFetch('salesReportC', Object.assign({}, _cBase, { part: pt })); })); } catch (eWarmC) { /* bỏ qua */ }
+      try { await Promise.all(['cur', 'prev'].map(function(pt){ return _srFetch('salesReportC', Object.assign({}, _cBase, { part: pt }), UC); })); } catch (eWarmC) { /* bỏ qua */ }
     }
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
@@ -66,7 +73,7 @@ async function _srLoad(){
       sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','),
       sanPham: _srState.cSanPham || '',
       byCreator: _srState.byCreator ? '1' : ''
-    });
+    }, UC);
   } else if (_srState.sub === 'D') {
     _srState.dataD = await _srFetch('careLeadReport', {
       dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: (_srState.dCs||[]).join(',')
@@ -76,16 +83,20 @@ async function _srLoad(){
     // con nhanh 'base' (salesReportA/DT TONG) nua. Chuan hoa lai ten field cho khop shape
     // {saleBan, giaTriDon} ma _computeCommissionData_()/_computeBonusData_() can, de CACH TINH
     // (splitMulti_ + chia deu/theo nguong) dung chung y het, khong viet lai.
+    // storeCaseReport (don chia voi cua hang) chay SONG SONG voi salesReportB thay vi cho B xong (Duyen 2026-11-16: tai bao cao cham); ket qua doc o cuoi nhu cu.
+    var _pStoreE = _srFetch('storeCaseReport', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: (_srState.eSale||[]).join(',') }, UC);
+    _pStoreE.catch(function(){});   // tranh canh bao unhandled khi store loi truoc luc doc ket qua
     var dPos = await _srFetch('salesReportB', {
       dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
       sale: (_srState.eSale||[]).join(',')
-    });
+    }, UC);
+    var _lastErrE = _srState.lastFetchError;
     // Lọc Sale ra 0 đơn: gần như chắc chắn do tên đã chọn (từ Team) KHÔNG trùng tên trong cột "Thẻ" của Pos.
     // Thay vì để 0đ không rõ lý do, tải lại không lọc Sale, hiển thị tất cả và báo rõ tên Sale thật trong Pos.
     _srState.eMismatch = null;
     var _saleSelE = _srState.eSale || [];
     if (_saleSelE.length && dPos && !(dPos.orders && dPos.orders.length)) {
-      var dAllE = await _srFetch('salesReportB', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: '' });
+      var dAllE = await _srFetch('salesReportB', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: '' }, UC);
       if (dAllE && dAllE.orders && dAllE.orders.length) {
         var cntE = {};
         dAllE.orders.forEach(function(o){
@@ -109,9 +120,10 @@ async function _srLoad(){
     // Don chia voi CUA HANG (Bao cao L) cho muc "Thu nhap tung Sale": cung khoang ngay/Sale; loi/thieu quyen KHONG lam hong Bao cao E.
     _srState.dataEStore = null; _srState.dataEStoreErr = '';
     try {
-      var dStoreE = await _srFetch('storeCaseReport', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: (_srState.eSale||[]).join(',') });
+      var dStoreE = await _pStoreE;
       if (dStoreE && dStoreE.ok !== false && !dStoreE.error) _srState.dataEStore = dStoreE; else _srState.dataEStoreErr = String((dStoreE && (dStoreE.error || dStoreE.message)) || 'không có dữ liệu');
     } catch (eStoreE) { _srState.dataEStoreErr = String((eStoreE && eStoreE.message) || eStoreE); }
+    _srState.lastFetchError = _srState.dataE ? '' : _lastErrE;   // E hong thi giu dung loi cua B/Pos, khong bi loi cua store ghi de
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
     // ma 2 o ngay rong / cu sang thang khac => bao cao tinh nham toan bo lich su don).
@@ -122,7 +134,7 @@ async function _srLoad(){
     _srState.dataF = await _srFetch('saleKpiReport', {
       dateFrom: _srState.fDateFrom, dateTo: _srState.fDateTo,
       sale: (_srState.fSale||[]).join(',')
-    });
+    }, UC);
   } else if (_srState.sub === 'L') {
     // KH qua cua hang (trang tinh cua hang) — khop SDT+ngay voi don Pos, chia 30% cho Sale chua co the
     if (_srState.lDateQuick && _srState.lDateQuick !== 'custom'){
@@ -150,7 +162,7 @@ async function _srLoad(){
     var dPosG = await _srFetch('salesReportB', {
       dateFrom: _srState.gDateFrom, dateTo: _srGPosTo_(_srState.gDateTo),
       sale: (_srState.gSale||[]).join(',')
-    });
+    }, UC);
     _srRegisterIdentity_(dPosG);
     if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     if (dPosG && dPosG.orders){
@@ -173,7 +185,7 @@ function _srSubSelectHtml_(){
   return '<select onchange="_srSetSub(this.value)" title="Chọn báo cáo" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:600;font-size:13px;max-width:100%">' +
     items.map(function(it){ return '<option value="' + it[0] + '"' + (it[0] === cur ? ' selected' : '') + '>' + it[1] + '</option>'; }).join('') + '</select>';
 }
-function _srSetSub(sub){ _srApplySub_(sub); _srLoad(); }
+function _srSetSub(sub){ _srApplySub_(sub); _srLoad(true); }   // duong XEM: duoc dung bo nho dem 60s (xem _srLoad)
 function _srSetField(key, val){ _srState[key] = val; }
 // Bo loc nhanh khoang ngay dung chung cho A/D/E cua Bao cao doanh so — quickKey la ten field
 // luu lua chon dropdown ('dateQuick'/'dDateQuick'/'eDateQuick'), fromKey/toKey la 2 field ngay
@@ -323,7 +335,7 @@ function srSaleComboKey(e){
   opts.forEach(function(o,i){ o.classList.toggle('active', i===_srSaleComboIdx); });
   if (_srSaleComboIdx>=0 && opts[_srSaleComboIdx]) opts[_srSaleComboIdx].scrollIntoView({block:'nearest'});
 }
-function _srApply(){ _srLoad(); }
+function _srApply(){ _srLoad(true); }   // duong XEM (Loc/doi ky/doi bo loc): duoc dung bo nho dem 60s; cac duong GHI goi _srLoad() khong tham so => lay so moi
 
 // ── An/Hien Page & Sale khoi bao cao chung (yeu cau 2026-09-25) ──
 function _srToggleHiddenPanel(){

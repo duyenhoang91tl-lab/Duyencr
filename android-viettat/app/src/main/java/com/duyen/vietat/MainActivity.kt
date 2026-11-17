@@ -10,6 +10,11 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import android.graphics.BitmapFactory
+import android.media.MediaPlayer
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.core.content.ContextCompat
 import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -183,14 +188,12 @@ fun App(crm: CrmWeb) {
                     val nImg = s.options.count { kindOf(it) == "img" }
                     val nAud = s.options.count { kindOf(it) == "aud" }
                     val preview = s.options.firstOrNull { kindOf(it) == null }.orEmpty()
-                    Card(onClick = {
-                        if (crmItem) Toast.makeText(ctx, "Mục lấy từ CRM — sửa trên CRM (tab Zalo AI → Viết tắt), rồi bấm ☁ CRM để cập nhật", Toast.LENGTH_LONG).show()
-                        else editing = s
-                    }, Modifier.fillMaxWidth()) {
+                    // Mục CRM cũng bấm vào xem được ĐỦ nội dung và sửa CÁ NHÂN HOÁ (chỉ trên máy này) — SnippetDialog xử lý theo Store.isCrm(s.id).
+                    Card(onClick = { editing = s }, Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Text(s.abbr, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (crmItem) Text("☁ CRM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                if (crmItem) Text(if (Store.isPersonal(s.id)) "☁ CRM · ✎ cá nhân hoá" else "☁ CRM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             }
                             if (s.keyword.isNotBlank()) Text(s.keyword, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (preview.isNotBlank()) Text(preview, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -222,10 +225,24 @@ fun App(crm: CrmWeb) {
     }
 }
 
+/** Hình thu nhỏ để XEM trong hộp sửa (giải mã giảm kích thước, tránh tràn bộ nhớ với ảnh lớn); null nếu tệp chưa có/hỏng. */
+private fun thumb(path: String, target: Int = 480): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+    val b = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, b)
+    var sample = 1
+    while (b.outWidth / (sample * 2) >= target && b.outHeight / (sample * 2) >= target) sample *= 2
+    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+}.getOrNull()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     val ctx = LocalContext.current
+    // Mục lấy từ CRM (id "crm_…"): xem đủ nội dung + sửa thành BẢN CÁ NHÂN HOÁ chỉ trên máy này (Store.savePersonal); không xoá được, không đổi thư mục.
+    val crm = Store.isCrm(s.id)
+    val personal = crm && Store.isPersonal(s.id)
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var playing by remember { mutableStateOf("") }
     var abbr by remember { mutableStateOf(s.abbr) }
     var kw by remember { mutableStateOf(s.keyword) }
     var folder by remember { mutableStateOf(s.folderId) }
@@ -271,29 +288,82 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
     }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) startRec() }
     DisposableEffect(Unit) { onDispose { rec?.let { r -> runCatching { r.stop() }; r.release() } } }
+    fun stopPlay() { player?.let { runCatching { it.stop() }; it.release() }; player = null; playing = "" }
+    fun togglePlay(name: String) {
+        val was = playing; stopPlay()
+        if (was == name) return
+        val f = File(Store.mediaDir, name)
+        if (!f.exists()) { Toast.makeText(ctx, "Tệp ghi âm chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM", Toast.LENGTH_SHORT).show(); return }
+        runCatching {
+            val mp = MediaPlayer()
+            mp.setDataSource(f.absolutePath); mp.setOnCompletionListener { playing = "" }; mp.prepare(); mp.start()
+            player = mp; playing = name
+        }.onFailure { Toast.makeText(ctx, "Không phát được tệp này", Toast.LENGTH_SHORT).show() }
+    }
+    DisposableEffect(Unit) { onDispose { player?.let { p -> runCatching { p.stop() }; p.release() } } }
 
     AlertDialog(onDismissRequest = onDone,
-        title = { Text(if (s.id.isEmpty()) "Thêm viết tắt" else "Sửa viết tắt") },
+        title = { Text(if (s.id.isEmpty()) "Thêm viết tắt" else if (crm) "Mục từ CRM" else "Sửa viết tắt") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (crm) Text(if (personal) "✎ Đang dùng BẢN CÁ NHÂN HOÁ của bạn — chỉ áp dụng trên máy này, không đổi trên CRM."
+                    else "☁ Mục lấy từ CRM. Bạn xem đủ nội dung và sửa được — bản sửa CHỈ áp dụng trên máy này (không đổi trên CRM, người khác không bị ảnh hưởng).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                if (personal) OutlinedButton({
+                    Store.restoreCrm(s.id)
+                    Toast.makeText(ctx, "Đang lấy lại bản chung từ CRM…", Toast.LENGTH_SHORT).show()
+                    onDone()   // App gọi lại ☁ CRM sau khi đóng hộp → bản chung quay lại
+                }, Modifier.fillMaxWidth()) { Text("↩ Khôi phục bản chung từ CRM") }
                 OutlinedTextField(abbr, { abbr = it }, singleLine = true, label = { Text("Viết tắt (vd: stk)") })
                 OutlinedTextField(kw, { kw = it }, singleLine = true, label = { Text("Từ khoá (cách nhau dấu phẩy)") })
-                OutlinedButton({ pickFolderDlg = true }, Modifier.fillMaxWidth()) {
+                if (crm) Text("📁 " + (Store.folders.firstOrNull { it.id == folder }?.name ?: "CRM"), style = MaterialTheme.typography.bodySmall)
+                else OutlinedButton({ pickFolderDlg = true }, Modifier.fillMaxWidth()) {
                     Text("📁 " + (Store.folders.firstOrNull { it.id == folder }?.name ?: "Chung") + "  ▾", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                opts.forEachIndexed { i, o ->
-                    if (kindOf(o) != null) {
+                // NGUYÊN NHÂN GỐC (Duyên 16/11) "không thấy nút thêm tin nhắn" + "chữ lẫn hình khó xem": trước đây vẽ theo THỨ TỰ trong danh sách nên chữ/hình xen kẽ,
+                // còn nút "+ Nội dung" nằm ở hàng nút CUỐI (cuộn ngang) sau cả chục hình. Nay chia 3 phần có tiêu đề + số lượng, nút thêm nằm ngay dưới từng phần, ô chữ có ✕.
+                val textIdx = opts.indices.filter { kindOf(opts[it]) == null }
+                val imgIdx = opts.indices.filter { kindOf(opts[it]) == "img" }
+                val audIdx = opts.indices.filter { kindOf(opts[it]) == "aud" }
+
+                @Composable
+                fun mediaRow(i: Int, o: String) {
+                    // XEM đủ: hình hiện thu nhỏ, ghi âm có nút ▶ Nghe.
+                    val isImg = kindOf(o) == "img"
+                    val mname = mediaNameOf(o)
+                    val mf = File(Store.mediaDir, mname)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text("${i + 1}. ${labelOf(o)}", Modifier.weight(1f))
-                            TextButton({ opts.removeAt(i) }) { Text("✕") }
+                            Text(labelOf(o), Modifier.weight(1f))
+                            if (!isImg && mf.exists()) TextButton({ togglePlay(mname) }) { Text(if (playing == mname) "■ Dừng" else "▶ Nghe") }
+                            TextButton({ if (playing == mname) stopPlay(); opts.removeAt(i) }) { Text("✕") }
                         }
-                    } else OutlinedTextField(o, { opts[i] = it }, label = { Text("Nội dung ${i + 1}") },
-                        supportingText = { if (i == 0) Text("Biến: {ngày} {giờ} {thứ} {ngày mai} · {tên} = tên khách, tự lấy từ màn hình (hoặc gõ: viết tắt + tên) · {tên đầy đủ}") },
-                        modifier = Modifier.fillMaxWidth())
+                        if (isImg) {
+                            val bmp = remember(o) { thumb(mf.absolutePath) }
+                            if (bmp != null) Image(bmp, null, Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = ContentScale.Fit)
+                            else Text("(hình chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
+                        } else if (!mf.exists()) Text("(tệp ghi âm chưa có trên máy — bấm ⋮ › ☁ Cập nhật từ CRM)", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
+
+                Text("💬 Tin nhắn mẫu (${textIdx.size})", style = MaterialTheme.typography.titleSmall)
+                textIdx.forEachIndexed { k, i ->
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.Top) {
+                        OutlinedTextField(opts[i], { opts[i] = it }, label = { Text("Nội dung ${k + 1}") },
+                            supportingText = { if (k == 0) Text("Biến: {ngày} {giờ} {thứ} {ngày mai} · {tên} = tên khách, tự lấy từ màn hình (hoặc gõ: viết tắt + tên) · {tên đầy đủ}") },
+                            modifier = Modifier.weight(1f))
+                        TextButton({ opts.removeAt(i) }) { Text("✕") }
+                    }
+                }
+                OutlinedButton({ opts.add("") }, Modifier.fillMaxWidth()) { Text("+ Thêm tin nhắn mẫu") }
+
+                Text("🖼 Hình ảnh (${imgIdx.size})", style = MaterialTheme.typography.titleSmall)
+                imgIdx.forEach { i -> mediaRow(i, opts[i]) }
+                OutlinedButton({ pickImg.launch("image/*") }, Modifier.fillMaxWidth()) { Text("+ Thêm hình ảnh") }
+
+                Text("🎤 Ghi âm / âm thanh (${audIdx.size})", style = MaterialTheme.typography.titleSmall)
+                audIdx.forEach { i -> mediaRow(i, opts[i]) }
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    TextButton({ opts.add("") }) { Text("+ Nội dung") }
-                    TextButton({ pickImg.launch("image/*") }) { Text("+ Hình ảnh") }
                     TextButton({
                         if (rec != null) stopRec()
                         else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRec()
@@ -306,18 +376,22 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
         confirmButton = {
             TextButton({
                 if (rec != null) stopRec()
-                val n = Snippet(s.id.ifEmpty { UUID.randomUUID().toString() }, folder, abbr.trim(), kw.trim(), opts.filter { it.isNotBlank() }, System.currentTimeMillis())
+                val n = Snippet(s.id.ifEmpty { UUID.randomUUID().toString() }, folder, abbr.trim(), kw.trim(), opts.filter { it.isNotBlank() }.let { l -> l.filter { kindOf(it) == null } + l.filter { kindOf(it) == "img" } + l.filter { kindOf(it) == "aud" } }, System.currentTimeMillis())
                 if (n.abbr.isNotEmpty() && n.options.isNotEmpty()) {
-                    val i = Store.snippets.indexOfFirst { it.id == n.id }
-                    if (i >= 0) Store.snippets[i] = n else Store.snippets += n
-                    Store.save()
+                    if (crm) Store.savePersonal(n)   // mục CRM → bản cá nhân hoá (☁ CRM áp lại, không bị ghi đè)
+                    else {
+                        val i = Store.snippets.indexOfFirst { it.id == n.id }
+                        if (i >= 0) Store.snippets[i] = n else Store.snippets += n
+                        Store.save()
+                    }
                 }
+                stopPlay()
                 onDone()
             }) { Text("Lưu") }
         },
         dismissButton = {
             Row {
-                if (s.id.isNotEmpty()) TextButton({ Store.deleteSnippet(s.id); onDone() }) { Text("Xoá") }
+                if (s.id.isNotEmpty() && !crm) TextButton({ Store.deleteSnippet(s.id); onDone() }) { Text("Xoá") }
                 TextButton(onDone) { Text("Huỷ") }
             }
         })

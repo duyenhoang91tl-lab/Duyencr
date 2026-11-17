@@ -59,6 +59,14 @@ object Store {
         if (local) o.optJSONArray("tombstones")?.let { a ->
             for (i in 0 until a.length()) a.getJSONObject(i).let { tomb[it.getString("id")] = it.getString("kind") to it.getLong("ts") }
         }
+        if (local) o.optJSONArray("overrides")?.let { a ->
+            for (i in 0 until a.length()) {
+                val j = a.getJSONObject(i)
+                val oa = j.optJSONArray("options") ?: continue
+                overrides[j.getString("id")] = Snippet(j.getString("id"), j.optString("folderId"), j.getString("abbr"), j.optString("keyword"),
+                    (0 until oa.length()).map { oa.getString(it) }, j.optLong("updatedAt", 1))
+            }
+        }
         return n
     }
 
@@ -72,6 +80,12 @@ object Store {
             }
         })
         o.put("tombstones", JSONArray().also { a -> tomb.forEach { (id, v) -> a.put(JSONObject().put("id", id).put("kind", v.first).put("ts", v.second)) } })
+        o.put("overrides", JSONArray().also { a ->
+            overrides.values.forEach {
+                a.put(JSONObject().put("id", it.id).put("folderId", it.folderId).put("abbr", it.abbr)
+                    .put("keyword", it.keyword).put("options", JSONArray(it.options)).put("updatedAt", it.updatedAt))
+            }
+        })
         return o.toString(2)
     }
 
@@ -79,6 +93,30 @@ object Store {
     fun importJson(text: String): Int = runCatching { parse(text).also { save() } }.getOrDefault(-1)
 
     val tomb = mutableMapOf<String, Pair<String, Long>>()
+
+    /**
+     * BẢN CÁ NHÂN HOÁ của mục CRM (Duyên yêu cầu 2026-11-15): mục lấy từ CRM (id "crm_…") bấm vào xem được ĐỦ nội dung và sửa được — bản sửa chỉ áp dụng cho
+     * app trên máy này (không đổi trên CRM, không ảnh hưởng người khác). Lưu riêng theo id mục CRM và ÁP LẠI mỗi lần ☁ CRM (replaceCrm xoá-rồi-nạp lại
+     * toàn bộ mục CRM nên nếu không lưu riêng thì bản sửa mất ngay lần cập nhật sau).
+     */
+    val overrides = mutableMapOf<String, Snippet>()
+    /** Số bản cá nhân hoá mà CRM đã XOÁ mục gốc ở lần ☁ CRM gần nhất → đã giữ lại thành mục riêng (Crm.pull đọc để báo cho người dùng). */
+    @Volatile var orphaned = 0
+
+    fun isPersonal(id: String) = overrides.containsKey(id)
+
+    /** Lưu bản cá nhân hoá của mục CRM `n` (n.id = "crm_…"): cập nhật ngay trong danh sách + nhớ để ☁ CRM không ghi đè. */
+    @Synchronized
+    fun savePersonal(n: Snippet) {
+        overrides[n.id] = n
+        val i = snippets.indexOfFirst { it.id == n.id }
+        if (i >= 0) snippets[i] = n else snippets += n
+        save()
+    }
+
+    /** Bỏ bản cá nhân hoá. Nội dung chung gốc quay lại ở lần ☁ CRM kế tiếp (gọi pull ngay sau khi gọi hàm này). */
+    @Synchronized
+    fun restoreCrm(id: String) { overrides.remove(id); save() }
 
     fun deleteSnippet(id: String) {
         snippets.removeAll { it.id == id }; tomb[id] = "snippet" to System.currentTimeMillis(); save()
@@ -98,6 +136,7 @@ object Store {
         folders.removeAll { isCrm(it.id) }; snippets.removeAll { isCrm(it.id) }
         var n = 0
         val fresh = mutableListOf<Folder>()
+        val seen = HashSet<String>()
         for (i in 0 until a.length()) {
             val j = a.getJSONObject(i)
             val oa = j.optJSONArray("options") ?: continue
@@ -113,11 +152,24 @@ object Store {
             val imgs = j.optJSONArray("images")?.let { ia -> (0 until ia.length()).mapNotNull { k -> imgFiles[ia.optJSONObject(k)?.optString("id").orEmpty()]?.let { f -> "[[img:$f]]" } } } ?: emptyList()
             // Tệp ghi âm đính kèm (audios, 2026-11-14): như ảnh nhưng dạng [[aud:tên_file]] (🎤 Ghi âm); tệp chưa tải được thì bỏ qua, lần cập nhật sau thử lại.
             val auds = j.optJSONArray("audios")?.let { aa -> (0 until aa.length()).mapNotNull { k -> audFiles[aa.optJSONObject(k)?.optString("id").orEmpty()]?.let { f -> "[[aud:$f]]" } } } ?: emptyList()
-            snippets += Snippet("crm_" + j.optString("id", abbr), fid, abbr, j.optString("keyword"),
+            val base = Snippet("crm_" + j.optString("id", abbr), fid, abbr, j.optString("keyword"),
                 (0 until oa.length()).map { oa.getString(it) } + imgs + auds, j.optLong("updatedAt", 1))
+            seen += base.id
+            // Bản cá nhân hoá (nếu có) đè nội dung chung; giữ thư mục của CRM. Hình/ghi âm CRM đã nằm trong options của bản cá nhân hoá (cùng tên file crm_<id>.<đuôi>).
+            val ov = overrides[base.id]
+            snippets += if (ov != null) base.copy(abbr = ov.abbr, keyword = ov.keyword, options = ov.options, updatedAt = ov.updatedAt) else base
             n++
         }
         folders.addAll(fresh.sortedBy { it.name })
+        // Mục gốc đã bị XOÁ trên CRM mà người dùng từng cá nhân hoá: giữ bản của họ thành mục riêng (thư mục "Chung") thay vì để mất. CHỈ khi CRM trả về
+        // ít nhất 1 mục — danh sách rỗng thường là lỗi máy chủ tạm thời (đã từng xảy ra), lúc đó giữ nguyên để lần sau áp lại.
+        orphaned = 0
+        if (seen.isNotEmpty()) {
+            overrides.values.filter { it.id !in seen }.toList().forEach { ov ->
+                snippets += ov.copy(id = java.util.UUID.randomUUID().toString(), folderId = "default", updatedAt = System.currentTimeMillis())
+                overrides.remove(ov.id); orphaned++
+            }
+        }
         save(); return n
     }
 
@@ -215,8 +267,14 @@ object Store {
     }
 
     /** Khớp chính xác từ viết tắt, hoặc từ khoá bắt đầu bằng từ đang gõ (>= 2 ký tự). */
-    fun match(w: String): List<Snippet> = snippets.filter { s ->
-        s.abbr.equals(w, true) ||
-            (w.length >= 2 && s.keyword.split(",").map { it.trim() }.any { it.isNotEmpty() && it.startsWith(w, true) })
+    fun match(w: String): List<Snippet> {
+        // NGUYÊN NHÂN GỐC "chọn 3 mẫu mà chèn ra cả mẫu của nhóm khác" (Duyên 16/11): trước đây khớp viết tắt VÀ khớp từ khoá được GỘP chung,
+        // nên mục của nhóm khác chỉ cần có từ khoá bắt đầu bằng chữ đang gõ là bị đổ hết nội dung vào bảng chọn. Nay có mục khớp ĐÚNG viết tắt thì CHỈ lấy các mục đó;
+        // chỉ khi không có mục nào trùng viết tắt mới dùng khớp từ khoá.
+        val exact = snippets.filter { it.abbr.equals(w, true) }
+        if (exact.isNotEmpty()) return exact
+        return snippets.filter { s ->
+            w.length >= 2 && s.keyword.split(",").map { it.trim() }.any { it.isNotEmpty() && it.startsWith(w, true) }
+        }
     }
 }

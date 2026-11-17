@@ -12,8 +12,9 @@ vm.createContext(ctx);
 function grab(file, startRe) { const s = R(file); const i = s.search(startRe); let d = 0, j = s.indexOf('{', i); for (let k = j; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}') { d--; if (!d) return s.slice(i, k + 1); } } }
 vm.runInContext(grab('js/04-fn-synczalophonesettingsfromgas.js', /function _ymd\(d\)/), ctx);
 vm.runInContext(grab('js/10-fn-pkkpipct.js', /function _pkQuickRange\(key\)/), ctx);
+{ const s10 = R('js/10-fn-pkkpipct.js'); vm.runInContext(s10.slice(s10.indexOf('var _SR_CACHE_ACTIONS_'), s10.indexOf('async function _srFetch(')), ctx); }   // bien/ham cache cua _srFetch (js/10) phai co truoc khi chay _srFetch
 vm.runInContext(grab('js/10-fn-pkkpipct.js', /async function _srFetch\(/), ctx);
-vm.runInContext(grab('js/11-fn-srload.js', /async function _srLoad\(\)/), ctx);
+vm.runInContext(grab('js/11-fn-srload.js', /async function _srLoad\(/), ctx);
 vm.runInContext("var _srState = { sub: 'B', dateFrom: '', dateTo: '', dateQuick: 'custom', bSale: [], bNguon: [], bMarketer: [], bCareStatus: [], bKhStatus: [], bZaloStatus: [] }; function _srStoreForBOk_() { return false; }", ctx);
 (async () => {
   const q = u => Object.fromEntries(new URL(u).searchParams);

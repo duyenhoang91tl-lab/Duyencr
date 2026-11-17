@@ -3,11 +3,11 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../js/50-split-orders.js', 'utf8');
 function grab(name, async_) { const key = (async_ ? 'async function ' : 'function ') + name + '('; const i = src.indexOf(key); if (i < 0) throw new Error('thieu ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } }
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
-const names = ['splitEsc_', 'splitMoney_', 'splitKitOn_', 'splitStateChip_', 'splitErrColor_', 'splitToneColor_', 'splitFixCodeNy_', 'splitFixParseLines_', 'splitFixRemoveCode_', 'splitFixMergeExtra_', 'splitFixDefaultText_', 'splitFixSumHtml_', 'splitFixPanelHtml_', 'splitFixEdit_'];
-const asyncNames = ['_splitFixGetExtra_', '_splitFixPutExtra_', 'splitFixSave_', 'splitFixDelete_'];
-let SETTING = '', POSTS = [], TOASTS = [], CONFIRM = true, LOADS = 0;
+const names = ['splitFixEditSaved_', 'splitEsc_', 'splitMoney_', 'splitKitOn_', 'splitStateChip_', 'splitErrColor_', 'splitToneColor_', 'splitFixCodeNy_', 'splitFixParseLines_', 'splitFixRemoveCode_', 'splitFixMergeExtra_', 'splitFixDefaultText_', 'splitFixSumHtml_', 'splitFixPanelHtml_', 'splitFixEdit_'];
+const asyncNames = ['_splitFixGetExtra_', '_splitFixPutExtra_', 'splitFixSave_', 'splitFixSaveCode_', 'splitFixDelete_'];
+let DOMV = {}, SETTING = '', POSTS = [], TOASTS = [], CONFIRM = true, LOADS = 0;
 const ctx = { _srState: { fixOpen: true, mDateFrom: '2026-10-01', mDateTo: '2026-10-31' }, _srIsAdmin_: () => true, gsUrl: 'http://gs', toast: m => TOASTS.push(m), confirm: () => CONFIRM,
-  _srFetch: async (a) => a === 'getSetting' ? { value: SETTING } : null, _srLoad: () => { LOADS++; }, splitFixLoad_: () => {}, JSON, console, document: { getElementById: () => null },
+  _srFetch: async (a) => a === 'getSetting' ? { value: SETTING } : null, _srLoad: () => { LOADS++; }, splitFixLoad_: () => {}, JSON, console, document: { getElementById: (id) => DOMV[id] || null },
   fetch: async (u, o) => { const b = JSON.parse(o.body); POSTS.push(b); if (b.action === 'setSetting') SETTING = b.value; return { json: async () => ({ ok: true }) }; } };
 vm.createContext(ctx);
 vm.runInContext(names.map(n => grab(n)).join('\n') + '\n' + asyncNames.map(n => grab(n, true)).join('\n') + '\n_splitFixRerender_ = function(){};', ctx);
@@ -32,10 +32,11 @@ ctx._srState.fix = { edits: {}, data: { ok: true, total: 1, rows: [ROW] }, extra
 let h = vm.runInContext('splitFixPanelHtml_()', ctx);
 ok(/10T10\/2026/.test(h) && /11T10\/2026/.test(h) && /line-through/.test(h) && /Khach &lt;A&gt;/.test(h) && /An = 8000000/.test(h), 'panel: hien ma don, don goc Base (don bi loai gach ngang), khach da escape, chia hien tai');
 ok(/Chia tay đang lưu trong CRM<\/b> \(1 đơn\)/.test(h) && /ninhnga99, huyenmaii1990 = 6\.700\.000/.test(h), 'panel: liet ke chia tay dang luu (gop 2 dong cung ma = 1 don)');
-ok(!/split-fix-shadow/.test(h) && /file kế toán<\/b> \(đã xác nhận\)/.test(h), 'panel: ghi thu tu ap dung (file ke toan truoc), chua co dong bi che');
-ctx._srState.fix.data.shadowed = ['17T10'];
-ok(/split-fix-shadow/.test(vm.runInContext('splitFixPanelHtml_()', ctx)), 'panel: dong luu bi file ke toan che (khop ma bo nam) hien canh bao khong co hieu luc');
-delete ctx._srState.fix.data.shadowed;
+ok(!/split-fix-override/.test(h) && /file kế toán<\/b>; dòng lưu ở đây/.test(h), 'panel: ghi mac dinh theo ke toan, dong admin de len; chua co dong nao de len ke toan');
+ok(/id="sr-fix-ovc"/.test(h) && /id="sr-fix-ovt"/.test(h) && /splitFixSaveCode_\(\)/.test(h) && /splitFixEditSaved_\(/.test(h), 'panel: co form Chinh de theo ma (ke ca don da co o file ke toan) + nut Sua dong da luu');
+ctx._srState.fix.data.overrides = ['17T10'];
+ok(/split-fix-override/.test(vm.runInContext('splitFixPanelHtml_()', ctx)), 'panel: dong luu dang de len ke toan (khop ma bo nam) hien nhan');
+delete ctx._srState.fix.data.overrides;
 ctx._srIsAdmin_ = () => false; ok(vm.runInContext('splitFixPanelHtml_()', ctx) === '', 'khong phai admin => khong hien panel'); ctx._srIsAdmin_ = () => true;
 vm.runInContext('splitFixEdit_(0, "An = 9000000\\nBinh = 3000000")', ctx);
 ok(/khớp/.test(vm.runInContext('splitFixSumHtml_(0)', ctx)), 'sua dong: tong 12tr = Pos => "khop"');
@@ -53,6 +54,18 @@ ok(/chênh \+500\.000/.test(vm.runInContext('splitFixSumHtml_(0)', ctx)), 'sua d
   ok(POSTS.length === 0, 'huy xac nhan => khong ghi');
   CONFIRM = true; vm.runInContext('splitFixEdit_(0, "loi")', ctx); await vm.runInContext('splitFixSave_(0)', ctx);
   ok(POSTS.length === 0 && /❌/.test(TOASTS[TOASTS.length - 1]), 'dong loi => bao loi, khong ghi');
+  // chinh de 1 don theo ma (ke ca don da co o file ke toan): ma hoa-thuong chuan hoa, thay SACH dong cu cung ma
+  SETTING = JSON.stringify([{ code: '17T10/2026', sales: ['old'], tong: 1 }, { code: '99T10/2026', sales: ['z'], tong: 9 }]); POSTS = []; CONFIRM = true; LOADS = 0;
+  DOMV = { 'sr-fix-ovc': { value: ' 17t10/2026 ' }, 'sr-fix-ovt': { value: 'ninhnga99, huyenmaii1990 = 6.700.000\nninhnga99 = 10708000' } };
+  await vm.runInContext('splitFixSaveCode_()', ctx);
+  let sv = JSON.parse(SETTING);
+  ok(POSTS.length === 1 && sv.length === 3 && sv.filter(x => x.code === '17T10/2026').length === 2 && !sv.some(x => x.sales[0] === 'old') && sv.some(x => x.code === '99T10/2026') && LOADS === 1, 'chinh de theo ma: luu dung 2 dong, thay dong cu cung ma, giu ma khac, tinh lai bao cao');
+  POSTS = []; DOMV = { 'sr-fix-ovc': { value: '' }, 'sr-fix-ovt': { value: 'a = 1' } }; await vm.runInContext('splitFixSaveCode_()', ctx);
+  ok(POSTS.length === 0 && /mã đơn/.test(TOASTS[TOASTS.length - 1]), 'chinh de: thieu ma don => bao loi, khong ghi');
+  DOMV = { 'sr-fix-ovc': { value: '5T11' }, 'sr-fix-ovt': { value: 'abc' } }; await vm.runInContext('splitFixSaveCode_()', ctx);
+  ok(POSTS.length === 0 && /❌/.test(TOASTS[TOASTS.length - 1]), 'chinh de: dong loi => khong ghi');
+  vm.runInContext('_srState.fix.extra = [{ code: "17T10/2026", sales: ["a","b"], tong: 5 }, { code: "17T10/2026", sales: ["a"], tong: 7 }]; splitFixEditSaved_("17T10/2026")', ctx);
+  ok(vm.runInContext('_srState.fix.ovCode', ctx) === '17T10/2026' && vm.runInContext('_srState.fix.ovText', ctx) === 'a, b = 5\na = 7', 'nut Sua: do dong da luu len form');
   await vm.runInContext('splitFixDelete_("99T10/2026")', ctx);
   ok(JSON.parse(SETTING).every(x => x.code !== '99T10/2026') && JSON.parse(SETTING).length === 2, 'xoa chia tay 99T10 khoi bang');
   console.log(fail ? 'FAIL ' + fail : 'ALL OK'); process.exit(fail ? 1 : 0);

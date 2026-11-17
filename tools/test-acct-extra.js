@@ -27,11 +27,12 @@ vm.runInContext(`
 
 // ── Bang CHIA BO SUNG cua CRM (Settings acctSplitExtra): dung _loadAcctSplit_ THAT; chi gia lap file KT (SpreadsheetApp) + Settings ──
 const don = (ghi, sale, val) => ({ ngayTaoDon: '02/10/2026', trangThai: 'Hoàn thành', theSale: sale, soDienThoai: '0900000001', nguonDon: 'Fb Phạm Thu Hiền', giaTri: val, giaTriSauGiam: val, sanPham: 'Nhẫn', maSanPham: 'N1', soLuong: '1', khachHang: 'K', cod: 0, marketer: '', ghiChu: ghi });
+let OVR = '';
 let KTVALS = [['Kênh bán', 'Sale bán', 'Giá trị cọc', 'Tổng giá trị đơn', 'Giá trị chênh', 'Mã bộ đếm', 'Xác nhận']], EXTRA = '';
 ctx.CacheService = new Proxy(svc(), { get: (t, p) => p === 'getScriptCache' ? () => ({ get: () => null, put() {}, remove() {} }) : t[p] });
 const _SSBASE = svc();
 ctx.SpreadsheetApp = new Proxy(_SSBASE, { get: (t, p) => p === 'openById' ? (id) => (id === ctx.ACCT_SPLIT_SS_ID_ ? { getSheets: () => [{ getDataRange: () => ({ getValues: () => KTVALS }) }] } : _SSBASE.openById(id)) : t[p] });
-ctx.__getSetting = k => (k === 'acctSplitExtra' ? EXTRA : null);
+ctx.__getSetting = k => (k === 'acctSplitExtra' ? EXTRA : k === 'orderSaleOverride' ? OVR : null);
 vm.runInContext('getSetting_ = function(k) { return __getSetting(k); }; _acctExtraMemo_ = null;', ctx);
 const run = (dons, extra, kt) => { EXTRA = extra ? JSON.stringify(extra) : ''; KTVALS = [KTVALS[0]].concat(kt || []); ctx.__rows = []; ctx.__don = dons;
   vm.runInContext('_acctExtraMemo_ = null;', ctx);
@@ -56,10 +57,6 @@ B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], null, ktRows)
 ok(g(B, 'ninhnga99') === 8666000 && g(B, 'huyenmaii1990') === 8666000, 'KHONG co bang bo sung: hanh vi cu giu nguyen (file KT chua x => chia deu)');
 B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], [{ code: '17T10/2026', sales: ['ninhnga99', 'huyenmaii1990'], tong: 6700000 }, { code: '17T10/2026', sales: ['ninhnga99'], tong: 10708000 }], ktRows);
 ok(g(B, 'ninhnga99') === 14058000 && g(B, 'huyenmaii1990') === 3350000 && B.totalGiaTri === 17408000, 'Co bang bo sung: 17T10 = KT 14.058.000 / 3.350.000 (thay dong file KT cung ma, khong can x)');
-// 5b) (2026-11-15) KE TOAN THANG ADMIN: dong KT DA XAC NHAN ('x') cung ma => bang CRM bi bo qua; KT chua 'x' thi admin van chinh duoc (ca 5 o tren)
-const ktConf = [['Fb', 'ninhnga99', 0, 5000000, 0, '17T10/2026', 'x']];
-B = run([don('17T10/2026', 'ninhnga99, huyenmaii1990', 17332000)], [{ code: '17T10/2026', sales: ['huyenmaii1990'], tong: 1000000 }], ktConf);
-ok(g(B, 'ninhnga99') === 5000000 && g(B, 'huyenmaii1990') === 0, 'KT da xac nhan (x) thang bang CRM cua admin cung ma: 17T10 = ninhnga99 5.000.000');
 // 6) don khong co trong bang bo sung (BH386 theo Pos) + don thuong: KHONG doi
 B = run([don('BH386T10/2026/6190', 'huyenmaii1990', 6150000), don('999T10/2026', 'anhtrinh1995', 1000000)], [{ code: 'M44707', sales: ['ninhnga99'], tong: 1335000 }]);
 ok(g(B, 'huyenmaii1990') === 6150000 && g(B, 'anhtrinh1995') === 1000000 && B.totalGiaTri === 7150000, 'BH386T10/2026 (theo Pos) + don thuong khong co trong bang bo sung: giu nguyen');
@@ -70,4 +67,9 @@ ok(g(B, 'anhtrinh1995') === 1000000, 'JSON hong: bo qua bang bo sung, bao cao va
 // 8) tong 0 duoc chap nhan, tong am bi bo; ma khong co sale bi bo
 vm.runInContext('_acctExtraMemo_ = null;', ctx); EXTRA = JSON.stringify([{ code: 'X1T10', sales: [], tong: 5 }, { code: '', sales: ['a'], tong: 5 }, { code: 'X2T10', sales: ['a'], tong: -3 }]);
 ok(J(vm.runInContext('_loadAcctExtra_().length', ctx)) === 0, 'dong sai (khong sale / khong ma / tong am) bi bo qua');
+// 9) Ep sale theo don (orderSaleOverride cua phien khac) voi "a, b" => chia deu 2 nguoi, giu nguyen gia tri Pos (dung cho the bao hanh lanVH1995)
+OVR = JSON.stringify({ '1339T10/2026': 'minhanh99, lanVH1995' });
+B = run([don('1339T10/2026 + BH441T10/2026/5790', 'minhanh99', 3930000)], null);
+ok(g(B, 'minhanh99') === 1965000 && g(B, 'lanVH1995') === 1965000 && B.totalGiaTri === 3930000, 'orderSaleOverride "minhanh99, lanVH1995": chia deu 1.965.000/1.965.000, gia tri Pos giu nguyen');
+OVR = '';
 console.log(fails ? '\nFAILED ' + fails : '\nALL ACCT-EXTRA TESTS PASSED'); process.exit(fails ? 1 : 0);

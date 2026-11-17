@@ -564,6 +564,31 @@ function getDonLastDateByPhone_(rows) {
   return map;
 }
 
+// CHAN DOAN Danh sach KH vs POS (BUOC 0 ke hoach "Danh sach KH khop don POS", HANDOFF.md): liet ke don POS (sheet "dữ liệu đơn") cua 1 NGAY,
+// tuy chon chi nhung don co sale do trong cot The (tach bang _donSaleNamesFromThe_ — dung quy tac nhu Bao cao B). CHI DOC.
+// Tra { ok, date, sale, orders, phones, revenue (chi don KHONG bi loai), items:[{phone, rawPhone, name, the, sales[], rev, status, excluded}] } (toi da 800 dong).
+function donDayDiag_(dateIso, sale) {
+  var d = String(dateIso == null ? '' : dateIso).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { ok: false, error: 'date phai dang YYYY-MM-DD' };
+  var want = _normTxt_(String(sale == null ? '' : sale).trim());
+  var rows = readDonChiTiet_(), items = [], seen = {}, nPhones = 0, rev = 0, orders = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var dt = parseVNDate_(r.ngayTaoDon);
+    if (!dt || _vnYmd_(dt) !== d) continue;
+    var names = _donSaleNamesFromThe_(r.theSale);
+    if (want && names.map(_normTxt_).indexOf(want) === -1) continue;
+    var ph = normPhone_(String(r.soDienThoai || ''));
+    var ex = _donHasExcludedStatus_(r.trangThai);
+    var v = Number(r.giaTriSauGiam) || 0;
+    orders++;
+    if (!ex) rev += v;
+    if (ph && !seen[ph]) { seen[ph] = 1; nPhones++; }
+    if (items.length < 800) items.push({ phone: ph, rawPhone: String(r.soDienThoai || ''), name: String(r.khachHang || ''), the: String(r.theSale || ''), sales: names, rev: v, status: String(r.trangThai || ''), excluded: !!ex });
+  }
+  return { ok: true, date: d, sale: String(sale || ''), orders: orders, phones: nPhones, revenue: rev, items: items };
+}
+
 // Chuyen cac dong tho cua "dữ liệu đơn" thanh object don (TACH TU readDonChiTiet_ 2026-10-09 de Supabase backfill/doc dung CHUNG 1 logic —
 // khong duoc co 2 ban logic lech nhau). vals = mang dong (getValues, bat dau tu so dong firstRow, 1-based); lastNgay = ngay ke thua tu dong
 // co ngay gan nhat TRUOC lo nay ('' o lo dau). Tra { items:[{srcRow, obj}], lastNgay } — dong bi bo (rong/dong Tong) khong co trong items.
@@ -674,7 +699,7 @@ function readDonChiTiet_() {
   // posRow = so dong THAT trong sheet "dữ liệu đơn" (header o dong 1) — de ke toan do lai tung don (Bao cao L). Chi gan o day
   // (khong sua _donConvertRows_ dung chung voi Supabase backfill). Cache cu <=90s chua co posRow thi chi hien trong tam.
   var out = conv.items.map(function (it) { var o = it.obj; o.posRow = it.srcRow; return o; });
-  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), DON_CACHE_TTL_); } catch (eCache) {}
   return out;
 }
 

@@ -1,3 +1,5 @@
+// Mèo máy thay 🤖 (js/38 proCatTag_; chưa nạp/lỗi → '🤖 ' như cũ).
+function _tbCat_(px){ try { var h = typeof proCatTag_ === 'function' ? proCatTag_(px) : ''; if (h) return h.charAt(0) === '<' ? h : h + ' '; } catch (e) {} return '🤖 '; }
 // ═══════════════════════════════════════════════════════════════
 //  THƯỞNG PHẠT ĐỘI SALE ONLINE + VĂN PHÒNG (phòng kinh doanh) — mục cuối Báo cáo B (Duyên yêu cầu 2026-10-29)
 //  TÁCH RIÊNG các chương trình thưởng của công ty (Báo cáo E/F/G…): không cộng chung, không đổi số của các báo cáo đó.
@@ -184,7 +186,7 @@ async function _tbSavePenalty(){
 // ── Gợi ý phạt tự động từ tin nhắn Pancake (chỉ gợi ý, Admin bấm "Ghi phạt" mới tính) ──
 function _tbSuggestHtml_(d){
   var g = _tbState.sg, date = g.date || _tbToday_();
-  var h = '<div style="border:1px dashed #d97706;border-radius:10px;padding:10px;margin-bottom:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b style="font-size:13px">🤖 Gợi ý phạt từ tin nhắn Pancake</b>' +
+  var h = '<div style="border:1px dashed #d97706;border-radius:10px;padding:10px;margin-bottom:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b style="font-size:13px">' + _tbCat_(16) + 'Gợi ý phạt từ tin nhắn Pancake</b>' +
     '<input type="date" id="tb-sg-date" value="' + _tbEsc_(date) + '" onchange="_tbState.sg.date=this.value;_tbState.sg.data=null">' +
     '<button class="btn sm" onclick="_tbSuggestLoad()"' + (g.loading ? ' disabled' : '') + '>' + (g.loading ? 'Đang quét…' : '🔍 Quét ngày này') + '</button>' +
     '<span style="font-size:11px;color:var(--muted)">Chỉ là gợi ý (tính cả ngày đêm). Không phát hiện được tin "nhảy từ Sale khác"; đơn gộp 72h đối chiếu theo SĐT trên đơn Base — kiểm tra trước khi ghi.</span></div>';

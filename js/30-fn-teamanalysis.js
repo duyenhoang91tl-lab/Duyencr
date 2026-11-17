@@ -1,3 +1,5 @@
+// Mèo máy thay 🤖 (js/38 proCatTag_; chưa nạp/lỗi → '🤖 ' như cũ). Trả HTML đã kèm khoảng cách phải.
+function _taCat_(px){ try { var h = typeof proCatTag_ === 'function' ? proCatTag_(px) : ''; if (h) return h.charAt(0) === '<' ? h : h + ' '; } catch (e) {} return '🤖 '; }
 // ═══ AI PHÂN TÍCH TOÀN TEAM (v13.23) — modal xem "ai làm tốt / ai chưa tốt" ═══
 // Gọi GAS action=teamAnalysis (gom KPI Sale + KPI Pancake + đơn thất bại + CS thêm KH, chấm điểm bằng quy tắc, AI viết nhận xét).
 // Menu: js/29-sidenav.js (ACTS.teamai, nhóm Báo cáo, chỉ admin). Backend: gas_v13.js → teamAnalysis_ / scoreTeam_.
@@ -29,13 +31,13 @@ function openTeamAnalysisModal(){
     el.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(20,20,10,.45);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px';
     el.innerHTML =
       '<div style="background:var(--surface);border-radius:var(--rlg);box-shadow:var(--shadow-md);width:min(1180px,100%);padding:18px 20px">' +
-        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="font-size:17px;font-weight:700;flex:1">🤖 AI phân tích toàn team</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="font-size:17px;font-weight:700;flex:1">' + _taCat_(22) + 'AI phân tích toàn team</div>' +
         '<button class="btn" onclick="closeTeamAnalysisModal()" style="padding:4px 12px">✕ Đóng</button></div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
           '<label style="font-size:12px;color:var(--muted)">Từ</label><input type="date" id="ta-from" class="ymf-date">' +
           '<label style="font-size:12px;color:var(--muted)">Đến</label><input type="date" id="ta-to" class="ymf-date">' +
           '<button class="btn" onclick="_taRange(\'week\')">7 ngày</button>' + (typeof qrPillsHtml_ === 'function' ? qrPillsHtml_('custom', "_taQuick(this.value)") : _quickRangeSelectHtml('custom', "_taQuick(this.value)")) + '' +
-          '<button class="btn primary" id="ta-run" onclick="runTeamAnalysis(false)">🤖 Phân tích</button>' +
+          '<button class="btn primary" id="ta-run" onclick="runTeamAnalysis(false)">' + _taCat_(16) + 'Phân tích</button>' +
           '<button class="btn" onclick="runTeamAnalysis(true)" title="Bỏ kết quả lưu tạm 10 phút, gọi AI viết lại">↻ Làm mới</button>' +
         '</div>' +
         '<div class="guide-text" id="ta-body" style="font-size:13px;color:var(--muted)">Chọn khoảng ngày rồi bấm “Phân tích”. Hệ thống đọc các báo cáo đã có (KPI Sale, KPI Pancake, đơn thất bại, CS thêm KH), chấm điểm từng người và nhờ AI nhận xét.</div>' +
@@ -67,7 +69,7 @@ async function runTeamAnalysis(refresh){
   } catch (e) {
     var msg = e && e.name === 'AbortError' ? 'Quá thời gian chờ — thử lại hoặc chọn khoảng ngày ngắn hơn.' : String(e && e.message || e);
     body.innerHTML = '<div style="color:var(--red)">Không phân tích được: ' + esc(msg) + '<br><span style="color:var(--muted)">Nếu báo “Unknown action”/không có kết quả: chưa deploy bản GAS v13.23 (xem hướng dẫn deploy).</span></div>';
-  } finally { if (timer) clearTimeout(timer); _taState.busy = false; if (btn) { btn.disabled = false; btn.textContent = '🤖 Phân tích'; } }
+  } finally { if (timer) clearTimeout(timer); _taState.busy = false; if (btn) { btn.disabled = false; btn.innerHTML = _taCat_(16) + 'Phân tích'; } }   /* innerHTML (không textContent) vì _taCat_ trả HTML mèo */
 }
 function _taSetFilter(k){ _taState.filter = k; _taRender(); }
 function _taRender(){
