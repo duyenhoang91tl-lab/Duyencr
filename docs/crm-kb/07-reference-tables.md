@@ -49,7 +49,7 @@
 | (chạy tay trong Editor) | — | Supabase, không cần adminKey: `sbKiemTraKetNoi`, `sbBatGhiSongSong`, `sbBackfillThu`/`sbBackfillThat`/`sbBackfillTuDau`, `sbDoiChieu`, `sbBatDocSupabase`, `sbTatSupabase`, `sbSuaSDTLoi`, `sbXemTrangThai` (xem `docs/SUPABASE-PLAN.md`) |
 | ntlReport | GET | Bảo mật bước 3 (cần adminKey): đếm request dữ liệu theo ngày/action/nguồn (`src`)/có-không token để biết ai còn gọi trần trước khi bắt buộc token. Cũng chạy tay `xemLogKhongToken` trong Editor. Chi tiết: `docs/SECURITY-PLAN.md` |
 | donDaily | GET | Đơn POS THEO TỪNG ĐƠN (`?days=90`, 1..400; cache bản 90 ngày key `don_daily_v1`): `rows` = [[sđt, 'YYYY-MM-DD', tên khách, [sale…], doanh thu đơn, [[sale, TIỀN phần chia]…]]] + `skipped` {noPhone,noPhoneRev,noDate,noDateRev} (đơn Báo cáo B không gắn được khách) — `_donDailyRows_`/`buildDonDaily_`, cùng quy tắc Báo cáo B (loại Hủy/Hoàn, chia thẻ chung). Client: `js/88-pos-orders.js` |
-| donDayDiag | GET | CHỈ ĐỌC, chẩn đoán: `?date=YYYY-MM-DD&sale=<tên, trống = mọi sale>` trả đơn POS của 1 ngày để đối chiếu Danh sách KH — `donDayDiag_`. Chưa có giao diện client (kế hoạch `js/86-pos-diag.js` bước 0b chưa làm) |
+| donDayDiag | GET | CHỈ ĐỌC, chẩn đoán: `?date=YYYY-MM-DD&sale=<tên, trống = mọi sale>` trả đơn POS của 1 ngày để đối chiếu Danh sách KH — `donDayDiag_`. Client: `js/86-pos-diag.js` (nút admin "🔍 Đối soát POS") |
 | sbStatus | GET | Supabase (cần adminKey): chế độ `SB_MODE` (off/write/read), cờ STALE, số SĐT dirty |
 | sbSetMode / sbResyncCare | POST | Supabase (cần adminKey): đổi chế độ off/write/read (`read` bị từ chối khi STALE trừ `clearStale:true`) / sửa các SĐT dirty (mirror lỗi) |
 
