@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — DS KH KHỚP ĐƠN POS: BẢN DÁN SẴN PROJECT KNOWLEDGE `docs/crm-kb/11-project-knowledge-pos.md`) — XONG (đã push); chỉ tài liệu, không đổi code
+- ✅ Kiểm lại: bước 3 (js/89) do phiên khác đã push trước (468bced) nên KHÔNG ghi đè; bản của phiên này giữ ở nhánh cục bộ, không push. Bước 5, 6, 7, 8 đã xong từ các phiên khác; test `tools/test-pos-*.js` đều đạt khi kiểm.
+- ✅ `docs/crm-kb/11-project-knowledge-pos.md` (MỚI): bản dán sẵn cho Project knowledge "Crm" — 2 action `donDaily`/`donDayDiag`, quy ước 1 khách/1 SĐT + `posOnly`, nhóm file js/86–92 và thứ tự nạp, quy ước Báo cáo B, bài học "biến `let` của app không nằm trong `window` → dùng tên trần + `typeof`". `00-READ-FIRST.md` thêm dòng định tuyến.
+- ⚠ Việc của Duyên: dán nội dung file 11 vào Project knowledge "Crm" (Claude không sửa được Project knowledge). Revoke token GitHub đã dán nhiều lần.
+- [ ] **VIỆC KẾ TIẾP:** Duyên kiểm trên máy thật (Ctrl+F5 → Danh sách KH → CS biichnguyen1993 + 16/11–30/11: ≥ 9 khách, thanh "✓ Khớp POS"; GAS đã deploy `donDaily`/`donDayDiag`). Lệch gì dùng "🔍 Đối soát POS" → Copy gửi lại.
+
 ## 2026-11-17 (phiên Claude — R5d BƯỚC 1: KHÁCH TRÙNG SĐT, CHỈ XEM) — XONG 1/2 (đã push); BƯỚC 2 "GỘP" CHƯA LÀM, chờ Duyên xem kết quả quét thật
 Duyên yêu cầu: "gộp chuẩn khách theo danh sách khách hàng; phần báo cáo lên đơn vẫn phải theo đơn của khách". Hiểu = R5d (đã chốt 16/11: trùng theo SĐT, gộp GIỮ TẤT CẢ dữ liệu). Làm AN TOÀN: bước 1 chỉ PHÁT HIỆN, KHÔNG sửa dữ liệu, KHÔNG đụng DT TỔNG/đơn hàng → mọi báo cáo doanh thu/đơn giữ nguyên (vẫn theo đơn của từng khách).
 NGUYÊN NHÂN GỐC: CareData khoá theo SĐT nhưng 1 khách có thể nằm ở NHIỀU dòng khi SĐT gõ khác dạng (0912… / 912… / 84912… / +84912…). Màn hình gộp theo `normPhone` nên thấy 1 khách, còn Sheet giữ nhiều dòng (ghi chú/lịch ở dòng này, trạng thái/CS ở dòng kia). `dedupeCare_` cũ chỉ GIỮ 1 dòng nhiều ô nhất rồi XOÁ phần còn lại → MẤT dữ liệu, vì vậy KHÔNG dùng để gộp.
