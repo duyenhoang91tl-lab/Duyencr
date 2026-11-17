@@ -25,6 +25,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 
 | Danh sách KH khớp đơn POS (lọc ngày/CS theo đơn POS, khách chỉ có POS, DT 2 mục, thanh đối soát) | `05-sasum-reports-ui.md` mục "Tab Danh sách KH — khớp đơn POS" | `js/88`–`js/92`, `gas_v13.js` (`donDaily`, `donDayDiag`) |
 | Cập nhật Project knowledge "Crm" cho phần Danh sách KH khớp đơn POS (bản dán sẵn: bảng action, quy ước, cấu trúc js/86–92, bài học biến `let`) | `11-project-knowledge-pos.md` | — |
+| Combo có sẵn (sheet COMBO: action comboList/Save/Delete, tab 🎁 Combo, Trợ lý AI giá, Pancake Soạn đơn thêm combo vào giỏ, bẫy giá nghìn/đồng) | `12-combo-co-san.md` | `gas_v13.js`, `js/93-combo-tab.js`, `js/38-pro-dock.js`, `extension-pancake/*` |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
