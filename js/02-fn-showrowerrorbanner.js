@@ -888,7 +888,7 @@ function _rowHtml(c) {
   const csBadges = csNames.slice(0,3).map(n=>`<span class="cs-badge">${esc(n)}</span>`).join('');
   const csExtra = csNames.length>3?`<span class="cs-badge">+${csNames.length-3}</span>`:'';
   const csHtml = csNames.length ? `<div class="cs-badge-wrap">${csBadges}${csExtra}</div>` : '<span style="color:var(--hint);font-size:11px">—</span>';
-  const careCSHtml = c.careCS ? `<span class="cs-badge" style="background:var(--green-bg);color:var(--green)">${esc(c.careCS)}</span>` : '<span style="color:var(--hint);font-size:11px">—</span>';
+  const careCSHtml = c.careCS ? `<span class="cs-badge" style="background:var(--green-bg);color:var(--green)">${esc(typeof _csCanonText_==='function' ? _csCanonText_(c.careCS) : c.careCS)}</span>` : '<span style="color:var(--hint);font-size:11px">—</span>';
   const srcTags = c.sources.slice(0,2).map(x=>`<span class="btag">${esc(x)}</span>`).join('');
   const srcExtra = c.sources.length>2?`<span class="btag">+${c.sources.length-2}</span>`:'';
   // Ghi chú gần nhất (cache để khỏi sort lại mỗi lần scroll)

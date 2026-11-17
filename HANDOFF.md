@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — GỘP CS CHUẨN: biichnguyen1993 = Biichnguyen1993) — XONG (đã push, chỉ Ctrl+F5)
+NGUYÊN NHÂN GỐC: dữ liệu gốc ghi cùng 1 CS bằng 2 kiểu hoa/thường nên `updateCSStaffList` (js/04) dựng "Lọc theo CS" thành 2 mục riêng (602 + 364 KH) và cột CS phụ trách hiện 2 chip; bộ lọc đã khớp không phân biệt hoa/thường (`_csFilterListMatch`) nhưng DANH SÁCH/ĐẾM thì không gộp.
+- ✅ `js/08`: `_csCanonBuild_` dựng bảng tên chuẩn (chỉ cho tên có >1 kiểu viết): ưu tiên kiểu viết trong TÊN SALE của TÀI KHOẢN (`accounts[].names`), không có thì kiểu nhiều khách nhất, hòa → viết hoa chữ đầu. `_csCanonSet_`/`_csCanonName_`/`_csCanonText_`; `_buildCsSet_` trả tên chuẩn (khách nạp sau cũng đúng).
+- ✅ `js/04` `updateCSStaffList`: dựng bảng chuẩn → chuẩn hoá `csSet` + `careCSSet` của mọi khách → ô tìm "Lọc theo CS" + chip lọc nâng cao chỉ 1 mục (số KH = số khách DUY NHẤT); `<select>` ẩn vẫn giữ cả kiểu viết cũ để lọc khớp KH chỉ được chia/ghi kiểu cũ; lựa chọn đang chọn trước đó tự đổi sang tên chuẩn. `js/02` cột CS chăm sóc hiện tên chuẩn. `?v=20261117a` cho js/02, 04, 08.
+- Chỉ chuẩn hoá phía trình duyệt — KHÔNG sửa chữ trong Google Sheet. Tên KHÁC HẲN (thuydinh95 / Thuydinh1995) vẫn do "1 người = nhiều tên" (`_personAliases`) lo như cũ, chưa gộp ở danh sách này.
+- Test mới `tools/test-cs-canon.js` (12 ca). Cả bộ 360/361: chỉ `test-vh-var` đỏ — LỖI CÓ SẴN (đỏ cả khi bỏ thay đổi của mình): `js/33-pro-profile.js:174 max-height:48vh` và `js/80-acct-split-extra.js:61 max-height:92vh` còn `vh` trần — phiên sửa các file đó cần đổi sang biến `--vh`.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → "Lọc theo CS" chỉ còn 1 "Biichnguyen1993"; nếu muốn gộp cả thuydinh95/Thuydinh1995 trong danh sách (hoặc chuẩn hoá luôn chữ trong Sheet) thì báo.
+
 ## 2026-11-16 (phiên Claude — APP ANDROID "VIẾT TẮT" 1.25: TÁCH PHẦN TIN NHẮN / HÌNH ẢNH / GHI ÂM + NÚT "+ THÊM TIN NHẮN MẪU") — XONG mục 1,2 (đã push); CÒN mục 4
 NGUYÊN NHÂN GỐC: `SnippetDialog` (MainActivity.kt) vẽ `opts` theo THỨ TỰ trong danh sách nên chữ/hình xen kẽ; nút "+ Nội dung" nằm ở hàng nút CUỐI (cuộn ngang) sau cả chục hình nên như không có; ô chữ không có ✕.
 - ✅ SnippetDialog: 3 phần có tiêu đề + số lượng (💬 Tin nhắn mẫu / 🖼 Hình ảnh / 🎤 Ghi âm), "+ Thêm tin nhắn mẫu" và "+ Thêm hình ảnh" ngay dưới từng phần, ô chữ có ✕. Khi Lưu xếp chữ → hình → ghi âm (mọi nơi dùng đều lọc theo `kindOf`).
