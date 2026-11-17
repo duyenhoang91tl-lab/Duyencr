@@ -168,6 +168,15 @@ function doGetCore_(e) {
       try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
     }
+    if (action === 'donDaily') {   // don POS THEO TUNG DON (xem _donDailyRows_) — ?days=90 (1..400). Chi cache ban mac dinh 90 ngay, key 'don_daily_v1' xoa CUNG LUC voi donChiTiet_v4/don_phones_v6.
+      var daysDD = Math.floor(Number(e && e.parameter && e.parameter.days));
+      if (!(daysDD >= 1)) daysDD = 90;
+      if (daysDD > 400) daysDD = 400;
+      if (daysDD === 90) { var cachedDD = _cacheGetBig_('don_daily_v1'); if (cachedDD) { try { return jsonOut_(JSON.parse(cachedDD)); } catch(ecDD) {} } }
+      var resDD = buildDonDaily_(daysDD);
+      if (daysDD === 90) { try { _cachePutBig_('don_daily_v1', JSON.stringify(resDD), DON_CACHE_TTL_); } catch(ecDD2) {} }
+      return jsonOut_(resDD);
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
