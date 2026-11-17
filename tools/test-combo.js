@@ -62,3 +62,19 @@ ok(J(ctx.comboDelete_({ token: 't', code: 'NOPE' })).error, 'delete missing');
 const g = J(ctx.doGet({ parameter: { action: 'comboList', q: 'vong' } }));
 ok(g.ok && g.rows.length === 1, 'doGet comboList');
 console.log('ALL COMBO TESTS PASSED');
+
+// ── Buoc 2: tich hop priceAsk_ + client js/38-pro-dock.js ──
+ok(ctx._comboVnd_(1299) === 1299000 && ctx._comboVnd_(990000) === 990000, 'priceVnd quy doi nghin/dong');
+sheet.rows.push(['CB9', 'Combo Lắc cỏ 4 lá + nhẫn', 'Lắc cỏ 4 lá | Bạc 925 | 16cm | 1\n2 x Nhẫn bạc trơn | | Size 12', '1.299', 'Chỉ online', '', '2099-01-01', 'bốn lá, may mắn', true]);
+ctx.readPriceCatalog_ = () => [{ 'Nhóm': 'Lắc', 'Tên sản phẩm': 'Lắc cỏ 4 lá', 'Chất liệu': 'Bạc 925', 'Kiểu/Size': '16cm', 'Giá bán': '2.310' }];
+ctx._priceCatalogRowsCached_ = () => ctx.readPriceCatalog_();
+let pa = ctx.priceAsk_('Lắc cỏ bốn lá bao nhiêu tiền');
+ok(pa.ok && Array.isArray(pa.combos) && pa.combos.some(c => c.code === 'CB9'), 'priceAsk_ kem combo (cau dai, loose)');
+ok(pa.combos.every(c => c.usable), 'chi combo dang ap dung');
+pa = ctx.priceAsk_('nhẫn mạ vàng 24k');
+ok(pa.ok && pa.combos.length === 0, 'khong lien quan -> khong combo');
+const dock = require('../js/38-pro-dock.js');
+const txt = dock.proPriceFormat_({ ok: true, found: false, suggestions: ['A'], combos: [{ name: 'Combo X', code: 'CB1', priceVnd: 1299000, items: [{ name: 'Lắc', qty: 2, chatLieu: 'Bạc', size: '16cm' }], note: 'online', end: '2099-01-31' }] });
+ok(/COMBO CÓ SẴN/.test(txt) && /1\.299\.000đ/.test(txt) && /2 × Lắc \(Bạc, 16cm\)/.test(txt) && /đến 31\/01\/2099/.test(txt), 'client format combo');
+ok(/Giá theo BẢNG GIÁ/.test(dock.proPriceFormat_({ ok: true, found: true, text: 'x', combos: [] })) && !/COMBO/.test(dock.proPriceFormat_({ ok: true, found: true, text: 'x', combos: [] })), 'khong combo -> y nhu cu');
+console.log('ALL COMBO STEP2 TESTS PASSED');

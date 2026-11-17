@@ -591,7 +591,7 @@ function readCTKMCatalog_() {
 // cung nhan "2 x Ten" o dau dong).
 var COMBO_SHEET_NAME = 'COMBO';
 var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động'];
-var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va'];
+var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va', 'tien', 'vnd', 'dong'];
 
 function _comboParseItems_(text) {
   var out = [];
@@ -622,6 +622,8 @@ function _comboPriceNum_(v) {
   var d = String(v == null ? '' : v).replace(/[^\d]/g, '');
   return d ? parseInt(d, 10) : 0;
 }
+// Gia nhap giong cot Gia ban DANH_MUC (nghin dong: 1.299 = 1.299.000d); so >= 100000 coi la dong day du.
+function _comboVnd_(n) { return n > 0 && n < 100000 ? n * 1000 : n; }
 function _comboRow_(r, todayYmd) {
   var sd = _ctkmParseDate_(r[5]), ed = _ctkmParseDate_(r[6]);
   var active = !(r[8] === false || String(r[8]).trim().toLowerCase() === 'false' || String(r[8]).trim() === '0' || _stripVN_(r[8]) === 'khong' || _stripVN_(r[8]) === 'tat');
@@ -637,7 +639,7 @@ function _comboRow_(r, todayYmd) {
   return {
     code: String(r[0] == null ? '' : r[0]).trim(), name: String(r[1] == null ? '' : r[1]).trim(),
     items: _comboParseItems_(itemsText), itemsText: itemsText,
-    price: _comboPriceNum_(r[3]), priceText: String(r[3] == null ? '' : r[3]).trim(),
+    price: _comboPriceNum_(r[3]), priceVnd: _comboVnd_(_comboPriceNum_(r[3])), priceText: String(r[3] == null ? '' : r[3]).trim(),
     note: String(r[4] == null ? '' : r[4]), start: sd ? _vnYmd_(sd) : '', end: ed ? _vnYmd_(ed) : '',
     keywords: String(r[7] == null ? '' : r[7]), active: active, expired: expired, upcoming: upcoming,
     usable: active && !expired && !upcoming, statusLabel: label
@@ -672,18 +674,21 @@ function _comboTokens_(q) {
   return s.split(/\s+/).filter(function (t) { return t && _COMBO_STOP_.indexOf(t) === -1; });
 }
 // Khop khong dau + doi chu so (bon->4). Moi tu khoa phai trung (ten/ma/tu khoa/san pham/ghi chu); diem cao len truoc.
-function searchCombos_(rows, q) {
+// loose=true (hoi gia trong cau dai): chi can khop ~70% tu khoa, de 'lac co bon la tam bi vang' van ra combo.
+function searchCombos_(rows, q, loose) {
   var toks = _comboTokens_(q);
+  var need = loose ? Math.max(1, Math.ceil(toks.length * 0.7)) : toks.length;
   if (!toks.length) return rows.slice();
   var out = [];
   rows.forEach(function (r) {
     var head = ' ' + _stripVN_(_priceNumWords_(r.name + ' ' + r.code + ' ' + r.keywords)) + ' ';
     var body = ' ' + _stripVN_(_priceNumWords_(r.itemsText + ' ' + r.note)) + ' ';
-    var score = 0;
+    var score = 0, hits = 0;
     for (var i = 0; i < toks.length; i++) {
       var t = toks[i];
-      if (head.indexOf(t) !== -1) score += 3; else if (body.indexOf(t) !== -1) score += 1; else return;
+      if (head.indexOf(t) !== -1) { score += 3; hits++; } else if (body.indexOf(t) !== -1) { score += 1; hits++; } else if (!loose) return;
     }
+    if (hits < need) return;
     out.push({ r: r, s: score + (r.usable ? 0.5 : 0) });
   });
   out.sort(function (a, b) { return b.s - a.s; });
