@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 đêm (phiên Claude) — COMBO CÓ SẴN: BƯỚC 3/6 TAB "🎁 COMBO" TRA CỨU — XONG (chỉ cần Ctrl+F5; GAS đã deploy từ bước 1-2 là đủ)
+- ✅ `js/93-combo-tab.js` mới: tab "🎁 Combo" (registerExtraTab, nằm trong menu Hồ sơ — thêm `'combo'` ở `js/29-sidenav.js`). Gọi GAS `comboList&q=`; mặc định chỉ combo ĐANG ÁP DỤNG (nút đổi sang xem tất cả); thẻ hiện tên, mã, giá đồng, từng món × SL, ghi chú, trạng thái/hạn; nút 📋 Copy để dán vào chat khách. Lỗi GAS (chưa deploy) hiện rõ trên tab.
+- ✅ `index.html` thêm 1 thẻ script (sau js/92); `js/INDEX.md` ghi mục mới; `css/99-dark-auto.css` sinh lại (`node tools/gen-dark-theme.js`) vì js mới có màu inline. `tools/test-combo-tab.js` xanh; test-combo xanh.
+- ⚠ Test ĐỎ SẴN TỪ TRƯỚC (đã xác minh bằng git stash, KHÔNG do bước này): test-ai-cat-slot, test-budget (jsGzip 963.369 > trần 960.000; scriptTags 109/110 — còn 1 chỗ trống), test-chat-coach-ui, test-cust-link, test-dept-settings, test-dist-equivalence. Phiên sau nên xử riêng; nếu thêm script mới nữa sẽ chạm trần scriptTags.
+- [ ] **VIỆC KẾ TIẾP:** (4) màn admin thêm/sửa/xóa combo (GAS `comboSave`/`comboDelete` đã có, cần token đăng nhập admin — xem `_khoAuth_`); (5) Pancake AI "Soạn đơn" thêm combo vào giỏ (extension-pancake, nhắc reload extension; xem `addToCart_` trong pancake-content.js); (6) docs + đề xuất cập nhật Project knowledge. Để bước 4 khỏi tốn thêm script tag, nên gộp vào js/93-combo-tab.js.
+
 ## 2026-11-17 đêm (phiên Claude) — COMBO CÓ SẴN: BƯỚC 2/6 TRỢ LÝ AI "Giá sản phẩm" HIỆN COMBO — XONG (cần deploy GAS + Ctrl+F5)
 - ✅ GAS: `priceAsk_` nay = `priceAskBase_` (logic cũ, không đổi) + trường `combos` (tối đa 5 combo ĐANG ÁP DỤNG khớp câu hỏi, qua `_priceAskCombos_` → `searchCombos_(rows,q,true)`; loose = chỉ cần ~70% từ khóa nên câu dài "lắc cỏ bốn lá bao nhiêu tiền" vẫn ra). Lỗi/không có sheet COMBO → [] (không làm hỏng tra giá). Thêm `priceVnd` vào mỗi combo (giá nhập <100000 coi là NGHÌN đồng như cột Giá bán DANH_MUC → ×1000; ≥100000 là đồng đầy đủ). Stopword thêm: tien/vnd/dong.
 - ✅ Client js/38-pro-dock.js: `proPriceRequest_` giữ `combos`; `proComboText_` + `proPriceFormat_` hiện khối "🎁 COMBO CÓ SẴN" (tên, mã, giá đồng, từng món × SL, ghi chú, hạn) dưới giá lẻ; nếu không có SP lẻ khớp mà có combo thì chỉ hiện combo.
