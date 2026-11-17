@@ -1310,8 +1310,6 @@ async function syncFromGS(opts) {
           if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
         }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
-      // Đơn POS theo từng đơn (donDaily, bước 2/7 Danh sách KH khớp POS): chạy NỀN, không await — GAS dựng bằng Báo cáo B nên có thể chậm, không được kéo dài vòng đồng bộ. Tự bỏ qua nếu mới tải < 2 phút hoặc nội dung không đổi.
-      try { if (typeof posOrdersSync_ === 'function') posOrdersSync_().then(function (r) { if (r && !r.ok && r.error) console.warn('donDaily:', r.error); }); } catch (poErr) {}
       // ── Nguồn "CSKH-Duyên" (sheet thứ 3, có thể tới hàng trăm nghìn dòng) — CHỈ kéo bản "nhẹ"
       // [phone,name,tier] mỗi dòng (action=cskhDuyenLite), KHÔNG kéo đủ 17 trường (địa chỉ/công
       // ty/nợ/email/ghi chú...) mỗi vòng poll nữa — kéo full từng dòng làm CRM lag nặng khi data
