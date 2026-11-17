@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — DS KH KHỚP ĐƠN POS: KIỂM LẠI BƯỚC 4/7 SAU KHI BƯỚC 3 ĐÃ CÓ) — không đổi code
+- Duyên bảo "làm bước 4": bước 4/7 (`js/90-pos-filter.js`) ĐÃ XONG ở commit c1d9031. Chỉ kiểm lại: tại origin/main js/88, js/89, js/90 đều nạp theo đúng thứ tự trong index.html; `test-pos-orders` (23 ca), `test-pos-customers` (12 ca), `test-pos-filter` (18 ca) đều ĐẠT.
+- **Cảnh báo ở mục bước 4 ("chưa thấy đủ khách nếu bước 3 chưa xong") ĐÃ HẾT HIỆU LỰC:** khách POS-only (js/89) tạo trong `buildCustomers` trước khi `ymList`/`csSet` được dựng (js/02 ~dòng 313), nên đi qua bộ lọc js/90 như khách thường (đọc code, chưa chạy trên dữ liệu thật).
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → Danh sách KH → lọc CS biichnguyen1993 + 16/11–30/11, kỳ vọng ≥ 9 khách (cần GAS đã deploy `donDaily`). Rồi Bước 5 (`_custRev_`/`_custOrderCount_` theo đơn POS đang lọc), Bước 6 thanh đối soát, Bước 7 dọn + đề xuất cập nhật Project knowledge.
+
 ## 2026-11-17 (phiên Claude — DANH SÁCH KH KHỚP ĐƠN POS, BƯỚC 3/7: TẠO KHÁCH CHO SĐT CHỈ CÓ Ở POS `js/89-pos-customers.js`) — XONG (đã push); chờ Duyên xem trên máy thật
 NGUYÊN NHÂN GỐC: `buildCustomers` (js/02) chỉ tạo khách từ DT tổng / careData / careLeads / cskhData; SĐT chỉ có trong POS không thành khách → khách POS của sale (9 khách 16/11 của biichnguyen1993) không có trong danh sách, lọc đúng cũng không thấy. Duyên chốt 17/11: khách chỉ có POS CÓ tự thêm.
 - ✅ `js/89-pos-customers.js` (MỚI, `?v=20261117a`, nạp SAU js/88 TRƯỚC js/90): `posCustomersInject_(customerMap)` thêm khách cho mọi SĐT có đơn POS (js/88) mà customerMap chưa có; tên = tên ở đơn POS mới nhất khác SĐT (không có thì SĐT); cờ `posOnly:true`. KHÔNG ghi vào careData/careLeads thật.
