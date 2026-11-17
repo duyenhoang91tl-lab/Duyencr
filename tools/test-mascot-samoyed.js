@@ -320,4 +320,38 @@ ok(ix.indexOf('js/66-sakura-petals.js') < ix.indexOf('js/79-mascot-samoyed.js') 
   const minTop = bark.length ? Math.min.apply(null, bark.map((q) => q.y - 14)) : NaN;
   ok(bark.length > 10 && minTop >= 0, 'bong bóng "Gâu gâu!" luôn nằm TRONG canvas suốt cú nhảy (W=' + W0 + ', đỉnh thấp nhất y=' + minTop.toFixed(1) + ' ≥ 0, ' + bark.length + ' khung)');
 });
+// 3f) CHUỒN CHUỒN (Duyên 17/11: "thêm vài con chuồn chuồn bay nữa"): số lượng theo màn, trong khung 160s không NaN,
+// có cả bay nhanh lẫn LƠ LỬNG, bay nhanh hơn bướm, không đậu hoa, KHÔNG làm chó giật mình, tắt vườn thì không bay, vẽ không lỗi.
+[[1200, 3], [500, 2]].forEach(([W0, n0]) => {
+  const ed = makeEnv({ w: W0 }); let td = 1000; ed.step(td);
+  const gd = ed.win._mascotState_();
+  ok(gd.dragonflies.length === n0, 'W=' + W0 + ': ' + n0 + ' chuồn chuồn (có ' + gd.dragonflies.length + ')');
+  ok(new Set(gd.dragonflies.map(d => d.pal[0])).size === n0, 'W=' + W0 + ': mỗi chuồn chuồn 1 màu thân khác nhau');
+  gd.setFlee(1e9);   // chặn chó chạy trốn ong để đo riêng chuồn chuồn
+  let badD = 0, hov = 0, fly = 0, dist = 0, nf = 0; const pv = gd.dragonflies.map(d => ({ x: d.x, y: d.y }));
+  for (let i = 0; i < 1600; i++) {
+    td += 100; ed.step(td);
+    gd.dragonflies.forEach((d, j) => {
+      if (!isFinite(d.x) || !isFinite(d.y) || !isFinite(d.a) || d.y < 0 || d.y > gd.ch || d.x < -21 || d.x > W0 + 21) badD++;
+      if (d.st === 'hover') hov++; else if (d.st === 'fly') { fly++; const dx = d.x - pv[j].x, dy = d.y - pv[j].y; if (Math.abs(dx) < 60) { dist += Math.sqrt(dx * dx + dy * dy); nf++; } } else badD++;
+      pv[j] = { x: d.x, y: d.y };
+    });
+  }
+  ok(badD === 0, 'W=' + W0 + ': chuồn chuồn luôn trong khung 160s, trạng thái chỉ fly/hover, không NaN (' + badD + ' lần sai)');
+  ok(hov > 40 && fly > 400, 'W=' + W0 + ': có cả LƠ LỬNG (' + hov + ') lẫn bay (' + fly + ')');
+  const spd = dist / nf / 0.1;
+  ok(spd > 40 && spd < 100, 'W=' + W0 + ': tốc độ bay trung bình ~' + spd.toFixed(0) + 'px/s (nhanh hơn bướm 16-28)');
+});
+{
+  const ef = makeEnv(); let tf = 1000; ef.step(tf);
+  const gf = ef.win._mascotState_(); gf.dog.mode = 'idle'; gf.dog.until = 1e9; gf.dog.x = 300; gf.setFlee(0);
+  gf.bees.forEach(b => { b.x = -500; b.y = 20; b.v = 0; b.st = 'sit'; b.until = 1e9; b.fi = 0; });   // ong đậu xa → không dọa chó
+  gf.dragonflies.forEach(d => { d.x = 300; d.y = gf.ch - 46; d.st = 'hover'; d.until = 1e9; });   // 3 chuồn chuồn lơ lửng ngay sát chó
+  for (let i = 0; i < 20; i++) { tf += 100; ef.step(tf); }
+  ok(gf.dog.mode === 'idle' && !gf.dog.run, 'chuồn chuồn bay sát chó KHÔNG làm chó giật mình (chỉ ong mới dọa)');
+  ef.store['ome_garden'] = '0'; const hb = ef.calls.draw;
+  const eg = makeEnv({ ls: { ome_garden: '0' } }); eg.step(1000); const gg = eg.win._mascotState_(); const x0 = gg.dragonflies.map(d => d.x + ',' + d.y).join('|');
+  for (let i = 0; i < 20; i++) eg.step(1000 + (i + 1) * 100);
+  ok(gg.dragonflies.map(d => d.x + ',' + d.y).join('|') === x0, 'tắt vườn → chuồn chuồn đứng yên (không cập nhật)');
+}
 console.log('PASS', pass, 'FAIL', fail); process.exit(fail ? 1 : 0);

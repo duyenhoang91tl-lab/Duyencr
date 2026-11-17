@@ -13,8 +13,10 @@
 //  KHÔNG chặn thao tác bên dưới; bấm lên nút/liên kết/ô nhập thì chó không phản ứng; giảm chuyển động thì không phản ứng).
 //  Bướm bay nhấp nhô lên-xuống, thỉnh thoảng ĐẬU lên hoa 3–6 giây (cánh khép/xoè chậm) rồi bay LÊN tiếp.
 //  Ong thỉnh thoảng bay tới một bông hoa, ĐẬU 2.5–4.5 giây rồi bay tiếp; ong đang đậu không làm chó giật mình.
+//  Chuồn chuồn (17/11/2026): 3 con desktop / 2 con điện thoại, bay NHANH theo đường thẳng rồi LƠ LỬNG (hover) 0.5–1.3s rồi lao tiếp; 4 cánh trong suốt
+//  vỗ nhanh, thân dài nhiều màu. KHÔNG đậu hoa và KHÔNG làm chó giật mình (chỉ ong mới dọa chó). Chung nút vườn 'ome_garden'.
 //  Bật/tắt: ☰ → ⚙ Settings → "🐶 Tắt/Bật linh vật Samoyed" (mọi vai trò); lưu localStorage 'ome_mascot' ('0' = tắt, mặc định bật).
-//  Vườn (hoa + bướm + ong) có nút RIÊNG "🌼 Tắt/Bật vườn hoa-bướm-ong" (localStorage 'ome_garden'): tắt vườn thì chỉ còn chó.
+//  Vườn (hoa + bướm + ong + chuồn chuồn) có nút RIÊNG "🌼 Tắt/Bật vườn hoa-bướm-ong" (localStorage 'ome_garden'): tắt vườn thì chỉ còn chó.
 //  (Tắt chó thì cả canvas ẩn — vườn nằm chung canvas nên cũng ẩn theo.)
 //  GỠ HẲN: xoá thẻ <script src="js/79-mascot-samoyed.js"> trong index.html + mục act:mascot ở js/29-sidenav.js
 //  + mục it('mascot') / điều kiện k === 'mascot' ở js/37-fn-configpage.js + file này.
@@ -30,7 +32,7 @@
   var RUN = 96;           // tốc độ chạy trốn ong (px/giây)
   var canvas = null, ctx = null, raf = 0, last = 0, W = 0, dpr = 1, rzTimer = 0, clock = 0;
   var dog = { x: 70, facing: 1, mode: 'idle', until: 6, target: 70, nextIdle: 8, walking: false, run: false, react: null };
-  var hearts = [], flowers = [], butterflies = [], bees = [], fleeCool = 4;
+  var hearts = [], flowers = [], butterflies = [], bees = [], dragonflies = [], fleeCool = 4;
   var INTERACTIVE = 'button,a,input,textarea,select,label,summary,[onclick],[role="button"],[contenteditable="true"]';
   var BARKS = ['Gâu!', 'Gâu gâu!', 'Hihi ♥', 'Gâu~'];
   var FCOL = ['#FF6B8A', '#FF4466', '#FFD700', '#FF69B4', '#FF8C42', '#DA70D6', '#FF6347', '#E040FB', '#FFAB40'];
@@ -38,6 +40,8 @@
   var BPAL = [['#FF7043', '#FFCA28', '#FFF8E1'], ['#E040FB', '#7C4DFF', '#F3E5F5'], ['#29B6F6', '#3949AB', '#E1F5FE'], ['#FFD600', '#FF6D00', '#FFFDE7'],
               ['#66BB6A', '#00ACC1', '#E8F5E9'], ['#EC407A', '#FF8A80', '#FCE4EC'], ['#26C6DA', '#AB47BC', '#E0F7FA'], ['#EF5350', '#FFB74D', '#FFEBEE'],
               ['#5C6BC0', '#26A69A', '#E8EAF6'], ['#FFA726', '#D81B60', '#FFF3E0']];
+  // Chuồn chuồn: mỗi con = [màu thân, màu đốt/mắt đậm]; con thứ i dùng bộ i % 5.
+  var DPAL = [['#E53935', '#7F1D1D'], ['#1E88E5', '#0D3B7A'], ['#00ACC1', '#00505A'], ['#43A047', '#1B5E20'], ['#FB8C00', '#8A3B00']];
   var BCOL = BPAL.map(function(p){ return p[0]; });   // giữ BCOL: màu cánh trên (tương thích b.color)
 
   function isOn(){ try { return localStorage.getItem(KEY) !== '0'; } catch(e){ return true; } }
@@ -127,9 +131,13 @@
     butterflies.length = nb;
     while (bees.length < nz) bees.push({ x: rnd(W * 0.4, W), y: rnd(18, CH - 40), a: rnd(0, 6.283), v: rnd(46, 70), ph: rnd(0, 6.283), size: rnd(6, 8) });
     bees.length = nz;
+    var nd = W < 600 ? 2 : 3;   // chuồn chuồn: bay nhanh + lơ lửng, không đậu hoa
+    while (dragonflies.length < nd) dragonflies.push({ x: rnd(0, W), y: rnd(14, CH - 44), a: rnd(0, 6.283), v: rnd(52, 84), ph: rnd(0, 6.283), size: rnd(5, 7), pal: DPAL[dragonflies.length % DPAL.length], st: 'fly', until: 0 });
+    dragonflies.length = nd;
+    dragonflies.forEach(function(d){ d.st = 'fly'; });
     bees.forEach(function(b){ b.st = 'fly'; });
     butterflies.forEach(function(b){ b.st = 'fly'; });   // hoa vừa được tạo lại → ong về trạng thái bay tự do
-    butterflies.concat(bees).forEach(function(f){ if (f.x > W) f.x = rnd(0, W); });
+    butterflies.concat(bees, dragonflies).forEach(function(f){ if (f.x > W) f.x = rnd(0, W); });
   }
 
   function drawFlower(c, f, t){   // hoa lắc lư (từ _sagaDrawFlower của game): cúc trắng-màu và hướng dương
@@ -184,6 +192,30 @@
     c.restore();
   }
 
+  function drawDragonfly(c, d, t){   // chuồn chuồn nhìn từ trên: thân dài nằm dọc hướng bay (+x), 2 đôi cánh trong suốt vỗ nhanh sang hai bên
+    var s = d.size, pal = d.pal || DPAL[0], hov = d.st === 'hover';
+    var fl = 0.62 + 0.38 * Math.abs(Math.sin(t * (hov ? 38 : 30) + d.ph));   // độ xoè cánh 0.62..1 (vỗ rất nhanh)
+    var bob = hov ? Math.sin(t * 5 + d.ph) * 1.2 : 0, i;
+    c.save(); c.translate(d.x, d.y + bob); c.rotate(d.a);
+    c.globalAlpha = 0.9;
+    [[s * 0.55, -0.25], [s * 0.05, 0.25]].forEach(function(w){   // [vị trí dọc thân, độ xiên]: cánh trước xiên ra trước, cánh sau xiên ra sau
+      [1, -1].forEach(function(sd){
+        c.save(); c.translate(w[0], sd * s * 0.2); c.rotate(sd * (Math.PI / 2 + w[1]));
+        c.beginPath(); c.ellipse(0, -s * 0.9 * fl, s * 0.28, s * 1.05 * fl, 0, 0, 6.283);
+        c.fillStyle = 'rgba(190,230,255,0.62)'; c.fill(); c.lineWidth = 0.8; c.strokeStyle = '#3F7FBF'; c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 0.1); c.lineTo(0, -s * 1.9 * fl); c.lineWidth = 0.5; c.stroke();   // gân giữa cánh
+        c.restore();
+      });
+    });
+    c.globalAlpha = 1;
+    c.beginPath(); c.moveTo(s * 0.3, 0); c.lineTo(-s * 2.1, 0); c.lineWidth = Math.max(1.6, s * 0.3); c.lineCap = 'round'; c.strokeStyle = pal[0]; c.stroke();   // bụng dài
+    for (i = 0; i < 4; i++){ c.beginPath(); c.moveTo(-s * (0.5 + i * 0.4), -s * 0.15); c.lineTo(-s * (0.5 + i * 0.4), s * 0.15); c.lineWidth = 0.9; c.strokeStyle = pal[1]; c.stroke(); }   // đốt bụng
+    c.beginPath(); c.arc(s * 0.5, 0, s * 0.3, 0, 6.283); c.fillStyle = pal[0]; c.fill();   // ngực
+    c.beginPath(); c.arc(s * 0.95, 0, s * 0.26, 0, 6.283); c.fillStyle = pal[1]; c.fill();   // đầu
+    c.beginPath(); c.arc(s * 1.05, -s * 0.2, s * 0.14, 0, 6.283); c.arc(s * 1.05, s * 0.2, s * 0.14, 0, 6.283); c.fillStyle = '#111'; c.fill();   // 2 mắt to
+    c.restore();
+  }
+
   // Bay lang thang: đổi hướng nhẹ ngẫu nhiên, chạm trần/sàn thì dội lại, ra mép trái/phải thì vòng sang phía đối diện.
   function flyStep(f, dt, ymin, ymax, jitter){
     f.a += rnd(-1, 1) * jitter * dt;
@@ -234,6 +266,16 @@
     }
     flyStep(b, dt, 16, CH - 34, 6);
     if (flowers.length && Math.random() < 0.3 * dt){ b.fi = (Math.random() * flowers.length) | 0; b.st = 'go'; }   // ~1 lần / 3.5 giây
+  }
+
+  // Chuồn chuồn: lao nhanh gần như THẲNG (đổi hướng rất nhẹ) → thỉnh thoảng LƠ LỬNG 'hover' 0.5–1.3s (đứng yên, chỉ nhấp nhô) → đổi hướng lao tiếp.
+  function dragonflyStep(d, dt){
+    if (d.st === 'hover'){
+      if (clock >= d.until){ d.st = 'fly'; d.a += rnd(-1.2, 1.2); d.v = rnd(52, 84); }
+      return;
+    }
+    flyStep(d, dt, 12, CH - 40, 1.6);
+    if (Math.random() < 0.22 * dt){ d.st = 'hover'; d.until = clock + rnd(0.5, 1.3); }   // ~1 lần / 4.5 giây
   }
 
   // ── Hình con Samoyed: port từ drawDog() của game (bỏ phần hoảng sợ/ong), thêm dáng ĐI DẠO. d = {x, y, facing, walking, s} ──
@@ -358,6 +400,7 @@
     if (dog.react) drawBark(ctx, dog.x, CH - 30 - lift - 52 * sc - 8, dog.react.txt, rt < 0.9 ? 1 : Math.max(0, (1.1 - rt) / 0.2));
     if (g) for (i = 0; i < butterflies.length; i++) drawButterfly(ctx, butterflies[i], clock);
     if (g) for (i = 0; i < bees.length; i++) drawBee(ctx, bees[i], clock);
+    if (g) for (i = 0; i < dragonflies.length; i++) drawDragonfly(ctx, dragonflies[i], clock);
   }
 
   function startIdle(){
@@ -384,6 +427,7 @@
     if (garden){
       for (k = 0; k < butterflies.length; k++) butterflyStep(butterflies[k], dt);
       for (k = 0; k < bees.length; k++) beeStep(bees[k], dt);
+      for (k = 0; k < dragonflies.length; k++) dragonflyStep(dragonflies[k], dt);
     }
     if (dog.react){ dog.react.t += dt; if (dog.react.t >= 1.1) dog.react = null; }
     fleeCool -= dt;
@@ -464,7 +508,7 @@
   window._mascotPlan_ = mascotPlan_;   // chỉ để test
   window._mascotFlee_ = mascotFlee_;
   window._mascotHit_ = hitDog_;
-  window._mascotState_ = function(){ return { x: dog.x, mode: dog.mode, facing: dog.facing, run: dog.run, w: W, ch: CH, flowers: flowers.length, butterflies: butterflies, bees: bees, dog: dog, setFlee: function(v){ fleeCool = v; } }; };   // chỉ để test
+  window._mascotState_ = function(){ return { x: dog.x, mode: dog.mode, facing: dog.facing, run: dog.run, w: W, ch: CH, flowers: flowers.length, butterflies: butterflies, bees: bees, dragonflies: dragonflies, dog: dog, setFlee: function(v){ fleeCool = v; } }; };   // chỉ để test
 
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();

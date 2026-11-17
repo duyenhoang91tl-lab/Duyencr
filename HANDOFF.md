@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — VƯỜN HOA-BƯỚM-ONG: THÊM CHUỒN CHUỒN) — XONG (đã push); chờ Duyên xem trên máy thật
+Duyên: "cho mình thêm vài con chuồn chuồn bay nữa nhé". Trước đó repo CHƯA có chuồn chuồn (vườn chỉ có hoa/bướm/ong) → thêm loài bay mới vào CÙNG canvas + CÙNG nút `ome_garden`, không thêm file/menu mới.
+- ✅ `js/79-mascot-samoyed.js` (`?v=20261117a`): mảng `dragonflies` (3 con desktop / 2 điện thoại, tạo trong `initScene`), bảng màu `DPAL` (5 bộ, mỗi con 1 màu thân), `drawDragonfly` (thân dài có đốt, đầu + 2 mắt to, 2 đôi cánh trong suốt vỗ nhanh), `dragonflyStep` (lao nhanh 52–84px/s gần thẳng bằng `flyStep` jitter 1.6 → LƠ LỬNG `hover` 0.5–1.3s ~1 lần/4.5s → đổi hướng lao tiếp). KHÔNG đậu hoa, KHÔNG làm chó giật mình (chỉ ong dọa chó, giữ nguyên logic cũ). Tắt vườn → không vẽ/không cập nhật. `_mascotState_()` thêm `dragonflies` (chỉ để test).
+- ✅ `tools/test-mascot-samoyed.js`: 89 → 101 ca (số lượng theo màn, mỗi con 1 màu, trong khung 160s không NaN, có cả bay lẫn lơ lửng, tốc độ ~40–100px/s, chuồn chuồn sát chó không làm chó giật mình, tắt vườn đứng yên). Chạy 6 lần liên tiếp đều xanh (không ngẫu nhiên đỏ).
+- 🧪 Duyên: Ctrl+F5 → nhìn đáy màn hình: vài con chuồn chuồn (đỏ/xanh dương/xanh ngọc/xanh lá/cam) lao ngang rồi đứng lơ lửng rồi lao tiếp. CHỜ ẢNH/ý kiến.
+- [ ] **VIỆC KẾ TIẾP:** không còn việc mở. Nếu muốn chỉnh: số con (`nd` ở `initScene`), tốc độ (`rnd(52, 84)`), tần suất lơ lửng (`0.22 * dt`), thời gian lơ lửng (`rnd(0.5, 1.3)`), màu (`DPAL`). Không đụng gas_v13.js nên KHÔNG cần deploy lại GAS; extension không đổi nên không cần reload extension.
+
 ## 2026-11-17 (phiên Claude — R5a BƯỚC 3/3: ĐỔI TRẠNG THÁI HÀNG LOẠT `js/84-cust-bulk-status.js`) — XONG (đã push); chờ Duyên thử máy thật
 Duyên chốt lại 17/11: làm R5a, thao tác hàng loạt = **Gán CS** (bước 2, đã có) + **Đổi trạng thái** (bước này). Gửi tin hàng loạt / Xuất CSV hàng loạt: KHÔNG làm.
 NGUYÊN NHÂN GỐC (R5a): đổi Tình trạng CS / Trạng thái KH cho nhiều khách phải mở hồ sơ từng người.
