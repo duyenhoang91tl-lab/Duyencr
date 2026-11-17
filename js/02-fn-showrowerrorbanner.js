@@ -957,7 +957,7 @@ function _rowHtml(c) {
     <td class="col-level" style="${levelDisp}">${levelHtml}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
-    <td class="col-order"><span style="font-weight:600">${c.totalOrders}</span><span style="color:var(--muted);font-size:11px"> / ${fmtVND(c.totalRevenue)}</span></td>
+    <td class="col-order">${(typeof posRevCellHtml_==='function' && posRevCellHtml_(c)) || ('<span style="font-weight:600">' + c.totalOrders + '</span><span style="color:var(--muted);font-size:11px"> / ' + fmtVND(c.totalRevenue) + '</span>')}</td>
     <td class="col-product"><div class="btags">${brandTags}${extra}</div></td>
     <td class="col-cs">${csHtml}</td>
     <td class="col-carecs">${careCSHtml}</td>
