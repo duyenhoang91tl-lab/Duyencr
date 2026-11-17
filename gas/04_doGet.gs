@@ -177,6 +177,12 @@ function doGetCore_(e) {
       if (daysDD === 90) { try { _cachePutBig_('don_daily_v1', JSON.stringify(resDD), DON_CACHE_TTL_); } catch(ecDD2) {} }
       return jsonOut_(resDD);
     }
+    // CHAN DOAN (chi doc, khong ghi): don POS cua 1 ngay (+ loc theo 1 sale trong the) de doi chieu voi Danh sach KH cua CRM — xem donDayDiag_ + js/86-pos-diag.js.
+    // GET ?action=donDayDiag&date=2026-11-16&sale=biichnguyen1993  (sale de trong = moi sale)
+    if (action === 'donDayDiag') {
+      try { return jsonOut_(donDayDiag_(e && e.parameter ? e.parameter.date : '', e && e.parameter ? e.parameter.sale : '')); }
+      catch (edd) { return jsonOut_({ ok: false, error: String(edd && edd.message || edd) }); }
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
