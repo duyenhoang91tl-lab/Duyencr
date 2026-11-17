@@ -80,16 +80,28 @@ async function proPriceRequest_(gsUrl, question, fetchFn, timeoutMs)
     var url = gsUrl + (String(gsUrl).indexOf('?')>=0 ? '&' : '?') + 'action=priceAsk&q=' + encodeURIComponent(String(question||'').slice(0,200));
     var r = await fetchFn(url, { method:'GET', redirect:'follow', signal: ac ? ac.signal : undefined });
     var d = await r.json();
-    if (d && d.ok) return { ok:true, found:!!d.found, text:String(d.text||''), unit:d.unit||'', suggestions:Array.isArray(d.suggestions)?d.suggestions:[] };
+    if (d && d.ok) return { ok:true, found:!!d.found, text:String(d.text||''), unit:d.unit||'', suggestions:Array.isArray(d.suggestions)?d.suggestions:[], combos:Array.isArray(d.combos)?d.combos:[] };
     var err = (d && (d.error||d.message)) || 'Không tra được bảng giá';
     if (/unknown action|priceAsk/i.test(err)) err += ' (backend GAS có thể chưa lên bản có tra giá — xem tab Actions của repo)';
     return { ok:false, error:String(err) };
   } catch(e){ return { ok:false, error: e && e.name==='AbortError' ? 'Quá thời gian chờ — thử lại.' : String(e&&e.message||e) }; }
   finally { if (timer) clearTimeout(timer); }
 }
+// Combo có sẵn (sheet COMBO) khớp câu hỏi → khối chữ kèm danh sách món + giá combo (đồng đầy đủ: c.priceVnd).
+function proComboText_(combos){
+  var cs = (combos||[]).filter(function(c){ return c && c.name; });
+  if (!cs.length) return '';
+  return '🎁 COMBO CÓ SẴN:\n' + cs.map(function(c){
+    var items = (c.items||[]).map(function(it){ var d = [it.chatLieu, it.size].filter(Boolean).join(', '); return '   • ' + (it.qty||1) + ' × ' + it.name + (d ? ' (' + d + ')' : ''); }).join('\n');
+    return '▸ ' + c.name + (c.code ? ' [' + c.code + ']' : '') + ' — 💰 ' + (c.priceVnd ? Number(c.priceVnd).toLocaleString('vi-VN') + 'đ' : (c.priceText||'')) + '\n' + items +
+      (c.note ? '\n   📝 ' + String(c.note).replace(/\s+/g,' ').trim() : '') + (c.end ? '\n   ⏰ đến ' + c.end.split('-').reverse().join('/') : '');
+  }).join('\n');
+}
 function proPriceFormat_(r){
   if (!r || !r.ok) return '⚠ ' + ((r && r.error) || 'Không tra được bảng giá');
-  if (r.found) return 'Giá theo BẢNG GIÁ (DANH_MUC), đơn vị nghìn đồng — ví dụ 2.310 = 2.310.000đ:\n' + r.text;
+  var cb = proComboText_(r.combos);
+  if (r.found) return 'Giá theo BẢNG GIÁ (DANH_MUC), đơn vị nghìn đồng — ví dụ 2.310 = 2.310.000đ:\n' + r.text + (cb ? '\n\n' + cb : '');
+  if (cb) return cb + '\n\n(Không có sản phẩm lẻ khớp rõ trong bảng giá' + ((r.suggestions||[]).length ? ' — gợi ý: ' + r.suggestions.slice(0,5).join('; ') : '') + ')';
   var sg = (r.suggestions||[]).slice(0,8);
   return 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá.' + (sg.length ? '\nCó thể bạn muốn hỏi:\n' + sg.map(function(x){ return '• '+x; }).join('\n') : '') + '\nHãy gõ rõ TÊN sản phẩm (kèm chất liệu / size / SAPHIA / RUBY nếu có).';
 }
@@ -410,6 +422,16 @@ function proCatTag_(px){
     return '<span class="pro-cat-tag" aria-hidden="true" style="display:inline-block;width:' + px + 'px;height:' + px + 'px;vertical-align:-' + Math.round(px * 0.22) + 'px;margin-right:5px">' + proCatIcon_(px) + '</span>';
   } catch (e) { return '🤖'; }
 }
+// Điền mèo vào các ô giữ chỗ trong HTML TĨNH: <span class="ai-cat-slot" data-px="16">🤖 </span> (vd tab "Zalo AI" ở index.html). Chưa có mèo/lỗi → giữ nguyên 🤖. Gọi nhiều lần vẫn an toàn.
+function proCatFill_(root){
+  if (typeof document === 'undefined') return 0;
+  var base = root || document, n = 0, slots = base.querySelectorAll ? base.querySelectorAll('.ai-cat-slot:not([data-filled])') : [];
+  for (var i = 0; i < slots.length; i++){
+    var el = slots[i], h = proCatTag_(+el.getAttribute('data-px') || 16);
+    if (h && h.charAt(0) === '<'){ el.innerHTML = h; el.setAttribute('data-filled', '1'); n++; }
+  }
+  return n;
+}
 // Hiệu ứng khi AI đang trả lời: cả mặt Samoyed lắc lư nhẹ (như vẫy đầu) + thẻ tên ở vòng cổ nhấp nháy cam (class pro-cat-ant); giảm chuyển động → KHÔNG lắc,
 // chỉ đổi thẻ tên sang màu cam đứng yên (vẫn có tín hiệu "đang bận" mà không chuyển động). Style chèn 1 lần, tự chứa (không đụng css/*).
 function proCatStyle_(){
@@ -704,4 +726,5 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };
+try { proCatFill_(); if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', function(){ try { proCatFill_(); } catch (e) {} }); } catch (e) {}
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proComboText_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };

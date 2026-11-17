@@ -175,6 +175,11 @@ function _priceCatalogRowsCached_() {
 }
 // GET action=priceAsk&q=<cau hoi>. Tra { ok, found:true, text, unit } | { ok, found:false, suggestions:[ten san pham gan dung] } | { ok:false, error }.
 function priceAsk_(q) {
+  var r = priceAskBase_(q);
+  if (r && r.ok) r.combos = _priceAskCombos_(String(q || '').slice(0, 200));   // + combo co san khop (sheet COMBO)
+  return r;
+}
+function priceAskBase_(q) {
   q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!q) return { ok: false, error: 'Thieu cau hoi (q)' };
   var rows;
@@ -195,6 +200,14 @@ function priceAsk_(q) {
     }
   }
   return { ok: true, found: false, suggestions: names };
+}
+// Combo dang ap dung khop cau hoi (toi da 5) — gan vao ket qua priceAsk_ de Tro ly AI "Gia san pham" hien kem. Loi/khong co sheet -> [].
+function _priceAskCombos_(q) {
+  try {
+    var rows = readComboCatalog_().filter(function (c) { return c.usable; });
+    if (!rows.length) return [];
+    return searchCombos_(rows, q, true).slice(0, 5);
+  } catch (e) { return []; }
 }
 // GET action=priceItem&name=<TEN san pham chinh xac (lay tu goi y cua priceAsk)>.
 // Tra { ok, found, name, info:[{k,v}], variants:[{mat,size,prices:[{label,value,stone}]}] } de giao dien cho nhan vien BAM tung buoc (chat lieu -> size/kieu -> gia),

@@ -284,4 +284,7 @@ html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color
   html.ui-pro #dp{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   html.ui-pro #dp .dp-hdr{position:sticky;top:0;z-index:3;background:var(--surface)}
   html.ui-pro #dp .dp-body{flex:none;overflow:visible;padding-bottom:72px}
+  /* FIX 16/11: thanh tab (Chăm sóc · Lịch hẹn · Lịch sử đơn · Tổng quan…) bị ÉP CÒN ~12px nên biến mất trên điện thoại → không vào được tab Lịch sử đơn (nơi có khung 🎁 Tích điểm).
+     NGUYÊN NHÂN GỐC: .dp-tabs có overflow-x:auto (css/01) nên min-height = 0 và flex-shrink = 1; #dp là cột flex cao cố định, #dp-pro (cao, không co được) chiếm chỗ → chỉ .dp-tabs bị co. Đo Chromium: 12px → 36px sau khi flex:none. */
+  html.ui-pro #dp .dp-tabs{flex:none}
 }

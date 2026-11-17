@@ -35,7 +35,11 @@ function csSelAddAction_(a) {
 function csSelInject_(html, phone) {
   var on = csSelHas_(phone);
   var box = '<input type="checkbox" class="cs-sel-box" data-cs-sel="' + String(phone).replace(/[^0-9+]/g, '') + '" title="Chọn khách này"' + (on ? ' checked' : '') + '>';
-  var out = String(html).replace('<td class="col-name">', '<td class="col-name">' + box);
+  // Ô tích nằm TRONG div.cname (cùng dòng với tên). Đặt thẳng sau <td> thì ô tích thành 1 dòng riêng → dòng cao 78px thay vì 58px (VT_ROW_H)
+  // → bảng ảo tính sai + màn hình nhỏ chỉ còn thấy ~1 khách. Không có div.cname thì mới chèn đầu ô Tên.
+  var out = String(html);
+  if (out.indexOf('<div class="cname">') !== -1) out = out.replace('<div class="cname">', function () { return '<div class="cname">' + box; });
+  else out = out.replace('<td class="col-name">', function () { return '<td class="col-name">' + box; });
   if (on) out = out.replace('<tr ', '<tr class="cs-sel-on" ');
   return out;
 }

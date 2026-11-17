@@ -168,6 +168,21 @@ function doGetCore_(e) {
       try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
     }
+    if (action === 'donDaily') {   // don POS THEO TUNG DON (xem _donDailyRows_) — ?days=90 (1..400). Chi cache ban mac dinh 90 ngay, key 'don_daily_v1' xoa CUNG LUC voi donChiTiet_v4/don_phones_v6.
+      var daysDD = Math.floor(Number(e && e.parameter && e.parameter.days));
+      if (!(daysDD >= 1)) daysDD = 90;
+      if (daysDD > 400) daysDD = 400;
+      if (daysDD === 90) { var cachedDD = _cacheGetBig_('don_daily_v1'); if (cachedDD) { try { return jsonOut_(JSON.parse(cachedDD)); } catch(ecDD) {} } }
+      var resDD = buildDonDaily_(daysDD);
+      if (daysDD === 90) { try { _cachePutBig_('don_daily_v1', JSON.stringify(resDD), DON_CACHE_TTL_); } catch(ecDD2) {} }
+      return jsonOut_(resDD);
+    }
+    // CHAN DOAN (chi doc, khong ghi): don POS cua 1 ngay (+ loc theo 1 sale trong the) de doi chieu voi Danh sach KH cua CRM — xem donDayDiag_ + js/86-pos-diag.js.
+    // GET ?action=donDayDiag&date=2026-11-16&sale=biichnguyen1993  (sale de trong = moi sale)
+    if (action === 'donDayDiag') {
+      try { return jsonOut_(donDayDiag_(e && e.parameter ? e.parameter.date : '', e && e.parameter ? e.parameter.sale : '')); }
+      catch (edd) { return jsonOut_({ ok: false, error: String(edd && edd.message || edd) }); }
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
@@ -175,6 +190,7 @@ function doGetCore_(e) {
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
+    if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
@@ -520,6 +536,8 @@ function doGetCore_(e) {
       return jsonOut_(findDuplicateOrders_(fdoPhone));
     }
     if (action === 'dedupeCare') return dedupeCare_();
+    // ── R5d buoc 1: KHACH TRUNG (CHI DOC) — nhom cac dong CareData cung SDT chuan hoa (0912.../+84912.../84912.../thieu so 0). KHONG sua/xoa gi, KHONG dung toi don hang ──
+    if (action === 'findDuplicateCustomers') return jsonOut_(findDuplicateCustomers_());
     // ── LUU TRU DON CU: xem truoc (dry-run) so dong se chuyen. Can adminKey. &months=6..12 &which=base|pos|both ──
     if (action === 'archivePreview') {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });

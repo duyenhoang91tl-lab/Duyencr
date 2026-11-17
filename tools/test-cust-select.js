@@ -60,6 +60,18 @@ if (JSDOM) {
   ok(!bar.classList.contains('is-open') && boxes().every((b) => !b.checked), 'Bo chon -> thanh an, het tich');
 }
 // 3) dang ky trong index.html + khong sua js/02
+// 3) LỖI "danh sách chỉ thấy 1 khách": ô tích đặt thẳng sau <td> thành 1 dòng riêng → dòng cao 78px thay vì 58px (VT_ROW_H) → bảng ảo tính sai.
+//    Ô tích PHẢI nằm trong div.cname (cùng dòng với tên), không đứng trước nó.
+{
+  const realRow = '<tr data-phone=\"0901\" onclick=\"openDp(this.dataset.phone)\">\n<td class=\"col-name\"><div class=\"cname\">A</div><div class=\"cphone\">0901</div></td></tr>';
+  const o = S.csSelInject_(realRow, '0901');
+  ok(/<div class=\"cname\"><input type=\"checkbox\" class=\"cs-sel-box\"/.test(o), 'o tich nam TRONG div.cname (cung dong voi ten)');
+  ok(!/<td class=\"col-name\"><input/.test(o), 'o tich KHONG dung truoc div.cname (se thanh dong rieng, dong cao 78px)');
+  ok((o.match(/cs-sel-box/g) || []).length === 1, 'chi 1 o tich moi dong');
+  const rh = fs.readFileSync(path.join(ROOT, 'js', '02-fn-showrowerrorbanner.js'), 'utf8');
+  ok(/<td class=\"col-name\"><div class=\"cname\">/.test(rh), 'js/02 _rowHtml van co <div class=\"cname\"> ngay sau <td col-name> (neu doi, sua csSelInject_)');
+  ok(/\.cname:has\(>\.cs-sel-box\)\{display:flex/.test(fs.readFileSync(path.join(ROOT, 'css', '28-cust-select.css'), 'utf8')), 'css/28: cname co o tich dung flex cung dong');
+}
 ok(/js\/82-cust-select\.js/.test(idx) && /css\/28-cust-select\.css/.test(idx), 'index.html nap js/82 + css/28');
 ok(idx.indexOf('js/82-cust-select.js') > idx.indexOf('js/06-main-renew-sources.js') && idx.indexOf('js/82-cust-select.js') > idx.indexOf('js/02'), 'js/82 nap SAU js/02 va js/06 (can _rowHtml, _vt)');
 console.log(fail ? '\nFAILED ' + fail : '\nALL CUST-SELECT TESTS PASSED'); process.exit(fail ? 1 : 0);
