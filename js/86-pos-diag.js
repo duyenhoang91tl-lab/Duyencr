@@ -8,8 +8,8 @@
   function fmt_(v) { return (typeof fmtVND === 'function') ? fmtVND(v) : String(v); }
   function lc_(s) { return String(s || '').trim().toLowerCase(); }
 
-  var WHY = { OK: '✓ Có trong danh sách', NO_CUST: 'A — chưa có khách (SĐT không có trong allCustomers)', NO_DAY: 'B — khách không có ngày đơn này trong ymList (lọc ngày gốc bỏ; js/90 bù bằng đơn POS)',
-    NO_CS: 'C — CS không nằm trong csSet của khách', HIDDEN: 'D — có khách + CS + ngày nhưng bị BỘ LỌC KHÁC loại', EXCL: '— đơn bị loại (Hủy/Hoàn), không tính' };
+  var WHY = { OK: '✓ Có trong danh sách', NO_CUST: 'A — chưa có khách (SĐT không có trong allCustomers)', NO_DAY: 'B — khách không có ngày đơn này ở đơn Base lẫn đơn POS client đang giữ (đơn POS ngoài cửa sổ đã tải? thử chọn khoảng ngày rộng hơn)',
+    NO_CS: 'C — CS không nằm trong csSet của khách', HIDDEN: 'D — có khách + CS + ngày (kể cả ngày đơn POS) nhưng KHÔNG hiện: bị BỘ LỌC KHÁC loại, hoặc danh sách chưa làm mới (thử Ctrl+F5)', EXCL: '— đơn bị loại (Hủy/Hoàn), không tính' };
 
   // HAM THUAN. diag: ket qua donDayDiag; customers: allCustomers; shown: mang khach dang hien; sale: ten CS (co the rong); aliasFn(sale) -> mang ten cung nguoi.
   function khDiagClassify_(diag, customers, shown, sale, aliasFn) {
@@ -30,11 +30,14 @@
       else if (!c) why = 'NO_CUST';
       else if (inList[a.phone]) why = 'OK';
       else {
-        var hasDay = (c.ymList || []).some(function (o) { return o && o.ds === diag.date; });
+        // Tinh ngay GIONG bo loc that (js/90): ngay don Base (ymList) HOAC ngay don POS client dang giu (posOrdersByPhone). Neu chi doc ymList (da tra lai nguyen sau khi loc) thi khach co don POS dung ngay van bi bao nham la "khong co ngay".
+        var pr = (G.posOrdersByPhone && G.posOrdersByPhone[a.phone]) || [];
+        var hasDay = (c.ymList || []).some(function (o) { return o && o.ds === diag.date; }) || pr.some(function (r) { return r && r.ds === diag.date; });
         var csOk = !sale || Array.from(c.csSet || []).some(function (n) { return want[lc_(n)]; });
         why = !csOk ? 'NO_CS' : (!hasDay ? 'NO_DAY' : 'HIDDEN');
+        a.posRows = pr.length;
       }
-      out.push({ phone: a.phone || a.rawPhone, name: a.name, orders: a.orders, rev: a.rev, why: why, text: WHY[why] });
+      out.push({ phone: a.phone || a.rawPhone, name: a.name, orders: a.orders, rev: a.rev, why: why, text: WHY[why], posRows: a.posRows || 0 });
     });
     var sum = {}; out.forEach(function (o) { sum[o.why] = (sum[o.why] || 0) + 1; });
     out.sort(function (x, y) { return (x.why === 'OK') - (y.why === 'OK') || y.rev - x.rev; });
@@ -45,7 +48,7 @@
   function khDiagText_(r) {
     var L = ['ĐỐI SOÁT POS ' + r.date + (r.sale ? ' · ' + r.sale : ''), 'POS: ' + r.posOrders + ' đơn / ' + r.posPhones + ' SĐT / ' + fmt_(r.posRevenue) + ' (đơn không bị loại)',
       'Kết quả: ' + Object.keys(r.summary).map(function (k) { return k + '=' + r.summary[k]; }).join(', ')];
-    r.rows.forEach(function (o) { L.push(o.phone + ' | ' + (o.name || '') + ' | ' + o.orders + ' đơn | ' + fmt_(o.rev) + ' | ' + o.text); });
+    r.rows.forEach(function (o) { L.push(o.phone + ' | ' + (o.name || '') + ' | ' + o.orders + ' đơn | ' + fmt_(o.rev) + ' | ' + o.text + (o.why !== 'OK' && o.why !== 'EXCL' && o.why !== 'NO_CUST' ? ' [client giữ ' + (o.posRows || 0) + ' đơn POS của SĐT này]' : '')); });
     return L.join('\n');
   }
   G.khDiagText_ = khDiagText_;

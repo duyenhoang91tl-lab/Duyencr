@@ -31,4 +31,13 @@ const r2 = ctx.khDiagClassify_(diag, [{ phone: '0900000004', ymList: [{ ds: D }]
 ok(r2.rows.find(x => x.phone === '0900000004').why === 'HIDDEN', 'alias cung nguoi coi la khop CS');
 ok(/Doi soat|ĐỐI SOÁT POS 2026-11-16/.test(ctx.khDiagText_(r)) && ctx.khDiagText_(r).split('\n').length === r.rows.length + 3, 'text copy: 3 dong dau + moi SDT 1 dong');
 const idx = R('index.html'); ok(idx.indexOf('js/85-kh-sb-toggle') < idx.indexOf('js/86-pos-diag.js') && idx.indexOf('js/86-pos-diag.js') < idx.indexOf('js/88-pos-orders.js'), 'js/86 nap giua js/85 va js/88');
+// LOI THAT 17/11 (C Trang): khach da co san, khong co don Base ngay 16/11 nhung CLIENT DANG GIU don POS ngay do -> khong duoc bao nham la "B khong co ngay"
+ctx.posOrdersByPhone = { '0387099422': [{ ds: D, sales: [B, 'thuyha88'], rev: 2200000 }] };
+const diagT = { ok: true, date: D, orders: 1, phones: 1, revenue: 2200000, items: [it('0387099422', 2200000)] };
+const rT = ctx.khDiagClassify_(diagT, [{ phone: '0387099422', ymList: [], csSet: new Set([B, 'thuyha88']) }], [], B, null);
+ok(rT.rows[0].why === 'HIDDEN' && rT.rows[0].posRows === 1, 'co don POS dung ngay o client (ymList rong) -> D (khong con bao nham la B), kem so don POS client giu');
+ok(/client giữ 1 đơn POS/.test(ctx.khDiagText_(rT)), 'text copy ghi so don POS client dang giu cho SDT');
+ctx.posOrdersByPhone = {};
+const rT2 = ctx.khDiagClassify_(diagT, [{ phone: '0387099422', ymList: [], csSet: new Set([B]) }], [], B, null);
+ok(rT2.rows[0].why === 'NO_DAY' && rT2.rows[0].posRows === 0, 'client KHONG giu don POS nao + khong co don Base ngay do -> van la B');
 console.log(fails ? '\n' + fails + ' LOI' : '\nTAT CA DAT'); process.exit(fails ? 1 : 0);
