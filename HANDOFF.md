@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude) — COMBO CÓ SẴN: ZALO AI "SOẠN ĐƠN" THÊM COMBO VÀO GIỎ (parity Pancake) — XONG (reload extension Zalo AI; KHÔNG đổi GAS)
+- NGUYÊN NHÂN LÀM: combo 6/6 chỉ có CRM + Trợ lý AI + Pancake; quy tắc song song (`08-extension-parity.md`) yêu cầu Zalo AI làm theo. Ghi chú cũ trong `12-combo-co-san.md` "Zalo chưa có giỏ hàng" là SAI (Zalo có giỏ từ 14/10) nên làm thẳng theo cách Pancake, không cần hỏi lại cách dùng.
+- ✅ `extension-zalo/zalo-content.js`: `_zaiBldCall_` thêm `GET_COMBOS` → GAS `comboList` (không có `rows` → `GAS_NO_COMBO`, đã thêm vào danh sách mã lỗi giữ nguyên ở `_zaiApiErr_` nên KHÔNG bị đổi thành "Lỗi API"); khối `#zaib-combo` NGOÀI `#zaib-dyn` (để `renderBuilderDynZai_` không xoá); `loadCombosZai_` (cache `zaiCombos` 5 phút, chỉ combo `usable`), `renderBuilderCombosZai_` (lọc không dấu, tối đa 5, ô số bộ + "+ Thêm combo"), `addComboToCartZai_` (1 dòng tiêu đề giá combo × số bộ + mỗi món 1 dòng 0đ, SL món × số bộ). Thêm SP lẻ xong thì render lại combo (ô gõ vừa xoá).
+- ✅ `manifest.json` 2026.11.18.1. `tools/test-zalo-combo.js` (23 kiểm, chạy mã THẬT trong jsdom: lọc không dấu, escape, 2 bộ = 1.700.000đ, combo lỗi) xanh; test-pk-combo, test-zalo-apierr xanh; `node -c` OK. Docs: `12-combo-co-san.md` mục 4 + `08-extension-parity.md`.
+- ⚠ Dòng 0đ có thể hiện "0đ" trong tin tổng kết gửi khách (giống Pancake) — Duyên xem thử; nếu không muốn thì báo, sẽ ẩn giá 0đ của dòng món thuộc combo (làm cho cả 2 extension).
+- ⚠ Chưa chạy được trong phiên này: test-zalo-smoke / test-zalo-price-tpl-split (SKIP vì tìm jsdom ở đường dẫn riêng) — phiên sau chạy lại khi có jsdom.
+- [ ] **VIỆC KẾ TIẾP:** COMBO XONG ở mọi nơi (CRM, Trợ lý AI, Pancake, Zalo). Còn lại: `test-budget` đỏ (jsGzip > trần) cần xử riêng. 🧪 Duyên: reload extension Zalo AI trong chrome://extensions + F5 chat.zalo.me → mở chat → khối giá chọn tab "🧩 Soạn đơn" → gõ tên combo → "+ Thêm combo" → kiểm "Đơn hàng đang tính".
+
 ## 2026-11-18 (phiên Claude) — COMBO CÓ SẴN: BƯỚC 5/6 PANCAKE AI "SOẠN ĐƠN" THÊM COMBO VÀO GIỎ — XONG (reload extension Pancake AI; GAS đã deploy từ bước 1-2 là đủ)
 - ✅ `extension-pancake/pancake-background.js`: message `GET_COMBOS` → `handleGetCombos` gọi GAS `action=comboList` (GAS cũ không có `rows` → lỗi `GAS_NO_COMBO`, client coi như không có combo, KHÔNG báo lỗi giữa lúc lên đơn).
 - ✅ `extension-pancake/pancake-content.js`: khối "🎁 Combo có sẵn" (`#pkb-combo`, nằm NGOÀI `#pkb-dyn` để `renderBuilderDyn_` không xóa) ngay dưới ô gõ tên ở tab Soạn đơn. Chỉ hiện combo `usable` (đang áp dụng), lọc không dấu theo ô gõ (mã/tên/từ khóa/món), tối đa 5, ô "số bộ" + nút "+ Thêm combo". Cache `chrome.storage.local.pkCombos` 5 phút.
