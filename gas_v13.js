@@ -810,6 +810,165 @@ function readCTKMCatalog_() {
   return rows;
 }
 
+// ─── COMBO CO SAN (sheet "COMBO" cung file PRICE_SS_ID) ─────────────────────────────────────
+// Yeu cau Duyen 17/11/2026: tao combo co san de tra cuu trong CRM (Tro ly AI "Gia san pham",
+// tab Combo, Pancake AI "Soan don"). KHAC "khoCombo" (tru ton kho) va AIContext 'combo_template' (mau tin nhan).
+// CS sua thang tren Google Sheets HOAC admin sua trong CRM (comboSave/comboDelete) — cung 1 sheet.
+// Cot "San pham": MOI DONG 1 mon, dang "Ten | Chat lieu | Size | SL" (chi Ten bat buoc; SL mac dinh 1;
+// cung nhan "2 x Ten" o dau dong).
+var COMBO_SHEET_NAME = 'COMBO';
+var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động'];
+var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va'];
+
+function _comboParseItems_(text) {
+  var out = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
+    line = String(line).trim();
+    if (!line) return;
+    var qty = 1;
+    var m = line.match(/^(\d{1,3})\s*[xX×]\s*(.+)$/);
+    if (m) { qty = parseInt(m[1], 10); line = m[2]; }
+    var p = line.split('|').map(function (s) { return String(s).trim(); });
+    if (!p[0]) return;
+    if (p.length >= 4 && /^\d{1,3}$/.test(p[3])) qty = parseInt(p[3], 10);
+    if (qty < 1) qty = 1;
+    out.push({ name: p[0], chatLieu: p[1] || '', size: p[2] || '', qty: qty });
+  });
+  return out;
+}
+function _comboItemsToText_(items) {
+  return (items || []).map(function (it) {
+    var n = String(it && it.name || '').trim();
+    if (!n) return '';
+    var q = parseInt(it.qty, 10); if (!(q >= 1)) q = 1;
+    return n + ' | ' + String(it.chatLieu || '').trim() + ' | ' + String(it.size || '').trim() + ' | ' + q;
+  }).filter(function (s) { return s; }).join('\n');
+}
+function _comboPriceNum_(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  var d = String(v == null ? '' : v).replace(/[^\d]/g, '');
+  return d ? parseInt(d, 10) : 0;
+}
+function _comboRow_(r, todayYmd) {
+  var sd = _ctkmParseDate_(r[5]), ed = _ctkmParseDate_(r[6]);
+  var active = !(r[8] === false || String(r[8]).trim().toLowerCase() === 'false' || String(r[8]).trim() === '0' || _stripVN_(r[8]) === 'khong' || _stripVN_(r[8]) === 'tat');
+  var expired = ed ? (_vnYmd_(ed) < todayYmd) : false;
+  var upcoming = (!expired && sd) ? (_vnYmd_(sd) > todayYmd) : false;
+  var label = '';
+  if (!active) label = '⛔ Đã tắt';
+  else if (expired) label = '❌ Đã hết hạn (kết thúc ' + _ctkmFmtDateVN_(ed) + ')';
+  else if (upcoming) label = '⏳ Chưa bắt đầu (từ ' + _ctkmFmtDateVN_(sd) + ')';
+  else if (ed) label = '✅ Còn áp dụng (đến ' + _ctkmFmtDateVN_(ed) + ')';
+  else label = '✅ Đang áp dụng';
+  var itemsText = String(r[2] == null ? '' : r[2]);
+  return {
+    code: String(r[0] == null ? '' : r[0]).trim(), name: String(r[1] == null ? '' : r[1]).trim(),
+    items: _comboParseItems_(itemsText), itemsText: itemsText,
+    price: _comboPriceNum_(r[3]), priceText: String(r[3] == null ? '' : r[3]).trim(),
+    note: String(r[4] == null ? '' : r[4]), start: sd ? _vnYmd_(sd) : '', end: ed ? _vnYmd_(ed) : '',
+    keywords: String(r[7] == null ? '' : r[7]), active: active, expired: expired, upcoming: upcoming,
+    usable: active && !expired && !upcoming, statusLabel: label
+  };
+}
+function _comboSheet_(create) {
+  var ss = SpreadsheetApp.openById(PRICE_SS_ID), sh = ss.getSheetByName(COMBO_SHEET_NAME);
+  if (!sh && create) {
+    sh = ss.insertSheet(COMBO_SHEET_NAME);
+    sh.getRange(1, 1, 1, COMBO_HEADERS.length).setValues([COMBO_HEADERS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+// Doc toan bo combo (cot theo VI TRI co dinh = COMBO_HEADERS). Sheet chua co -> tu tao (CS thay ngay de dien).
+function readComboCatalog_() {
+  var sh = _comboSheet_(true);
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, COMBO_HEADERS.length).getValues();
+  var today = _vnYmd_(new Date()), rows = [];
+  vals.forEach(function (r, i) {
+    if (!String(r[0] || '').trim() && !String(r[1] || '').trim()) return;
+    var o = _comboRow_(r, today); o.row = i + 2;
+    rows.push(o);
+  });
+  rows.sort(function (a, b) { return (a.usable ? 0 : 1) - (b.usable ? 0 : 1); });
+  return rows;
+}
+function _comboTokens_(q) {
+  var s = _stripVN_(_priceNumWords_(q)).replace(/[^a-z0-9\s]/g, ' ');
+  return s.split(/\s+/).filter(function (t) { return t && _COMBO_STOP_.indexOf(t) === -1; });
+}
+// Khop khong dau + doi chu so (bon->4). Moi tu khoa phai trung (ten/ma/tu khoa/san pham/ghi chu); diem cao len truoc.
+function searchCombos_(rows, q) {
+  var toks = _comboTokens_(q);
+  if (!toks.length) return rows.slice();
+  var out = [];
+  rows.forEach(function (r) {
+    var head = ' ' + _stripVN_(_priceNumWords_(r.name + ' ' + r.code + ' ' + r.keywords)) + ' ';
+    var body = ' ' + _stripVN_(_priceNumWords_(r.itemsText + ' ' + r.note)) + ' ';
+    var score = 0;
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i];
+      if (head.indexOf(t) !== -1) score += 3; else if (body.indexOf(t) !== -1) score += 1; else return;
+    }
+    out.push({ r: r, s: score + (r.usable ? 0.5 : 0) });
+  });
+  out.sort(function (a, b) { return b.s - a.s; });
+  return out.map(function (x) { return x.r; });
+}
+function comboList_(q) {
+  try {
+    var rows = readComboCatalog_();
+    var m = q ? searchCombos_(rows, q) : rows;
+    return { ok: true, total: rows.length, count: m.length, rows: m.slice(0, 50) };
+  } catch (err) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + (err && err.message || err) }; }
+}
+function _comboNormSave_(c) {
+  c = c || {};
+  var name = String(c.name || '').trim();
+  if (!name) return { error: 'Thieu ten combo.' };
+  var items = Array.isArray(c.items) ? c.items : _comboParseItems_(c.itemsText);
+  var text = _comboItemsToText_(items);
+  if (!text) return { error: 'Combo can it nhat 1 san pham.' };
+  var price = _comboPriceNum_(c.price != null ? c.price : c.priceText);
+  if (!(price > 0)) return { error: 'Thieu gia combo (so > 0).' };
+  var sd = c.start ? _ctkmParseDate_(c.start) : null, ed = c.end ? _ctkmParseDate_(c.end) : null;
+  if (c.start && !sd) return { error: 'Ngay bat dau khong hop le.' };
+  if (c.end && !ed) return { error: 'Ngay ket thuc khong hop le.' };
+  if (sd && ed && _vnYmd_(ed) < _vnYmd_(sd)) return { error: 'Ngay ket thuc truoc ngay bat dau.' };
+  return { rec: [String(c.code || '').trim(), name, text, c.priceText ? String(c.priceText).trim() : price, String(c.note || ''),
+    sd ? _vnYmd_(sd) : '', ed ? _vnYmd_(ed) : '', String(c.keywords || ''), c.active === false ? false : true] };
+}
+function comboSave_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc them/sua combo.', code: 'FORBIDDEN' });
+  var n = _comboNormSave_(data && data.combo); if (n.error) return jsonOut_({ error: n.error });
+  return _khoWithLock_(function () {
+    var sh = _comboSheet_(true), last = sh.getLastRow(), row = 0, rec = n.rec, code = rec[0];
+    if (!code) { code = 'CB' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyMMddHHmmss'); rec[0] = code; }
+    if (last >= 2) {
+      var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code.toUpperCase()) { row = j + 2; break; }
+    }
+    var tgt = row || (last + 1);
+    sh.getRange(tgt, 1, 1, COMBO_HEADERS.length).setValues([rec]);
+    return jsonOut_({ ok: true, code: code, created: !row });
+  });
+}
+function comboDelete_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc xoa combo.', code: 'FORBIDDEN' });
+  var code = String(data && data.code || '').trim();
+  if (!code) return jsonOut_({ error: 'Thieu ma combo.' });
+  return _khoWithLock_(function () {
+    var sh = _comboSheet_(false), last = sh ? sh.getLastRow() : 0;
+    if (last < 2) return jsonOut_({ error: 'Khong tim thay combo.' });
+    var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code.toUpperCase()) { sh.deleteRow(j + 2); return jsonOut_({ ok: true }); }
+    return jsonOut_({ error: 'Khong tim thay combo.' });
+  });
+}
+
 // Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
 var _CTKM_KEYWORDS_ = ['khuyen mai','khuyenmai','giam gia','giamgia','uu dai','uudai',
   'sale','freeship','free ship','qua tang','tang qua','ma giam','magiam','voucher',
@@ -2721,6 +2880,7 @@ function doGetCore_(e) {
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
+    if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
@@ -8081,6 +8241,8 @@ function doPostCore_(e) {
     if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
     if (action === 'tonKhoImport')        return tonKhoImport_(data);
     if (action === 'khoComboSave')        return khoComboSave_(data);
+    if (action === 'comboSave')           return comboSave_(data);
+    if (action === 'comboDelete')         return comboDelete_(data);
     if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
     if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
     if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);

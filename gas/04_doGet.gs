@@ -190,6 +190,7 @@ function doGetCore_(e) {
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
+    if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();

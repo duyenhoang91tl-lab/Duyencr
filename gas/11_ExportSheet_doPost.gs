@@ -294,6 +294,8 @@ function doPostCore_(e) {
     if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
     if (action === 'tonKhoImport')        return tonKhoImport_(data);
     if (action === 'khoComboSave')        return khoComboSave_(data);
+    if (action === 'comboSave')           return comboSave_(data);
+    if (action === 'comboDelete')         return comboDelete_(data);
     if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
     if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
     if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);
