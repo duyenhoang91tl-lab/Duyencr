@@ -32,11 +32,13 @@ NGUYÊN NHÂN GỐC: `proProfileData_` (js/33) lấy đơn từ `_posOrdersCache
 - Không đổi GAS → không cần deploy; app Android: đóng mở lại / Ctrl+F5.
 - [ ] CHỜ Duyên xem: mở hồ sơ khách nhiều đơn ở tab Chăm sóc → vài giây sau Dòng thời gian phải hiện đủ đơn và cuộn riêng được. Nếu "cuộn lên" ý Duyên là chỗ khác (vd cố định phần đầu hồ sơ) thì báo lại.
 
-## 2026-11-16 (phiên Claude — ẨN/HIỆN CỘT LỌC BÊN TRÁI Ở DANH SÁCH KH) — BƯỚC 1/2 XONG (đã push); đang làm bước 2
+## 2026-11-16 (phiên Claude — ẨN/HIỆN CỘT LỌC BÊN TRÁI Ở DANH SÁCH KH) — XONG CẢ 2 BƯỚC (đã push); chờ Duyên xem trên máy thật
 Duyên (gửi ảnh khoanh cột lọc: ô tìm, Lọc theo CS, Loại KH, Phân loại KH, Tình trạng CS): "chỉnh phần menu này khi mở danh sách khách hàng cũng có thể ẩn hoặc hiện như menu chính".
 NGUYÊN NHÂN GỐC: cột lọc `.sidebar` chỉ ẩn được CÙNG LÚC với menu chính (mũi tên `#sh-edge` js/55 → `shell-collapsed`) hoặc là ngăn kéo trên điện thoại; không có nút ẩn/hiện RIÊNG cho cột lọc nên muốn bảng rộng hơn phải thu gọn cả menu chính.
 - ✅ **BƯỚC 1 XONG (đã push)** `css/29-kh-sb-toggle.css` (MỚI, token-only, đã thêm TOKEN_ONLY + sinh lại 99-dark-auto.css): `html.kh-sb-off .app .sidebar{display:none}` chỉ ở >768px (điện thoại giữ ngăn kéo cũ) + kiểu nút `#kh-sb-edge` (mũi tên mép cột lọc, hiện khi có class `is-on`). index.html nạp css/29. Chưa có JS nên CHƯA có nút (không đổi hành vi).
-- [ ] **BƯỚC 2 (đang làm)** `js/85-kh-sb-toggle.js`: tạo nút `#kh-sb-edge` (‹ ẩn / › hiện), lưu localStorage `ome_kh_sb` ('0' = ẩn), chỉ hiện ở tab Danh sách KH (không `body.no-kh-sidebar`/`rpt-mode`/`shell-collapsed`, >768px), đặt sát mép phải cột lọc (hoặc mép trái vùng nội dung khi đang ẩn); hàm thuần `khSbPlan_` + test; kiểm bằng Chromium headless. KHÔNG sửa js/55.
+- ✅ **BƯỚC 2 XONG (đã push)** `js/85-kh-sb-toggle.js` (MỚI) + `tools/test-kh-sb-toggle.js`: nút `#kh-sb-edge` (‹ ẩn / › hiện) ở mép phải cột lọc (khi ẩn: mép trái vùng nội dung, nằm DƯỚI mũi tên hồng của menu chính), lưu `localStorage ome_kh_sb` ('0' = ẩn, nhớ sau khi tải lại). Chỉ hiện ở tab Danh sách KH, >768px, không rpt-mode, không `shell-collapsed`. Hàm thuần `khSbPlan_`. Không sửa js/55. Đo Chromium headless: ẩn cột lọc → vùng bảng 866px → 1126px; tải lại vẫn nhớ; tab khác + điện thoại: không hiện nút. Test mới 11 ca + tokens/dark-theme/cust-select/mobile-fit đạt; index.html 6 khối script không lỗi cú pháp. KHÔNG đổi GAS/extension → chỉ Ctrl+F5.
+- 🧪 Duyên: Ctrl+F5 → Danh sách KH: bấm mũi tên trắng ‹ ở mép phải cột lọc để ẩn, › để hiện lại. Gỡ hẳn: xoá dòng script js/85 + link css/29 trong index.html.
+- [ ] **VIỆC KẾ TIẾP:** chờ phản hồi. Lưu ý: khi menu chính đang thu gọn (mũi tên hồng `›` ở mép trái) cột lọc đã bị ẩn theo — nút riêng chỉ hiện khi menu chính đang mở; nếu Duyên muốn bật cột lọc riêng cả khi menu chính thu gọn thì cần sửa js/55/css/13 (chưa làm). Rồi R5a BƯỚC 3 (`js/84-cust-bulk-status.js`) như mục R5a bên dưới.
 
 ## 2026-11-16 (phiên Claude — SỬA "DANH SÁCH KH CHỈ HIỂN THỊ 1 KHÁCH") — XONG (đã push); chờ Duyên xem trên máy thật
 Duyên: "fix danh sách khách hàng chỉ hiển thị 1 khách".

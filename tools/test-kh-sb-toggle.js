@@ -1,0 +1,24 @@
+// Test ẩn/hiện cột lọc Danh sách KH (js/85 + css/29). Chạy: node tools/test-kh-sb-toggle.js
+const fs = require('fs'), path = require('path'); const ROOT = path.join(__dirname, '..');
+let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
+const { khSbPlan_: P } = require(path.join(ROOT, 'js', '85-kh-sb-toggle.js'));
+const base = { width: 1366, listTab: true, rptMode: false, shellCollapsed: false, loggedIn: true, sbRight: 500, appLeft: 240 };
+let r = P(Object.assign({}, base, { hidden: false }));
+ok(r.show && !r.hide && r.left === 500 && r.label === '‹', 'đang hiện cột lọc: nút ‹ ở mép phải cột lọc (500), không ẩn');
+r = P(Object.assign({}, base, { hidden: true }));
+ok(r.show && r.hide && r.left === 240 && r.label === '›' && /Hiện/.test(r.title), 'đang ẩn: nút › ở mép trái vùng nội dung (240), áp class ẩn');
+ok(!P(Object.assign({}, base, { listTab: false })).show, 'tab khác Danh sách KH: không hiện nút');
+ok(!P(Object.assign({}, base, { width: 700 })).show, 'điện thoại (<=768px): không hiện nút (dùng ngăn kéo cũ)');
+ok(!P(Object.assign({}, base, { rptMode: true })).show, 'màn Báo cáo: không hiện nút');
+r = P(Object.assign({}, base, { shellCollapsed: true, hidden: true }));
+ok(!r.show && !r.hide, 'menu chính đang thu gọn (cột lọc đã ẩn theo): không hiện nút, không áp class thừa');
+ok(!P(Object.assign({}, base, { loggedIn: false })).show, 'chưa đăng nhập: không hiện nút');
+ok(P({}).show === false && P().show === false, 'thiếu dữ liệu: không lỗi, không hiện');
+const css = fs.readFileSync(path.join(ROOT, 'css', '29-kh-sb-toggle.css'), 'utf8');
+ok(/@media \(min-width:769px\)\{html\.kh-sb-off \.app \.sidebar\{display:none\}\}/.test(css), 'css/29: ẩn .sidebar chỉ ở >768px');
+ok(/#kh-sb-edge\.is-on\{display:block\}/.test(css), 'css/29: nút chỉ hiện khi is-on');
+const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+ok(/js\/85-kh-sb-toggle\.js/.test(idx) && /css\/29-kh-sb-toggle\.css/.test(idx), 'index.html nạp js/85 + css/29');
+const s55 = fs.readFileSync(path.join(ROOT, 'js', '55-fn-shell.js'), 'utf8');
+ok(!/kh-sb/.test(s55), 'js/55 (menu chính) không bị sửa');
+console.log(fail ? '\nFAILED ' + fail : '\nALL KH-SB-TOGGLE TESTS PASSED'); process.exit(fail ? 1 : 0);
