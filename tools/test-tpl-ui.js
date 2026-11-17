@@ -10,7 +10,7 @@ const zsrc = fs.readFileSync(path.join(__dirname, '..', 'extension-zalo', 'zalo-
 const psrc = fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pancake-content.js'), 'utf8');
 function fnSrc(src, name) { const i = src.indexOf('function ' + name); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let m = k; m < src.length; m++) { if (src[m] === '{') d++; else if (src[m] === '}') { d--; if (d === 0) return src.slice(i, m + 1); } } }
 const zchunk = zsrc.slice(zsrc.indexOf('  let _zaiMsgTemplates = []'), zsrc.indexOf('  // ── DOANH SO & HOA HONG CUA TOI'));
-const zhelp = fnSrc(zsrc, 'zaiFold_') + '\n' + fnSrc(zsrc, 'zaiRankTpls_');
+const zhelp = /const ZAI_API_ERR = [^\n]*;/.exec(zsrc)[0] + '\n' + fnSrc(zsrc, '_zaiApiErr_') + '\n' + fnSrc(zsrc, 'zaiFold_') + '\n' + fnSrc(zsrc, 'zaiRankTpls_');   // + chuan hoa loi API (_zaiTplCall_ goi _zaiApiErr_)
 const phelp = ['_stripVNlocal_', 'isMyOpenTpl_', 'tplLines_', 'rankMsgTemplates_', 'renderMsgTemplateRows_', 'openTplForm_', 'loadMsgTemplates_', 'fillTplGroupSelect_'].map(n => fnSrc(psrc, n)).join('\n') + '\n' + fnSrc(psrc, 'ensureTplCatalog_') + '\nconst _fold_ = (s) => _stripVNlocal_(String(s || \'\').normalize(\'NFC\')).replace(/\\s+/g, \' \').trim();\nconst _vnSort_ = (a, b) => String(a).localeCompare(String(b), \'vi\', { numeric: true });\nconst _itemNames_ = (it) => { const o = []; if (it.t) o.push(it.t); if (it.m && _fold_(it.m) !== _fold_(it.t)) o.push(it.m); return o; };\nlet _imgFlatItems = null, _imgFlatLoading = false;';
 const esc1 = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const esc2 = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -81,7 +81,7 @@ const body = S => S.box.innerHTML;
     // xoa: huy -> khong goi; dong y -> goi dung + thong bao + tai lai
     S.env.confirmAns = false; S.box.querySelector('[data-did="t2"]').click(); await sleep(10); ok(!S.env.calls.some(c => c.action === 'deleteMessageTemplate'), N + ': huy xoa -> khong goi');
     S.env.confirmAns = true; S.env.reply = { ok: false, error: 'Khong co quyen' }; S.box.querySelector('[data-did="t2"]').click(); await sleep(20);
-    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && (N === 'Zalo' ? /Lỗi xoá mẫu: Khong co quyen/ : /^Khong co quyen$/).test(S.status()), N + ': xoa loi -> thong bao');
+    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && (N === 'Zalo' ? /^Lỗi API$/ : /^Khong co quyen$/).test(S.status()), N + ': xoa loi -> thong bao');
     S.env.calls.length = 0; S.env.reply = { ok: true }; S.box.querySelector('[data-did="t2"]').click(); await sleep(30);
     ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'deleteMessageTemplate', id: 't2', createdBy: 'Hoa' }) && /Đã xoá mẫu/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': xoa OK -> payload dung + thong bao + tai lai danh sach: ' + JSON.stringify(S.env.calls));
     // form de xuat moi
@@ -91,7 +91,7 @@ const body = S => S.box.innerHTML;
     F('content').value = 'x'; F('save').click(); ok(/Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống/.test(S.status()), N + ': thieu nhom/SP/tinh huong -> nhac'); F('content').value = '';
     F('title').value = '  Tiêu đề mới '; F('content').value = ' Nội dung mới '; F('product').value = 'Nhẫn'; F('topic').value = 'Hỏi giá'; F('tags').value = 'a, b';
     S.env.calls.length = 0; S.env.reply = { ok: false, error: 'Server bận' }; F('save').click(); await sleep(20);
-    ok(!F('save').disabled && /Server bận/.test(S.status()) && S.host.querySelector('#' + S.pre + 'title'), N + ': gui loi -> mo lai nut, giu form, thong bao');
+    ok(!F('save').disabled && (N === 'Zalo' ? /^Lỗi API$/ : /Server bận/).test(S.status()) && S.host.querySelector('#' + S.pre + 'title'), N + ': gui loi -> mo lai nut, giu form, thong bao');
     S.env.calls.length = 0; S.env.reply = { ok: true }; F('save').click(); await sleep(30);
     ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'saveMessageTemplate', template: { id: '', title: 'Tiêu đề mới', content: 'Nội dung mới', tags: 'a, b', product: 'Nhẫn', nhom: '', topic: 'Hỏi giá', createdBy: 'Hoa' } }), N + ': payload gui dung (da trim): ' + JSON.stringify(S.env.calls[0]));
     ok(S.host.innerHTML === '' && /Đã lưu mẫu \(chờ duyệt\)/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': gui OK -> dong form, thong bao, tai lai');

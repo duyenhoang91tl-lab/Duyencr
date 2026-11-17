@@ -54,6 +54,10 @@ function _colLetter_(n) {
 
 // ─── CACHE LON: chia manh de vuot gioi han ~100KB/1 key cua CacheService ─────────────
 // (danh muc gia day du co the vuot 100KB nen cache.put 1 key se bi bo qua am tham)
+// TTL (giay) cua cache TOAN BO sheet don Pos: 'donChiTiet_v4' (readDonChiTiet_) va 'don_phones_v6' (action donPhones) — PHAI dung chung 1 hang so vi hai key xoa cung luc.
+// 2026-11-16 (Duyen: "an load bao cao hoi lau du chi xem thang"): 90s -> 600s. NGUYEN NHAN GOC cham: moi khi cache het han, buildSalesReportB_/E/F/G doc + doi + JSON.stringify TOAN BO lich su sheet Pos
+// (khong phu thuoc "chi xem 1 thang"). Nhap file / xoa trung / sua o qua he thong da removeAll(['donChiTiet_v4_n','don_phones_v6_n', 'don_daily_v1_n']) nen so khong cu; CHI sua tay truc tiep tren sheet Pos moi phai cho toi 10 phut.
+var DON_CACHE_TTL_ = 600;
 function _cachePutBig_(key, str, ttl) {
   try {
     var cache = CacheService.getScriptCache();

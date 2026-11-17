@@ -1628,6 +1628,16 @@
   // khi GAS cu chua co danh muc phang), ctkmCatalog (CTKM theo san pham, cache 10 phut). Gia theo "Loai da" (Mac dinh/SAPHIA/RUBY, nho theo may qua chrome.storage.local).
   // Ma ham ben duoi DAN XUAT CO HOC tu Pancake. Khac biet: "Loai da" o Zalo hien trong khoi gia; ket qua tab "Go tim" CHUA doi gia theo loai da (gap — xem KB 08).
   const ZAI_FLAT_TTL_MS = 15 * 60 * 1000;
+  // MOI loi API/GAS cua cac ham goi {ok,error} (_zaiBldCall_/_zaiImgCall_/_zaiTplCall_/_zaiFetchCsStats_) hien cho CS DUY NHAT 1 cau "Lỗi API" — y het Pancake AI (normalizeApiResp_,
+  // Duyen 22/10/2026, quy tac song song). Chi tiet goc nam o errorRaw + Console (F12). Giu nguyen: ma noi bo GAS_NO_FLAT/GAS_NO_CTKM (code so khop chuoi), thieu URL GAS / chua chon CS / thieu link anh (CS can biet phai lam gi).
+  // KHONG ap cho cac cho goi GAS truc tiep co logic dua vao chuoi loi goc (thu lai khi 429, goi y deploy khi 'Unknown action'...).
+  const ZAI_API_ERR = 'Lỗi API';
+  function _zaiApiErr_(tag, raw) {
+    raw = String(raw || '');
+    if (/GAS_NO_FLAT|GAS_NO_CTKM|Chưa cài đặt URL|Chưa chọn CS|Thiếu link ảnh/i.test(raw)) return { ok: false, error: raw };
+    try { console.warn('[Zalo AI] ' + ZAI_API_ERR + ' —', tag, raw); } catch (_) {}
+    return { ok: false, error: ZAI_API_ERR, errorRaw: raw };
+  }
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
   // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
   // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
@@ -1653,7 +1663,7 @@
       if (type === 'GET_PRICE_FLAT') { if (!Array.isArray(data.items)) throw new Error('GAS_NO_FLAT'); return { ok: true, data: { items: data.items } }; }
       if (type === 'GET_CTKM') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_CTKM'); return { ok: true, data: { rows: data.rows } }; }
       return { ok: true, data: { rows: data.rows || [], total: data.total || 0 } };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
   // Chuyen che do trong khoi gia: "🔎 Go tim" <-> "🧩 Soan don (chon tung buoc)"
   function bindPriceModeZai_() {
@@ -1783,7 +1793,7 @@
           _zaiSetBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
         } else {
           _zaiFlatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
-          _zaiSetBldMsg_('Lỗi tải danh mục: ' + escAttrZai_(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+          _zaiSetBldMsg_(escAttrZai_(resp?.error || ZAI_API_ERR) + ' — chuyển tab rồi quay lại để thử lại.');
         }
         renderBuilderDynZai_();
       });
@@ -1843,7 +1853,7 @@
     if (_zaiItemFold_(q).length < 2) { _zaiFlatItems = []; renderBuilderDynZai_(); return; }
     _zaiBldCall_('GET_PRICE', { q }).then((resp) => {
       if (q !== _zaiBld.q) return; // đã gõ tiếp, bỏ kết quả cũ
-      if (!resp?.ok) { _zaiSetBldMsg_('Lỗi tìm: ' + escAttrZai_(resp?.error || 'không rõ')); return; }
+      if (!resp?.ok) { _zaiSetBldMsg_(escAttrZai_(resp?.error || ZAI_API_ERR)); return; }
       _zaiFlatItems = (resp.data.rows || []).map(_zaiNormPriceRow_).filter((it) => it.t || it.m);
       renderBuilderDynZai_();
     });
@@ -2039,7 +2049,7 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || (type === 'GET_DRIVE_IMAGE' ? 'Không đọc được ảnh.' : 'Không tải được danh sách sản phẩm.'));
       return { ok: true, data: type === 'GET_DRIVE_IMAGE' ? data : { items: data.items || [] } };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
     function _zaiLocalStripVN_(s) {
     if (!s) return '';
@@ -2157,7 +2167,7 @@
         _zaiImgFlatItems = resp.data.items || [];
       } else {
         _zaiImgFlatItems = [];
-        if (dyn) dyn.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không tải được danh mục')}</div>`;
+        if (dyn) dyn.innerHTML = `<div class="zai-ctkm-loading">${escAttrZai_(resp?.error || ZAI_API_ERR)}</div>`;
         return;
       }
       renderImgDynZai_();
@@ -2178,7 +2188,7 @@
     _zaiImgCall_('GET_DRIVE_IMAGE', { link }).then((resp) => {
       const slot = document.getElementById(`zaiimg-slot-${i}`);
       if (!slot) return;
-      if (!resp?.ok) { slot.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      if (!resp?.ok) { slot.innerHTML = `<div class="zai-ctkm-loading">${escAttrZai_(resp?.error || ZAI_API_ERR)}</div>`; return; }
       const data = resp.data;
       if (data.image && data.image.base64) {
         slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb" />` +
@@ -2341,7 +2351,7 @@
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       return { ok: true, data };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
   async function loadMsgTemplatesZai_() {
     const box = document.getElementById('zai-tpl-result');
@@ -2455,7 +2465,7 @@
       b.disabled = true;
       _zaiTplCall_('DELETE_MESSAGE_TEMPLATE', { id: t.id, createdBy: _currentCS || '' }).then((resp) => {
         if (resp?.ok) { _zaiTplStatus_('Đã xoá mẫu.'); loadMsgTemplatesZai_(); }
-        else { b.disabled = false; _zaiTplStatus_('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; _zaiTplStatus_(resp?.error || ZAI_API_ERR); }
       });
     }));
   }
@@ -2544,7 +2554,7 @@
       }).then((resp) => {
         // Server tra status: 'approved' khi admin da dang nhap o Cai dat extension (kem token) -> dung duoc ngay; con lai 'pending' (cho admin duyet).
         if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_(resp.data && resp.data.status === 'approved' ? 'Đã lưu mẫu — dùng được ngay (admin không cần duyệt).' : 'Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_(resp?.error || ZAI_API_ERR); }
       });
     });
   }
@@ -2559,10 +2569,10 @@
       const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=csStats&cs=' + encodeURIComponent(cs) +
         '&dateFrom=' + encodeURIComponent(dateFrom || '') + '&dateTo=' + encodeURIComponent(dateTo || ''), { redirect: 'follow' });
       const data = await res.json();
-      if (data.error) return { ok: false, error: String(data.error) };
-      if (data.ok === false) return { ok: false, error: 'Không tính được số liệu.' };
+      if (data.error) return _zaiApiErr_('csStats', data.error);
+      if (data.ok === false) return _zaiApiErr_('csStats', 'Không tính được số liệu.');
       return { ok: true, data };
-    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+    } catch (e) { return _zaiApiErr_("csStats", e && e.message || e); }
   }
   const _ZAI_STATS_RANGES_ = [
     { v: 'today', l: 'Hôm nay' }, { v: 'yesterday', l: 'Hôm qua' }, { v: 'thisWeek', l: 'Tuần này' }, { v: 'lastWeek', l: 'Tuần trước' },
@@ -2636,7 +2646,7 @@
       _zaiStatsState.loading = false;
       if (!resp?.ok) {
         _zaiStatsState.data = null;
-        resEl.innerHTML = `<div class="zai-stats-note zai-stats-err">⚠️ ${escHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        resEl.innerHTML = `<div class="zai-stats-note zai-stats-err">⚠️ ${escHtml(resp?.error || ZAI_API_ERR)}</div>`;
         return;
       }
       _zaiStatsState.data = resp.data;

@@ -716,6 +716,10 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
+    // Go xong o "Ngu canh / San pham" roi Enter = lay goi y luon (khoi phai cuon xuong bam nut)
+    panelEl.querySelector("#pk-ctx-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); requestSuggestion(true); }
+    });
     var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", openai: "OpenAI (ChatGPT)" };
   function _refreshAiKeyBanner() {
     var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
@@ -4426,16 +4430,41 @@
     });
   }
 
+  // Thong bao NGAY TRONG khung goi y (canh nut "Lay goi y moi") — truoc day cac truong hop
+  // "khong doc duoc tin nhan"/"dang tai"/"backend tra rong" chi ghi vao dong trang thai o DAU
+  // panel; panel cuon duoc nen CS dang o duoi cung (cho nut bam) khong thay gi => tuong "viet xong
+  // chang hien gi". kind: 'info' | 'warn'.
+  function showSugNotice_(text, kind) {
+    const box = panelEl && panelEl.querySelector("#pk-ai-suggestions");
+    if (!box) return;
+    const warn = kind === "warn";
+    box.innerHTML = '<div class="pk-ai-cust-loading" style="margin-top:6px;padding:8px;border-radius:6px;font-style:normal;' +
+      (warn ? 'background:#fffbeb;border:1px solid #fde68a;color:#92400e' : 'background:#f0f7ff;border:1px solid #dbeafe;color:#1e40af') +
+      '">' + escapeHtml(text) + '</div>';
+    try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+  }
+
   async function requestSuggestion(manual) {
+    const ctxEl = panelEl.querySelector("#pk-ctx-input");
+    const ctxText = ctxEl ? ctxEl.value.trim() : "";
     const messages = extractMessages();
-    if (!messages.length) {
-      setStatus("Không tìm thấy tin nhắn nào. Kiểm tra lại selector trong Options.");
+    // Khong co tin nhan nhung CS da go san pham/ngu canh vao o "Ngu canh / San pham" => van cho
+    // chay (che do tra cuu san pham theo y CS), khong chan.
+    if (!messages.length && !ctxText) {
+      const msg = "Không đọc được tin nhắn nào trong hội thoại. Hãy mở 1 hội thoại, hoặc gõ tên sản phẩm vào ô \"Ngữ cảnh / Sản phẩm\" rồi bấm lại (nếu hội thoại có tin mà vẫn báo vậy: kiểm tra selector trong Options).";
+      setStatus(msg);
+      if (manual) showSugNotice_("⚠️ " + msg, "warn");
       return;
     }
 
     setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
+    const refreshBtn = panelEl.querySelector("#pk-ai-refresh");
+    if (manual) {
+      showSugNotice_("⏳ Đang lấy gợi ý" + (_useProducts ? " (có tra cứu sản phẩm — có thể mất vài giây)" : "") + "...", "info");
+      if (refreshBtn) { refreshBtn.disabled = true; }
+    }
+    const done_ = () => { if (refreshBtn) refreshBtn.disabled = false; };
 
-    const ctxEl = panelEl.querySelector("#pk-ctx-input");
     safeSendMessage_(
       {
         type: "FETCH_SUGGESTION",
@@ -4443,13 +4472,14 @@
           platform: PLATFORM,
           messages,
           tone: _activeTone,
-          context: ctxEl ? ctxEl.value.trim() : "",
+          context: ctxText,
           custLines: buildCustLines(),
           withProducts: _useProducts,
           stonePref: _stonePref
         }
       },
       (resp) => {
+        done_();
         if (!resp?.ok) {
           setStatus(resp?.error || PK_API_ERR);
           showAiFallbackHint_();
@@ -4458,6 +4488,8 @@
         renderSuggestions(resp.data);
       }
     );
+    // Neu extension bi vo hieu (safeSendMessage_ khong goi callback) thi mo lai nut sau 1 nhip
+    setTimeout(() => { if (refreshBtn && refreshBtn.disabled && _extInvalidated) done_(); }, 500);
   }
 
   // ── 3 câu mở đầu chủ động (dùng khi CS muốn nhắn trước cho khách) ──
@@ -4525,6 +4557,7 @@
 
     if (!list.length) {
       setStatus("Backend không trả về gợi ý nào.");
+      showSugNotice_("⚠️ AI không trả về gợi ý nào. Thử bấm \"Lấy gợi ý mới\" lần nữa, hoặc gõ rõ hơn vào ô Ngữ cảnh / Sản phẩm.", "warn");
       return;
     }
 
@@ -4554,6 +4587,7 @@
     });
 
     renderImageSuggestion(data.image);
+    try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
   }
 
   // Cau khach hoi gan nhat — dung lam "ngu canh" khi luu mau AI hoc (cot context cua sheet AIContext).

@@ -7,6 +7,46 @@
 var _pkc = { phone: '', convs: [], msgs: {}, active: '', after: '', timer: null, loading: false, firstLoad: true, err: '', sending: false, tick: 0, okAt: '' };
 function _pkcEsc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function _pkcUrl(qs) { return gsUrl + (gsUrl.indexOf('?') > -1 ? '&' : '?') + qs; }
+// GỌI GAS ĐỌC JSON + PHÂN LOẠI LỖI (16/11/2026). NGUYÊN NHÂN GỐC "Không kết nối được máy chủ" khi vào Social > Chat: trước đây
+// `(await fetch(...)).json()` nằm trong 1 catch DUY NHẤT nên MỌI sự cố (mất mạng, GAS trả TRANG LỖI HTML do quá tải/quá thời gian/chưa deploy
+// quyền truy cập, JSON hỏng, treo không phản hồi) đều hiện cùng 1 câu "Không kết nối được máy chủ" -> không biết sửa chỗ nào, và 1 lần
+// GAS khởi động nguội trả HTML là báo lỗi luôn. Nay: timeout 30s (không treo), TỰ THỬ LẠI 1 lần sau 1,2s, và báo ĐÚNG nguyên nhân
+// (mất mạng / quá chậm / HTTP xxx / trang lỗi của Apps Script kèm trích đoạn). Lỗi ném ra có .kind = net|timeout|http|parse.
+var _pkcRetryMs = 1200;
+function _pkcFetchErr_(kind, status, body) {
+  var b = String(body || ''), m = '', t = (b.match(/<title>([^<]{1,120})/i) || [])[1] || '';
+  if (kind === 'net') m = 'Không kết nối được máy chủ.';
+  else if (kind === 'timeout') m = 'Máy chủ phản hồi quá chậm (quá 30 giây).';
+  else if (kind === 'http') m = 'Máy chủ báo lỗi (HTTP ' + status + ').';
+  else if (/Exceeded maximum execution time|quá thời gian thực thi|thời gian thực thi tối đa/i.test(b)) m = 'Apps Script chạy quá thời gian cho phép (máy chủ đang quá tải).';
+  else if (/Service invoked too many times|quá nhiều lần|quota/i.test(b)) m = 'Apps Script hết hạn mức gọi dịch vụ trong ngày (urlfetch/quota).';
+  else if (/accounts\.google\.com|ServiceLogin|Sign in|Đăng nhập/i.test(b)) m = 'Apps Script yêu cầu đăng nhập Google — deployment chưa để quyền truy cập "Bất kỳ ai" (Anyone).';
+  else m = 'Máy chủ trả về trang lỗi thay vì dữ liệu' + (t ? ' (“' + t.trim() + '”)' : '') + (b ? ': ' + b.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) : '.');
+  var e = new Error(m); e.kind = kind; e.status = status || 0; e.body = b.slice(0, 300); return e;
+}
+async function _pkcFetchJson_(url, opt) {
+  opt = opt || {}; var tries = opt.retry === 0 ? 1 : 2, tmo = opt.timeout || 30000, last = null;
+  for (var i = 0; i < tries; i++) {
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null, tm = null;
+    var cut = new Promise(function (res, rej) { tm = setTimeout(function () { try { if (ctl) ctl.abort(); } catch (e0) {} rej(_pkcFetchErr_('timeout', 0, '')); }, tmo); });   // tự ngắt theo giờ, KHÔNG phụ thuộc fetch có hưởng ứng abort hay không (WebView cũ/mock)
+    try {
+      var j = null, txt = '', r = null;
+      await Promise.race([cut, (async function () {
+        r = await fetch(url, ctl ? { redirect: 'follow', signal: ctl.signal } : { redirect: 'follow' });
+        if (r && typeof r.text === 'function') { txt = await r.text(); try { j = JSON.parse(txt); } catch (e1) { j = null; } }
+        else if (r && typeof r.json === 'function') { j = await r.json(); }
+      })()]);
+      if (j !== null && typeof j === 'object') return j;
+      last = _pkcFetchErr_(r && r.ok === false ? 'http' : 'parse', r && r.status, txt);
+    } catch (e) {
+      last = (e && e.kind) ? e : (e && e.name === 'AbortError') ? _pkcFetchErr_('timeout', 0, '') : _pkcFetchErr_('net', 0, e && e.message);
+    } finally { if (tm) clearTimeout(tm); }
+    try { console.warn('[chat] tải lỗi (lần ' + (i + 1) + '/' + tries + '):', last.kind, last.status, last.body || last.message); } catch (e2) {}
+    if (i < tries - 1) await new Promise(function (res) { setTimeout(res, _pkcRetryMs); });
+  }
+  throw last;
+}
+function _pkcErrText_(e) { return (e && e.kind && e.message) ? e.message : 'Không kết nối được máy chủ.'; }
 function _pkcHm(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
 function _pkcDay(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
 function _pkcStop() { if (_pkc.timer) { clearInterval(_pkc.timer); _pkc.timer = null; } }
@@ -245,8 +285,7 @@ function _pkcAuthFail(j) {
 async function pkcLoad(full) {
   var P = _pkc; if (!P.phone || P.loading) return; P.loading = true; var ph = P.phone;
   try {
-    var r = await fetch(_pkcUrl('action=pkChat&phone=' + encodeURIComponent(ph) + ((!full && P.after) ? '&after=' + encodeURIComponent(P.after) : '')), { redirect: 'follow' });
-    var j = await r.json();
+    var j = await _pkcFetchJson_(_pkcUrl('action=pkChat&phone=' + encodeURIComponent(ph) + ((!full && P.after) ? '&after=' + encodeURIComponent(P.after) : '')));
     if (_pkc.phone !== ph) return;   // đã chuyển sang khách khác
     if (!j || j.error) { P.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được chat.'); _pkcStatus(); return; }
     _pkcAuthShown = false; P.err = ''; P.okAt = _pkcHm(new Date().toISOString()); P.gv = j.gv || '';
@@ -255,7 +294,7 @@ async function pkcLoad(full) {
     (j.messages || []).forEach(function (m) { (P.msgs[m.c] = P.msgs[m.c] || {})[m.id] = m; if (m.at && (!P.after || m.at > P.after)) P.after = m.at; });
     if (!P.active || !P.convs.some(function (c) { return c.id === P.active; })) P.active = P.convs.length ? P.convs[0].id : '';
     _pkcRender(P.firstLoad); P.firstLoad = false;
-  } catch (e) { P.err = 'Không kết nối được máy chủ.'; _pkcStatus(); }
+  } catch (e) { P.err = _pkcErrText_(e); _pkcStatus(); }
   finally { P.loading = false; }
 }
 function _pkcStatus() {

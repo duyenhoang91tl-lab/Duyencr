@@ -142,8 +142,9 @@ if (require.main === module) (async () => {
   for (const flat of [{ ok: false, error: 'Khong doc duoc <sheet>' }, { ok: true, data: { items: [] } }]) {
     const a = makeSide('zalo', { flat }), b = makeSide('pancake', { flat }); a.init(); b.init(); await sleep(60); const mA = norm(a.q('#Xb-msg').outerHTML), mB = norm(b.q('#Xb-msg').outerHTML), strip = h => h.replace(/>[^<]*</, '><');   // bo noi dung cau loi: Pancake dung cau chuan 'Lỗi API' (ddaf130), Zalo van 'Lỗi tải danh mục: <chi tiet>'
     ok(a.dyn() === b.dyn() && strip(mA) === strip(mB) && b.q('#Xb-msg').textContent.length > 0, 'loi nap danh muc: cung bo cuc (noi dung cau loi moi ben):' + dd(mA, mB));
-    if (mA !== mB) console.log('!!   CANH BAO: cau bao loi nap danh muc cua Zalo CHUA giong Pancake — can lam Zalo song song');
-    ok(!a.q('#Xb-msg').querySelector('sheet') && /Lỗi tải danh mục|không nhận diện được cột/.test(a.q('#Xb-msg').textContent), 'thong bao loi/khong nhan dien cot (da escape)');
+    // Mock Pancake tra thang resp (bo qua normalizeApiResp_) nen khong so nguyen HTML o ca loi: Zalo phai hien cau chuan 'Lỗi API' (_zaiApiErr_, song song ddaf130); ca khong loi: HTML phai y het.
+    if (flat.ok === false ? !/^Lỗi API — /.test(a.q('#Xb-msg').textContent) : mA !== mB) console.log('!!   CANH BAO: cau bao loi nap danh muc cua Zalo CHUA giong Pancake — can lam Zalo song song');
+    ok(!a.q('#Xb-msg').querySelector('sheet') && /Lỗi API|không nhận diện được cột/.test(a.q('#Xb-msg').textContent), 'thong bao loi/khong nhan dien cot (da escape)');
   }
   // ===== 8. tab che do (Go tim <-> Soan don) =====
   const A = makeSide('zalo'), B = makeSide('pancake'); A.bindTabs(); B.bindTabs();

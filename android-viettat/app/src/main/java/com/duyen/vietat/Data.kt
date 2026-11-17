@@ -267,8 +267,14 @@ object Store {
     }
 
     /** Khớp chính xác từ viết tắt, hoặc từ khoá bắt đầu bằng từ đang gõ (>= 2 ký tự). */
-    fun match(w: String): List<Snippet> = snippets.filter { s ->
-        s.abbr.equals(w, true) ||
-            (w.length >= 2 && s.keyword.split(",").map { it.trim() }.any { it.isNotEmpty() && it.startsWith(w, true) })
+    fun match(w: String): List<Snippet> {
+        // NGUYÊN NHÂN GỐC "chọn 3 mẫu mà chèn ra cả mẫu của nhóm khác" (Duyên 16/11): trước đây khớp viết tắt VÀ khớp từ khoá được GỘP chung,
+        // nên mục của nhóm khác chỉ cần có từ khoá bắt đầu bằng chữ đang gõ là bị đổ hết nội dung vào bảng chọn. Nay có mục khớp ĐÚNG viết tắt thì CHỈ lấy các mục đó;
+        // chỉ khi không có mục nào trùng viết tắt mới dùng khớp từ khoá.
+        val exact = snippets.filter { it.abbr.equals(w, true) }
+        if (exact.isNotEmpty()) return exact
+        return snippets.filter { s ->
+            w.length >= 2 && s.keyword.split(",").map { it.trim() }.any { it.isNotEmpty() && it.startsWith(w, true) }
+        }
     }
 }

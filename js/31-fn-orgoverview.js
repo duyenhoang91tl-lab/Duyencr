@@ -1,3 +1,5 @@
+// Mèo máy thay 🤖 (js/38 proCatTag_; chưa nạp/lỗi → '🤖 ' như cũ).
+function _ovCat_(px){ try { var h = typeof proCatTag_ === 'function' ? proCatTag_(px) : ''; if (h) return h.charAt(0) === '<' ? h : h + ' '; } catch (e) {} return '🤖 '; }
 // ═══ TỔNG QUAN KẾT QUẢ KINH DOANH (màn hình đầu tiên) + HỒ SƠ NHÂN SỰ (v13.24) ═══
 // Backend: GAS action=orgOverview (gas_v13.js → orgOverview_). Tab 'overview' = 🏠 Tổng quan; bấm menu ☰ bên trái để vào các màn chi tiết.
 // Phạm vi XEM (lọc ở client, giống các báo cáo khác): admin = toàn công ty; manager = các phòng được gán (cột team của tài khoản, key phòng cách nhau dấu phẩy)
@@ -189,7 +191,7 @@ function _ovRender(){
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 6px"><div style="font-weight:700">🧑‍💼 Nhân viên <span id="ov-pcount" style="font-weight:400;color:var(--muted);font-size:11.5px"></span> <span style="font-weight:400;color:var(--muted);font-size:11.5px">— bấm để xem hồ sơ</span></div>' +
     '<input id="ov-q" class="ymf-date" placeholder="🔍 Tìm tên…" value="' + esc(_ov.q) + '" oninput="_ovSetQ(this.value)" style="margin-left:auto;min-width:160px">' +
     ((_ov.dept !== '' || _ov.team) ? '<button class="btn" onclick="_ov.dept=\'\';_ov.team=\'\';_ovRender()">✕ Bỏ lọc</button>' : '') +
-    (_ovIsAdmin() ? '<button class="btn" onclick="openTeamAnalysisModal()">🤖 AI phân tích team</button>' : '') + '</div>' +
+    (_ovIsAdmin() ? '<button class="btn" onclick="openTeamAnalysisModal()">' + _ovCat_(16) + 'AI phân tích team</button>' : '') + '</div>' +
     '<div id="ov-people" style="overflow-x:auto"></div>' +
     '<div style="margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.5">' + esc(d.note || '') + ((d.warnings || []).length ? '<br><span style="color:var(--tn)">⚠ ' + d.warnings.map(esc).join(' · ') + '</span>' : '') + '</div>';
   body.innerHTML = h; _ovRenderPeople();
@@ -237,7 +239,7 @@ function _ovProfileHtml(p, d){
     '<div style="font-weight:700;margin:12px 0 6px">📝 Đánh giá tổng quan</div>' +
     '<div style="line-height:1.6">' + ((p.strengths || []).length ? '<div style="color:var(--green)">✔ ' + p.strengths.map(esc).join('<br>✔ ') + '</div>' : '') + ((p.issues || []).length ? '<div style="color:var(--red);margin-top:3px">✖ ' + p.issues.map(esc).join('<br>✖ ') + '</div>' : '') +
     (!(p.strengths || []).length && !(p.issues || []).length ? '<div style="color:var(--muted)">' + esc(p.comment || '') + '</div>' : '') + '</div>' +
-    '<div style="margin-top:8px"><button class="btn" id="ov-ai-btn" data-n="' + esc(p.name) + '" onclick="_ovAskAI(this.dataset.n)">🤖 Nhờ AI nhận xét &amp; gợi ý việc cần làm</button> <span id="ov-ai-out" style="font-size:12.5px"></span></div>' + members;
+    '<div style="margin-top:8px"><button class="btn" id="ov-ai-btn" data-n="' + esc(p.name) + '" onclick="_ovAskAI(this.dataset.n)">' + _ovCat_(16) + 'Nhờ AI nhận xét &amp; gợi ý việc cần làm</button> <span id="ov-ai-out" style="font-size:12.5px"></span></div>' + members;
 }
 function openEmployeeProfile(name){
   var d = _ov.data; if (!d) { toast('Chưa có dữ liệu tổng quan'); return; }

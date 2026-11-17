@@ -11,4 +11,7 @@ ok(b.errors.length === 3 && Object.keys(b.obj).length === 1, 'báo lỗi: mã sa
 const rt = ctx._osoToRows_({ '162T10/2026': 'yenNTH2004' }); ok(rt.length === 1 && rt[0].code === '162T10/2026' && rt[0].name === 'yenNTH2004', 'đọc ngược setting → dòng bảng');
 ok(/act:ordersale/.test(fs.readFileSync(__dirname + '/../js/29-sidenav.js', 'utf8')) && /openOrderSaleOvrModal/.test(fs.readFileSync(__dirname + '/../js/29-sidenav.js', 'utf8')), 'nối vào menu Cài đặt team (admin)');
 ok(/js\/65-order-sale-ovr\.js/.test(fs.readFileSync(__dirname + '/../index.html', 'utf8')), 'index.html nạp js/65');
+{ const m = ctx._osoMergeJson_([{ code: '162T10/2026', name: 'yenNTH2004' }], '{"162T10":"huyenmaii1990","1339T10/2026":"minhanh99, lanVH1995","abc":"x","5T10":""}');
+  ok(m.error === '' && m.added === 1 && m.updated === 1 && m.rows.length === 2 && m.rows[0].name === 'huyenmaii1990' && m.rows[1].code === '1339T10/2026' && m.rows[1].name === 'minhanh99, lanVH1995', 'gộp JSON: mã trùng (bỏ năm) đổi tên, mã mới thêm, mã sai/tên rỗng bỏ, tên "a, b" giữ'); 
+  ok(ctx._osoMergeJson_([], '{khong json').error !== '' && ctx._osoMergeJson_([], '[1]').error !== '' && ctx._osoMergeJson_([], '').error !== '', 'gộp JSON: hỏng / mảng / rỗng → báo lỗi, không đổi danh sách'); }
 process.exit(bad ? 1 : 0);
