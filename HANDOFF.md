@@ -1,5 +1,9 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — MÈO MÁY SANG PANCAKE AI)
+- ✅ extension-pancake: mèo máy thay 🤖 ở tiêu đề panel (`pkCat_(24)`), nút thu nhỏ hình tròn (`_setCollapseBtnIcon_`) và popup. SVG vẽ thuần trong pancake-content.js (`pkCatSvg_`, bản sao của `proCatIconSvg_` bên js/38). manifest 2026.11.17.1. Test: tools/test-pancake-cat-icon.js.
+- ⏳ Chưa làm (tuỳ chọn): các 🤖 phụ trong Pancake ("Soạn tin", "Đang hỏi AI…"), Zalo AI, và Bước 4 của CRM (js/30, 31, 60 — chưa sửa; "Chạy tự động" và nhãn menu js/29 cố ý giữ). Cần reload extension trong chrome://extensions.
+
 ## 2026-11-16 (phiên Claude — TĂNG TỐC TẢI BÁO CÁO, BƯỚC 2/3: BẬT CACHE CHO ĐƯỜNG XEM + CHẠY SONG SONG B/E) — XONG (đã push)
 - ✅ `js/11-fn-srload.js` (`?v=20261116a`): `_srLoad(useCache)`. `useCache !== true` → `_srCacheClear_()` rồi lấy số MỚI: mọi đường GHI (lưu/xoá chia tay, công tắc ghép, tỷ lệ chia, chốt tháng…) đang gọi `_srLoad()` không tham số nên không bao giờ thấy số cũ sau khi sửa. Chỉ đường XEM `_srApply` (nút Lọc/đổi kỳ/đổi bộ lọc) và `_srSetSub` (đổi báo cáo) gọi `_srLoad(true)` → dùng cache 60s. Truyền cờ cho A/B/C(2 request làm nóng + request chính)/E/F/G. L (`fresh=1`), M, K, H không đổi.
 - ✅ Báo cáo B và E: `storeCaseReport` nay chạy SONG SONG với `salesReportB` (trước đó nối tiếp: B xong mới gọi store → cộng dồn thời gian). Lỗi store vẫn KHÔNG làm hỏng B/E; lỗi của chính B/E được giữ đúng (trước đây request store sau ghi đè `lastFetchError`).
