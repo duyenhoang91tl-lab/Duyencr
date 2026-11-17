@@ -512,8 +512,7 @@ Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2
 
 
 
-<<<<<<< HEAD
-## 2026-11-14 (phiên 62) — NHẮC QUY TRÌNH CHAT: AI quét hội thoại, nhắc sale làm đúng sheet "Kịch bản Chatpage" — BƯỚC 1, 2, 3a XONG (đã push); ĐANG LÀM 3b
+## 2026-11-14 (phiên 68) — NHẮC QUY TRÌNH CHAT: AI quét hội thoại, nhắc sale làm đúng sheet "Kịch bản Chatpage" — BƯỚC 1, 2, 3a XONG (đã push); ĐANG LÀM 3b
 - **Yêu cầu Duyên (18/10):** từ sheet "Kịch bản Chatpage" (https://docs.google.com/spreadsheets/d/1yyOy27HQRQvplhFFDwwZt94J85WK0c5HAen_ouqF2Is, tab Kịch bản/FAQ), để **Pancake AI và CRM quét hội thoại và nhắc sale theo các bước quy trình**. Ví dụ: gửi hình ảnh kèm ghi âm; báo giá phải kèm CTKM nếu có; lên được đơn thì hướng dẫn khách gửi size tay. Thiết kế + bảng quy tắc + cấu hình đầy đủ: **`docs/NHAC-QUY-TRINH-CHAT.md`** (đọc file này trước).
 - **Cách chạy (KHÔNG dùng AI đoán mò):** mỗi quy tắc = sự kiện kích hoạt + việc sale phải làm, từ khoá KHÔNG dấu, xét trên 150 tin gần nhất (Supabase `pk_messages`, có ảnh/ghi âm/video). 4 trạng thái done/pending/due/na; `due` = quá hạn → nhắc. 10 quy tắc mặc định (`reply_fast, ask_birth, ask_phone, consult_image, consult_voice, trust_proof, quote_ctkm, wrist_size, order_confirm, follow_silent`), admin tắt/ghi đè/thêm qua Settings `chatCoachCfg`.
 - [x] **Bước 1 (backend, đã push `88739e9`):** `gas_v13.js` khối `CHAT_COACH_SECTION_` (cuối file; `gas/32_ChatCoach.gs`, `tools/split-gas.js` có PART mới): `coachEval_`, `coachBuildResult_`, `coachRules_`, `coachCtkm_`, `chatCoach_`; route `GET chatCoach?conv=<page_id>_<psid>` nhận `token` (CRM) HOẶC `ek` (extension), chỉ ĐỌC, từ chối tài khoản test. Test `tools/test-chat-coach.js` (69 ca). GAS `v13.60-coach` (`PK_GAS_VER_`).
@@ -525,7 +524,6 @@ Test: `node tools/test-viettat-tpl.js` (cập nhật: mặc định lấy mt_1,2
 - **Giả định CẦN DUYÊN XÁC NHẬN (docs mục "Điểm cần xác nhận"):** "gửi hình ảnh kèm ghi âm" đang hiểu là SALE gửi ảnh + tin ghi âm cho khách (sheet chỉ có "gửi ảnh 2 tông màu"); câu hướng dẫn đo chu vi cổ tay là gợi ý bổ sung.
 - **Việc Duyên/phiên sau cần làm:** (a) GAS tự deploy qua workflow `deploy-gas.yml` — kiểm tra xanh rồi Ctrl+F5 CRM, mở 1 hội thoại Pancake xem thẻ "Nhắc quy trình"; (b) reload extension Pancake trong `chrome://extensions` sau khi 3b lên.
 - **Lưu ý môi trường (rút kinh nghiệm):** sandbox có thể bị ĐẶT LẠI giữa chừng (mất thư mục repo + `/tmp/node_modules`) → COMMIT + PUSH NGAY từng bước nhỏ, TRƯỚC khi chạy bộ test dài. Bộ test hơn 200 file chạy >300 giây: chạy theo nhóm hoặc nền, ghi kết quả ra file. `safe-push.sh` cần `git config user.email/user.name` (cục bộ repo) mới tạo được commit merge.
-=======
 
 ## 2026-11-04 (phiên Claude — làm bù Zalo AI ⇄ Pancake AI + Đơn kẹt) — ĐANG LÀM, chia bước nhỏ, mỗi bước push main riêng
 
@@ -613,7 +611,6 @@ Bản SAO NGUYÊN VĂN `pancake-promo.js` (engine tính CT tự động, hàm th
 - [x] `gas_v13.js` (`buildSalesReportB_`): thêm `ghepPosPhuByKey` (khoá SĐT + bộ mã sắp xếp); nhánh `trungDonGoc` cộng giá trị dòng "anh em" vào đơn đã ghép; `orders[]` trả thêm `giaTriPosPhu`, `posPhuRows`. **KHÔNG đổi cách tính doanh thu** (dòng anh em vẫn đi nhánh Pos như cũ). `gas/*.gs` đã sinh lại (`split-gas --check` OK). Cả hàm "đơn chia lệch Base" (~dòng 20890, `31_SplitOrders.gs`) cũng cộng `giaTriPosPhu`.
 - [x] `js/11-fn-srload.js`: `_srBcPosVal_` cộng `giaTriPosPhu` (dùng cho màn hình, Excel check ngược, lọc đơn lệch); ô Giá Pos ghi "gồm N dòng Pos". `index.html` js/11 `?v=20261113b`. Test mới `tools/test-bc-pos-sibling.js` (6 ca) ĐẠT; `test-base-check-report.js` vẫn ĐẠT.
 - [ ] **VIỆC KẾ TIẾP:** (a) chờ workflow `deploy-gas` xanh + Ctrl+F5 CRM, vào Báo cáo B → check ngược Base, đơn ninhnga99 03/11 phải biến mất khỏi danh sách lệch; (b) **kiểm tra doanh thu đơn này không bị tính đôi:** bảng Theo Sale đang hiện 8.123.000 (100%) cho dòng 1 (chế độ tỷ lệ `POS_GHEP_RATIO`) + dòng 2 5.850.000 tính Pos riêng = 13.973.000 là ĐÚNG; nếu `POS_GHEP_RATIO` TẮT thì dòng 1 tính 13.973.000 + dòng 2 5.850.000 = tính đôi → cần báo để sửa tiếp; (c) nếu Duyên đưa dòng thật của đơn trong sheet "dữ liệu đơn" (SĐT 0942926655) để xác nhận giả thuyết 2 dòng — nếu thực tế là 1 dòng 8.123.000 thì nguyên nhân khác (đơn Pos đã sửa sau khi đồng bộ).
->>>>>>> origin/main
 
 ## 2026-11-13 (phiên 61) — Chế độ tối: chữ bớt mờ, sáng + tương phản cao hơn — XONG (đã push); CHỜ Duyên xem thực tế
 - **Yêu cầu Duyên:** "fix chế độ tối chữ mờ, tăng độ tương phản và màu chữ sáng".
