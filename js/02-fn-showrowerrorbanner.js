@@ -286,6 +286,8 @@ function buildCustomers() {
       };
     });
   }
+  // Khach chi co o POS (dữ liệu đơn): js/89 thêm vào customerMap SAU mọi nguồn khác (SĐT đã có khách thì giữ nguyên) — Danh sách KH khớp đơn POS, bước 3/7
+  if (typeof posCustomersInject_ === 'function') { try { posCustomersInject_(customerMap); } catch (e) { console.warn('posCustomersInject_', e); } }
   allCustomers = Object.values(customerMap).map(c => {
     // TONG DON / TONG DOANH THU: KH da co don POS -> theo POS (chuan, bo don hoan); chua co Pos -> theo Base nhu cu. Phan hang KH tinh tu rev nay.
     const tot = _custOrderCount_(c);
