@@ -1,5 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-17 (phiên Claude — DANH SÁCH KH KHỚP ĐƠN POS, BƯỚC 2/7: CLIENT NẠP `donDaily` VÀO RAM) — XONG (đã push, chỉ Ctrl+F5); CHƯA đổi giao diện
+NGUYÊN NHÂN GỐC cần bước này: client chưa có ngày/sale/doanh thu TỪNG đơn POS → bước 3–6 (thêm khách chỉ-có-POS, lọc ngày+CS, DT theo bộ lọc, thanh đối soát) chưa có nguồn. Số file: dùng `js/88-pos-orders.js` (tránh trùng `js/86-pos-diag.js` bước 0b của phiên khác).
+- ✅ `js/88-pos-orders.js` (MỚI): `posOrdersByPhone` = `{SĐT:[{ds,name,sales,rev,shares}]}` (mới nhất trước), `posOrdersMeta` {days,from,to,n,skipped,loadedAt,ver}, `posOrdersVer` (tăng khi đổi → memo bước sau). `posOrdersSync_({days,force})`: không chồng 2 request, bỏ qua nếu mới tải <2 phút (GAS đã cache 600s) hoặc nội dung y hệt lần trước (không dựng lại map), lỗi/GAS cũ chưa có `donDaily`/JSON hỏng → GIỮ dữ liệu cũ + trả `{ok:false,error}`; KHÔNG ghi localStorage. `posOrdersEnsureCovers_('YYYY-MM-DD')`: người dùng chọn ngày xa hơn 90 → tải `days` tương ứng (tối đa 400, quá thì `limit:true`); nhịp định kỳ sau khi mở rộng giữ nguyên khoảng đó, không tụt về 90.
+- ✅ `js/01-fn-splitmulti.js` (+1 dòng sau khối `donPhones`, `?v=20261117a`): gọi `posOrdersSync_()` CHẠY NỀN (không await — GAS dựng bằng Báo cáo B có thể chậm, không được kéo dài vòng đồng bộ). `index.html` thêm `<script js/88-pos-orders.js?v=20261117a>`; `js/INDEX.md` thêm dòng.
+- Test mới `tools/test-pos-orders.js` (21 ca): build map + bỏ dòng sai, meta/skipped, không localStorage, không gọi lại khi mới tải, không chồng request, mở rộng khoảng + không tụt về 90, trần 400, GAS cũ/mạng/JSON hỏng giữ dữ liệu cũ, 0 đơn hợp lệ.
+- ⚠ CẦN Duyên: Actions "Deploy GAS" xanh (bước 1 chưa có thì `donDaily` báo lỗi → console `donDaily: ...`, KHÔNG ảnh hưởng gì khác). Kiểm nhanh trên máy: F12 → Console gõ `posOrdersMeta` (ok:true, n>0) và `Object.keys(posOrdersByPhone).length`.
+- (c) Worker cache `donDaily` chưa làm (chỉ cần nếu app Android báo chậm/502 như `donPhones`).
+- [ ] **VIỆC KẾ TIẾP — BƯỚC 3** (`js/89-pos-customers.js`, bọc `buildCustomers`, KHÔNG sửa js/02): thêm khách cho SĐT chỉ có ở POS (tên từ `posOrdersByPhone`), 1 khách/1 SĐT (`normPhone`). Grep mọi nơi dùng `allCustomers`/`customerMap` trước.
+
 ## 2026-11-17 (phiên Claude — GỘP CS CHUẨN: biichnguyen1993 = Biichnguyen1993) — XONG (đã push, chỉ Ctrl+F5)
 ## 2026-11-17 (phiên Claude — DANH SÁCH KH KHỚP ĐƠN POS, BƯỚC 1/7: GAS TRẢ ĐƠN POS THEO TỪNG ĐƠN `donDaily`) — XONG (đã push); CHƯA có client dùng
 NGUYÊN NHÂN GỐC cần bước này: `donPhones` chỉ cho client tập SĐT + sale "từng có" + 1 ngày mới nhất/SĐT + DT cả đời → client không có ngày/sale/doanh thu TỪNG đơn POS nên không lọc Danh sách KH theo ngày/CS của đơn POS được (kế hoạch chi tiết ở mục 2026-11-16 bên dưới).
