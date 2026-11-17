@@ -620,6 +620,17 @@ function _priceAllPrices_(row, stoneFilter) {
   return defaultPrices;
 }
 
+// Doi SO VIET CHU CO DAU -> chu so ("cỏ bốn lá" -> "cỏ 4 lá", "tám bi" -> "8 bi") TRUOC khi bo dau, vi bang gia ghi so ("CÓ 4 LÁ", "8 BI VÀNG").
+// Chi doi dang CO DAU (bốn/năm/sáu/bảy/tám/chín/mười/một): dang khong dau de nham ("tam" = Tam Hy, "ba", "hai", "nam") nen giu nguyen.
+function _priceNumWords_(s) {
+  var map = { 'một': '1', 'bốn': '4', 'năm': '5', 'sáu': '6', 'bảy': '7', 'tám': '8', 'chín': '9', 'mười': '10' };
+  return String(s == null ? '' : s).normalize('NFC').toLowerCase().replace(/(^|[^\p{L}])(một|bốn|năm|sáu|bảy|tám|chín|mười)(?=[^\p{L}]|$)/gu, function (m, pre, w) { return pre + map[w]; });
+}
+// NGUYEN NHAN GOC (Duyen 17/11: hoi "Lắc cỏ 4 lá" / "Lắc cỏ bốn lá tám bi vàng" khong ra SP du bang gia co "TRANG SỨC LẮC CÓ 4 LÁ"): bo loc cu bo MOI tu < 3 ky tu ("cỏ","lá","4","bi") va
+// coi "co","la" la tu dung → chi con "lac" → khong du 2 tu khop → khong tim ra; con "tám" khop nham "TAM HỶ". Nay: doi so chu → so, giu tu ngan/so (khop NGUYEN TU), cong diem cum tu lien tiep (bigram/trigram).
+var _PRICE_NOISE_ = ['khach','hoi','gia','bao','nhieu','tien','san','pham','cho','minh','ban','em','anh','chi','oi','the','nao','duoc','khong','voi','nay','mua','can','van','tra','loi','giup','xin','vui','long','cac','hang','shop'];
+function _priceWordHit_(blob, w) { return w.length >= 3 && !/^\d+$/.test(w) ? blob.indexOf(w) !== -1 : (' ' + blob + ' ').indexOf(' ' + w + ' ') !== -1; }
+
 function _priceVariantsForPrompt_(userMsg) {
   var rows;
   try {
@@ -636,13 +647,13 @@ function _priceVariantsForPrompt_(userMsg) {
   // Loai da khach/sale nhac toi (tu tin nhan, ngu canh, hoac o tick "Loai da" ben Pancake AI
   // extension gui kem duoi dang "Loại đá khách hỏi: SAPHIA/RUBY" trong [KH]) — QUYET DINH
   // cot gia nao duoc dua vao bang duoi day (xem _priceAllPrices_).
-  var stripped = _stripVN_(userMsg);
+  var stripped = _stripVN_(_priceNumWords_(userMsg));
   var stoneFilter = '';
   if (stripped.indexOf('saphia') !== -1) stoneFilter = 'SAPHIA';
   else if (stripped.indexOf('ruby') !== -1) stoneFilter = 'RUBY';
 
-  var toks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-    .filter(function (w) { return w.length >= 3 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
+  var allToks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  var toks = allToks.filter(function (w) { return _PRICE_NOISE_.indexOf(w) === -1; });   // giu ca tu ngan (co, la, bi) va so (4, 8) — khop NGUYEN TU, xem _priceWordHit_
   if (!toks.length) return '';
 
   // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
@@ -654,11 +665,20 @@ function _priceVariantsForPrompt_(userMsg) {
       var nk = _stripVN_(k);
       if (nk.indexOf('ten') !== -1 || nk.indexOf('nhom') !== -1) nameBlob += ' ' + r[k];
     }
-    nameBlob = _stripVN_(nameBlob);
+    nameBlob = _stripVN_(nameBlob).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
     if (!nameBlob.trim()) continue;
     var hit = 0;
-    for (var t = 0; t < toks.length; t++) if (nameBlob.indexOf(toks[t]) !== -1) hit++;
-    if (hit >= 2) scored.push({ row: r, hit: hit, name: nameBlob });
+    for (var t = 0; t < toks.length; t++) if (_priceWordHit_(nameBlob, toks[t])) hit++;
+    if (hit >= 2) {
+      // cong diem CUM TU LIEN TIEP trong cau hoi (2..4 tu) xuat hien nguyen cum trong ten SP: "lac co 4 la" khop "LAC CO 4 LA" hon "LAC ... 8 BI VANG"
+      var bonus = 0, padded = ' ' + nameBlob + ' ';
+      for (var n = 2; n <= 4; n++) for (var s0 = 0; s0 + n <= allToks.length; s0++) {
+        var ph = allToks.slice(s0, s0 + n);
+        if (ph.some(function (w) { return _PRICE_NOISE_.indexOf(w) !== -1; })) continue;
+        if (padded.indexOf(' ' + ph.join(' ') + ' ') !== -1) bonus += n;
+      }
+      scored.push({ row: r, hit: hit + bonus, name: nameBlob });
+    }
   }
   if (!scored.length) return '';
   scored.sort(function (a, b) { return b.hit - a.hit; });
