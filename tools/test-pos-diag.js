@@ -30,6 +30,21 @@ ok(r.summary.OK === 1 && r.summary.NO_CUST === 2, 'tong ket dung');
 const r2 = ctx.khDiagClassify_(diag, [{ phone: '0900000004', ymList: [{ ds: D }], csSet: new Set(['thuydinh95']) }], [], 'Thuydinh1995', s => ['thuydinh95']);
 ok(r2.rows.find(x => x.phone === '0900000004').why === 'HIDDEN', 'alias cung nguoi coi la khop CS');
 ok(/Doi soat|ĐỐI SOÁT POS 2026-11-16/.test(ctx.khDiagText_(r)) && ctx.khDiagText_(r).split('\n').length === r.rows.length + 3, 'text copy: 3 dong dau + moi SDT 1 dong');
+// probe: dong D kem dieu kien nao loai khach + dong "Bo loc dang bat"
+{
+  const ctx2 = { console, Array, Object, String, Set, document: { getElementById: id => (id === 'ymf-hour-from' ? { value: '' } : null) }, setTimeout() {}, fmtVND: v => v + 'd',
+    currentTier: 'vip', currentCare: 'all', currentZalo: 'all', currentBuy: 'all', colFilters: { tier: new Set(), care: new Set(['Đã mua']) }, advFilters: {}, currentCF: {}, _inUserScope: () => true };
+  ctx2.window = ctx2; vm.createContext(ctx2); vm.runInContext(R('js/86-pos-diag.js'), ctx2);
+  const c = { phone: '0900000002', tier: 'normal', careStatus: 'Mới', zaloStatus: '', ymList: [{ ds: D }], csSet: new Set([B]) };
+  const pr = ctx2.khDiagProbe_(c);
+  ok(/LOẠI BỞI: tier,cột\.care/.test(pr), 'probe: tier + cot care loai khach -> ' + pr);
+  ok(/tier=vip/.test(ctx2.khDiagFilters_()) && /cột\.care\(1\)/.test(ctx2.khDiagFilters_()), 'khDiagFilters_ liet ke tier + cot.care');
+  const rr = ctx2.khDiagClassify_(diag, [c], [], B, null, ctx2.khDiagProbe_);
+  const row = rr.rows.find(x => x.phone === '0900000002');
+  ok(row.why === 'HIDDEN' && /LOẠI BỞI/.test(row.probe), 'dong HIDDEN mang probe');
+  rr.filters = ctx2.khDiagFilters_();
+  ok(/Bộ lọc đang bật: tier=vip/.test(ctx2.khDiagText_(rr)) && /\{LOẠI BỞI/.test(ctx2.khDiagText_(rr)), 'text copy co dong bo loc + probe');
+}
 const idx = R('index.html'); ok(idx.indexOf('js/85-kh-sb-toggle') < idx.indexOf('js/86-pos-diag.js') && idx.indexOf('js/86-pos-diag.js') < idx.indexOf('js/88-pos-orders.js'), 'js/86 nap giua js/85 va js/88');
 // LOI THAT 17/11 (C Trang): khach da co san, khong co don Base ngay 16/11 nhung CLIENT DANG GIU don POS ngay do -> khong duoc bao nham la "B khong co ngay"
 ctx.posOrdersByPhone = { '0387099422': [{ ds: D, sales: [B, 'thuyha88'], rev: 2200000 }] };
