@@ -1240,6 +1240,20 @@ function updateCSStaffList() {
     ..._buildCsSet_(c.orders, c.phone),
     ...(c.careCSSet||[])
   ]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+  // ── GỘP CS CHUẨN (17/11): cùng 1 tên khác hoa/thường (biichnguyen1993 / Biichnguyen1993) = 1 CS. Dựng bảng tên chuẩn từ MỌI kiểu viết
+  // đang có trong dữ liệu rồi chuẩn hoá tập CS của từng khách; <select> ẩn vẫn giữ cả các kiểu viết cũ (csSet) để _csFilterListMatch
+  // khớp được cả KH chỉ được chia/ghi bằng kiểu viết cũ, còn ô tìm + chip lọc nâng cao chỉ hiện 1 mục chuẩn.
+  let csShown = csSet;
+  if (typeof _csCanonBuild_ === 'function'){
+    const spell = {};
+    for (const c of allCustomers){
+      [c.csSet, c.careCSSet].forEach(st => { if (st) st.forEach(n => { const k = String(n).toLowerCase(), m = spell[k] || (spell[k] = {}); m[n] = (m[n]||0) + 1; }); });
+    }
+    _csCanonBuild_(spell);
+    for (const c of allCustomers){ if (typeof _csCanonSet_ === 'function'){ _csCanonSet_(c.csSet); _csCanonSet_(c.careCSSet); } }
+    csShown = [...new Set(csSet.map(_csCanonName_))].sort((a,b)=>a.localeCompare(b,'vi'));
+    if (typeof _invalidateFilterCache === 'function') { try { _invalidateFilterCache(); } catch(e){} }
+  }
   // Đếm số KH mỗi CS (theo phạm vi vai trò) để hiển thị cạnh tên trong ô tìm
   const counts = {};
   for (const c of allCustomers){
@@ -1253,16 +1267,16 @@ function updateCSStaffList() {
     sel.innerHTML = '<option value="all">— Tất cả CS —</option>' +
       csSet.map(cs=>`<option value="${esc(cs)}">${esc(cs)}</option>`).join('');
     // Chỉ giữ lại các tên vẫn còn tồn tại trong danh sách CS mới (bỏ tên đã đổi/xóa)
-    _csSetFilterSelection(prevSelected.filter(n => csSet.includes(n)));
+    _csSetFilterSelection([...new Set(prevSelected.map(n => (typeof _csCanonName_==='function' ? _csCanonName_(n) : n)))].filter(n => csSet.includes(n)));
   }
   // Dữ liệu cho ô "Lọc theo CS" có tìm kiếm (gõ tên)
   csComboData = [{value:'all', label:'— Tất cả CS —', count:0}]
-    .concat(csSet.map(cs=>({value:cs, label:cs, count: counts[cs]||0})));
+    .concat(csShown.map(cs=>({value:cs, label:cs, count: counts[cs]||0})));
   const ci = document.getElementById('cs-combo-input');
   csComboRender(ci ? ci.value : '');
   syncCSCombo();
   // Also update advanced filter CS chips
-  if (document.getElementById('adv-cs-chips')) buildAdvChips('cs', csSet, advFilters.cs, 'adv-cs-chips');
+  if (document.getElementById('adv-cs-chips')) buildAdvChips('cs', csShown, advFilters.cs, 'adv-cs-chips');
   // Populate year filter
   updateYearFilter();
 }

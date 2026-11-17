@@ -667,19 +667,26 @@ function _ptsSpentFromNote_(note){
   }
   return Math.round(sum * 100) / 100;
 }
+// Nguồn tính điểm (Duyên chốt 16/11/2026): ĐƠN POS nếu khách đã có đơn Pos (đã tải về _posOrdersCache), KHÔNG có thì lùi về đơn Base (c.orders).
+// NGUYÊN NHÂN GỐC trước đây: chỉ tính trên c.orders (Base, thường thiếu) trong khi số đơn/doanh thu hồ sơ lấy từ Pos → khách nhiều đơn Pos bị tính THIẾU điểm.
+// Không cộng dồn Pos + Base (tránh tính đôi cùng 1 đơn). Pos: revenue = giá trị sau giảm, note = ghi chú đơn Pos (cột ghiChu) → "Tích điểm: tiêu 50k" vẫn đọc được.
+function _ptsOrdersOf_(c){
+  var pos = (typeof _posOrdersCache !== 'undefined' && _posOrdersCache && c) ? _posOrdersCache[c.phone] : null;
+  return (pos && pos.length) ? { rows: pos, src: 'pos' } : { rows: (c && c.orders) || [], src: 'base' };
+}
 function _ptsOfCustomer_(c){
-  var earned = 0, spent = 0, per = new Map();
-  (c.orders || []).forEach(function(o){
+  var earned = 0, spent = 0, per = new Map(), so = _ptsOrdersOf_(c);
+  so.rows.forEach(function(o){
     var e = Math.floor((Number(o.revenue) || 0) * PTS_RATE / PTS_VALUE), sp = _ptsSpentFromNote_(o.note);
     earned += e; spent += sp; per.set(o, { earn: e, spent: sp });
   });
-  return { earned: earned, spent: spent, left: Math.round((earned - spent) * 100) / 100, per: per };
+  return { earned: earned, spent: spent, left: Math.round((earned - spent) * 100) / 100, per: per, src: so.src, n: so.rows.length };
 }
 function _ptsBoxHtml_(p){
   var n = function(v){ return (Math.round(v * 100) / 100).toLocaleString('vi-VN'); };
   var neg = p.left < 0;
   return '<div style="margin:0 0 12px;padding:10px 12px;border-radius:8px;background:var(--tn-bg,#fff7ed);border:1px solid var(--tn-b,#fed7aa)">' +
-    '<div style="font-size:12px;font-weight:700;margin-bottom:6px">🎁 Tích điểm</div>' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:6px">🎁 Tích điểm <span style="font-weight:400;color:var(--hint);font-size:10.5px">(theo ' + (p.n || 0) + ' đơn ' + (p.src === 'pos' ? 'Pos' : 'Base') + ')</span></div>' +
     '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px">' +
       '<div><div style="color:var(--muted);font-size:10.5px">Đã tích</div><b style="color:var(--green)">+' + n(p.earned) + ' điểm</b></div>' +
       '<div><div style="color:var(--muted);font-size:10.5px">Đã tiêu</div><b style="color:#b91c1c">−' + n(p.spent) + ' điểm</b></div>' +

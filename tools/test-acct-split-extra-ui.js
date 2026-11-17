@@ -1,0 +1,23 @@
+// Test: js/80-acct-split-extra.js — chuẩn hoá/kiểm tra dòng chia bổ sung KT + nối menu/index. Chạy: node tools/test-acct-split-extra-ui.js
+const fs = require('fs'), vm = require('vm');
+const R = p => fs.readFileSync(__dirname + '/../' + p, 'utf8');
+const ctx = { esc: s => String(s) }; vm.createContext(ctx); vm.runInContext(R('js/80-acct-split-extra.js'), ctx);
+let bad = 0; const ok = (c, t) => { console.log((c ? 'ok   ' : 'FAIL ') + t); if (!c) bad++; };
+const J = x => JSON.parse(JSON.stringify(x));
+ok(ctx._aseNormCode_(' 268t10/2026 ') === '268T10/2026' && ctx._aseNormCode_('m44707') === 'M44707' && ctx._aseNormCode_('NG83T10/2026') === 'NG83T10/2026' && ctx._aseNormCode_('abc') === '' && ctx._aseNormCode_('M12') === '', 'mã: chuẩn hoá in hoa/bỏ khoảng trắng; nhận mã bộ đếm và mã đơn M44707; sai → rỗng');
+ok(ctx._aseMoney_(10780000) === 10780000 && ctx._aseMoney_('10.780.000') === 10780000 && ctx._aseMoney_('0') === 0 && isNaN(ctx._aseMoney_('')) && isNaN(ctx._aseMoney_('abc')), 'tiền: số / chuỗi có dấu chấm / 0 hợp lệ; rỗng, chữ → NaN');
+let p = ctx._aseParse_('[{"code":"268T10/2026","sales":["ninhLTK1984","ninhnga99"],"tong":10780000}]');
+ok(p.error === '' && p.arr.length === 1, 'parse mảng JSON hợp lệ');
+ok(ctx._aseParse_('{"rows":[{"code":"1T10","sales":["a"],"tong":1}]}').arr.length === 1, 'parse dạng {rows:[...]}');
+ok(ctx._aseParse_('{khong json').error !== '' && ctx._aseParse_('{"a":1}').error !== '' && ctx._aseParse_('').error === '' && ctx._aseParse_('').arr.length === 0, 'JSON hỏng / không phải mảng → báo lỗi; rỗng → mảng rỗng');
+let b = J(ctx._aseBuild_([{ code: '268t10/2026', sales: 'ninhLTK1984, ninhnga99', tong: '10.780.000' }, { code: 'M44707', sales: ['ninhnga99'], tong: 1335000 }, { code: '1331T10/2026', sales: ['minhanh99', 'lanVH1995'], tong: 0 }]));
+ok(b.errors.length === 0 && b.arr.length === 3 && b.arr[0].code === '268T10/2026' && b.arr[0].sales.join() === 'ninhLTK1984,ninhnga99' && b.arr[0].tong === 10780000 && b.arr[2].tong === 0, 'build: chuẩn hoá mã, tách tên sale bằng dấu phẩy, tiền chuỗi → số, tong 0 giữ');
+b = J(ctx._aseBuild_([{ code: 'xx', sales: ['a'], tong: 1 }, { code: '1T10', sales: [], tong: 1 }, { code: '2T10', sales: ['a'], tong: -5 }, { code: '3T10', sales: ['a'] }, null, { code: '4T10', sales: ['a'], tong: 5 }]));
+ok(b.arr.length === 1 && b.arr[0].code === '4T10' && b.errors.length === 5, 'dòng sai (mã / thiếu sale / tong âm / thiếu tong / null) bị loại kèm 5 lỗi, dòng đúng vẫn giữ');
+const s = J(ctx._aseSummary_([{ code: '268T10/2026', sales: ['ninhLTK1984', 'ninhnga99'], tong: 10780000 }, { code: '268T10/2026', sales: ['ninhnga99'], tong: 4180000 }]));
+ok(s.length === 1 && s[0].rows === 2 && s[0].tong === 14960000 && s[0].sales.ninhnga99 === 9570000 && s[0].sales.ninhLTK1984 === 5390000, 'tóm tắt 268T10: 2 dòng, tổng 14.960.000, ninhnga99 9.570.000 / ninhLTK1984 5.390.000');
+ok(ctx._aseFmt_(14960000) === '14.960.000', 'định dạng tiền 14.960.000');
+ok(/'act:splitextra'/.test(R('js/29-sidenav.js')) && /splitextra:\s*\{[^}]*openAcctExtraModal[^}]*admin:true/.test(R('js/29-sidenav.js')), 'menu Cài đặt team có mục splitextra (chỉ admin)');
+ok(/js\/80-acct-split-extra\.js/.test(R('index.html')), 'index.html nạp js/80-acct-split-extra.js');
+ok(/key=acctSplitExtra/.test(R('js/80-acct-split-extra.js')) && /key: 'acctSplitExtra'/.test(R('js/80-acct-split-extra.js')) && /ACCT_EXTRA_KEY_ = 'acctSplitExtra'/.test(R('gas_v13.js')), 'UI và GAS dùng cùng key Settings acctSplitExtra');
+process.exit(bad ? 1 : 0);

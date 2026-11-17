@@ -184,7 +184,13 @@ class ExpanderService : AccessibilityService() {
         replaceTail(n, text, word, if (shareText) "" else joined)
         if (media.isEmpty()) return
         // Nhiều hình (+ ghi âm) mà KHÔNG bấm "Chia sẻ" → đưa vào Thư viện máy rồi mở BỘ CHỌN ẢNH của app chat (Zalo…): chọn nhiều ảnh như gửi thường, gửi thẳng vào khung chat đang mở.
-        if (!share && Build.VERSION.SDK_INT >= 29 && media.any { kindOf(it) == "img" } && media.size > 1) { sendViaChatGallery(media); return }
+        if (!share && Build.VERSION.SDK_INT >= 29 && media.any { kindOf(it) == "img" } && media.size > 1) {
+            // NGUYÊN NHÂN GỐC "chọn cả chữ lẫn hình → ô tin nhắn trống" (Duyên 16/11): mở bộ chọn ảnh làm app chat xoá/mất ô soạn tin nên chữ vừa chèn biến mất.
+            // Nay giữ chữ trong clipboard và tự chèn lại vào ô soạn tin khi quay về app chat.
+            val pk = rootInActiveWindow?.packageName?.toString().orEmpty()
+            if (joined.isNotEmpty()) restoreTextLater(pk, joined)
+            sendViaChatGallery(media); return
+        }
         val uris = media.mapNotNull { m ->
             File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
         }
@@ -228,6 +234,34 @@ class ExpanderService : AccessibilityService() {
                 }, 500)
             }
         }.start()
+    }
+
+    /** Giữ [text] trong clipboard, rồi chờ (tối đa ~90 giây) tới khi quay lại đúng app chat [pk] với ô soạn tin còn TRỐNG thì chèn lại chữ (SET_TEXT, không được thì dán). */
+    private fun restoreTextLater(pk: String, text: String) {
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("viettat", text))
+        var tries = 0; var seenAway = false
+        fun tick() {
+            tries++
+            if (tries > 180) { say("Chữ đã sao chép — nhấn giữ ô chat > Dán nếu chưa thấy"); return }
+            val root = rootInActiveWindow
+            val cur = root?.packageName?.toString().orEmpty()
+            if (cur != pk) seenAway = true
+            else if (root != null && (seenAway || tries > 8)) {
+                val ed = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+                if (ed != null) {
+                    val empty = ed.isShowingHintText || ed.text.isNullOrEmpty()
+                    if (empty) {
+                        val ok = setText(ed, text) || ed.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+                        dlog("khôi phục chữ sau bộ chọn ảnh: " + if (ok) "xong" else "app từ chối (chữ nằm trong clipboard)")
+                        if (!ok) say("Chữ đã sao chép — nhấn giữ ô chat > Dán")
+                        return
+                    }
+                    if (ed.text.toString().contains(text.take(20))) return   // chữ vẫn còn trong ô → không cần làm gì
+                }
+            }
+            ui.postDelayed({ tick() }, 500)
+        }
+        ui.postDelayed({ tick() }, 1500)
     }
 
     private fun dlog(s: String) { Diag.lastInsert = Diag.lastInsert + " | " + s }

@@ -160,13 +160,28 @@ function doGetCore_(e) {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
       // 100KB nen payload nay (5 map theo SDT) gan nhu chac chan THAT BAI AM THAM -> khong bao gio duoc cache. Nay doc 1 LAN roi
-      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL 90s bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
+      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL DON_CACHE_TTL_ (600s) bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
       var cachedDP = _cacheGetBig_('don_phones_v6');
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
       var rowsDP = readDonChiTiet_();
       var resDP = { phones: readDonPhones_(rowsDP), saleByPhone: getDonSaleByPhone_(rowsDP), orderCountByPhone: getDonOrderCountByPhone_(rowsDP), lastDateByPhone: getDonLastDateByPhone_(rowsDP), statsByPhone: getDonStatsByPhone_(rowsDP) };
-      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), 90); } catch(ec) {}
+      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), DON_CACHE_TTL_); } catch(ec) {}
       return jsonOut_(resDP);
+    }
+    if (action === 'donDaily') {   // don POS THEO TUNG DON (xem _donDailyRows_) — ?days=90 (1..400). Chi cache ban mac dinh 90 ngay, key 'don_daily_v1' xoa CUNG LUC voi donChiTiet_v4/don_phones_v6.
+      var daysDD = Math.floor(Number(e && e.parameter && e.parameter.days));
+      if (!(daysDD >= 1)) daysDD = 90;
+      if (daysDD > 400) daysDD = 400;
+      if (daysDD === 90) { var cachedDD = _cacheGetBig_('don_daily_v1'); if (cachedDD) { try { return jsonOut_(JSON.parse(cachedDD)); } catch(ecDD) {} } }
+      var resDD = buildDonDaily_(daysDD);
+      if (daysDD === 90) { try { _cachePutBig_('don_daily_v1', JSON.stringify(resDD), DON_CACHE_TTL_); } catch(ecDD2) {} }
+      return jsonOut_(resDD);
+    }
+    // CHAN DOAN (chi doc, khong ghi): don POS cua 1 ngay (+ loc theo 1 sale trong the) de doi chieu voi Danh sach KH cua CRM — xem donDayDiag_ + js/86-pos-diag.js.
+    // GET ?action=donDayDiag&date=2026-11-16&sale=biichnguyen1993  (sale de trong = moi sale)
+    if (action === 'donDayDiag') {
+      try { return jsonOut_(donDayDiag_(e && e.parameter ? e.parameter.date : '', e && e.parameter ? e.parameter.sale : '')); }
+      catch (edd) { return jsonOut_({ ok: false, error: String(edd && edd.message || edd) }); }
     }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho

@@ -9,7 +9,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const zsrc = fs.readFileSync(path.join(__dirname, '..', 'extension-zalo', 'zalo-content.js'), 'utf8');
 const psrc = fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pancake-content.js'), 'utf8');
 function fnEnd(src, name) { const i = src.indexOf('function ' + name); let d = 0, k = src.indexOf('{', i); for (let m = k; m < src.length; m++) { if (src[m] === '{') d++; else if (src[m] === '}') { d--; if (d === 0) return m + 1; } } throw new Error('khong thay ham ' + name); }
-const zchunk = zsrc.slice(zsrc.indexOf('  async function _zaiFetchCsStats_'), fnEnd(zsrc, 'renderStatsZai_'));
+const zchunk0 = zsrc.slice(zsrc.indexOf('  async function _zaiFetchCsStats_'), fnEnd(zsrc, 'renderStatsZai_'));
+// + chuan hoa loi API cua Zalo (_zaiApiErr_ + ZAI_API_ERR) — cac ham goi {ok,error} goi no
+const zapi = (() => { const a = zsrc.indexOf('  const ZAI_API_ERR'), i = zsrc.indexOf('function _zaiApiErr_('); let d = 0, k = zsrc.indexOf('{', i); for (let m = k; m < zsrc.length; m++) { if (zsrc[m] === '{') d++; else if (zsrc[m] === '}' && --d === 0) return zsrc.slice(a, m + 1); } })();
+const zchunk = zapi + '\n' + zchunk0;
 const pchunk = psrc.slice(psrc.indexOf('const _STATS_RANGES_'), fnEnd(psrc, 'renderStats_'));
 const esc1 = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const esc2 = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -78,10 +81,10 @@ function pancake(cs, gas) {
   // 4. chua chon CS: nhac, khong goi (ca 2 ben)
   Z = zalo('', DATA); const P = pancake('', DATA); Z.init(); P.init(); await sleep(40);
   ok(Z.env.calls.length === 0 && P.env.calls.length === 0 && /Chọn "CS đang dùng" ở đầu panel để xem số liệu/.test(Z.res().textContent) && norm(Z.body.innerHTML) === norm(P.body.innerHTML), 'chua chon CS: nhac giong het, khong goi API');
-  // 5. loi (backend / mang) hien ⚠ giong het
+  // 5. loi (backend / mang): Zalo hien cau chuan '⚠️ Lỗi API' (_zaiApiErr_); mock Pancake tra thang resp nen so HTML tru khoi thong bao loi (noErr)
   for (const err of [{ error: 'Khong co quyen xem CS nay' }, { ok: false }, new Error('mat mang')]) {
     const a = zalo('Hoa', err), b = pancake('Hoa', err); a.init(); b.init(); await sleep(60);
-    ok(/⚠️/.test(a.res().textContent) && norm(a.body.innerHTML) === norm(b.body.innerHTML), 'loi ' + (err.error || err.message || 'ok:false') + ': ⚠ giong het: ' + a.res().textContent.slice(0, 80));
+    ok(/⚠️ Lỗi API/.test(a.res().textContent) && noErr(a.body.innerHTML) === noErr(b.body.innerHTML), 'loi ' + (err.error || err.message || 'ok:false') + ': ⚠ giong het: ' + a.res().textContent.slice(0, 80));
   }
   // 6. phan hoi CU den tre khong de len phan hoi MOI (ca 2 ben)
   for (const mk of [zalo, pancake]) {
