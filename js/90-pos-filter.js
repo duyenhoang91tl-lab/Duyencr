@@ -6,6 +6,7 @@
 //   (2) c.csSet  = chi cac CS cua don CO TRONG KHOANG NGAY (don Base trong khoang + don POS trong khoang, ke ca the chung nhieu sale) + CS tu them so moi (careLeads)
 //       -> khach khop khi CO IT NHAT 1 don trong khoang ma the chua CS dang loc.
 //   Chay applyFilters goc, roi TRA NGUYEN ymList/csSet trong finally (khong de lai trang thai sua).
+// Du lieu POS doi (loadedAt/cua so ngay/so SDT) -> xoa _filterCache 1 lan (chu ky bo loc khong gom POS nen cache cu lam khach da co san trong CRM khong hien).
 // Khong co khoang ngay / chua tai don POS -> goi applyFilters goc y nguyen. Khach chi co o POS (khong co trong allCustomers) se do buoc 3 (js/89) them — buoc nay khong tao khach.
 // Loc ngay xa hon cua so POS dang giu (mac dinh 90 ngay) -> tu goi posOrdersEnsureDays_ (js/88) roi loc lai (Duyen chot 17/11: "tu chon khoang ngay rong hon").
 (function () {
@@ -41,7 +42,7 @@
   }
   G.posFilterView_ = posFilterView_;
 
-  var _ensuring = {};
+  var _ensuring = {}, _posStamp = '';
   function daysNeeded_(from) {   // so ngay tu `from` toi hom nay (+1 cho an toan)
     var t = new Date(from + 'T00:00:00').getTime();
     if (!isFinite(t)) return 0;
@@ -54,6 +55,12 @@
     var _prev = applyFilters;
     applyFilters = function () {
       var P = G.posOrders, by = G.posOrdersByPhone, list = (typeof allCustomers !== 'undefined') ? allCustomers : null;
+      // NGUYEN NHAN GOC (Duyen 17/11: doi soat POS ra 8/9 khach, con C Trang 0387099422 la khach DA CO san trong CRM nhung van thieu): applyFilters co CACHE (js/16 _filterCache)
+      // khoa theo chu ky bo loc (_filterSignature) ma chu ky KHONG gom du lieu POS. Don POS ve xong -> js/89 chi dung lai danh sach khi co khach POS-only moi (khach da co thi khong),
+      // js/90 goi applyFilters -> chu ky y het -> tra lai danh sach DA DEM tu luc chua co don POS -> khach cu khong co ngay Base do khong hien. Sua: du lieu POS doi (loadedAt/cua so ngay/so SDT)
+      // thi xoa cache 1 lan truoc khi loc. (loadedAt chi doi khi noi dung POS doi — js/88 — nen khong xoa cache vo ich.)
+      var stamp = (P && P.loadedAt && by) ? (P.loadedAt + ':' + (P.from || '') + ':' + (P.days || 0) + ':' + Object.keys(by).length) : '';
+      if (stamp !== _posStamp) { _posStamp = stamp; if (typeof _invalidateFilterCache === 'function') { try { _invalidateFilterCache(); } catch (e) {} } }
       if (!P || !P.loadedAt || !by || !list) return _prev.apply(this, arguments);
       var from = dom_('ymf-date-from'), to = dom_('ymf-date-to');
       // Khoang ngay xa hon cua so dang giu -> tai them roi loc lai 1 lan (moi so ngay chi thu 1 lan/lan nap trang)
