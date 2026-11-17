@@ -535,6 +535,8 @@ function doGetCore_(e) {
       return jsonOut_(findDuplicateOrders_(fdoPhone));
     }
     if (action === 'dedupeCare') return dedupeCare_();
+    // ── R5d buoc 1: KHACH TRUNG (CHI DOC) — nhom cac dong CareData cung SDT chuan hoa (0912.../+84912.../84912.../thieu so 0). KHONG sua/xoa gi, KHONG dung toi don hang ──
+    if (action === 'findDuplicateCustomers') return jsonOut_(findDuplicateCustomers_());
     // ── LUU TRU DON CU: xem truoc (dry-run) so dong se chuyen. Can adminKey. &months=6..12 &which=base|pos|both ──
     if (action === 'archivePreview') {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });

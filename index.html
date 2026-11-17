@@ -1295,6 +1295,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/27-settings-hub.css?v=20261115f"><!-- R9a: trung tâm lối tắt cài đặt (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/28-cust-select.css?v=20261116b"><!-- R5a: chọn nhiều khách (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/29-kh-sb-toggle.css?v=20261116a"><!-- ẩn/hiện cột lọc Danh sách KH (js/85; chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/30-cust-dup.css?v=20261117a"><!-- R5d bước 1: bảng xem khách trùng SĐT (js/87; chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/99-dark-auto.css?v=20261116a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
@@ -1858,6 +1859,7 @@ function openBcLogModal(phone){
 <script src="js/84-cust-bulk-status.js?v=20261117a"></script><!-- R5a bước 3: Đổi trạng thái (Tình trạng CS / Trạng thái KH) hàng loạt cho khách đã chọn; KH tự nhảy như hồ sơ; không cho chọn nhóm Chốt -->
 <script src="js/85-kh-sb-toggle.js?v=20261116a"></script><!-- ẩn/hiện cột lọc Danh sách KH (nút #kh-sb-edge, lưu ome_kh_sb; css/29); gỡ = xoá dòng này + link css/29 -->
 <script src="js/86-pos-diag.js?v=20261117b"></script><!-- Danh sach KH khop don POS, buoc 8: nut admin Doi soat POS (donDayDiag, chi doc)-->
+<script src="js/87-cust-dup.js?v=20261117a"></script><!-- R5d bước 1: nút admin "🔎 Khách trùng" (CHỈ XEM) — gọi GAS findDuplicateCustomers; gỡ = xoá dòng này + css/30 -->
 <script src="js/88-pos-orders.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 2: tai + giu don POS theo tung don (GAS donDaily), chi RAM; boc syncFromGS; go = xoa dong nay -->
 <script src="js/89-pos-customers.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 3: them khach chi co o POS (js/02 buildCustomers goi posCustomersInject_); nap SAU js/88, TRUOC js/90; go = xoa dong nay (hook trong js/02 tu bo qua) -->
 <script src="js/90-pos-filter.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 4: loc ngay + CS theo don POS cung luc (boc applyFilters, tam thoi ymList/csSet roi tra lai); nap SAU js/88; go = xoa dong nay -->

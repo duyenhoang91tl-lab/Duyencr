@@ -2105,7 +2105,7 @@ function tatChanKhac() { return _enfSet_('other', false); }
 //  (khong doi hanh vi cu). Cai: chay datChuSoHuu('ten_dang_nhap') trong Editor; xem: xemChuSoHuu. Chi chan khi co token hop le
 //  (token thieu/het han do cong tac 4b xu ly) va KHONG chan khoa extension (extension dung `ek`, xem EXT_ALLOWED_).
 // ═══════════════════════════════════════════════════════════════
-var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1, importUndo: 1, importBatches: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
+var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1, findDuplicateCustomers: 1, importUndo: 1, importBatches: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
 function _ownerUsers_() {
   var a = [];
   try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('ownerUsers') || '[]') || []; } catch (e) { a = []; }
@@ -3046,6 +3046,8 @@ function doGetCore_(e) {
       return jsonOut_(findDuplicateOrders_(fdoPhone));
     }
     if (action === 'dedupeCare') return dedupeCare_();
+    // ── R5d buoc 1: KHACH TRUNG (CHI DOC) — nhom cac dong CareData cung SDT chuan hoa (0912.../+84912.../84912.../thieu so 0). KHONG sua/xoa gi, KHONG dung toi don hang ──
+    if (action === 'findDuplicateCustomers') return jsonOut_(findDuplicateCustomers_());
     // ── LUU TRU DON CU: xem truoc (dry-run) so dong se chuyen. Can adminKey. &months=6..12 &which=base|pos|both ──
     if (action === 'archivePreview') {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });
@@ -12884,6 +12886,52 @@ function dedupeCare_() {
   try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
   if (sbMode_() !== 'off') sbMarkStale_('dedupeCare_ xoa/sap xep lai dong CareData');   // dong GIU LAI co the khac dong da backfill
   return jsonOut_({ ok: true, removed: removed, kept: out.length - 1 });
+}
+
+// ═══ R5d BUOC 1 — PHAT HIEN KHACH TRUNG (CHI DOC) ═══
+// NGUYEN NHAN GOC: CareData khoa theo SDT nhung cung 1 khach co the nam o NHIEU dong khi SDT go khac dang (0912.../912.../84912.../+84912...). Client gop theo normPhone nen
+// nhin thay 1 khach, con Sheet van giu nhieu dong -> ghi chu/lich nam o dong nay, trang thai/CS nam o dong khac. dedupeCare_ cu CHI GIU 1 dong (xoa phan con lai, MAT DU LIEU) nen KHONG dung de gop.
+// Ham nay chi LIET KE nhom trung de Duyen xem truoc. KHONG sua CareData, KHONG dung toi DT TONG/don hang (bao cao doanh thu van tinh theo don cua khach nhu cu).
+// custDupGroups_ la ham THUAN (test: node tools/test-cust-dup-gas.js). data = getValues(): dong 0 = tieu de, tu dong 1 = khach; nhan cot theo TEN tieu de.
+function custDupGroups_(data, maxGroups) {
+  var head = (data && data[0]) ? data[0].map(function (h) { return String(h || '').trim(); }) : CARE_HEADERS;
+  var ix = {}; head.forEach(function (h, i) { if (h && ix[h] === undefined) ix[h] = i; });
+  function cell(row, k) { return ix[k] === undefined ? '' : row[ix[k]]; }
+  function cnt(row) { var n = 0; for (var j = 1; j < row.length; j++) { if (String(row[j] == null ? '' : row[j]).trim()) n++; } return n; }
+  var by = {}, scanned = 0;
+  for (var i = 1; i < (data || []).length; i++) {
+    var row = data[i], raw = row && row[ix.phone === undefined ? 0 : ix.phone];
+    if (raw === '' || raw == null) continue;
+    var np = normPhone_(String(raw)); if (!np || np.length < 8) continue;   // < 8 so = khong phai SDT (cung nguong voi normPhone o client)
+    scanned++;
+    (by[np] = by[np] || []).push({
+      row: i + 1, raw: String(raw), name: String(cell(row, 'name') || ''), cs: String(cell(row, 'cs') || ''),
+      status: String(cell(row, 'status') || ''), khStatus: String(cell(row, 'khStatus') || ''), zalo: String(cell(row, 'zalo') || ''),
+      noteLen: String(cell(row, 'note') || '').length, hasSched: !!String(cell(row, 'schedules') || '').trim(),
+      nickZalos: String(cell(row, 'nickZalos') || ''), updated: String(cell(row, 'updated') || ''), filled: cnt(row)
+    });
+  }
+  var groups = [], extra = 0;
+  Object.keys(by).forEach(function (np) {
+    var rows = by[np]; if (rows.length < 2) return;
+    // goi y GIU: dong nhieu o co du lieu nhat; hoa thi dong cap nhat moi nhat (chuoi 'updated' ISO/so sanh duoc), hoa nua thi dong dung SDT chuan truoc
+    var best = rows.slice().sort(function (a, b) {
+      return (b.filled - a.filled) || (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : 0) || ((a.raw === np ? 0 : 1) - (b.raw === np ? 0 : 1)) || (a.row - b.row);
+    })[0];
+    var variants = []; rows.forEach(function (r) { if (variants.indexOf(r.raw) < 0) variants.push(r.raw); });
+    extra += rows.length - 1;
+    groups.push({ phone: np, count: rows.length, keepRow: best.row, variants: variants, rows: rows });
+  });
+  groups.sort(function (a, b) { return (b.count - a.count) || (a.phone < b.phone ? -1 : 1); });
+  var total = groups.length, cap = maxGroups || 500;
+  return { scanned: scanned, groupCount: total, extraRows: extra, truncated: total > cap, groups: groups.slice(0, cap) };
+}
+function findDuplicateCustomers_() {
+  var sh = getSheet_(SH_CARE, CARE_HEADERS);
+  if (sh.getLastRow() < 3) return { ok: true, scanned: 0, groupCount: 0, extraRows: 0, truncated: false, groups: [] };
+  var res = custDupGroups_(sh.getDataRange().getValues(), 500);
+  res.ok = true; res.readOnly = true;
+  return res;
 }
 
 // ─── CHAY TAY TU APPS SCRIPT EDITOR (chon ham roi bam Run, xem ket qua o Executions) ───
