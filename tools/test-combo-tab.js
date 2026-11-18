@@ -3,7 +3,7 @@
 // Chạy: node tools/test-combo-tab.js -> "ALL COMBO TAB TESTS PASSED".
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const wrap = { innerHTML: '' }; const catCalls = [], posCalls = []; let catReply = null, posReply = null; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
+const wrap = { innerHTML: '' }; const catCalls = [], posCalls = []; let catReply = null, posReply = null, ctkmReply = { ok: true, rows: [] }; const ctkmCalls = []; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
 const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeout, clearTimeout, encodeURIComponent,
   gsUrl: 'https://x/exec', esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   document: { getElementById: id => id === 'xt-wrap-combo' ? wrap : null, activeElement: null },
@@ -11,6 +11,7 @@ const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeo
   _authAccount: { role: 'admin' }, confirm: () => confirmAns, toast: m => toasts.push(m),
   fetch: (url, o) => {
     if (/action=priceCatalogFlat/.test(url)){ catCalls.push(url); return Promise.resolve({ json: async () => catReply }); }
+    if (/action=ctkmCatalog/.test(url)){ ctkmCalls.push(url); return Promise.resolve({ json: async () => ctkmReply }); }
     if (/action=posPrice/.test(url)){ posCalls.push(url); return Promise.resolve({ json: async () => posReply(JSON.parse(decodeURIComponent(url.split('action=posPrice&q=')[1]))) }); }
     calls.push(url); bodies.push(o && o.body); return new Promise(res => resolvers.push(() => res({ json: async () => reply(url) }))); } };
 vm.createContext(ctx);
@@ -206,5 +207,21 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   run("_cbEF('itemsText','2 x Nhẫn bạc trơn | | Size 12')"); run('_cbRawToggle()'); await tick();
   ok(run('_cb.edit.rawMode') === false && run('_cb.edit.items.length') === 1 && run('_cb.edit.items[0].qty') === 2, 'quay lại chọn: chữ → dòng');
   ok(!run("_cbLineHtml(_cbMkItem({ name: '<b>x</b>', chatLieu: '<i>' }), 0)").includes('<b>x</b>'), 'escape HTML tên SP');
+
+  // ── bước 3/4: CTKM tham khảo dưới dòng SP (chỉ CTKM đang áp dụng, khớp tên SP; không tự tính giảm giá) ──
+  ctkmReply = { ok: true, rows: [
+    { STT: 1, 'Chương trình': 'Giảm 10% vòng cuốn dịp 20/11', 'Nội dung': 'Áp dụng vòng cuốn mọi chất liệu', __ctkmExpired: false },
+    { STT: 2, 'Chương trình': 'Giảm vòng cuốn mùa hè (cũ)', __ctkmExpired: true },
+    { STT: 3, 'Chương trình': 'Tặng quà khi mua nhẫn bạc', 'Nội dung': 'nhẫn bạc trơn', __ctkmExpired: false },
+    { STT: 4, 'Chương trình': 'CTKM sắp tới vòng cuốn', __ctkmUpcoming: true } ] };
+  run('_cbCtkm.loaded=false; _cbCtkm.rows=[]'); ctkmCalls.length = 0; run('_cbNew()'); await tick();
+  run("_cbPickSet('vong cuon'); _cbPickAdd(0)"); await tick();
+  ok(ctkmCalls.length === 1 && ctkmCalls[0].includes('action=ctkmCatalog'), 'mở form nạp CTKM 1 lần');
+  ok(mk('cb-items').innerHTML.includes('CTKM liên quan') && mk('cb-items').innerHTML.includes('Giảm 10% vòng cuốn dịp 20/11'), 'hiện CTKM đang áp dụng có nhắc tên SP');
+  ok(!mk('cb-items').innerHTML.includes('(cũ)') && !mk('cb-items').innerHTML.includes('sắp tới') && !mk('cb-items').innerHTML.includes('Tặng quà khi mua nhẫn'), 'KHÔNG hiện CTKM hết hạn / chưa bắt đầu / không liên quan');
+  ok(run('_cb.edit.items[0].disc') === 0, 'không tự điền khuyến mãi (chỉ tham khảo)');
+  run('_cbNew()'); await tick(); ok(ctkmCalls.length === 1, 'CTKM đã nạp thì không gọi lại');
+  run('_cbCtkm.loaded=false; _cbCtkm.rows=[]'); ctkmReply = { error: 'Unknown action' }; run('_cbNew()'); await tick();
+  run("_cbPickSet('vong cuon'); _cbPickAdd(0)"); ok(!mk('cb-items').innerHTML.includes('CTKM liên quan') && !wrap.innerHTML.includes('Unknown action'), 'GAS cũ/không có CTKM: ẩn khối, không báo lỗi');
   console.log('ALL COMBO TAB TESTS PASSED');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -64,12 +64,13 @@ function _cbPriceToSend_(v){   // người dùng nhập đồng đầy đủ →
   if (d < 1000 || d % 1000) return { err: 'Giá dưới 100.000đ phải tròn nghìn (vd 85000).' };
   return { n: d / 1000 };
 }
-function _cbNew(){ _cb.edit = { isNew:true, code:'', name:'', price:'', itemsText:'', items:[], rawMode:false, note:'', start:'', end:'', keywords:'', active:true, images:[], imgMsg:'', err:'' }; _cbPick.q = ''; _cbRender(); _cbCatLoad(); }
+function _cbNew(){ _cb.edit = { isNew:true, code:'', name:'', price:'', itemsText:'', items:[], rawMode:false, note:'', start:'', end:'', keywords:'', active:true, images:[], imgMsg:'', err:'' }; _cbPick.q = ''; _cbRender(); _cbCatLoad(); _cbCtkmLoad(); }
 function _cbEditAt(i){
   var c = _cbVisible()[i]; if (!c) return;
   _cb.edit = { isNew:false, code:c.code || '', name:c.name || '', price:String(c.priceVnd || ''), itemsText:c.itemsText || '', items:_cbParseItems(c.itemsText), rawMode:false, note:c.note || '', start:c.start || '', end:c.end || '', keywords:c.keywords || '', active:c.active !== false, images:_cbImgLines(c.imagesText), imgMsg:'', err:'' };
   _cbPick.q = ''; _cbRender();
   if (_cbCat.loaded) _cbAttachAll(); else _cbCatLoad();
+  _cbCtkmLoad();
 }
 function _cbEF(k, v){ if (_cb.edit) _cb.edit[k] = v; }
 function _cbCancel(){ if (_cb.saving) return; _cb.edit = null; _cbRender(); }
@@ -326,6 +327,35 @@ function _cbSrcNote(it){
   if (it.src === 'saphia') return 'Bảng giá SAPHIA'; if (it.src === 'ruby') return 'Bảng giá RUBY';
   return it.src === 'tay' ? 'nhập tay' : 'chưa có giá — nhập tay';
 }
+// ── CTKM THAM KHẢO (bước 3/4): sheet CTKM là văn bản tự do (cột mỗi lúc một khác) nên KHÔNG tự tính giảm giá — chỉ nhắc các CTKM ĐANG áp dụng có nhắc tên SP dưới dòng, admin tự nhập ô Khuyến mãi. ──
+var _cbCtkm = { rows: [], loaded: false, loading: false };
+async function _cbCtkmLoad(){
+  if (_cbCtkm.loaded || _cbCtkm.loading || typeof gsUrl === 'undefined' || !gsUrl) return;
+  _cbCtkm.loading = true;
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=ctkmCatalog', { redirect:'follow' });
+    var d = await r.json();
+    if (d && Array.isArray(d.rows)) _cbCtkm.rows = d.rows.filter(function(row){ return !row.__ctkmExpired && !row.__ctkmUpcoming; }).map(function(row){
+      var keys = Object.keys(row).filter(function(k){ return k.indexOf('__ctkm') !== 0 && row[k] !== '' && row[k] != null && _cbFold(k).trim() !== 'stt'; });
+      return { title: keys.length ? String(row[keys[0]]) : '', w: _cbWords(keys.map(function(k){ return row[k]; }).join(' ')) };
+    }).filter(function(x){ return x.title; });
+    _cbCtkm.loaded = true;
+  } catch(e){ _cbCtkm.loaded = true; }   // GAS cũ / chưa có sheet CTKM → không hiện gì, không báo lỗi
+  _cbCtkm.loading = false; _cbItemsRefresh();
+}
+function _cbCtkmFor(it){
+  var toks = _cbWords(it.name).trim().split(' ').filter(function(t){ return t.length > 1; }), out = [];
+  if (!toks.length) return out;
+  for (var i = 0; i < _cbCtkm.rows.length && out.length < 2; i++){
+    var ok = true; for (var k = 0; k < toks.length; k++) if (_cbCtkm.rows[i].w.indexOf(' ' + toks[k] + ' ') < 0){ ok = false; break; }
+    if (ok) out.push(_cbCtkm.rows[i].title.length > 90 ? _cbCtkm.rows[i].title.slice(0, 90) + '…' : _cbCtkm.rows[i].title);
+  }
+  return out;
+}
+function _cbCtkmHtml(it){
+  var m = _cbCtkmFor(it); if (!m.length) return '';
+  return '<div style="font-size:12px;margin-top:6px;color:#8a5a00;background:#fff8e6;border-radius:6px;padding:4px 8px">🎁 CTKM liên quan: ' + m.map(esc).join(' · ') + ' <span style="color:var(--muted)">— tự nhập khuyến mãi ở trên nếu áp dụng</span></div>';
+}
 function _cbLineHtml(it, i){
   var opt = function(v, label, on){ return '<option value="' + v + '"' + (it.src === v ? ' selected' : '') + (on ? '' : ' disabled') + '>' + label + '</option>'; };
   var sub = [it.chatLieu, it.size].filter(Boolean).join(' · '), st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;text-align:right;box-sizing:border-box';
@@ -339,7 +369,7 @@ function _cbLineHtml(it, i){
         opt('pos', 'POS gần nhất', it.posPrice > 0) + opt('bg', 'Bảng giá', it.bg.p > 0) + opt('saphia', 'SAPHIA', it.bg.sp > 0) + opt('ruby', 'RUBY', it.bg.r > 0) + opt('tay', 'Nhập tay', true) + (it.src ? '' : '<option selected disabled>—</option>') +
         '</select> <span style="color:var(--muted)">' + esc(_cbSrcNote(it)) + '</span></span>' +
       '<span>Khuyến mãi: <input value="' + esc(it.disc ? String(it.disc) : '') + '" placeholder="0" onchange="_cbLineSet(' + i + ',\'disc\',this.value)" style="width:84px;' + st + '"> <button type="button" class="btn sm" onclick="_cbLineDiscMode(' + i + ')" title="Đổi giữa đ và %">' + (it.discPct ? '%' : 'đ') + '</button></span>' +
-      '<span style="display:flex;gap:8px;align-items:center"><b style="font-size:14px;color:#1a56b0">' + esc(_cbVnd(_cbNet(it)) || '0đ') + '</b><button type="button" class="btn sm" onclick="_cbLineDel(' + i + ')" title="Bỏ khỏi combo">🗑</button></span></div></div>';
+      '<span style="display:flex;gap:8px;align-items:center"><b style="font-size:14px;color:#1a56b0">' + esc(_cbVnd(_cbNet(it)) || '0đ') + '</b><button type="button" class="btn sm" onclick="_cbLineDel(' + i + ')" title="Bỏ khỏi combo">🗑</button></span></div>' + _cbCtkmHtml(it) + '</div>';
 }
 function _cbItemsInner(e){
   var items = e.items || [], t = _cbTotals(items);
