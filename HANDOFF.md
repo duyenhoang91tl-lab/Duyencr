@@ -4,7 +4,8 @@
 - NGUYÊN NHÂN LÀM: Duyên: "ok làm nốt" sau khi Pancake AI đã đổi (icon SVG/popup/PNG + nút Hỏi AI). Quy tắc song song `08-extension-parity.md`: bên này có thì bên kia có. Zalo trước đó dùng emoji 🤖 ở nút nổi + header, 💬 ở popup.
 - ✅ A1 (`extension-zalo/zalo-content.js`): thêm `zaiCatSvg_` (bản sao `pkCatSvg_` của Pancake, class `zai-cat`/`zai-cat-ant`); nút nổi `#ome-zai-toggle` và tiêu đề header dùng Samoyed. `tools/test-zalo-cat-icon.js` MỚI 7/7; test-zalo-smoke, test-price-ai-ui xanh.
 - ✅ A2 nút Hỏi AI (`#zai-price-ai-btn`) lên hàng "👤 CS:" (`#zai-cs-bar`, giữ id + listener `askPriceAiZai_`). LƯU Ý khác Pancake: khối giá của Zalo LUÔN hiện (không nằm trong menu) nên KHÔNG cần tự mở mục; chỉ cần cuộn tới + focus ô hỏi khi ô trống.
-- [ ] A3 `zalo-popup.html` (h1 đang 💬)  [ ] A4 icon16.png  [ ] A5 icon48.png  [ ] A6 icon128.png
+- ✅ A3 `zalo-popup.html` (h1 đang 💬 → svg Samoyed sinh từ `zaiCatSvg_(26,false)`)  [ ] A4 icon16.png  [ ] A5 icon48.png  [ ] A6 icon128.png
+  (PNG dựng từ `zaiCatSvg_(512,false)` bằng sharp, nền trong suốt, resize 16/48/128 — giống cách làm Pancake)
 - 🧪 Duyên: reload Zalo AI ở chrome://extensions → nút nổi + header là bé Samoyed.
 
 ## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON PNG THANH CÔNG CỤ CHROME SANG BÉ SAMOYED) — XONG CẢ 3 FILE (đã push); reload extension; KHÔNG đổi GAS
