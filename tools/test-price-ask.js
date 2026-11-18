@@ -122,6 +122,19 @@ ok(X.proIntent_('sales', 'tóm tắt doanh số') === 'summary' && X.proIntent_(
   ok(fetches.length === 0 && /Chưa mở khách/.test(log[0].text), 'cau hoi KHACH binh thuong khong bi cuop sang tra gia');
   log = await ask('sales', 'doanh số kỳ này');
   ok(fetches.length === 0, 'cau hoi doanh so khong bi cuop sang tra gia');
+  // ── 2026-11-18 (Duyên: gõ "mặt di lặc" ở tab Doanh số → "chưa hiểu câu này"): câu giống TÊN SẢN PHẨM mà tab không hiểu → thử tra bảng giá dù KHÔNG có chữ "giá" ──
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: TRANG SỨC MẶT CỔ DI LẶC (MẪU V)\n- Giá thường: 14.550' }) });
+  log = await ask('sales', 'mặt di lặc');
+  ok(fetches.length === 1 && /action=priceAsk/.test(fetches[0].u) && log.length === 2 && log[0].text === 'mặt di lặc' && /DI LẶC/.test(log[1].text) && !/chưa hiểu/.test(JSON.stringify(log)) && !D.busy && el('pro-ai-q').value === '', 'Doanh so + "mặt di lặc" (khong chu "giá"): tra bang gia, KHONG bao chua hieu');
+  log = await ask('customer', 'mặt di lặc'); ok(fetches.length === 1 && /DI LẶC/.test(log[1].text), 'Khach (chua mo khach) + "mặt di lặc": cung tra bang gia');
+  log = await ask('leads', 'mặt di lặc'); ok(fetches.length === 1 && /DI LẶC/.test(log[1].text), 'Khach nong + "mặt di lặc": cung tra bang gia');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: false, text: '', suggestions: [] }) });
+  log = await ask('leads', 'bla bla bla xyz');
+  ok(fetches.length === 1 && log.length === 2 && log[0].role === 'user' && /chưa hiểu/.test(log[1].text) && !D.busy, 'khong co SP khop: tra 1 lan roi van bao "chua hieu" cu, khong nhan doi tin hoi');
+  log = await ask('leads', 'nhẫn'); ok(fetches.length === 0, '1 tu: khong tra gia (tranh goi GAS vo ich)');
+  log = await ask('leads', '0912 345 678'); ok(fetches.length === 0, 'so dien thoai: khong tra gia');
+  log = await ask('sales', 'ai cần hỗ trợ nhất'); ok(fetches.length === 0, 'cau doanh so da hieu: khong bi cuop sang tra gia');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Giá bán: 450', unit: 'nghin' }) });
   log = await ask('customer', 'gia han thanh toan');   // co tu "gia" nhung la Y DINH khach? khong — proIntent_ customer ''
   ok(fetches.length === 1, 'tu "gia" ma khong y dinh khac -> tra gia (da biet: chi thay cho cau tro ly "chua hieu")');
   fetchImpl = async () => ({ json: async () => ({ ok: false, error: 'Bang gia (DANH_MUC) dang rong' }) });

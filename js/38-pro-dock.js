@@ -682,6 +682,18 @@ async function proAiSendSales_(question, q){
   _proDock.log.pop(); _proDock.log.push(r.ok ? { role:'bot', text:r.text, provider:r.provider } : { role:'bot', text:'⚠ '+r.error });
   _proDock.busy = false; proAiLogRender_();
 }
+// 2026-11-18 (Duyên: gõ "mặt di lặc" ở tab Doanh số → "chưa hiểu câu này" dù bảng giá có "MẶT CỔ DI LẶC"): NGUYÊN NHÂN GỐC — chỉ tra bảng giá khi câu có chữ "giá" (proPriceIntent_)
+// hoặc đang ở tab 💰; các tab khác trả PRO_RULE_HELP. Nay ở chế độ quy tắc, câu mà tab hiện tại KHÔNG hiểu mà trông giống TÊN SẢN PHẨM (2–8 từ, không phải SĐT/số) thì thử tra bảng giá trước.
+function proRuleUnderstands_(mode, q){
+  if (mode==='sales') return !!proSalesBIntent_(q);
+  if (mode==='leads') return !!proLeadsIntent_(q);
+  return !!proIntent_(mode, q);
+}
+function proLooksLikeProduct_(q){
+  var n = proNorm_(q).trim();
+  if (!n || n.length>80 || /^[\d\s.+()-]+$/.test(n)) return false;
+  var w = n.split(/\s+/).length; return w>=2 && w<=8;
+}
 async function proAiSend_(){
   if (_proDock.busy) return;
   var q = document.getElementById('pro-ai-q'), question = (q.value||'').trim(); if (!question) return;
@@ -695,6 +707,18 @@ async function proAiSend_(){
     if (pr.ok && !pr.found && (pr.suggestions||[]).length){ pm.text = proPriceNotFoundText_(); pm.chips = pr.suggestions.slice(0,8).map(function(n){ return { kind:'name', label:n }; }); }   // gợi ý thành nút bấm → xem thông tin + giá
     _proDock.log.push(pm);
     _proDock.busy = false; proAiLogRender_(); return;
+  }
+  if (PRO_AI_ENGINE==='rule' && _proDock.mode!=='price' && !proRuleUnderstands_(_proDock.mode, question) && proLooksLikeProduct_(question)){
+    _proDock.log.push({ role:'user', text:question }); _proDock.busy = true;
+    _proDock.log.push({ role:'bot', text:'⏳ Đang tra bảng giá…' }); proAiLogRender_();
+    var pr2 = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch);
+    _proDock.log.pop();
+    if (pr2.ok && (pr2.found || (pr2.combos||[]).length)){
+      q.value = '';
+      _proDock.log.push({ role:'bot', text:proPriceFormat_(pr2), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
+      _proDock.busy = false; proAiLogRender_(); return;
+    }
+    _proDock.log.pop(); _proDock.busy = false; proAiLogRender_();   // không thấy sản phẩm → chạy tiếp luồng cũ (trả gợi ý "chưa hiểu")
   }
   if (_proDock.mode==='leads'){   // R8d: khách nóng/ấm/nguội — luôn tính tại chỗ (quy tắc), không gọi AI
     _proDock.log.push({ role:'user', text:question }); q.value = '';
@@ -727,4 +751,4 @@ async function proAiSend_(){
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 try { proCatFill_(); if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', function(){ try { proCatFill_(); } catch (e) {} }); } catch (e) {}
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proComboText_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };
+if (typeof module!=='undefined') module.exports = { proRuleUnderstands_, proLooksLikeProduct_, proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proComboText_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };

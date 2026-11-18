@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — TRỢ LÝ AI: GÕ "MẶT DI LẶC" Ở TAB DOANH SỐ BÁO "CHƯA HIỂU CÂU NÀY") — XONG code (đã commit; chờ push khi có token mới); chỉ cần Ctrl+F5
+Duyên (ảnh tab Doanh số, câu "mặt di lặc", bảng giá có "TRANG SỨC MẶT CỔ DI LẶC (MẪU V)" + "MẶT CỔ PHẬT QUAN ÂM/ DI LẶC MẪU B").
+NGUYÊN NHÂN GỐC: `proAiSend_` (js/38) chỉ tra bảng giá khi đang ở tab 💰 hoặc câu có chữ "giá" (`proPriceIntent_`); câu "mặt di lặc" không có chữ "giá" nên ở các tab khác rơi vào `PRO_RULE_HELP` ("chưa hiểu câu này"). Backend GAS `priceAsk_` KHÔNG lỗi: đã kiểm bằng bảng mẫu có đúng 2 SP di lặc → "mặt di lặc", "di lặc", "mặt cổ di lặc" đều ra đủ 2 SP + giá.
+- ✅ `js/38-pro-dock.js` (`?v=20261118a`): `proRuleUnderstands_(mode,q)` + `proLooksLikeProduct_(q)` (2–8 từ, không phải SĐT/số thuần). Ở chế độ quy tắc, nếu tab hiện tại KHÔNG hiểu câu mà câu giống tên sản phẩm → tra `priceAsk` trước; có SP/combo khớp thì trả giá (nhãn "Bảng giá DANH_MUC"); không khớp thì chạy tiếp luồng cũ ("chưa hiểu", không nhân đôi tin hỏi). Câu 1 từ / SĐT / câu tab đã hiểu KHÔNG bị gọi GAS thêm. Không đổi GAS.
+- ✅ `tools/test-price-ask.js` thêm 8 ca (Doanh số/Khách/Khách nóng + "mặt di lặc" → ra giá; không khớp → vẫn "chưa hiểu"; 1 từ/SĐT/câu doanh số không gọi GAS); xác nhận ĐỎ khi bỏ bản sửa, xanh khi có. test-pro-dock-salesb, test-pro-leads, test-pro-sales-summary-top3 xanh. ⚠ `test-pro-dock-drag` không chạy được trong phiên này (thiếu jsdom, không liên quan).
+- [ ] **VIỆC KẾ TIẾP:** push (cần token mới trong tin nhắn). 🧪 Duyên: Ctrl+F5 → Trợ lý AI → tab Doanh số → gõ "mặt di lặc" → phải ra danh sách giá. Gợi ý (chưa làm, hỏi Duyên): câu 1 từ như "di lặc" ở tab khác vẫn báo "chưa hiểu" — nếu muốn cũng tra giá thì báo.
+
 ## 2026-11-18 (phiên Claude — ZALO AI: ĐỔI ICON = BÉ SAMOYED + ĐƯA NÚT "HỎI AI" LÊN HÀNG CS, SONG SONG VỚI PANCAKE) — XONG CẢ 6 FILE (đã push); reload extension Zalo AI; KHÔNG đổi GAS
 - NGUYÊN NHÂN LÀM: Duyên: "ok làm nốt" sau khi Pancake AI đã đổi (icon SVG/popup/PNG + nút Hỏi AI). Quy tắc song song `08-extension-parity.md`: bên này có thì bên kia có. Zalo trước đó dùng emoji 🤖 ở nút nổi + header, 💬 ở popup.
 - ✅ A1 (`extension-zalo/zalo-content.js`): thêm `zaiCatSvg_` (bản sao `pkCatSvg_` của Pancake, class `zai-cat`/`zai-cat-ant`); nút nổi `#ome-zai-toggle` và tiêu đề header dùng Samoyed. `tools/test-zalo-cat-icon.js` MỚI 7/7; test-zalo-smoke, test-price-ai-ui xanh.
