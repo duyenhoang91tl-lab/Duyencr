@@ -1636,7 +1636,7 @@ function _srBcIsLech_(diff, baseV){   // diff = Base − Pos
 }
 function _srBcBuild_(orders){
   var detail = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Nguồn đơn', 'Thẻ Pos (nguyên văn)', 'Giá Pos gốc (1 lần/đơn)', 'Ghi chú Pos', 'Mã bộ đếm đã khớp',
-    'Dòng trong DT TỔNG (Base)', 'Mã Base', 'Ngày tạo Base', 'Người tạo Base', 'Sale bán (Base)', 'Trạng thái Base', 'Giá trị đơn gốc Base', 'Có tính doanh thu?', 'Tổng Base được tính (1 lần/đơn)', 'Chênh Base − Pos (1 lần/đơn)', 'Phần còn lại tính theo Thẻ Pos (1 lần/đơn)', 'Sale nhận phần còn lại (Thẻ Pos)', 'Doanh thu tính = Base + phần còn lại (1 lần/đơn)']];
+    'Dòng trong DT TỔNG (Base)', 'Mã Base', 'Ngày tạo Base', 'Người tạo Base', 'Sale bán (Base)', 'Trạng thái Base', 'Giá trị đơn gốc Base', 'Có tính doanh thu?', 'Tổng Base được tính (1 lần/đơn)', 'Chênh Base − Pos (1 lần/đơn)', 'Phần còn lại tính theo Thẻ Pos (1 lần/đơn)', 'Sale nhận phần còn lại (Thẻ Pos)', 'Doanh thu tính = Base + phần còn lại (1 lần/đơn)', 'Nguyên nhân lệch (gợi ý, 1 lần/đơn)']];
   var chia = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Sale', 'Phần chia (%)', 'Tiền chia (đơn gốc Base + phần còn lại theo Thẻ Pos)', 'Ghi chú']];
   var tot = { don: 0, pos: 0, base: 0, lech: 0, du: 0 };
   (orders || []).forEach(function(o, i){
@@ -1648,7 +1648,8 @@ function _srBcBuild_(orders){
       detail.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', first ? Math.round(posV) : '', o.ghiChu || '', (o.ghepCodes || []).join(', '),
         b.dong || '', b.ma || '', b.ngay || '', b.nguoiTao || '', b.saleBan || '', b.trangThai || '', Math.round(Number(b.giaTri) || 0), b.tinh ? 'Có' : 'Không (đơn Base bị loại)',
         first ? Math.round(baseV) : '', first ? Math.round(baseV - posV) : '',
-        first && o.ghepDu ? Math.round(Number(o.ghepDu)) : '', first ? (o.ghepDuSale || '') : '', first ? Math.round(baseV + (Number(o.ghepDu) || 0)) : '']);
+        first && o.ghepDu ? Math.round(Number(o.ghepDu)) : '', first ? (o.ghepDuSale || '') : '', first ? Math.round(baseV + (Number(o.ghepDu) || 0)) : '',
+        first && _srBcIsLech_(baseV - posV, baseV) ? _srBcCause_(o).join('; ') : '']);   // 2026-11-18 bước 3: cùng nhãn với cột trên màn hình; đơn khớp để trống
     });
     _srOrderShares_(o, 'adj').forEach(function(x){
       chia.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', x.name, Math.round(x.frac * 1000) / 10, Math.round(x.giaTri), _srBcQuayTxt_(o)]);

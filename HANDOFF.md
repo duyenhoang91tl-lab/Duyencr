@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — CHECK NGƯỢC BASE: BƯỚC 3 EXCEL CÓ CỘT NGUYÊN NHÂN) — XONG (đã push); chỉ cần Ctrl+F5; ĐỐI SOÁT POS ⇄ BASE (3/3 bước) XONG
+- NGUYÊN NHÂN LÀM: bước 2 mới gắn nhãn trên màn hình; file Excel kế toán dùng ("📥 Xuất Excel check ngược Base") vẫn không có nhãn nên phải đối chiếu tay với màn hình.
+- ✅ `js/11-fn-srload.js` (`?v=20261118c`): `_srBcBuild_` thêm cột cuối "Nguyên nhân lệch (gợi ý, 1 lần/đơn)" ở sheet "Check ngược từng đơn" = đúng `_srBcCause_` của màn hình; chỉ ghi ở dòng đầu mỗi đơn và CHỈ đơn lệch (đơn khớp để trống) để lọc/SUM không lặp. Không đổi số tiền.
+- ✅ `tools/test-bc-cause-export.js` (7 kiểm, chạy hàm THẬT với số trong ảnh: Base 0đ, bảo hành 14.948k vs 1.470k, 36.526k vs 57.833k, đơn khớp trống, 2 đơn gốc chỉ ghi dòng đầu) xanh; test-bc-cause, test-bc-pos-sibling, test-recon-export xanh.
+- [ ] **VIỆC KẾ TIẾP:** không còn bước kỹ thuật mở. Chờ Duyên thử + điền ô "Ô ADMIN NHẬP TAY" bên dưới; 3 đơn nghi vấn dữ liệu (nocNB2003saleoff 06/11, minhanh99 05/11, trangbeCSKH1995 09/11) cần Duyên/kế toán xác nhận bên Base/Pos. 🧪 Duyên: Ctrl+F5 → Báo cáo B → 📥 Xuất Excel check ngược Base → sheet "Check ngược từng đơn" → cột cuối có nhãn.
+
 ## 2026-11-18 (phiên Claude — CHECK NGƯỢC BASE: BƯỚC 2 GẮN NHÃN NGUYÊN NHÂN) — XONG (đã push); chỉ cần Ctrl+F5; BƯỚC 3 (Excel có cột nhãn) CHƯA LÀM
 - NGUYÊN NHÂN LÀM: bước 2 của "viết lại logic đối soát" (xem mục ngay dưới): Duyên phải đọc tay từng dòng lệch để biết vì sao lệch.
 - ✅ `js/11-fn-srload.js` (`?v=20261118b`): hàm thuần `_srBcCause_(o)` trả mảng nhãn gợi ý theo thứ tự ưu tiên: bảo hành/chi phí/tiền công/đổi (regex không dấu; "đổi" chỉ khớp "đổi hàng/size/màu/sp/nhẫn/vòng/dây/lại" để "đối tác" không dính) · Base nhập 0đ / mọi đơn gốc bị loại · có đơn gốc Base bị loại · đã bỏ qua N dòng Pos trùng · Pos gấp đôi Base / Base gấp đôi Pos · (nếu chưa nhãn nào) Base lớn hơn / Pos lớn hơn (kèm số đơn gốc). Bảng check ngược thêm cột "Nguyên nhân (gợi ý)" trước cột Đơn gốc Base; không nhãn → "chưa rõ — kiểm tra tay". CHỈ gợi ý, KHÔNG đổi số tiền/cách tính.
