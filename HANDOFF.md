@@ -3,7 +3,7 @@
 ## 2026-11-18 (phiên Claude — THƯ VIỆN SẢN PHẨM v2: THÔNG TIN SẢN PHẨM (văn bản) + Ô TÌM TOÀN CỤC RA SP/COMBO) — ĐANG LÀM TỪNG BƯỚC
 - YÊU CẦU MỚI Duyên: (1) ô tìm khách toàn cục (#search-input) cũng ra sản phẩm + combo, bấm là mở thư mục trong Thư viện sản phẩm; (2) mỗi thư mục có thêm THÔNG TIN sản phẩm dạng văn bản Duyên tự cập nhật (vd ý nghĩa), hiện cùng danh sách ảnh; sắp xếp thông minh.
 - ✅ BƯỚC A GAS (`gas_v13.js`, split OK, `tools/test-plib.js` mở rộng xanh): sheet `ThuVienSPInfo` (productKey, productName, group, info, updatedBy, updatedAt), POST `plibInfoSave` (CHỈ ADMIN, ≤4000 ký tự, lưu rỗng = xóa, cell ép định dạng văn bản nên "- ..." / "=..." không thành công thức & không bị thêm dấu '). `plibList` không key: counts kèm `info` (để ô tìm tìm cả trong nội dung; thư mục chỉ có info vẫn hiện n=0); có key: thêm `info:{text,by,at}`.
-- [ ] BƯỚC B client `js/94`: khung "📝 Thông tin sản phẩm" trong thư mục (xem/sửa/chép, nút chèn mục gợi ý Ý nghĩa/Điểm nổi bật/Cách tư vấn/Bảo quản), 📝 trên thẻ, tìm cả trong nội dung (tên khớp xếp trước).
+- ✅ BƯỚC B client `js/94` (test `tools/test-plib-tab.js` +nhiều kiểm, bump `?v=20261118c`): khung "📝 Thông tin sản phẩm" trong thư mục (xem/sửa/chép, nút chèn mục gợi ý Ý nghĩa/Điểm nổi bật/Cách tư vấn/Bảo quản), 📝 trên thẻ, tìm cả trong nội dung (tên khớp xếp trước).
 - [ ] BƯỚC C `js/69-pro-smart-search.js`: thêm khối "🛍️ Sản phẩm / combo" vào hộp gợi ý #cust-suggest → `plibOpen`.
 - [ ] BƯỚC D docs/crm-kb/13 + HANDOFF.
 
