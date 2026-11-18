@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — COMBO: ẢNH CHO COMBO, hỏi giá ra combo kèm ảnh) — ĐANG LÀM TỪNG BƯỚC; BƯỚC 1/3 GAS XONG (đã push; workflow tự deploy — xem tab Actions xanh)
+Duyên: "update thêm phần combo thì hỏi giá cũng ra combo luôn, add được ảnh vào combo để check giá ra cả ảnh combo tương ứng".
+- GHI CHÚ: hỏi giá RA COMBO ĐÃ CÓ từ combo bước 2 (`priceAsk_` trả `combos` khớp câu hỏi, Trợ lý AI hiện khối "🎁 COMBO CÓ SẴN"); việc mới là ẢNH.
+- ✅ **BƯỚC 1/3 GAS** (`gas_v13.js` → gas/02_PriceCatalog_CTKM.gs): sheet COMBO thêm CỘT 10 "Ảnh" (1–4 link, mỗi link 1 dòng; link Drive `/file/d/ID`, `?id=ID`, `uc?export=view&id=ID` hoặc link ảnh http trực tiếp; link THƯ MỤC Drive không dùng được). Sheet cũ 9 cột TỰ thêm cột + tiêu đề (`_comboSheet_`). `_comboRow_` trả `images` (link Drive đổi sang `drive.google.com/thumbnail?id=ID&sz=w600`) + `imagesText` (nguyên văn để sửa). `comboSave` nhận `images:[…]` (hoặc `imagesText`), bỏ link rác, tối đa 4, và tự bật chia sẻ "ai có link" cho file Drive (lỗi quyền thì bỏ qua). `tools/test-combo.js` thêm 9 ca; test-price-ask xanh; `split-gas --check` OK.
+- [ ] **BƯỚC 2/3 (kế tiếp):** `js/93-combo-tab.js` — form admin có nút "📷 Thêm ảnh" (tải từ máy → action `uploadTemplateImage` có sẵn, trả link Drive công khai) + ô dán link + nút xoá ảnh; thẻ combo hiện ảnh. Bước 3/3: Trợ lý AI (js/38) hiện ảnh combo ở khối "🎁 COMBO CÓ SẴN".
+- ⚠ Pancake/Zalo "Soạn đơn" chưa hiện ảnh combo (quy tắc song song `08-extension-parity.md`): hỏi Duyên có cần không sau bước 3.
+
 ## 2026-11-18 (phiên Claude — TRỢ LÝ AI: GÕ "MẶT DI LẶC" Ở TAB DOANH SỐ BÁO "CHƯA HIỂU CÂU NÀY") — XONG code (đã commit; chờ push khi có token mới); chỉ cần Ctrl+F5
 Duyên (ảnh tab Doanh số, câu "mặt di lặc", bảng giá có "TRANG SỨC MẶT CỔ DI LẶC (MẪU V)" + "MẶT CỔ PHẬT QUAN ÂM/ DI LẶC MẪU B").
 NGUYÊN NHÂN GỐC: `proAiSend_` (js/38) chỉ tra bảng giá khi đang ở tab 💰 hoặc câu có chữ "giá" (`proPriceIntent_`); câu "mặt di lặc" không có chữ "giá" nên ở các tab khác rơi vào `PRO_RULE_HELP` ("chưa hiểu câu này"). Backend GAS `priceAsk_` KHÔNG lỗi: đã kiểm bằng bảng mẫu có đúng 2 SP di lặc → "mặt di lặc", "di lặc", "mặt cổ di lặc" đều ra đủ 2 SP + giá.

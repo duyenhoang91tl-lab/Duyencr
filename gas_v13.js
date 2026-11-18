@@ -817,7 +817,7 @@ function readCTKMCatalog_() {
 // Cot "San pham": MOI DONG 1 mon, dang "Ten | Chat lieu | Size | SL" (chi Ten bat buoc; SL mac dinh 1;
 // cung nhan "2 x Ten" o dau dong).
 var COMBO_SHEET_NAME = 'COMBO';
-var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động'];
+var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động', 'Ảnh'];
 var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va', 'tien', 'vnd', 'dong'];
 
 function _comboParseItems_(text) {
@@ -851,6 +851,27 @@ function _comboPriceNum_(v) {
 }
 // Gia nhap giong cot Gia ban DANH_MUC (nghin dong: 1.299 = 1.299.000d); so >= 100000 coi la dong day du.
 function _comboVnd_(n) { return n > 0 && n < 100000 ? n * 1000 : n; }
+// ANH COMBO (Duyen 2026-11-18): cot 10 'Anh' = 1-4 link anh, moi link 1 dong (hoac cach nhau dau phay/cham phay). Dang nhan: link Drive (/file/d/ID, ?id=ID, uc?export=view&id=ID) hoac link anh http(s) truc tiep.
+// Link Drive doi sang drive.google.com/thumbnail?id=ID&sz=w600 (cung dang CRM da dung de xem truoc anh; file phai chia se 'bat ky ai co link' — anh tai tu CRM len da tu bat). Link thu muc Drive KHONG dung duoc (khong biet anh nao).
+function _comboImageUrls_(text) {
+  var out = [];
+  String(text == null ? '' : text).split(/[\r\n,;]+/).forEach(function (u) {
+    u = String(u).trim();
+    if (!u || out.length >= 4) return;
+    var m = u.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || u.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m) { out.push('https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w600'); return; }
+    if (/^https?:\/\/\S+$/i.test(u) && !/\/folders\//.test(u)) out.push(u);
+  });
+  return out;
+}
+function _comboImageIds_(text) {   // id file Drive trong o Anh (de bat chia se khi luu)
+  var ids = [];
+  String(text == null ? '' : text).split(/[\r\n,;]+/).forEach(function (u) {
+    var m = String(u).match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || String(u).match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m && ids.indexOf(m[1]) < 0) ids.push(m[1]);
+  });
+  return ids;
+}
 function _comboRow_(r, todayYmd) {
   var sd = _ctkmParseDate_(r[5]), ed = _ctkmParseDate_(r[6]);
   var active = !(r[8] === false || String(r[8]).trim().toLowerCase() === 'false' || String(r[8]).trim() === '0' || _stripVN_(r[8]) === 'khong' || _stripVN_(r[8]) === 'tat');
@@ -869,6 +890,7 @@ function _comboRow_(r, todayYmd) {
     price: _comboPriceNum_(r[3]), priceVnd: _comboVnd_(_comboPriceNum_(r[3])), priceText: String(r[3] == null ? '' : r[3]).trim(),
     note: String(r[4] == null ? '' : r[4]), start: sd ? _vnYmd_(sd) : '', end: ed ? _vnYmd_(ed) : '',
     keywords: String(r[7] == null ? '' : r[7]), active: active, expired: expired, upcoming: upcoming,
+    imagesText: String(r[9] == null ? '' : r[9]), images: _comboImageUrls_(r[9]),
     usable: active && !expired && !upcoming, statusLabel: label
   };
 }
@@ -878,6 +900,14 @@ function _comboSheet_(create) {
     sh = ss.insertSheet(COMBO_SHEET_NAME);
     sh.getRange(1, 1, 1, COMBO_HEADERS.length).setValues([COMBO_HEADERS]).setFontWeight('bold');
     sh.setFrozenRows(1);
+  }
+  // Sheet COMBO cu chi co 9 cot: them cot 'Anh' (cot 10) + tieu de, neu khong getRange(…,10 cot) se loi.
+  if (sh) {
+    try {
+      var need = COMBO_HEADERS.length;
+      if (typeof sh.getMaxColumns === 'function' && sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
+      if (!String(sh.getRange(1, need, 1, 1).getValues()[0][0] || '').trim()) sh.getRange(1, need, 1, 1).setValues([[COMBO_HEADERS[need - 1]]]);
+    } catch (e) {}
   }
   return sh;
 }
@@ -928,6 +958,16 @@ function comboList_(q) {
     return { ok: true, total: rows.length, count: m.length, rows: m.slice(0, 50) };
   } catch (err) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + (err && err.message || err) }; }
 }
+// Gia tri luu o cot Anh: mang c.images (hoac chuoi c.imagesText) -> moi link 1 dong, bo dong rong, toi da 4. Link khong hop le (khong phai http/Drive) bi bo.
+function _comboImageUrlsRaw_(c) {
+  var src = Array.isArray(c.images) ? c.images.join('\n') : String(c.imagesText || '');
+  var keep = [];
+  src.split(/[\r\n,;]+/).forEach(function (u) {
+    u = String(u).trim();
+    if (u && keep.length < 4 && _comboImageUrls_(u).length) keep.push(u);
+  });
+  return keep.join('\n');
+}
 function _comboNormSave_(c) {
   c = c || {};
   var name = String(c.name || '').trim();
@@ -942,7 +982,8 @@ function _comboNormSave_(c) {
   if (c.end && !ed) return { error: 'Ngay ket thuc khong hop le.' };
   if (sd && ed && _vnYmd_(ed) < _vnYmd_(sd)) return { error: 'Ngay ket thuc truoc ngay bat dau.' };
   return { rec: [String(c.code || '').trim(), name, text, c.priceText ? String(c.priceText).trim() : price, String(c.note || ''),
-    sd ? _vnYmd_(sd) : '', ed ? _vnYmd_(ed) : '', String(c.keywords || ''), c.active === false ? false : true] };
+    sd ? _vnYmd_(sd) : '', ed ? _vnYmd_(ed) : '', String(c.keywords || ''), c.active === false ? false : true,
+    _comboImageUrlsRaw_(c)] };
 }
 function comboSave_(data) {
   var a = _khoAuth_(data); if (a.err) return a.err;
@@ -957,6 +998,9 @@ function comboSave_(data) {
     }
     var tgt = row || (last + 1);
     sh.getRange(tgt, 1, 1, COMBO_HEADERS.length).setValues([rec]);
+    _comboImageIds_(rec[9]).forEach(function (id) {   // de CRM/Tro ly AI hien anh: chia se 'bat ky ai co link' (khong duoc quyen thi bo qua)
+      try { DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    });
     return jsonOut_({ ok: true, code: code, created: !row });
   });
 }

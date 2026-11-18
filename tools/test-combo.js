@@ -10,17 +10,19 @@ const data = [
   ['CB3', 'Combo tắt', 'Nhẫn', 100, '', '', '', '', false],
 ];
 let tokenUser = { role: 'admin' };
+const shared = [];
 const sheet = { rows: [H.slice()].concat(data.map(r => r.slice())),
   getLastRow() { return this.rows.length; },
   getRange(r, c, nr, nc) { const s = this; return { getValues: () => s.rows.slice(r - 1, r - 1 + nr).map(x => { const o = []; for (let i = 0; i < nc; i++) o.push(x[c - 1 + i] === undefined ? '' : x[c - 1 + i]); return o; }),
     setValues: v => { for (let i = 0; i < v.length; i++) { s.rows[r - 1 + i] = s.rows[r - 1 + i] || []; for (let j = 0; j < v[i].length; j++) s.rows[r - 1 + i][c - 1 + j] = v[i][j]; } return { setFontWeight() {} }; } }; },
-  deleteRow(n) { this.rows.splice(n - 1, 1); }, setFrozenRows() {} };
+  deleteRow(n) { this.rows.splice(n - 1, 1); }, setFrozenRows() {}, maxCols: 9, getMaxColumns() { return this.maxCols; }, insertColumnsAfter(c, n) { this.maxCols += n; } };
 const ctx = { console, Date, JSON, Math, Object, Array, String, Number, parseInt, isNaN, isFinite, encodeURIComponent,
   Logger: { log() {} }, LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {}, tryLock: () => true }) },
   PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty() {}, getProperties: () => ({}) }) },
   CacheService: { getScriptCache: () => ({ get: () => null, put() {}, remove() {}, removeAll() {} }) },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: s => ({ setMimeType() { return this; }, getContent: () => s }) },
-  Utilities: { getUuid: () => 'x', formatDate: () => '261117120000' } };
+  Utilities: { getUuid: () => 'x', formatDate: () => '261117120000' },
+  DriveApp: { Access: { ANYONE_WITH_LINK: 'A' }, Permission: { VIEW: 'V' }, getFileById: id => ({ setSharing: (a, b) => { shared.push(id + ':' + a + ':' + b); } }) } };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8'), ctx, { filename: 'gas_v13.js' });
 ctx.SpreadsheetApp = { openById: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) };
@@ -61,6 +63,21 @@ ok(J(ctx.comboDelete_({ token: 't', code: 'NOPE' })).error, 'delete missing');
 // doGet routing
 const g = J(ctx.doGet({ parameter: { action: 'comboList', q: 'vong' } }));
 ok(g.ok && g.rows.length === 1, 'doGet comboList');
+// ── 2026-11-18: ANH COMBO (cot 10 'Anh') ──
+ok(sheet.maxCols === 10 && String(sheet.rows[0][9]) === 'Ảnh', 'sheet cu 9 cot: tu them cot Anh (cot 10) + tieu de');
+const FID = '1AbCdEfGhIjKlMnOpQrStUv';
+ok(JSON.stringify(ctx._comboImageUrls_('https://drive.google.com/file/d/' + FID + '/view?usp=sharing\nhttps://drive.google.com/uc?export=view&id=' + FID + '2\nhttps://cdn.example.com/a.jpg\nhttps://drive.google.com/drive/folders/' + FID + '\nrac roi')) ===
+  JSON.stringify(['https://drive.google.com/thumbnail?id=' + FID + '&sz=w600', 'https://drive.google.com/thumbnail?id=' + FID + '2&sz=w600', 'https://cdn.example.com/a.jpg']), 'doi link Drive -> thumbnail, giu link http, BO link thu muc va chu rac');
+ok(ctx._comboImageUrls_('a\nb\nhttps://x.com/1.png\nhttps://x.com/2.png\nhttps://x.com/3.png\nhttps://x.com/4.png\nhttps://x.com/5.png').length === 4, 'toi da 4 anh');
+r = J(ctx.comboSave_({ token: 't', combo: { name: 'Combo co anh', items: [{ name: 'Vòng' }], price: 500000, images: ['https://drive.google.com/uc?export=view&id=' + FID, 'rac', 'https://cdn.example.com/b.jpg'] } }));
+const saved = sheet.rows[sheet.rows.length - 1];
+ok(r.ok && saved[9] === 'https://drive.google.com/uc?export=view&id=' + FID + '\nhttps://cdn.example.com/b.jpg', 'luu anh: moi link 1 dong, link rac bi bo');
+ok(shared.some(x => x.indexOf(FID + ':A:V') === 0), 'file Drive duoc bat chia se bat ky ai co link');
+const lst = J(ctx.jsonOut_(ctx.comboList_('combo co anh'))).rows[0];
+ok(lst.images.length === 2 && /thumbnail\?id=/.test(lst.images[0]) && lst.images[1] === 'https://cdn.example.com/b.jpg' && /uc\?export=view/.test(lst.imagesText), 'comboList tra images (thumbnail) + imagesText');
+ok(J(ctx.jsonOut_(ctx.comboList_(''))).rows.find(x => x.code === 'CB1' || x.code === 'CB2').images.length === 0, 'combo cu khong co anh: images = []');
+r = J(ctx.comboSave_({ token: 't', combo: { code: lst.code, name: 'Combo co anh', items: [{ name: 'Vòng' }], price: 500000, images: [] } }));
+ok(r.ok && sheet.rows[sheet.rows.length - 1][9] === '', 'sua + bo het anh: o Anh rong');
 console.log('ALL COMBO TESTS PASSED');
 
 // ── Buoc 2: tich hop priceAsk_ + client js/38-pro-dock.js ──
