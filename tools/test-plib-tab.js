@@ -37,6 +37,17 @@ const run = s => vm.runInContext(s, ctx);
   ok(run("plibSearch('nhan', 8).length") === 2, 'plibSearch (ô tìm toàn cục) ra SP + combo chứa "nhan"');
   ok(run("plibSearch('kim tien')[0].n") === 3, 'plibSearch kèm số ảnh');
   ok(/3\/50 ảnh/.test(wrap.innerHTML) && /C1/.test(wrap.innerHTML), 'thẻ hiện 3/50 ảnh + ảnh bìa');
+  // phím tắt: gõ -> Enter mở thẳng thư mục đầu tiên; ↑↓ đổi mục chọn
+  run("_pl.q='kim tien'"); run('_plRender()');
+  ok(run('_pl.shown.length') === 1, 'có 1 kết quả');
+  folder = [{ id: 'k', fileId: 'F', url: 'u', name: 'k.jpg', by: 'a' }];
+  const ev = k => ({ key: k, preventDefault() {} });
+  ctx._ev = ev('Enter'); await run('_plKeydown(_ev)');
+  ok(run('_pl.cur && _pl.cur.key') === 'nhan kim tien', 'Enter mở thư mục đầu tiên');
+  run("_pl.cur=null;_pl.q='nhan';_pl.hi=0"); run('_plRender()');
+  ctx._ev = ev('ArrowDown'); run('_plKeydown(_ev)'); ok(run('_pl.hi') === 1, '↓ chọn mục 2');
+  ctx._ev = ev('ArrowDown'); run('_plKeydown(_ev)'); ok(run('_pl.hi') === 0, '↓ quay vòng');
+  run("_pl.q='';_pl.hi=0;_pl.cur=null");
   folder = [{ id: 'a1', fileId: 'F', url: 'u', name: 'x.jpg', by: 'a' }];
   await run("plibOpen('Nhẫn Kim Tiền', 'Nhẫn')");
   ok(ctx._tab === 'plib', 'plibOpen chuyển tab');

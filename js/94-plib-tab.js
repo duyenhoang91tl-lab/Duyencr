@@ -5,7 +5,7 @@
 //  KEY thư mục = tên bỏ dấu/thường/gọn — PHẢI giống server `_plibKey_` (đổi 1 bên là lệch thư mục). Combo: tên gửi lên "Combo: <tên>", group "Combo".
 //  Ảnh thu nhỏ ≤1600px trước khi gửi (như Thư viện cũ js/48); tải tuần tự từng ảnh, dừng khi thư mục đầy. Xóa: người tải lên hoặc admin (server kiểm).
 // ════════════════════════════════════════════════════════════════════
-var _pl = { prods:[], combos:[], counts:{}, q:'', cur:null, items:[], n:0, max:50, me:'', admin:false, loading:false, loadingFolder:false, err:'', up:'', loadedCat:false, timer:0 };
+var _pl = { prods:[], combos:[], counts:{}, q:'', cur:null, items:[], n:0, max:50, me:'', admin:false, loading:false, loadingFolder:false, err:'', up:'', loadedCat:false, timer:0, hi:0 };
 var _PL_SHOW_MAX = 120;
 function _plKey(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 120); }
 function _plTok(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
@@ -82,7 +82,13 @@ function plibOpen(name, group){
   try { if (typeof switchTab === 'function') switchTab('plib', el); } catch(e){}
   return _plLoadFolder();
 }
-function _plSetQ(v){ _pl.q = v || ''; clearTimeout(_pl.timer); _pl.timer = setTimeout(_plRender, 150); }
+function _plSetQ(v){ _pl.q = v || ''; _pl.hi = 0; clearTimeout(_pl.timer); _pl.timer = setTimeout(_plRender, 150); }
+// Giống ô tìm khách: ↑/↓ chọn thư mục, Enter mở thẳng thư mục đang chọn (mặc định kết quả đầu tiên).
+function _plKeydown(e){
+  var n = (_pl.shown || []).length; if (!n) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); clearTimeout(_pl.timer); _pl.hi = (_pl.hi + (e.key === 'ArrowDown' ? 1 : -1) + n) % n; _plRender(); }
+  else if (e.key === 'Enter'){ e.preventDefault(); clearTimeout(_pl.timer); if (_pl.q) _plOpenIdx(Math.min(_pl.hi, n - 1)); }
+}
 // ── Tải ảnh ──
 function _plShrink(file){
   return new Promise(function(ok){
@@ -139,7 +145,7 @@ function _plFolderCard(f, i){
   var c = _pl.counts[f.key] || {}, n = c.n || 0;
   var th = c.cover ? '<img loading="lazy" src="' + esc(_plThumb(c.cover, 300)) + '" alt="" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;background:#eef6f0">'
     : '<div style="width:100%;aspect-ratio:1/1;border-radius:8px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:34px;color:#9ca3af">📁</div>';
-  return '<div class="ml-card pick" onclick="_plOpenIdx(' + i + ')" title="Mở thư mục">' + th +
+  return '<div class="ml-card pick" onclick="_plOpenIdx(' + i + ')" title="Mở thư mục"' + (_pl.q && i === _pl.hi ? ' style="border-color:#2b7a4b;box-shadow:0 0 0 2px #cfe9d8"' : '') + '>' + th +
     '<div class="ml-n">' + (f.combo ? '🎁 ' : '') + esc(f.name) + '</div>' +
     '<div class="ml-m">' + esc(f.group || '') + (f.variants > 1 && !f.combo ? ' · ' + f.variants + ' size/chất liệu' : '') + '</div>' +
     '<div class="ml-m" style="color:' + (n ? '#2b7a4b' : '#9ca3af') + ';font-weight:600">' + n + '/' + _pl.max + ' ảnh</div></div>';
@@ -173,13 +179,13 @@ function _plRender(){
   var focus = document.activeElement && document.activeElement.id === 'pl-q';
   w.innerHTML = '<div style="padding:14px 18px"><div style="font-size:18px;font-weight:700;margin-bottom:4px">🛍️ Thư viện sản phẩm</div>' +
     '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Mỗi sản phẩm trong bảng giá và mỗi combo có 1 thư mục ảnh (tối đa ' + _pl.max + ' ảnh). Gõ tên sản phẩm hoặc combo (không cần dấu) rồi bấm để mở thư mục.</div>' +
-    '<div class="ml-bar"><input id="pl-q" class="ml-q" type="search" style="max-width:420px" placeholder="🔍 Tìm sản phẩm / combo…" value="' + esc(_pl.q) + '" oninput="_plSetQ(this.value)">' +
+    '<div class="ml-bar"><input id="pl-q" class="ml-q" type="search" style="max-width:420px" placeholder="🔍 Tìm sản phẩm / combo…" value="' + esc(_pl.q) + '" oninput="_plSetQ(this.value)" onkeydown="_plKeydown(event)">' +
     '<button class="btn sm" onclick="_plEnsureData(true)">↻ Làm mới</button></div>' +
     (_pl.loading ? '<div class="ml-empty">Đang tải…</div>' : '') +
     (_pl.err ? '<div class="ml-empty" style="color:#b91c1c">' + esc(_pl.err) + '</div>' : '') +
     (!_pl.loading ? '<div class="ml-m" style="margin-bottom:8px">' + list.length + ' thư mục' + (list.length > shown.length ? ' · hiện ' + shown.length + ' đầu, gõ thêm để lọc' : '') + '</div>' : '') +
     '<div class="ml-grid">' + shown.map(_plFolderCard).join('') + '</div>' +
     (!_pl.loading && !shown.length && !_pl.err ? '<div class="ml-empty">Không có sản phẩm / combo khớp.</div>' : '') + '</div>';
-  if (focus){ var i = document.getElementById('pl-q'); if (i){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+  if (focus || !_pl._focused){ var i = document.getElementById('pl-q'); if (i){ _pl._focused = true; i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 }
-registerExtraTab('plib', '🛍️ Thư viện sản phẩm', function(){ if (_pl.cur) _plRender(); else _plEnsureData(); });
+registerExtraTab('plib', '🛍️ Thư viện sản phẩm', function(){ _pl._focused = false; if (_pl.cur) _plRender(); else _plEnsureData(); });
