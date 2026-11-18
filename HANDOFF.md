@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON PNG THANH CÔNG CỤ CHROME SANG BÉ SAMOYED) — ĐANG LÀM TỪNG FILE (xem dấu ✅); reload extension; KHÔNG đổi GAS
+- NGUYÊN NHÂN LÀM: bước icon trước (header/popup) chỉ đổi SVG trong code; `extension-pancake/icons/icon16|48|128.png` (thanh công cụ Chrome + trang chrome://extensions, khai báo trong manifest.json) vẫn là hình cũ. PNG dựng từ chính `pkCatSvg_(512,false)` bằng sharp (nền trong suốt), resize 16/48/128.
+- [x] icon16.png  [ ] icon48.png  [ ] icon128.png
+- [ ] **VIỆC KẾ TIẾP:** xong 3 file thì chỉ còn (tuỳ Duyên) làm song song Zalo AI (icon + nút Hỏi AI lên hàng CS; Zalo hiện chưa đổi). 🧪 Duyên: reload Pancake AI ở chrome://extensions → icon thanh công cụ là bé Samoyed.
+
 ## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON = BÉ SAMOYED NHƯ CRM + ĐƯA NÚT "HỎI AI" RA Ô CS) — XONG CẢ 3 BƯỚC (icon header/nút thu nhỏ + popup + nút Hỏi AI lên hàng CS); reload extension Pancake AI; KHÔNG đổi GAS
 - NGUYÊN NHÂN LÀM: Duyên: "đổi icon Pancake AI giống icon AI trên CRM". CRM đã đổi icon AI sang mặt Samoyed (js/38 `proCatIconSvg_`, 16/11) nhưng Pancake vẫn là mèo máy có ăng-ten (`pkCatSvg_`).
 - ✅ BƯỚC 1 (`extension-pancake/pancake-content.js`): `pkCatSvg_` = bản sao nguyên văn `proCatIconSvg_` của CRM (đổi class `pro-cat`→`pk-cat`, `pro-cat-ant`→`pk-cat-ant`). Tên hàm/class giữ nguyên nên header + nút thu nhỏ tự đổi. `tools/test-pancake-cat-icon.js` thêm 1 kiểm (Samoyed, không còn ăng-ten) → 8/8.
