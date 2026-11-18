@@ -135,11 +135,36 @@
   let CUSTOM_FIELDS = [];
 
   // ── BUILD PANEL ──
+  // Icon AI = MẶT BÉ CHÓ SAMOYED — copy từ CRM (js/38-pro-dock.js proCatIconSvg_) qua Pancake AI (pkCatSvg_), theo yêu cầu Duyên 18/11/2026
+  // ("đổi icon AI giống CRM"). Trước đó Zalo AI dùng emoji 🤖. Vẽ SVG thuần, không cần file ảnh; blink=false → không chớp mắt.
+  function zaiCatSvg_(px, blink){
+    var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffd6cf', CX = 32, CY = 35;
+    var puffs = [[CX,CY,20.5]];
+    for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
+    function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+    function eye(cx, tilt){
+      var b = blink ? '<animate attributeName="ry" values="3.6;3.6;0.5;3.6;3.6" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+      return '<ellipse cx="'+cx+'" cy="32.5" rx="3.1" ry="3.6" fill="#2b2420" transform="rotate('+tilt+' '+cx+' 32.5)">'+b+'</ellipse>'
+        + '<circle cx="'+(cx+1.1)+'" cy="31.2" r="1.2" fill="#fff"/>';
+    }
+    function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.2" stroke-linejoin="round"/>'; }
+    var ears = ear('12,27 16,13.5 27,18', '16,22 17,17 21.6,19') + ear('52,27 48,13.5 37,18', '48,22 47,17 42.4,19');
+    var muzzle = '<ellipse cx="32" cy="42" rx="9.5" ry="7" fill="#f6efe6"/>';
+    var nose = '<path d="M29.2 38.6 Q32 37.2 34.8 38.6 Q34 41.6 32 41.8 Q30 41.6 29.2 38.6Z" fill="#2b2420"/><circle cx="31" cy="38.9" r="0.7" fill="#fff" opacity=".7"/>';
+    var smile = '<path d="M32 41.8 L32 43.4 M32 43.4 Q29.6 46.6 26.2 43 M32 43.4 Q34.4 46.6 37.8 43" fill="none" stroke="#5a4a42" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    var tongue = '<path d="M29.8 45.4 Q32 52 34.2 45.4 Q32 46.6 29.8 45.4Z" fill="#ff8fa6" stroke="#e5637f" stroke-width=".8" stroke-linejoin="round"/><path d="M32 46.2 L32 49" stroke="#e5637f" stroke-width=".7" stroke-linecap="round"/>';
+    var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle class="zai-cat-ant" cx="32" cy="59.8" r="3" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="58.8" r="0.9" fill="#fff"/>';
+    return '<svg class="zai-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+      + ears + circles(OUT, 1.2) + circles(FUR, 0)
+      + '<ellipse cx="14.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/><ellipse cx="49.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/>'
+      + muzzle + eye(23, -8) + eye(41, 8) + nose + smile + tongue + collar + '</svg>';
+  }
+
   function buildPanel() {
     if (document.getElementById('ome-zai-panel')) return;
 
     const toggle = document.createElement('button');
-    toggle.id = 'ome-zai-toggle'; toggle.title = 'Duyên AI'; toggle.textContent = '🤖 AI';
+    toggle.id = 'ome-zai-toggle'; toggle.title = 'Duyên AI'; toggle.innerHTML = zaiCatSvg_(34, false);
     toggle.addEventListener('click', togglePanel);
     document.body.appendChild(toggle);
 
@@ -149,7 +174,7 @@
     // Header
     const hdr = document.createElement('div');
     hdr.className = 'zai-hdr';
-    hdr.innerHTML = `<div style="flex:1"><div class="zai-hdr-title">🤖 Duyên AI <span style="font-size:9px;font-weight:600;opacity:.85">Ver 14.06.12.7.26</span></div><div class="zai-hdr-sub">Tra cứu & gợi ý phản hồi khách</div></div>`;
+    hdr.innerHTML = `<div style="flex:1"><div class="zai-hdr-title" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:24px;height:24px;align-items:center">${zaiCatSvg_(24, false)}</span>Duyên AI <span style="font-size:9px;font-weight:600;opacity:.85">Ver 14.06.12.7.26</span></div><div class="zai-hdr-sub">Tra cứu & gợi ý phản hồi khách</div></div>`;
     const cfgBtn = document.createElement('button');
     cfgBtn.className = 'zai-cfg-btn'; cfgBtn.id = 'zai-cfg-toggle'; cfgBtn.title = 'Cài đặt'; cfgBtn.textContent = '⚙';
     hdr.appendChild(cfgBtn); panel.appendChild(hdr);
