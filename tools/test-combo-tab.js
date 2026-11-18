@@ -3,13 +3,16 @@
 // Chạy: node tools/test-combo-tab.js -> "ALL COMBO TAB TESTS PASSED".
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const wrap = { innerHTML: '' }; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
+const wrap = { innerHTML: '' }; const catCalls = [], posCalls = []; let catReply = null, posReply = null; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
 const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeout, clearTimeout, encodeURIComponent,
   gsUrl: 'https://x/exec', esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   document: { getElementById: id => id === 'xt-wrap-combo' ? wrap : null, activeElement: null },
   registerExtraTab: (id, label, fn) => { ctx._reg = { id, label, fn }; },
   _authAccount: { role: 'admin' }, confirm: () => confirmAns, toast: m => toasts.push(m),
-  fetch: (url, o) => { calls.push(url); bodies.push(o && o.body); return new Promise(res => resolvers.push(() => res({ json: async () => reply(url) }))); } };
+  fetch: (url, o) => {
+    if (/action=priceCatalogFlat/.test(url)){ catCalls.push(url); return Promise.resolve({ json: async () => catReply }); }
+    if (/action=posPrice/.test(url)){ posCalls.push(url); return Promise.resolve({ json: async () => posReply(JSON.parse(decodeURIComponent(url.split('action=posPrice&q=')[1]))) }); }
+    calls.push(url); bodies.push(o && o.body); return new Promise(res => resolvers.push(() => res({ json: async () => reply(url) }))); } };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', '93-combo-tab.js'), 'utf8'), ctx, { filename: '93-combo-tab.js' });
 const C1 = { code: 'CB1', name: 'Combo <Lắc> 4 lá', items: [{ name: 'Lắc cỏ 4 lá', chatLieu: 'Bạc 925', size: '16cm', qty: 1 }, { name: 'Nhẫn bạc trơn', chatLieu: '', size: 'Size 12', qty: 2 }],
@@ -17,6 +20,12 @@ const C1 = { code: 'CB1', name: 'Combo <Lắc> 4 lá', items: [{ name: 'Lắc c�
 const C2 = { code: 'CB2', name: 'Hết hạn', items: [{ name: 'Nhẫn', qty: 1 }], priceVnd: 0, priceText: '990', usable: false, statusLabel: '❌ Đã hết hạn' };
 // GAS thật trả thêm itemsText/active/start/keywords (mẫu cho ca sửa combo)
 Object.assign(C1, { itemsText: 'Lắc cỏ 4 lá | Bạc 925 | 16cm | 1\nNhẫn bạc trơn |  | Size 12 | 2', active: true, start: '', keywords: 'lắc, nhẫn' });
+const CAT = [ { n: 'Vòng', t: 'Vòng cuốn 3', m: '', s: '', c: 'Ngọc bích', p: 4550, sp: 0, r: 0 }, { n: 'Charm', t: 'Charm bi mẫu số 10', m: '', s: 'Size 3', c: 'Bạc', p: 380, sp: 0, r: 0 },
+  { n: 'Nhẫn', t: 'Trang sức nhẫn túi tiền', m: '', s: '', c: 'Ngọc bích', p: 6350, sp: 0, r: 0 }, { n: 'Nhẫn', t: 'Nhẫn bạc trơn', m: '', s: 'Size 12', c: 'Bạc 925', p: 450, sp: 500, r: 0 } ];
+catReply = { ok: true, count: CAT.length, items: JSON.parse(JSON.stringify(CAT)) };
+const POS = { 'vong cuon 3': { price: 4550000, code: 'VC3-NB', date: '2026-11-12' }, 'charm bi mau so 10': { price: 380000, code: 'CV10K-BV-SIZE 3', date: '2026-11-12' }, 'nhan bac tron': { price: 450000, code: 'NBT-12', date: '2026-11-15' } };
+const fold = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+posReply = qs => ({ ok: true, results: qs.map(q => POS[fold(q.t)] ? Object.assign({ found: true, name: q.t }, POS[fold(q.t)]) : { found: false }) });
 const run = s => vm.runInContext(s, ctx);
 ok(ctx._reg && ctx._reg.id === 'combo', 'đăng ký tab combo');
 ok(run('_cbVnd(1299000)') === '1.299.000đ' && run('_cbVnd(0)') === '', 'format giá');
@@ -80,7 +89,7 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   ok(wrap.innerHTML.includes('Thêm combo mới'), 'form thêm mới');
   await run('_cbSave()'); ok(wrap.innerHTML.includes('Nhập tên combo') && !bodies.length, 'thiếu tên → báo lỗi, không gọi mạng');
   run("_cbEF('name','X')"); await run('_cbSave()'); ok(wrap.innerHTML.includes('ít nhất 1 sản phẩm') && !bodies.length, 'thiếu sản phẩm');
-  run("_cbEF('itemsText','2 x Nhẫn')"); await run('_cbSave()'); ok(wrap.innerHTML.includes('Nhập giá combo') && !bodies.length, 'thiếu giá');
+  run("_cbEF('rawMode',true); _cbEF('itemsText','2 x Nhẫn')"); await run('_cbSave()'); ok(wrap.innerHTML.includes('Nhập giá combo') && !bodies.length, 'thiếu giá');
   run("_cbEF('price','99500')"); await run('_cbSave()'); ok(wrap.innerHTML.includes('tròn nghìn') && !bodies.length, 'giá lẻ <100k');
   run("_cbEF('price','250000'); _cbEF('start','2026-12-31'); _cbEF('end','2026-12-01')"); await run('_cbSave()'); ok(wrap.innerHTML.includes('Ngày kết thúc trước') && !bodies.length, 'ngày ngược');
   run("_cbEF('end','')");
@@ -133,5 +142,69 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   reply = () => ({ ok: false, error: 'Can dang nhap de upload anh' }); run('_cb.edit.images=[]');
   pk = run('_cbImgPick([{ name: "z.png", type: "image/png", size: 5 }])'); await new Promise(r => setTimeout(r, 30)); while (resolvers.length) resolvers.shift()(); await pk;
   ok(run('_cb.edit.images.length') === 0 && wrap.innerHTML.includes('Can dang nhap de upload anh'), 'server từ chối upload: hiện lỗi, không thêm ảnh');
+
+  // ═══ 2026-11-18: CHỌN SẢN PHẨM TỪ DANH SÁCH CÓ SẴN + GIÁ NIÊM YẾT POS / BẢNG GIÁ ═══
+  const els = {}, mk = id => (els[id] = els[id] || { innerHTML: '', value: '', focus() {} });
+  ctx.document.getElementById = id => id === 'xt-wrap-combo' ? wrap : ['cb-items', 'cb-pick-res', 'cb-pick-st', 'cb-pick-q', 'cb-price'].includes(id) ? mk(id) : id === 'cb-img-link' ? linkEl : null;
+  const tick = () => new Promise(r => setTimeout(r, 15));
+  // danh mục lỗi → báo + còn cách nhập chữ
+  run('_cbCat.loaded=false; _cbCat.items=[]'); catReply = { error: 'GAS chưa có priceCatalogFlat' }; run('_cbNew()'); await tick();
+  ok(mk('cb-pick-st').innerHTML.includes('GAS chưa có priceCatalogFlat') && mk('cb-pick-st').innerHTML.includes('Nhập dạng chữ') && wrap.innerHTML.includes('Nhập dạng chữ (nâng cao)'), 'danh mục lỗi: báo rõ + còn lối nhập chữ');
+  catReply = { ok: true, count: CAT.length, items: JSON.parse(JSON.stringify(CAT)) }; run('_cbCat.err=""'); run('_cbNew()'); await tick();
+  ok(run('_cbCat.loaded') === true && mk('cb-pick-st').innerHTML.includes('4 sản phẩm'), 'tải danh mục thành công');
+  // tìm không dấu / gõ dở
+  run("_cbPickSet('vong cuon')"); ok(mk('cb-pick-res').innerHTML.includes('Vòng cuốn 3') && mk('cb-pick-res').innerHTML.includes('4.550.000đ'), 'tìm không dấu ra Vòng cuốn 3 kèm giá bảng giá');
+  run("_cbPickSet('nhan tui')"); ok(mk('cb-pick-res').innerHTML.includes('nhẫn túi tiền'), 'gõ dở "nhan tui" vẫn ra nhẫn túi tiền');
+  run("_cbPickSet('zzz')"); ok(mk('cb-pick-res').innerHTML.includes('Không có sản phẩm khớp'), 'không khớp');
+  // chọn → dòng kiểu POS, giá POS gần nhất thay giá bảng giá
+  posCalls.length = 0; run("_cbPickSet('vong cuon'); _cbPickAdd(0)");
+  ok(run('_cb.edit.items.length') === 1 && run('_cb.edit.items[0].price') === 4550000 && run('_cb.edit.items[0].src') === 'bg', 'chọn SP: có ngay giá bảng giá');
+  ok(mk('cb-items').innerHTML.includes('đang tra giá POS'), 'đang tra POS: báo trạng thái');
+  await tick();
+  ok(posCalls.length === 1 && JSON.parse(decodeURIComponent(posCalls[0].split('action=posPrice&q=')[1]))[0].t === 'Vòng cuốn 3', 'gọi posPrice 1 lần với đúng tên SP');
+  ok(run('_cb.edit.items[0].src') === 'pos' && run('_cb.edit.items[0].posDate') === '2026-11-12' && run('_cb.edit.items[0].code') === 'VC3-NB', 'có giá POS → dùng giá POS + mã SP');
+  ok(mk('cb-items').innerHTML.includes('VC3-NB') && mk('cb-items').innerHTML.includes('VÒNG CUỐN 3') && mk('cb-items').innerHTML.includes('POS đơn 12/11'), 'dòng hiện mã, tên, nguồn giá POS đơn 12/11');
+  // thêm 2 SP nữa (charm bi SL 3; nhẫn túi tiền không có đơn POS → bảng giá); chọn trùng thì tăng SL, không thêm dòng
+  run("_cbPickSet('charm'); _cbPickAdd(0); _cbPickSet('tui tien'); _cbPickAdd(0); _cbPickSet('vong cuon'); _cbPickAdd(0)"); await tick();
+  ok(run('_cb.edit.items.length') === 3 && run('_cb.edit.items[0].qty') === 2, 'chọn trùng → SL+1, không thêm dòng');
+  run("_cbLineSet(0,'qty','1'); _cbLineSet(1,'qty','3')");
+  ok(run('_cb.edit.items[2].src') === 'bg' && run('_cb.edit.items[2].posState') === 'none' && mk('cb-items').innerHTML.includes('chưa có đơn POS khớp'), 'SP chưa từng bán trên POS → dùng bảng giá + ghi chú rõ');
+  // KHUYẾN MÃI như màn Pos (ví dụ Duyên gửi: 10% / 0đ / 50.000đ)
+  run("_cbLineDiscMode(0); _cbLineSet(0,'disc','10'); _cbLineSet(2,'disc','50.000')");
+  const T = JSON.parse(JSON.stringify(run('_cbTotals(_cb.edit.items)')));
+  ok(T.models === 3 && T.qty === 5, 'Số mẫu mã 3, Số lượng SP 5: ' + JSON.stringify(T));
+  ok(T.list === 12040000 && T.disc === 505000 && T.net === 11535000, 'tổng niêm yết/khuyến mãi/sau KM: ' + JSON.stringify(T));
+  ok(run('_cbNet(_cb.edit.items[0])') === 4095000 && run('_cbNet(_cb.edit.items[1])') === 1140000 && run('_cbNet(_cb.edit.items[2])') === 6300000, 'thành tiền từng dòng khớp ví dụ POS (4.095.000 / 1.140.000 / 6.300.000)');
+  ok(mk('cb-items').innerHTML.includes('Số mẫu mã: 3') && mk('cb-items').innerHTML.includes('Số lượng SP: 5') && mk('cb-items').innerHTML.includes('4.095.000đ'), 'hiển thị số mẫu mã / số lượng / thành tiền');
+  run("_cbLineSet(0,'disc','999')"); ok(run('_cb.edit.items[0].disc') === 100, '% giảm tối đa 100');
+  run("_cbLineSet(0,'disc','10')");
+  // đổi nguồn giá / nhập tay / quay lại POS
+  run("_cbLineSet(0,'price','4.000.000')"); ok(run('_cb.edit.items[0].price') === 4000000 && run('_cb.edit.items[0].src') === 'tay', 'sửa giá tay → nguồn "nhập tay"');
+  run("_cbLineSrc(0,'pos')"); ok(run('_cb.edit.items[0].price') === 4550000 && run('_cb.edit.items[0].src') === 'pos', 'chọn lại nguồn POS');
+  run("_cbLineSrc(2,'saphia')"); ok(run('_cb.edit.items[2].src') === 'bg', 'nguồn không có giá (SAPHIA=0) → không đổi');
+  run("_cbLineDel(1)"); ok(run('_cb.edit.items.length') === 2, 'xóa dòng');
+  // so với giá combo + nút dùng tổng
+  run("_cbEF('price','8000000')"); run('_cbItemsRefresh()'); ok(mk('cb-items').innerHTML.includes('rẻ hơn'), 'giá combo thấp hơn tổng → báo rẻ hơn');
+  run("_cbEF('price','12000000')"); run('_cbItemsRefresh()'); ok(mk('cb-items').innerHTML.includes('CAO hơn tổng'), 'giá combo cao hơn tổng → cảnh báo');
+  const net2 = run('_cbTotals(_cb.edit.items).net'); run('_cbUseTotal()');
+  ok(run('_cb.edit.price') === String(net2) && mk('cb-price').value === String(net2), 'nút Dùng tổng làm giá combo: điền ô giá');
+  // LƯU: vẫn đúng định dạng cũ "Tên | Chất liệu | Size | SL", không lưu giá/khuyến mãi
+  run("_cbEF('name','Combo vòng + nhẫn'); _cbEF('price','10000000')"); bodies.length = 0; reply = () => ({ ok: true, code: 'CBX', created: true });
+  let pn = run('_cbSave()'); await tick(); while (resolvers.length) resolvers.shift()(); await pn;
+  const bn = JSON.parse(bodies[0]);
+  ok(bn.action === 'comboSave' && bn.combo.itemsText === 'Vòng cuốn 3 | Ngọc bích |  | 1\nTrang sức nhẫn túi tiền | Ngọc bích |  | 1' && bn.combo.price === 10000000 && !('priceText' in bn.combo), 'comboSave: itemsText đúng định dạng cũ, không kèm giá dòng: ' + bodies[0]);
+  while (resolvers.length) resolvers.shift()();
+  // SỬA combo cũ: đọc lại chữ → dòng, ghép bảng giá + POS; SP không có trong bảng giá → nhập tay; ghi lại KHÔNG đổi chữ
+  reply = () => ({ ok: true, total: 1, rows: [C1] }); let pl = run('_cbLoad()'); resolvers.shift()(); await pl;
+  run('_cb.all=true'); posCalls.length = 0; run('_cbEditAt(0)'); await tick();
+  ok(run('_cb.edit.items.length') === 2 && run('_cb.edit.items[1].qty') === 2 && run('_cb.edit.items[1].chatLieu') === '' && run('_cb.edit.items[1].size') === 'Size 12', 'combo cũ: parse đúng tên/chất liệu/size/SL');
+  ok(run('_cb.edit.items[1].price') === 450000 && run('_cb.edit.items[1].src') === 'pos' && run('_cb.edit.items[1].bg.sp') === 500000, 'combo cũ: Nhẫn bạc trơn Size 12 ghép bảng giá (SAPHIA 500.000) + giá POS 450.000');
+  ok(run('_cb.edit.items[0].price') === 0 && run('_cb.edit.items[0].src') === '' && mk('cb-items').innerHTML.includes('chưa có giá — nhập tay'), 'SP cũ không có trong bảng giá/POS: báo nhập tay');
+  ok(run('_cbItemsText(_cb.edit)') === C1.itemsText, 'ghi lại combo cũ KHÔNG đổi chữ (round-trip)');
+  // chế độ chữ (dự phòng)
+  run('_cbRawToggle()'); ok(run('_cb.edit.rawMode') === true && wrap.innerHTML.includes('<textarea') && wrap.innerHTML.includes('Lắc cỏ 4 lá | Bạc 925 | 16cm | 1'), 'chuyển sang nhập chữ giữ nội dung');
+  run("_cbEF('itemsText','2 x Nhẫn bạc trơn | | Size 12')"); run('_cbRawToggle()'); await tick();
+  ok(run('_cb.edit.rawMode') === false && run('_cb.edit.items.length') === 1 && run('_cb.edit.items[0].qty') === 2, 'quay lại chọn: chữ → dòng');
+  ok(!run("_cbLineHtml(_cbMkItem({ name: '<b>x</b>', chatLieu: '<i>' }), 0)").includes('<b>x</b>'), 'escape HTML tên SP');
   console.log('ALL COMBO TAB TESTS PASSED');
 })().catch(e => { console.error(e); process.exit(1); });
