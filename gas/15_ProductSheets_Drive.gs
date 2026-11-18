@@ -1183,3 +1183,22 @@ function _driveImageBase64_(fileId) {
   } catch (e) { return null; }
 }
 
+// Tra byte 1 anh COMBO (base64) cho extension Pancake/Zalo dan vao o chat (giong vietTatImage_). CHI cho file Drive nam trong cot Anh cua combo
+// DANG AP DUNG (chong doc Drive tuy y qua ID). NGUYEN NHAN GOC them: anh combo chi o dang link thumbnail, extension khong co quyen tai drive.google.com.
+function comboImage_(id) {
+  id = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) return { ok: false, error: 'ID anh khong hop le' };
+  var rows;
+  try { rows = readComboCatalog_(); } catch (e) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + String(e && e.message || e) }; }
+  var allowed = false;
+  for (var i = 0; i < rows.length && !allowed; i++) {
+    if (!rows[i].usable) continue;
+    var ids = _comboImageIds_(rows[i].imagesText || '');
+    for (var j = 0; j < ids.length; j++) if (ids[j] === id) { allowed = true; break; }
+  }
+  if (!allowed) return { ok: false, error: 'Anh nay khong thuoc combo nao dang ap dung', code: 'FORBIDDEN' };
+  var img = _driveImageBase64_(id);
+  if (!img) return { ok: false, error: 'Khong doc duoc anh (qua 3MB hoac chua chia se cho tai khoan chay GAS)' };
+  return { ok: true, id: id, base64: img.base64, mimeType: img.mimeType };
+}
+

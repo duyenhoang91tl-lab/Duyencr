@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — COMBO: GỬI ẢNH COMBO VÀO Ô CHAT TRONG EXTENSION, GIỐNG VIẾT TẮT) — ĐANG LÀM TỪNG BƯỚC; BƯỚC 1/3 XONG (GAS, workflow tự deploy)
+- ĐỀ BÀI Duyên: "cho combo cũng add được ảnh lên như với viettat". CRM web đã thêm/hiện ảnh combo (combo bước 1-3); còn thiếu: extension (Pancake, rồi Zalo) hiện ảnh combo và DÁN vào ô chat như viết tắt (`GET_VIETTAT_IMAGE` → base64 → File → paste).
+- NGUYÊN NHÂN GỐC cần action mới: ảnh combo chỉ lưu dạng link thumbnail Drive; extension không có quyền tải drive.google.com, và `vietTatImage` chỉ cho ảnh thuộc mục viết tắt → phải có đường lấy byte riêng cho ảnh combo.
+- ✅ BƯỚC 1/3 GAS (`gas_v13.js` → gas/02_PriceCatalog_CTKM.gs, split-gas OK): action GET `comboImage&id=<driveId>` = `comboImage_(id)`: CHỈ trả base64 cho file Drive nằm trong cột Ảnh của combo ĐANG ÁP DỤNG (combo hết hạn/ID lạ → FORBIDDEN, không chạm Drive); ≤3MB (`_driveImageBase64_`). `tools/test-combo-image.js` MỚI 6 kiểm. Chỉ hỗ trợ ảnh Drive (admin tải từ máy → đã là Drive); link ảnh http ngoài Drive vẫn hiện ở thẻ combo nhưng không dán được.
+- [ ] BƯỚC 2/3 Pancake: background `GET_COMBO_IMAGE` + content hiện ảnh trong khối "🎁 Combo có sẵn" của Soạn đơn + nút "📷 Gửi ảnh vào chat" (dán vào ô chat bằng paste, dự phòng copy). [ ] BƯỚC 3/3 Zalo AI song song (`08-extension-parity.md`).
+
 ## 2026-11-18 (phiên Claude — PANCAKE AI: "HỎI AI" LÊN ĐẦU PANEL + TRẢ LỜI NỀN TRẮNG + GỘP SIZE 1 DÒNG) — CẢ 2 BƯỚC XONG; reload extension Pancake AI (GAS tự deploy qua workflow)
 - ĐỀ BÀI Duyên: đưa phần Hỏi AI (icon AI) lên ĐẦU Pancake AI cho dễ nhìn; câu trả lời hiện nền trắng ngay bên dưới; giá liên tiếp "size 1 bao nhiêu, size 2 bao nhiêu", KHÔNG lặp cả nội dung sản phẩm cho mỗi size.
 - NGUYÊN NHÂN GỐC: (a) nút Hỏi AI trước nằm ở hàng "CS đang dùng", ô gõ câu hỏi + khung trả lời nằm trong mục "Tra cứu bảng giá" (ẩn mặc định) nên phải mở mục mới thấy; (b) danh sách giá gốc backend (`_priceVariantsForPrompt_`) ra MỖI size 1 dòng "- Chất liệu | Kiểu/Size | Giá" → cùng 1 SP khác size bị lặp cả dòng.

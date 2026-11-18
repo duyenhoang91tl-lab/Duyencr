@@ -2930,6 +2930,7 @@ function doGetCore_(e) {
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
+    if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
@@ -12063,6 +12064,25 @@ function _driveImageBase64_(fileId) {
     if (bytes.length > _DRIVE_IMG_MAX_BYTES_) return null;
     return { base64: Utilities.base64Encode(bytes), mimeType: blob.getContentType() };
   } catch (e) { return null; }
+}
+
+// Tra byte 1 anh COMBO (base64) cho extension Pancake/Zalo dan vao o chat (giong vietTatImage_). CHI cho file Drive nam trong cot Anh cua combo
+// DANG AP DUNG (chong doc Drive tuy y qua ID). NGUYEN NHAN GOC them: anh combo chi o dang link thumbnail, extension khong co quyen tai drive.google.com.
+function comboImage_(id) {
+  id = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) return { ok: false, error: 'ID anh khong hop le' };
+  var rows;
+  try { rows = readComboCatalog_(); } catch (e) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + String(e && e.message || e) }; }
+  var allowed = false;
+  for (var i = 0; i < rows.length && !allowed; i++) {
+    if (!rows[i].usable) continue;
+    var ids = _comboImageIds_(rows[i].imagesText || '');
+    for (var j = 0; j < ids.length; j++) if (ids[j] === id) { allowed = true; break; }
+  }
+  if (!allowed) return { ok: false, error: 'Anh nay khong thuoc combo nao dang ap dung', code: 'FORBIDDEN' };
+  var img = _driveImageBase64_(id);
+  if (!img) return { ok: false, error: 'Khong doc duoc anh (qua 3MB hoac chua chia se cho tai khoan chay GAS)' };
+  return { ok: true, id: id, base64: img.base64, mimeType: img.mimeType };
 }
 
 // ─── TU CAM (Sheet "Lưu ý từ cấm", file rieng "Report Sale" — theo yeu cau Duyen 27/09/2026):

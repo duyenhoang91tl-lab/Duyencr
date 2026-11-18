@@ -191,6 +191,7 @@ function doGetCore_(e) {
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
+    if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
