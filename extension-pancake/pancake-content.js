@@ -3777,7 +3777,9 @@
       const items = (c.items || []).map((it) => (Number(it.qty) > 1 ? it.qty + ' x ' : '') + it.name + [it.chatLieu, it.size].filter(Boolean).map((v) => ' · ' + v).join('')).join('; ');
       html += `<div class="pk-builder-ctkm-row"><b>${escapeHtml(c.name)}</b> — ${escapeHtml(_fmtVnd_(_comboVndOf_(c)))}${c.statusLabel ? ' · ' + escapeHtml(c.statusLabel) : ''}<br>${escapeHtml(items)}${c.note ? '<br><i>' + escapeHtml(c.note) + '</i>' : ''}<br>` +
         `<input type="number" min="1" value="1" class="pkb-combo-qty" data-code="${escapeHtml(c.code)}" style="width:52px" title="Số bộ combo" /> ` +
-        `<button class="pk-price-addbtn pkb-combo-add" data-code="${escapeHtml(c.code)}">+ Thêm combo</button></div>`;
+        `<button class="pk-price-addbtn pkb-combo-add" data-code="${escapeHtml(c.code)}">+ Thêm combo</button>` +
+        (_comboImgIds_(c).length ? ` <button class="pk-price-addbtn pkb-combo-send" data-code="${escapeHtml(c.code)}" title="Dán ảnh combo vào ô chat (giống viết tắt kèm ảnh) — CS kiểm tra rồi tự bấm Gửi">📷 Gửi ${_comboImgIds_(c).length} ảnh</button>` +
+          `<div class="pkb-combo-imgs">${_comboImgIds_(c).map((id) => `<span class="pkb-combo-img" data-id="${escapeHtml(id)}" title="Bấm để copy ảnh">⏳</span>`).join('')}</div>` : '') + '</div>';
     });
     if (hits.length > MAX) html += `<div class="pk-builder-ctkm-row">…còn ${hits.length - MAX} combo nữa — gõ thêm ở ô tìm để lọc.</div>`;
     html += '</div>';
@@ -3789,6 +3791,71 @@
       const qEl = Array.from(host.querySelectorAll('.pkb-combo-qty')).find((el) => el.getAttribute('data-code') === code);
       addComboToCart_(combo, Math.max(1, Math.floor(Number(qEl && qEl.value) || 1)));
     }));
+    host.querySelectorAll('.pkb-combo-send').forEach((btn) => btn.addEventListener('click', () => {
+      const combo = _comboRows.find((x) => String(x.code) === btn.getAttribute('data-code'));
+      if (combo) sendComboImages_(combo);
+    }));
+    host.querySelectorAll('.pkb-combo-img').forEach((sp) => {
+      const id = sp.getAttribute('data-id');
+      _getComboImageFile_(id).then((f) => {
+        if (!sp.isConnected) return;
+        const im = document.createElement('img'); im.src = URL.createObjectURL(f); im.alt = ''; im.draggable = false;
+        sp.textContent = ''; sp.appendChild(im);
+        sp.addEventListener('click', () => _copyComboImage_(f));
+      }, () => { if (sp.isConnected) sp.textContent = '⚠'; });
+    });
+  }
+  // ── ẢNH COMBO (giống viết tắt kèm ảnh): lấy byte qua background (GAS comboImage — chỉ ảnh thuộc combo đang áp dụng) → File → dán vào ô chat ──
+  // NGUYÊN NHÂN GỐC: ảnh combo chỉ là link Drive, trang Pancake không tải/dán được trực tiếp; viết tắt đã có cơ chế paste nên dùng lại cách đó.
+  const _comboImgCache_ = new Map();
+  function _comboImgIds_(c) {
+    const out = [];
+    (Array.isArray(c && c.images) ? c.images : []).forEach((u) => { const m = /[?&]id=([A-Za-z0-9_-]{15,})/.exec(String(u || '')); if (m && out.indexOf(m[1]) < 0) out.push(m[1]); });
+    return out.slice(0, 4);
+  }
+  function _getComboImageFile_(id) {
+    if (_comboImgCache_.has(id)) return Promise.resolve(_comboImgCache_.get(id));
+    return new Promise((resolve, reject) => {
+      safeSendMessage_({ type: 'GET_COMBO_IMAGE', id }, (resp) => {
+        if (!resp?.ok || !resp.data?.base64) { reject(new Error(resp?.error || PK_API_ERR)); return; }
+        try {
+          const bin = atob(resp.data.base64), u = new Uint8Array(bin.length);
+          for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+          const mime = resp.data.mimeType || 'image/jpeg', ext = ({ 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' })[mime] || 'jpg';
+          const f = new File([u], 'combo-' + id.slice(0, 6) + '.' + ext, { type: mime });
+          if (_comboImgCache_.size >= 30) _comboImgCache_.delete(_comboImgCache_.keys().next().value);
+          _comboImgCache_.set(id, f); resolve(f);
+        } catch (e) { reject(e); }
+      });
+    });
+  }
+  async function sendComboImages_(combo) {
+    const ids = _comboImgIds_(combo);
+    if (!ids.length) { setStatus('⚠ Combo chưa có ảnh Drive để gửi.'); return; }
+    const box = _slashGetChatBox_();
+    if (!box) { setStatus('⚠ Chưa thấy ô chat — mở cuộc chat (bấm vào ô soạn tin) rồi thử lại.'); return; }
+    setStatus('Đang lấy ' + ids.length + ' ảnh combo…');
+    const got = await Promise.all(ids.map((id) => _getComboImageFile_(id).then((f) => ({ f }), (e) => ({ err: String((e && e.message) || e) }))));
+    const files = got.filter((x) => x.f).map((x) => x.f), errs = got.filter((x) => x.err).map((x) => x.err);
+    if (!files.length) { setStatus('⚠ Không lấy được ảnh combo — ' + errs[0]); return; }
+    let done = false;
+    try {
+      const dt = new DataTransfer(); files.forEach((f) => dt.items.add(f));
+      box.focus();
+      box.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+      done = true;
+    } catch (e) {}
+    setStatus((done ? '✅ Đã dán ' + files.length + ' ảnh combo vào ô chat' : 'Không dán tự động được') + (errs.length ? ' · lỗi ' + errs.length + ' ảnh' : '') + ' — nếu ảnh chưa hiện: bấm vào ảnh nhỏ để copy rồi Ctrl+V. Kiểm tra rồi bấm Gửi.');
+  }
+  function _copyComboImage_(file) {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
+        c.toBlob((b) => { navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(() => setStatus('✅ Đã copy ảnh — Ctrl+V vào ô chat'), () => setStatus('⚠ Không copy được ảnh')); URL.revokeObjectURL(url); }, 'image/png');
+      } catch (e) { setStatus('⚠ Không copy được ảnh'); }
+    };
+    img.onerror = () => setStatus('⚠ Không đọc được ảnh'); img.src = url;
   }
   // Thêm cả combo vào giỏ: 1 dòng TIÊU ĐỀ mang GIÁ COMBO (× số bộ) + mỗi món 1 dòng giá 0đ (SL = SL món × số bộ),
   // nên tổng đơn = đúng giá combo, vẫn đủ món để CS chọn chất liệu/size/màu từng món như bình thường.

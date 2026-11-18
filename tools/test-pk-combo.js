@@ -13,6 +13,8 @@ const bg = fs.readFileSync(__dirname + '/../extension-pancake/pancake-background
 // ---- kiem nguon ----
 ok(/msg\?\.type === "GET_COMBOS"/.test(bg) && /action=comboList/.test(bg), 'background: co GET_COMBOS goi GAS action=comboList');
 ok(/GAS_NO_COMBO/.test(bg), 'background: GAS cu (khong co rows) bao GAS_NO_COMBO');
+ok(/msg\?\.type === "GET_COMBO_IMAGE"/.test(bg) && /action=comboImage&id=/.test(bg) && /\^\[A-Za-z0-9_-\]\{15,\}\$/.test(bg.slice(bg.indexOf('async function handleGetComboImage'))), 'background: GET_COMBO_IMAGE goi GAS comboImage, kiem dinh dang ID');
+ok(/new ClipboardEvent\('paste'/.test(src) && /async function sendComboImages_/.test(src) && /_slashGetChatBox_\(\)/.test(src.slice(src.indexOf('async function sendComboImages_'), src.indexOf('async function sendComboImages_') + 600)), 'content: sendComboImages_ dan anh vao o chat bang paste');
 ok(/<div id="pkb-combo"><\/div>\s*<div id="pkb-dyn">/.test(src), 'HTML: #pkb-combo nam ngoai #pkb-dyn (renderBuilderDyn_ khong xoa)');
 ok(/if \(_comboRows === null && !_comboLoading\) loadCombos_\(\);/.test(src), 'initBuilder_ tai combo 1 lan');
 ok(/filter\(\(r\) => r && r\.usable\)/.test(src), 'chi giu combo DANG AP DUNG (usable)');
@@ -25,12 +27,12 @@ const { document } = dom.window;
 const panelEl = document.getElementById('pk-ai-panel');
 const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const _stripVNlocal_ = s => String(s).replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const cart = []; let status = '';
+const cart = []; let status = ''; const sent = [];
 const addToCart_ = (it) => cart.push(it);
 const setStatus = (t) => { status = t; };
-const body = [cst('_fold_'), cst('_comboVndOf_'), cst('_fmtVnd_'), fn('_comboMatches_'), fn('renderBuilderCombos_'), fn('addComboToCart_'),
+const body = [cst('_fold_'), cst('_comboVndOf_'), cst('_fmtVnd_'), fn('_comboMatches_'), fn('_comboImgIds_'), fn('renderBuilderCombos_'), fn('addComboToCart_'),
   'return { setRows: (r) => { _comboRows = r; }, setQ: (q) => { _bld.q = q; }, render: renderBuilderCombos_, match: _comboMatches_, add: addComboToCart_, fmt: _fmtVnd_ };'].join('\n');
-const api = new Function('panelEl', 'escapeHtml', '_stripVNlocal_', 'addToCart_', 'setStatus', 'let _comboRows = null; let _bld = { q: "" };\n' + body)(panelEl, escapeHtml, _stripVNlocal_, addToCart_, setStatus);
+const api = new Function('panelEl', 'escapeHtml', '_stripVNlocal_', 'addToCart_', 'setStatus', '_getComboImageFile_', 'sendComboImages_', '_copyComboImage_', 'let _comboRows = null; let _bld = { q: "" };\n' + body)(panelEl, escapeHtml, _stripVNlocal_, addToCart_, setStatus, () => Promise.reject(new Error('stub')), (c) => { sent.push(c.code); }, () => {});
 
 const combos = [
   { code: 'CB1', name: 'Combo Tỳ hưu đôi', priceVnd: 850000, usable: true, statusLabel: '✅ Đang áp dụng', keywords: 'ty huu cap', itemsText: '2 x Tỳ hưu', note: 'Tặng dây',
@@ -78,4 +80,20 @@ ok(/Đã thêm combo/.test(status), 'bao da them');
 cart.length = 0; api.add(combos[2], 1);
 ok(cart.length === 0 && /thiếu món hoặc giá/.test(status), 'combo thieu mon/gia → bao loi, khong them');
 
+// ── ẢNH COMBO: nút "📷 Gửi N ảnh" + dải ảnh nhỏ chỉ khi combo có ảnh Drive; bấm nút → sendComboImages_(combo) ──
+{
+  const ID1 = '1AbCdEfGhIjKlMnOpQrSt', ID2 = '1ZyXwVuTsRqPoNmLkJiHg';
+  const withImg = { code: 'CBI', name: 'Combo ảnh', priceVnd: 500000, usable: true, statusLabel: '', keywords: '', itemsText: '', note: '', items: [{ name: 'Nhẫn', qty: 1 }],
+    images: ['https://drive.google.com/thumbnail?id=' + ID1 + '&sz=w600', 'https://drive.google.com/thumbnail?id=' + ID2 + '&sz=w600', 'https://example.com/x.jpg'] };
+  api.setRows([withImg, combos[1]]); api.setQ(''); api.render();
+  const host2 = panelEl.querySelector('#pkb-combo');
+  const sendBtns = host2.querySelectorAll('.pkb-combo-send');
+  if (sendBtns.length !== 1 || !/Gửi 2 ảnh/.test(sendBtns[0].textContent)) { console.error('FAIL: nut gui anh chi cho combo co anh Drive (2 anh, bo link ngoai Drive): ' + sendBtns.length); process.exit(1); }
+  console.log('ok   combo co anh -> nut "Gui 2 anh" (link ngoai Drive bi bo), combo khong anh -> khong co nut');
+  if (host2.querySelectorAll('.pkb-combo-img').length !== 2 || host2.querySelectorAll('.pkb-combo-img')[0].getAttribute('data-id') !== ID1) { console.error('FAIL: dai anh nho'); process.exit(1); }
+  console.log('ok   dai anh nho dung 2 o, dung id');
+  sendBtns[0].click();
+  if (sent.join() !== 'CBI') { console.error('FAIL: bam nut phai goi sendComboImages_(combo CBI): ' + sent.join()); process.exit(1); }
+  console.log('ok   bam nut -> goi sendComboImages_ dung combo');
+}
 console.log(bad ? ('\n' + bad + ' LOI') : '\nTAT CA DAT'); process.exit(bad ? 1 : 0);
