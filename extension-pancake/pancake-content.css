@@ -1548,7 +1548,7 @@
 #pk-ai-body > * { margin-bottom: 0 !important; }
 
 /* Thẻ trắng cho từng nhóm chức năng */
-#pk-ai-cs-row, #pk-ai-phone-row, #pk-menu-wrap, #pk-ai-customer:not(:empty) {
+#pk-ask-top, #pk-ai-cs-row, #pk-ai-phone-row, #pk-menu-wrap, #pk-ai-customer:not(:empty) {
   background: #fff; border: 1px solid var(--pk-border); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04);
 }
 #pk-ai-cs-row label { font-weight: 700; color: var(--pk-accent); text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
@@ -1608,9 +1608,16 @@
 #pk-ai-body::-webkit-scrollbar { width: 8px; }
 #pk-ai-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 
-/* Nút "🤖 Hỏi AI" nằm ở hàng "CS đang dùng" (Duyên yêu cầu 18/11/2026: đưa ra ô khoanh trong ảnh) — trước đây nằm trong #pk-price-row nên style cũ không còn áp dụng */
-#pk-ai-cs-row #pk-price-ai-btn {
-  flex: none; padding: 4px 9px; border: 1px solid var(--pk-accent, #7c3aed); background: #fff; color: var(--pk-accent, #7c3aed);
-  border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+/* Ô "Hỏi AI" nằm ĐẦU panel (Duyên yêu cầu 18/11/2026: dễ nhìn); câu trả lời hiện ngay bên dưới, nền trắng */
+#pk-ask-top { padding: 8px 10px; }
+#pk-ask-row { display: flex; align-items: center; gap: 6px; }
+#pk-ask-ico { display: inline-flex; width: 22px; height: 22px; flex: none; align-items: center; }
+#pk-ask-q { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12.5px; }
+#pk-ask-top #pk-price-ai-btn {
+  flex: none; padding: 5px 12px; border: none; background: var(--pk-accent, #7c3aed); color: #fff;
+  border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
-#pk-ai-cs-row #pk-price-ai-btn:hover { background: #f5f3ff; }
+#pk-ask-top #pk-price-ai-btn:hover { filter: brightness(1.08); }
+#pk-ask-top #pk-price-ai {
+  background: #fff; border: 1px solid var(--pk-border, #e5e7eb); border-radius: 8px; margin: 8px 0 0; max-height: 240px; overflow-y: auto;
+}

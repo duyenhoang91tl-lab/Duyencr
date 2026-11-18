@@ -425,6 +425,14 @@
       </div>
       <div id="pk-ai-body">
         <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
+        <div id="pk-ask-top">
+          <div id="pk-ask-row">
+            <span id="pk-ask-ico">${pkCat_(22)}</span>
+            <input type="text" id="pk-ask-q" autocomplete="off" spellcheck="false" placeholder="Hỏi AI về giá (vd: nhẫn bạc trơn size 12)…" />
+            <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — gõ câu hỏi rồi bấm (hoặc Enter); trả lời văn ngắn, giá lấy từ bảng giá">Hỏi AI</button>
+          </div>
+          <div id="pk-price-ai" style="display:none"></div>
+        </div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
           <div id="pk-cs-combo">
@@ -432,7 +440,6 @@
             <div id="pk-cs-list"></div>
           </div>
           <select id="pk-cs-sel" style="display:none"></select>
-          <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — gõ câu hỏi (vd: giá nhẫn bạc trơn size 12) rồi bấm; trả lời văn ngắn, giá lấy từ bảng giá">🤖 Hỏi AI</button>
         </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
@@ -469,7 +476,6 @@
                   <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
                   <button id="pk-price-btn">Tìm</button>
                 </div>
-                <div id="pk-price-ai" style="display:none"></div>
                 <div id="pk-price-result"></div>
               </div>
               <div id="pk-price-builder-mode" style="display:none">
@@ -832,6 +838,9 @@
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
+    panelEl.querySelector("#pk-ask-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") askPriceAi_();
+    });
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
@@ -2914,17 +2923,36 @@
 
   // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
   let _priceAiSeq = 0;
+  // Gộp các dòng "- Chất liệu: X | Kiểu/Size: S | Giá: P" (danh sách giá gốc của backend) thành 1 dòng / chất liệu:
+  // "X → size 1: P1 · size 2: P2". NGUYÊN NHÂN: cùng 1 sản phẩm khác size bị lặp lại cả dòng nhiều lần, CS phải đọc 1 loạt dài.
+  // Văn tự do của AI (không có dòng đúng dạng này) giữ nguyên.
+  function compactPriceText_(text) {
+    const lines = String(text || '').split('\n');
+    const re = /^\s*-\s*Chất liệu:\s*(.*?)\s*\|\s*Kiểu\/Size:\s*(.*?)\s*\|\s*(.+?)\s*$/;
+    const out = []; let grp = null;
+    const flush = () => { if (grp) { out.push(...grp.order.map((m) => '• ' + m + ' → ' + grp.map[m].join(' · '))); grp = null; } };
+    for (const ln of lines) {
+      const m = re.exec(ln);
+      if (!m) { flush(); out.push(ln); continue; }
+      if (!grp) grp = { order: [], map: {} };
+      const mat = m[1] || '(không ghi)', size = m[2];
+      const parts = m[3].split(' · ');
+      const price = parts.length === 1 ? parts[0].replace(/^[^:]*:\s*/, '') : m[3];
+      const sz = /^\(mặc định\)$/i.test(size) ? '' : (/^\d+([.,]\d+)?$/.test(size) ? 'size ' + size : size);
+      if (!grp.map[mat]) { grp.map[mat] = []; grp.order.push(mat); }
+      grp.map[mat].push(sz ? sz + ': ' + price : price);
+    }
+    flush();
+    return out.join('\n');
+  }
+
   function askPriceAi_() {
-    // Nút nằm ở hàng "CS đang dùng" (luôn hiện) → bấm khi đang ở mục khác thì tự mở "Tra cứu bảng giá" + chế độ "Gõ tìm" + đưa con trỏ vào ô hỏi,
-    // vì khung trả lời #pk-price-ai nằm TRONG mục đó (đang ẩn thì CS bấm mà không thấy gì).
-    const _ms = panelEl.querySelector('#pk-menu-sel');
-    if (_ms && _ms.value !== 'price') { _ms.value = 'price'; _ms.dispatchEvent(new Event('change', { bubbles: true })); }
-    const _sm = panelEl.querySelector('#pk-price-search-mode');
-    if (_sm && _sm.style.display === 'none') { const _tb = panelEl.querySelector('.pk-price-mode-btn[data-mode="search"]'); if (_tb) _tb.click(); }
-    const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
+    // Ô hỏi + khung trả lời nằm ĐẦU panel (luôn hiện) → không còn phải mở mục "Tra cứu bảng giá". Ô cũ #pk-price-q chỉ là dự phòng.
+    const qi = panelEl.querySelector('#pk-ask-q') || panelEl.querySelector('#pk-price-q');
+    const q = (qi.value || '').trim();
     const box = panelEl.querySelector('#pk-price-ai');
     box.style.display = '';
-    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { panelEl.querySelector('#pk-price-q').focus(); } catch (e) {} return; }
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { qi.focus(); } catch (e) {} return; }
     const seq = ++_priceAiSeq;
     box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
     safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
@@ -2936,15 +2964,16 @@
         box.innerHTML = '<div class="pk-price-ai-txt">Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).</div>' +
           (sg.length ? '<div class="pk-price-ai-sg">Có thể bạn muốn hỏi: ' + sg.map((x) => `<button type="button" class="pk-price-ai-chip" data-s="${escapeHtml(x)}">${escapeHtml(x)}</button>`).join(' ') + '</div>' : '');
         box.querySelectorAll('.pk-price-ai-chip').forEach((b) => b.addEventListener('click', () => {
-          panelEl.querySelector('#pk-price-q').value = b.getAttribute('data-s') || ''; askPriceAi_();
+          qi.value = b.getAttribute('data-s') || ''; askPriceAi_();
         }));
         return;
       }
-      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
+      const shown = compactPriceText_(d.text);
+      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(shown)}</div>` +
         `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
       const cp = box.querySelector('.pk-price-ai-copy');
       cp.addEventListener('click', () => {
-        try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
+        try { navigator.clipboard.writeText(shown).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
       });
     });
   }

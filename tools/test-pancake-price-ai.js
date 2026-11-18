@@ -50,6 +50,6 @@ function load(settings) {
   const ct = fs.readFileSync(path.join(root, 'pancake-content.js'), 'utf8'), css = fs.readFileSync(path.join(root, 'pancake-content.css'), 'utf8');
   ok(/id="pk-price-ai-btn"/.test(ct) && /id="pk-price-ai" style="display:none"/.test(ct) && /#pk-price-ai-btn"\)\.addEventListener\("click", askPriceAi_\)/.test(ct) && /type: 'ASK_PRICE'/.test(ct), 'content.js: nut + khung ket qua + listener + gui ASK_PRICE');
   ok(/#pk-price-ai \{/.test(css) && /\.pk-price-ai-txt/.test(css) && /pre-wrap/.test(css), 'css cho khung tra loi');
-  ok(/escapeHtml\(d\.text\)/.test(ct) && !/innerHTML = d\.text|innerHTML = `\$\{d\.text/.test(ct), 'cau tra loi AI duoc escapeHtml truoc khi chen vao DOM (chong chen HTML)');
+  ok(/escapeHtml\(shown\)/.test(ct) && /compactPriceText_\(d\.text\)/.test(ct) && !/innerHTML = d\.text|innerHTML = `\$\{d\.text/.test(ct), 'cau tra loi AI duoc escapeHtml truoc khi chen vao DOM (chong chen HTML)');
   console.log('ALL PANCAKE PRICE-AI TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });
