@@ -8,7 +8,7 @@ const reqs = [];
 let resp = null;
 w.fetch = async (u, o) => { reqs.push({ u, o }); const r = typeof resp === 'function' ? resp(u, o) : resp; return { text: async () => JSON.stringify(r) }; };
 w.localStorage.setItem('ome_sess_token', 'TOK123');
-w.eval('var gsUrl = "https://gs.example/exec"; var _srState = {};');
+w.eval('var gsUrl = "https://gs.example/exec"; var _srState = {}; var currentUser = { role: "admin", name: "Admin" };');
 w.eval(R('js/60-team-bonus.js'));
 w.confirm = () => true; w.alert = () => {};
 const cfg = { dailyMinOrders: 6, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000, penalties: [
@@ -104,5 +104,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const s11 = R('js/11-fn-srload.js'), idx = R('index.html');
   ok(/html \+= _tbPanelHtml_\(\);[^\n]*\n\s*html \+= _srBaseCheckPanelHtml_\(d\);/.test(s11), 'js/11: _srRenderB gan panel truoc muc check Base');
   ok(/js\/60-team-bonus\.js\?v=/.test(idx) && idx.indexOf('js/60-team-bonus.js') > idx.indexOf('js/11-fn-srload.js'), 'index.html nap js/60 sau js/11 co ?v=');
+  // ---- CHI ADMIN THAY (Duyen 17/11): sale (ke ca nguoi duoc thuong) / quan ly / chua dang nhap -> khong ve khoi, khong goi may chu ----
+  for (const who of [{ role: 'sale', name: 'ninhnga99' }, { role: 'manager', name: 'QL' }, { role: 'leader', name: 'TT' }, { role: 'viewer', name: 'V' }, null]) {
+    w.eval('currentUser = ' + JSON.stringify(who)); w.eval('_tbState.data = null; _tbState.err = \"\"; _tbState.loading = false'); const n0 = reqs.length;
+    const h = w.eval('_tbPanelHtml_()'); await w.eval('_tbLoad(true)'); await sleep(30);
+    ok(h === '' && reqs.length === n0, 'vai tro ' + (who ? who.role : '(chua dang nhap)') + ': khong ve khoi Thuong phat doi Sale va khong goi may chu');
+  }
+  w.eval('currentUser = { role: \"admin\", name: \"Admin\" }'); w.eval('_tbState.data = null; _tbState.err = \"\"; _tbState.loading = false');
+  ok(/id=\"tb-panel\"/.test(w.eval('_tbPanelHtml_()')), 'admin: van thay khoi nhu cu');
+  ok(/_tbIsAdmin_\(\)\) return '';/.test(R('js/60-team-bonus.js')), 'ma nguon: _tbPanelHtml_ tra rong khi khong phai admin');
   process.exit(fail ? 1 : 0);
 })();
