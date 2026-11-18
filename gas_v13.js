@@ -22098,7 +22098,10 @@ function teamBonusReport_(p, acc) {
 function teamBonusDoGet_(action, p) {
   try {
     var acc = _tbAccess_(p && p.token); if (!acc.ok) return jsonOut_(acc);
-    if (action === 'teamPenaltySuggest') return acc.admin ? jsonOut_(teamPenaltySuggest_(p, acc)) : jsonOut_({ ok: false, code: 'FORBIDDEN', error: 'Chi admin xem goi y phat.' });
+    // DUYEN 17/11: muc "Thuong phat doi Sale Online + Van phong" CHI ADMIN thay — sale (ke ca nguoi duoc thuong), quan ly, truong team, viewer deu KHONG xem.
+    // Chan o MAY CHU (khong chi an tren giao dien): neu khong, ai co quyen 'salesreport' van goi duoc action nay truc tiep va doc bang thuong/phat cua ca doi.
+    if (!acc.admin) return jsonOut_({ ok: false, code: 'FORBIDDEN', error: 'Muc thuong phat doi Sale chi danh cho admin.' });
+    if (action === 'teamPenaltySuggest') return jsonOut_(teamPenaltySuggest_(p, acc));
     return jsonOut_(teamBonusReport_(p, acc));
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi thuong phat doi Sale: ' + (err && err.message || err) }); }
 }

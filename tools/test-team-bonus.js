@@ -105,4 +105,20 @@ ok(/if \(TEAMBONUS_GET_ACTIONS_\[action\] === 1\) return teamBonusDoGet_\(action
 ok(/if \(TEAMBONUS_POST_ACTIONS_\[action\] === 1\) return teamBonusDoPost_\(action, data\)/.test(src), 'doPost noi teamPenaltySave/Delete');
 ok(/ACTION_FEATURE_ = \{ teamBonusReport:'salesreport'/.test(src), 'teamBonusReport gan hang muc salesreport (Admin bat/tat theo vai tro)');
 ok(/if \(!acc\.admin\) return jsonOut_\(\{ ok: false, code: 'FORBIDDEN'/.test(src), 'ghi/xoa phat chi admin');
+// ---- PHAN QUYEN HANH VI (Duyen 17/11: muc nay CHI ADMIN thay; sale duoc thuong cung khong thay) ----
+{
+  const calls = { report: 0, suggest: 0 }; let who = null;
+  const c2 = { jsonOut_: o => o, _tbAccess_: tok => tok ? who : { ok: false, code: 'AUTH' }, teamBonusReport_: () => { calls.report++; return { ok: true, totals: [{ name: 'ninhnga99' }] }; }, teamPenaltySuggest_: () => { calls.suggest++; return { ok: true }; } };
+  vm.createContext(c2); vm.runInContext(grab('teamBonusDoGet_'), c2);
+  const get = (act, tok) => c2.teamBonusDoGet_(act, { token: tok });
+  who = { ok: true, admin: false, seeAll: false, u: { role: 'sale' } };            // sale (ke ca nguoi duoc thuong)
+  let r = get('teamBonusReport', 't'); ok(r.ok === false && r.code === 'FORBIDDEN' && calls.report === 0, 'sale: teamBonusReport bi chan (FORBIDDEN), may chu KHONG tinh/tra so lieu');
+  r = get('teamPenaltySuggest', 't'); ok(r.ok === false && r.code === 'FORBIDDEN' && calls.suggest === 0, 'sale: teamPenaltySuggest bi chan');
+  who = { ok: true, admin: false, seeAll: true, u: { role: 'manager' } };          // quan ly / truong team / viewer: truoc day xem duoc ca doi
+  r = get('teamBonusReport', 't'); ok(r.ok === false && r.code === 'FORBIDDEN' && calls.report === 0, 'quan ly/truong team/viewer (seeAll) cung bi chan — chi admin');
+  r = get('teamBonusReport', ''); ok(r.ok === false && r.code === 'AUTH', 'chua dang nhap: van bao AUTH (khong lo gi)');
+  who = { ok: true, admin: true, seeAll: true, u: { role: 'admin' } };
+  r = get('teamBonusReport', 't'); ok(r.ok === true && calls.report === 1 && r.totals[0].name === 'ninhnga99', 'admin: xem bao cao binh thuong');
+  r = get('teamPenaltySuggest', 't'); ok(r.ok === true && calls.suggest === 1, 'admin: xem goi y phat binh thuong');
+}
 process.exit(fail ? 1 : 0);
