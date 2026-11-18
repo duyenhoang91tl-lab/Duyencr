@@ -1607,3 +1607,10 @@
 .pk-btn-outline { border-radius: 8px; }
 #pk-ai-body::-webkit-scrollbar { width: 8px; }
 #pk-ai-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+/* Nút "🤖 Hỏi AI" nằm ở hàng "CS đang dùng" (Duyên yêu cầu 18/11/2026: đưa ra ô khoanh trong ảnh) — trước đây nằm trong #pk-price-row nên style cũ không còn áp dụng */
+#pk-ai-cs-row #pk-price-ai-btn {
+  flex: none; padding: 4px 9px; border: 1px solid var(--pk-accent, #7c3aed); background: #fff; color: var(--pk-accent, #7c3aed);
+  border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+#pk-ai-cs-row #pk-price-ai-btn:hover { background: #f5f3ff; }

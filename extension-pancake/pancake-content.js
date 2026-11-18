@@ -432,6 +432,7 @@
             <div id="pk-cs-list"></div>
           </div>
           <select id="pk-cs-sel" style="display:none"></select>
+          <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — gõ câu hỏi (vd: giá nhẫn bạc trơn size 12) rồi bấm; trả lời văn ngắn, giá lấy từ bảng giá">🤖 Hỏi AI</button>
         </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
@@ -467,7 +468,6 @@
                 <div id="pk-price-row">
                   <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
                   <button id="pk-price-btn">Tìm</button>
-                  <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)">🤖 Hỏi AI</button>
                 </div>
                 <div id="pk-price-ai" style="display:none"></div>
                 <div id="pk-price-result"></div>
@@ -2915,10 +2915,16 @@
   // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
   let _priceAiSeq = 0;
   function askPriceAi_() {
+    // Nút nằm ở hàng "CS đang dùng" (luôn hiện) → bấm khi đang ở mục khác thì tự mở "Tra cứu bảng giá" + chế độ "Gõ tìm" + đưa con trỏ vào ô hỏi,
+    // vì khung trả lời #pk-price-ai nằm TRONG mục đó (đang ẩn thì CS bấm mà không thấy gì).
+    const _ms = panelEl.querySelector('#pk-menu-sel');
+    if (_ms && _ms.value !== 'price') { _ms.value = 'price'; _ms.dispatchEvent(new Event('change', { bubbles: true })); }
+    const _sm = panelEl.querySelector('#pk-price-search-mode');
+    if (_sm && _sm.style.display === 'none') { const _tb = panelEl.querySelector('.pk-price-mode-btn[data-mode="search"]'); if (_tb) _tb.click(); }
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-ai');
     box.style.display = '';
-    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; return; }
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { panelEl.querySelector('#pk-price-q').focus(); } catch (e) {} return; }
     const seq = ++_priceAiSeq;
     box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
     safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {

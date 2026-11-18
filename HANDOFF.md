@@ -1,10 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON = BÉ SAMOYED NHƯ CRM + ĐƯA NÚT "HỎI AI" RA Ô CS) — BƯỚC 1+2/3 XONG (icon header/nút thu nhỏ + popup); reload extension Pancake AI; KHÔNG đổi GAS
+## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON = BÉ SAMOYED NHƯ CRM + ĐƯA NÚT "HỎI AI" RA Ô CS) — XONG CẢ 3 BƯỚC (icon header/nút thu nhỏ + popup + nút Hỏi AI lên hàng CS); reload extension Pancake AI; KHÔNG đổi GAS
 - NGUYÊN NHÂN LÀM: Duyên: "đổi icon Pancake AI giống icon AI trên CRM". CRM đã đổi icon AI sang mặt Samoyed (js/38 `proCatIconSvg_`, 16/11) nhưng Pancake vẫn là mèo máy có ăng-ten (`pkCatSvg_`).
 - ✅ BƯỚC 1 (`extension-pancake/pancake-content.js`): `pkCatSvg_` = bản sao nguyên văn `proCatIconSvg_` của CRM (đổi class `pro-cat`→`pk-cat`, `pro-cat-ant`→`pk-cat-ant`). Tên hàm/class giữ nguyên nên header + nút thu nhỏ tự đổi. `tools/test-pancake-cat-icon.js` thêm 1 kiểm (Samoyed, không còn ăng-ten) → 8/8.
 - ✅ BƯỚC 2 (`extension-pancake/pancake-popup.html`): svg ở <h1> popup thay bằng SVG Samoyed sinh trực tiếp từ `pkCatSvg_(26,false)` (không chớp mắt vì popup tĩnh).
-- [ ] **VIỆC KẾ TIẾP:** bước 3 = chuyển nút "🤖 Hỏi AI" (`#pk-price-ai-btn`) từ khung Tra cứu bảng giá lên hàng "CS ĐANG DÙNG" (khoảng trống bên phải ô CS Duyên khoanh trong ảnh): GIỮ id + listener `askPriceAi_` (test-pancake-price-ai / test-price-ai-ui bắt đúng chỗ này); `askPriceAi_` tự mở mục "Tra cứu bảng giá" + chế độ Gõ tìm + focus ô hỏi khi đang ở mục khác. Chưa đụng icon PNG thanh công cụ Chrome (`icons/icon*.png`).
+- ✅ BƯỚC 3 (`pancake-content.js` + `pancake-content.css`): nút `#pk-price-ai-btn` chuyển từ khung Tra cứu bảng giá lên hàng "CS ĐANG DÙNG" (chỗ Duyên khoanh); GIỮ id + listener `askPriceAi_`. `askPriceAi_` nay tự mở mục "Tra cứu bảng giá" + chế độ "Gõ tìm" nếu đang ở mục khác và focus ô hỏi khi ô trống (khung trả lời nằm trong mục đó nên trước đây ẩn thì bấm không thấy gì). CSS riêng cho nút ở hàng CS. Test test-pancake-price-ai, test-price-ai-ui, test-pancake-chips, test-pancake-apierr, test-pancake-cat-icon đều xanh. Chưa test bấm thật trên trình duyệt.
+- ⚠ `node tools/check-ext-parity.js` báo LỆCH "chatCoach" chỉ có ở Pancake — LỖI CÓ SẴN từ trước (xác nhận bằng git stash), không do thay đổi này.
+- [ ] **VIỆC KẾ TIẾP:** không còn bước kỹ thuật mở. Chờ Duyên thử + nói nếu muốn (a) đổi cả icon PNG thanh công cụ Chrome (`icons/icon*.png`, cần dựng lại PNG từ SVG Samoyed), (b) làm song song cho Zalo AI (nút Hỏi AI/icon bên Zalo hiện chưa đổi, theo quy tắc chỉ sửa theo yêu cầu mới nhất). 🧪 Duyên: reload Pancake AI ở chrome://extensions → nút 🤖 Hỏi AI nằm cạnh ô CS; bấm khi đang ở mục khác → tự mở Tra cứu bảng giá.
 - 🧪 Duyên: reload Pancake AI ở chrome://extensions → tiêu đề panel hiện bé Samoyed (không còn mèo ăng-ten).
 
 ## 2026-11-18 (phiên Claude — CHECK NGƯỢC BASE: BƯỚC 3 EXCEL CÓ CỘT NGUYÊN NHÂN) — XONG (đã push); chỉ cần Ctrl+F5; ĐỐI SOÁT POS ⇄ BASE (3/3 bước) XONG
