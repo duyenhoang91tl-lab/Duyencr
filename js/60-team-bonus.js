@@ -6,7 +6,7 @@ function _tbCat_(px){ try { var h = typeof proCatTag_ === 'function' ? proCatTag
 //  Số liệu từ máy chủ: action teamBonusReport (gas_v13.js, gas/33_TeamBonus.gs). Thưởng tính trên ĐƠN GỐC BASE (ngày tạo), không tính trên Pos.
 //  Số đơn (thưởng ngày + đơn Base của tỷ lệ chốt tuần/tháng) tính theo NGƯỜI TẠO ĐƠN (Duyên 2026-10-31); doanh thu ở báo cáo vẫn chia như cũ.
 //  Thưởng ngày: nhiều đơn nhất ngày, tối thiểu 6 đơn, không tính đổi trả/bảo hành/thay dây. Thưởng tuần/tháng: tỷ lệ chốt cao nhất,
-//  tương tác ≥ trung bình đội. Phạt 9 loại nhập tay (chỉ Admin ghi/xoá). Panel tự tải theo tháng chọn, không phụ thuộc bộ lọc của Báo cáo B.
+//  tương tác ≥ trung bình đội. Phạt 9 loại nhập tay (chỉ Admin ghi/xoá). TOÀN BỘ MỤC CHỈ ADMIN THẤY (17/11): giao diện _tbIsAdmin_ + máy chủ teamBonusDoGet_. Panel tự tải theo tháng chọn, không phụ thuộc bộ lọc của Báo cáo B.
 //  Test: node tools/test-team-bonus-ui.js
 // ═══════════════════════════════════════════════════════════════
 var _tbState = { month: '', data: null, loading: false, err: '', open: true, tab: 'total', form: { date: '', sale: '', type: '1', amount: '', note: '' }, saving: false, sg: { date: '', data: null, loading: false, err: '', sale: {} } };
@@ -134,8 +134,11 @@ function _tbPanelBodyHtml_(){
   h += t === 'day' ? _tbDailyHtml_(d) : t === 'period' ? _tbPeriodsHtml_(d) : t === 'pen' ? _tbPenaltiesHtml_(d) : t === 'cfg' && d.canEdit ? _tbCfgHtml_(d) : _tbTotalsHtml_(d);
   return h;
 }
-// Khung panel (gắn vào cuối Báo cáo B). Lần đầu hiện ra thì tự tải.
+// CHỈ ADMIN thấy mục này (Duyên 17/11: sale được thưởng cũng không thấy). Chặt: chưa xác định người dùng / vai trò khác → KHÔNG hiện. Máy chủ cũng chặn (teamBonusDoGet_ FORBIDDEN).
+function _tbIsAdmin_(){ try { return typeof currentUser !== 'undefined' && !!currentUser && currentUser.role === 'admin'; } catch (e) { return false; } }
+// Khung panel (gắn vào cuối Báo cáo B). Lần đầu hiện ra thì tự tải. Không phải admin → '' (không vẽ khối, không gọi máy chủ).
 function _tbPanelHtml_(){
+  if (!_tbIsAdmin_()) return '';
   if (!_tbState.month) _tbState.month = _tbToday_().substring(0, 7);
   if (!_tbState.data && !_tbState.loading && !_tbState.err && _tbState.open) setTimeout(function(){ _tbLoad(false); }, 0);
   var h = '<div id="tb-panel" style="margin-top:22px;border:1.5px solid #d97706;border-radius:12px;padding:12px 14px">' +
@@ -151,6 +154,7 @@ function _tbTab(t){ _tbState.tab = t; _tbRepaint_(); }
 function _tbSetMonth(v){ if (!/^\d{4}-\d{2}$/.test(v || '')) return; _tbState.month = v; _tbState.data = null; _tbState.err = ''; _tbLoad(false); }
 function _tbFormType(v){ _tbState.form.type = v; _tbState.form.amount = ''; var a = document.getElementById('tb-f-amount'); if (a) a.value = ''; }
 async function _tbLoad(force){
+  if (!_tbIsAdmin_()) return;   // không phải admin: không gọi máy chủ
   if (!gsUrl) { _tbState.err = 'Chưa kết nối Google Apps Script (gsUrl trống).'; _tbRepaint_(); return; }
   _tbState.loading = true; _tbState.err = ''; if (!_tbState.data) _tbRepaint_();
   try {
