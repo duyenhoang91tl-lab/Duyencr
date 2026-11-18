@@ -1,5 +1,15 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — THƯ VIỆN SẢN PHẨM: mỗi sản phẩm/combo 1 thư mục ảnh, tối đa 50 ảnh) — ĐANG LÀM TỪNG BƯỚC
+- ĐỀ BÀI Duyên: thêm menu "Thư viện sản phẩm" để up ảnh theo từng sản phẩm của bảng giá (DANH_MUC, giống danh sách sản phẩm trên POS), tối đa 50 ảnh/thư mục. Bổ sung: ô tìm sản phẩm phải tìm được CẢ combo (như ô tìm thông tin khách), và bấm kết quả là nhảy thẳng vào thư mục thư viện sản phẩm.
+- QUYẾT ĐỊNH: 1 sản phẩm = 1 thư mục theo TÊN sản phẩm (cột Tên sản phẩm, fallback Tên thương mại) — các size/chất liệu cùng tên dùng chung thư mục. Combo = thư mục riêng, productName "Combo: <tên>". Khác "Thư viện" cũ (Social > Thư viện, ảnh phẳng không theo sản phẩm) — KHÔNG đụng phần cũ.
+- ✅ BƯỚC 1/4 GAS (`gas_v13.js` → gas/*.gs đã split + --check OK, test `tools/test-plib.js` xanh): sheet `ThuVienSP`, folder Drive `CRM_ThuVienSanPham` (mỗi SP 1 thư mục con). GET `plibList(token[,key])` (không key = đếm ảnh mỗi thư mục + ảnh bìa; có key = ảnh của thư mục), POST `plibUpload` (1 ảnh/lần, ≤6MB, server chặn ảnh thứ 51 trả `full:true`), POST `plibDelete` (xóa mềm, người tải lên hoặc admin). Key = tên bỏ dấu/thường/gọn (`_plibKey_`). 🐞 Bẫy đã gặp: cùng key mà gõ khác hoa/thường từng tạo 2 thư mục Drive → nay dùng tên đã lưu đầu tiên.
+- [ ] BƯỚC 2/4 client `js/94-plib-tab.js`: tab `registerExtraTab('plib','🛍️ Thư viện sản phẩm')`, danh sách SP từ `priceCatalogFlat` gộp theo tên + combo từ `comboList`, ô tìm không dấu (SP + combo), bấm → mở thư mục, tải nhiều ảnh (thu nhỏ ≤1600px, đếm x/50). Thêm vào js/29 (menu Social), js/06 (_PERM_TAB_DEFS), index.html script tag, js/INDEX.md, test.
+- [ ] BƯỚC 3/4: nối ô tìm nhanh toàn cục (js/69-pro-smart-search) để gõ tên SP/combo → bấm nhảy vào thư mục.
+- [ ] BƯỚC 4/4: ghi docs/crm-kb (file mới 13-thu-vien-san-pham.md + 1 dòng vào 00-READ-FIRST).
+- Lưu ý quy trình: repo KB (01-rules) quy định MERGE-ONLY (cấm rebase) và đã bỏ khối gas-code-v9/nhắc deploy tay (GAS tự deploy qua Actions) → làm theo KB, không theo bản instruction cũ.
+
+
 ## 2026-11-18 (phiên Claude — COMBO: FORM CHỌN SẢN PHẨM TỪ DANH SÁCH CÓ SẴN + GIÁ NIÊM YẾT POS/BẢNG GIÁ) — ĐANG LÀM TỪNG BƯỚC; CẢ 4/4 BƯỚC XONG (GAS tự deploy; web cần Ctrl+F5)
 - ĐỀ BÀI Duyên: form Thêm/Sửa combo (tab 🎁 Combo) thay ô gõ tay "Sản phẩm" bằng CHỌN sản phẩm từ danh sách có sẵn, kèm GIÁ NIÊM YẾT = đơn giá của đơn POS gần nhất có sản phẩm đó (hoặc giá theo bảng giá/CTKM), hiển thị từng dòng giống màn lên đơn POS (mã SP, tên, đơn giá × SL, Khuyến mãi, thành tiền; đầu danh sách "Số mẫu mã / Số lượng SP" + ô tìm).
 - QUYẾT ĐỊNH THIẾT KẾ: KHÔNG đổi định dạng lưu của sheet COMBO (vẫn `Tên | Chất liệu | Size | SL` mỗi dòng, cột 3) → Pancake/Zalo "Soạn đơn", Trợ lý AI giá, comboList KHÔNG phải sửa. Form mới chỉ là cách NHẬP: chọn SP → ghi ra đúng chuỗi cũ. Giá niêm yết/khuyến mãi từng dòng chỉ để admin THAM KHẢO khi định GIÁ COMBO (không lưu).

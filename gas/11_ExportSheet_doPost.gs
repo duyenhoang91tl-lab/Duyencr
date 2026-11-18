@@ -251,6 +251,7 @@ function doPostCore_(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var action = data.action;
+    if (PLIB_POST_ACTIONS_[action] === 1) return plibDoPost_(action, data);   // thu vien san pham
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin

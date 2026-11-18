@@ -124,8 +124,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_PROFILE`, `PROFILE_HEADERS`
 
 ## 29_MediaLib.gs
-- Hàm: `_mlibUser_`, `_mlibSheet_`, `_mlibFolder_`, `_mlibUrl_`, `_mlibClean_`, `_mlibDriveId_`, `_mlibRow_`, `_mlibAppend_`, `mlibList_`, `mlibUpload_`, `mlibAddDrive_`, `mlibSaveTpl_`, `mlibDelete_`, `mlibDoGet_`, `mlibDoPost_`
-- Hằng/biến: `SH_MLIB_`, `MLIB_HEADERS_`, `MLIB_TYPES_`, `MLIB_MAX_BYTES_`, `MLIB_GET_ACTIONS_`, `MLIB_POST_ACTIONS_`
+- Hàm: `_mlibUser_`, `_mlibSheet_`, `_mlibFolder_`, `_mlibUrl_`, `_mlibClean_`, `_mlibDriveId_`, `_mlibRow_`, `_mlibAppend_`, `mlibList_`, `mlibUpload_`, `mlibAddDrive_`, `mlibSaveTpl_`, `mlibDelete_`, `mlibDoGet_`, `mlibDoPost_`, `_plibKey_`, `_plibSheet_`, `_plibRoot_`, `_plibFolder_`, `_plibRow_`, `_plibRows_`, `plibList_`, `plibUpload_`, `plibDelete_`, `plibDoGet_`, `plibDoPost_`
+- Hằng/biến: `SH_MLIB_`, `MLIB_HEADERS_`, `MLIB_TYPES_`, `MLIB_MAX_BYTES_`, `MLIB_GET_ACTIONS_`, `MLIB_POST_ACTIONS_`, `SH_PLIB_`, `PLIB_HEADERS_`, `PLIB_MAX_PER_FOLDER_`, `PLIB_MAX_BYTES_`, `PLIB_GET_ACTIONS_`, `PLIB_POST_ACTIONS_`
 
 ## 30_KhDiscuss.gs
 - Hàm: `_khdPhone_`, `_khdSheet_`, `_khdMsg_`, `_khdAssignees_`, `_khdLeaderCovers_`, `_khdManagerCovers_`, `_khdUserAllowed_`, `_khdAccess_`, `khdList_`, `khdSend_`, `khdDelete_`, `khdDoGet_`, `khdDoPost_`, `_cvNorm_`, `_cvHasVN_`, `_cvStrip_`, `_cvWordCh_`, `_cvFindPhrase_`, `_cvSplitCsv_`, `_cvCompile_`, `cvDetect_`, `_cvBannedCompiled_`, `_cvAdmins_`, `_cvStaff_`, `scanBannedText_`, `cvScanMessages_`, `_cvNotifText_`, `_cvStaffUsers_`, `_rbSettingNum_`, `_rbEnabled_`, `_rbShiftYmd_`, `_rbMoney_`, `_rbFindEvents_`, `_rbText_`, `_rbNotify_`, `rbScan_`, `_rbScanMaybe_`, `rbScanTick_`, `installRbTrigger_`, `caiTriggerMuaLai`, `_cvNotify_`, `_cvEmail_`, `_cvEnrich_`, `cvScanOnce_`, `chatAuditScan`, `chayGiamSatChat`, `chanDoanGiamSatChat`, `batGiamSatChat`, `tatGiamSatChat`, `xemTuCamGiamSat`, `datChatAuditBoQua`, `datChatAuditBaoSale`, `datChatAuditAdmin`, `cvList_`
