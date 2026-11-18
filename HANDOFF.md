@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — PANCAKE AI: ĐỔI ICON = BÉ SAMOYED NHƯ CRM + ĐƯA NÚT "HỎI AI" RA Ô CS) — BƯỚC 1/3 XONG (icon header/nút thu nhỏ); reload extension Pancake AI; KHÔNG đổi GAS
+- NGUYÊN NHÂN LÀM: Duyên: "đổi icon Pancake AI giống icon AI trên CRM". CRM đã đổi icon AI sang mặt Samoyed (js/38 `proCatIconSvg_`, 16/11) nhưng Pancake vẫn là mèo máy có ăng-ten (`pkCatSvg_`).
+- ✅ BƯỚC 1 (`extension-pancake/pancake-content.js`): `pkCatSvg_` = bản sao nguyên văn `proCatIconSvg_` của CRM (đổi class `pro-cat`→`pk-cat`, `pro-cat-ant`→`pk-cat-ant`). Tên hàm/class giữ nguyên nên header + nút thu nhỏ tự đổi. `tools/test-pancake-cat-icon.js` thêm 1 kiểm (Samoyed, không còn ăng-ten) → 8/8.
+- [ ] **VIỆC KẾ TIẾP:** bước 2 = `extension-pancake/pancake-popup.html` (icon svg ở <h1> popup vẫn là mèo cũ → thay bằng SVG Samoyed sinh từ `pkCatSvg_(26,false)`); bước 3 = chuyển nút "🤖 Hỏi AI" (`#pk-price-ai-btn`) từ khung Tra cứu bảng giá lên hàng "CS ĐANG DÙNG" (khoảng trống bên phải ô CS Duyên khoanh trong ảnh): GIỮ id + listener `askPriceAi_` (test-pancake-price-ai / test-price-ai-ui bắt đúng chỗ này); `askPriceAi_` tự mở mục "Tra cứu bảng giá" + chế độ Gõ tìm + focus ô hỏi khi đang ở mục khác. Chưa đụng icon PNG thanh công cụ Chrome (`icons/icon*.png`).
+- 🧪 Duyên: reload Pancake AI ở chrome://extensions → tiêu đề panel hiện bé Samoyed (không còn mèo ăng-ten).
+
 ## 2026-11-18 (phiên Claude — CHECK NGƯỢC BASE: BƯỚC 3 EXCEL CÓ CỘT NGUYÊN NHÂN) — XONG (đã push); chỉ cần Ctrl+F5; ĐỐI SOÁT POS ⇄ BASE (3/3 bước) XONG
 - NGUYÊN NHÂN LÀM: bước 2 mới gắn nhãn trên màn hình; file Excel kế toán dùng ("📥 Xuất Excel check ngược Base") vẫn không có nhãn nên phải đối chiếu tay với màn hình.
 - ✅ `js/11-fn-srload.js` (`?v=20261118c`): `_srBcBuild_` thêm cột cuối "Nguyên nhân lệch (gợi ý, 1 lần/đơn)" ở sheet "Check ngược từng đơn" = đúng `_srBcCause_` của màn hình; chỉ ghi ở dòng đầu mỗi đơn và CHỈ đơn lệch (đơn khớp để trống) để lọc/SUM không lặp. Không đổi số tiền.
