@@ -36,7 +36,7 @@ const combos = [
   { code: 'CB1', name: 'Combo Tỳ hưu đôi', priceVnd: 850000, usable: true, statusLabel: '✅ Đang áp dụng', keywords: 'ty huu cap', itemsText: '2 x Tỳ hưu', note: 'Tặng dây',
     items: [{ name: 'Tỳ hưu', chatLieu: 'Bạc', size: '', qty: 2 }, { name: 'Dây đeo', chatLieu: '', size: 'M', qty: 1 }] },
   { code: 'CB2', name: 'Lắc cỏ 4 lá + charm', priceVnd: 1200000, usable: true, statusLabel: '', keywords: '', itemsText: 'Lắc cỏ 4 lá | Bạc | 16 | 1', note: '', items: [{ name: 'Lắc cỏ 4 lá', chatLieu: 'Bạc', size: '16', qty: 1 }] },
-  { code: 'CB3<x>', name: 'Combo "lỗi" & thử', priceVnd: 0, usable: true, statusLabel: '', keywords: '', itemsText: '', note: '', items: [] }
+  { code: 'CB3\" onmouseover=\"alert(1)\" <x>', name: 'Combo "lỗi" & thử', priceVnd: 0, usable: true, statusLabel: '', keywords: '', itemsText: '', note: '', items: [] }
 ];
 
 // 1) rong / null → khong hien gi
@@ -55,7 +55,12 @@ api.setQ(''); api.render();
 const host = panelEl.querySelector('#pkb-combo');
 ok(host.querySelectorAll('.pkb-combo-add').length === 3, 'hien 3 nut + Them combo');
 ok(/850\.000đ/.test(host.textContent), 'hien gia dong day du: ' + (host.textContent.match(/\d[\d.]*đ/g) || []).join(','));
-ok(host.innerHTML.indexOf('CB3<x>') === -1 && host.innerHTML.indexOf('&lt;x&gt;') !== -1, 'ma co < > duoc escape');
+// Ma combo la du lieu tu sheet (admin go) nen coi nhu KHONG TIN CAY: ma chua dau " + onmouseover + the <x> khong duoc thoat khoi thuoc tinh data-code.
+// (Luu y: trong thuoc tinh co ngoac kep thi < > vo hai — thu can escape that su la dau ". Kiem bang DOM, khong so chuoi innerHTML vi serializer jsdom ghi < > tho.)
+const evilCode = 'CB3" onmouseover="alert(1)" <x>';
+const evilBtns = [...host.querySelectorAll('.pkb-combo-add'), ...host.querySelectorAll('.pkb-combo-qty')];
+ok(evilBtns.length === 6 && host.querySelectorAll('[onmouseover]').length === 0, 'ma co chua dau " khong chen duoc thuoc tinh onmouseover (' + host.querySelectorAll('[onmouseover]').length + ' phan tu bi chen, ' + evilBtns.length + '/6 nut+o so luong)');
+ok(host.querySelector('x') === null && evilBtns.filter(el => el.getAttribute('data-code') === evilCode).length === 2, 'ma co giu dung chuoi goc trong data-code (nut + o so luong) va khong sinh the <x>');
 api.setQ('zzz'); api.render(); ok(/Không có combo nào khớp/.test(host.textContent), 'khong khop → thong bao');
 
 // 4) bam them combo (so bo = 2)
