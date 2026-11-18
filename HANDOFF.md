@@ -1,5 +1,20 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — ĐỐI SOÁT POS ⇄ BASE: BẢNG "CHECK NGƯỢC BASE" BÁO POS GẤP ĐÔI) — BƯỚC 1 XONG (đã push); workflow tự deploy GAS — Ctrl+F5 CRM
+NGUYÊN NHÂN GỐC (bảng Duyên gửi 18/11): 4 đơn "gồm 2 dòng Pos" có Giá Pos = ĐÚNG GẤP ĐÔI Base (33.450k vs 16.725k, 27.834k vs 13.917k, 20.404k vs 10.202k, 16.200k vs 8.100k → Chênh âm cả đơn). Luật cộng dòng Pos "anh em" (cùng SĐT + cùng bộ mã, thêm 13/11 cho #M47323 = 8.123k + 5.850k) cộng MÙ QUÁNG, kể cả khi dòng 1 ĐÃ bằng Base (dòng 2 chỉ là bản lặp). Chỉ ảnh hưởng SỐ HIỂN THỊ ở báo cáo check ngược; KHÔNG đổi cách tính doanh thu.
+- ✅ **BƯỚC 1 (gas_v13.js → gas/09_SalesReportB_POS.gs):** hàm mới `_posSiblingAdd_` — dòng anh em CHỈ được cộng khi làm GẦN tổng Base hơn (|Base−(Pos+phụ+dòng)| < |Base−(Pos+phụ)|); không thì ghi `posBoQuaRows/posBoQuaGia`. `js/11-fn-srload.js` (`?v=20261118a`) hiện thêm "bỏ qua N dòng Pos trùng (X đ)" dưới ô Giá Pos gốc. `tools/test-bc-pos-sibling.js` thêm 9 ca chạy hàm THẬT với số trong ảnh (xanh; test-recon-export, test-ghep-base-orders, test-report-b-export xanh). `split-gas --check` OK.
+- ⚠ **CHƯA XỬ LÝ (nghi vấn dữ liệu, cần Duyên/kế toán xem — không phải lỗi logic):** (a) dòng 06/11 nocNB2003saleoff: Pos 36.526k vs Base 57.833k (Base lớn hơn, 1 đơn Base); (b) dòng 05/11 minhanh99: Pos 14.948k (2 dòng, ghi chú "CHI PHÍ BẢO HÀNH, TIỀN CÔNG") vs Base 1.470k đơn Bảo hành; (c) dòng 09/11 trangbeCSKH1995: Base 0đ "Đang xử lý" nhưng ghi chú nói tổng 7tr300 → đơn Base nhập 0đ.
+- [ ] **CÒN LẠI CỦA "VIẾT LẠI LOGIC ĐỐI SOÁT" (làm bước sau, chưa đụng):** bước 2 = gắn nhãn nguyên nhân từng dòng lệch (trùng dòng Pos / Base 0đ / Base lớn hơn Pos / đơn bảo hành) để khỏi đọc tay; bước 3 = xuất Excel có cột nhãn.
+- 🧪 Duyên: Ctrl+F5 → Báo cáo B → "Báo cáo check ngược Base" → 4 đơn gấp đôi phải biến mất khỏi bảng (hoặc ghi "bỏ qua 1 dòng Pos trùng"); #M47323 (62T11 + 79T11) vẫn khớp 13.973k.
+
+### ✍️ Ô ADMIN NHẬP TAY (Duyên điền trực tiếp — phiên sau đọc mục này trước khi làm tiếp)
+> Sửa thẳng vào các dòng dưới; để trống = chưa có ý kiến.
+- **Ý kiến / quyết định của admin sau khi thử:** ______________________________
+- **Đơn nào vẫn lệch sai (mã đơn · số tiền Pos · số tiền Base · vì sao sai):** ______________________________
+- **Việc muốn làm TIẾP (đánh dấu x):** [ ] Bước 2 gắn nhãn nguyên nhân  [ ] Bước 3 Excel có cột nhãn  [ ] Xử lý 3 đơn nghi vấn dữ liệu ở trên  [ ] Khác: ______
+- **Ưu tiên / hạn chót:** ______________________________
+- **Ghi chú khác cho phiên Claude sau:** ______________________________
+
 ## 2026-11-17 (phiên Claude — THƯỞNG PHẠT ĐỘI SALE ONLINE + VĂN PHÒNG: CHỈ ADMIN THẤY) — XONG CẢ 2 BƯỚC (đã push); chờ Duyên deploy GAS + thử bằng tài khoản sale
 Duyên (ảnh khối "Thưởng phạt đội Sale Online + Văn phòng" ở cuối Báo cáo B): "mục này chỉ để mình admin thấy thôi, sale được thưởng cũng không thấy".
 NGUYÊN NHÂN GỐC: khối này gắn ở cuối Báo cáo B (`js/11:1447` → `_tbPanelHtml_` js/60) và action `teamBonusReport` thuộc hạng mục `salesreport` (không chỉ admin): `_tbAccess_` cho mọi người đăng nhập vào được; chỉ người không `seeAll` bị lọc còn phạt/tổng của chính mình, còn quản lý/trưởng team/viewer (`seeAll`) thấy cả đội; giao diện cũng không kiểm vai trò → sale mở được Báo cáo B là thấy khối + tiền thưởng của chính mình.
