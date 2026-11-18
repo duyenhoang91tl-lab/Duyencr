@@ -149,7 +149,18 @@ var PLIB_HEADERS_ = ['id', 'productKey', 'productName', 'group', 'fileId', 'url'
 var PLIB_MAX_PER_FOLDER_ = 50;
 var PLIB_MAX_BYTES_ = 6 * 1024 * 1024;
 var PLIB_GET_ACTIONS_ = { plibList: 1 };
-var PLIB_POST_ACTIONS_ = { plibUpload: 1, plibDelete: 1 };
+var PLIB_POST_ACTIONS_ = { plibUpload: 1, plibDelete: 1, plibInfoSave: 1 };
+//  THONG TIN SAN PHAM (van ban tu do: y nghia, diem ban hang...) — sheet "ThuVienSPInfo": productKey, productName, group, info, updatedBy, updatedAt. Moi thu muc 1 dong; CHI ADMIN sua (server kiem), ai cung doc.
+//  plibList khong key tra kem info trong counts (de o tim toan cuc tim ca trong noi dung); co key tra {info:{text,by,at}}. Luu rong = xoa noi dung. Cell ep dinh dang van ban (khong thanh cong thuc).
+var SH_PLIBI_ = 'ThuVienSPInfo';
+var PLIBI_HEADERS_ = ['productKey', 'productName', 'group', 'info', 'updatedBy', 'updatedAt'];
+var PLIBI_MAX_ = 4000;
+function _plibInfoSheet_() { return getSheet_(SH_PLIBI_, PLIBI_HEADERS_); }
+function _plibInfoRows_() {
+  var sh = _plibInfoSheet_(), n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(2, 1, n - 1, PLIBI_HEADERS_.length).getValues();
+}
 function _plibKey_(s) { return _stripVN_(s).replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 120); }
 function _plibSheet_() { return getSheet_(SH_PLIB_, PLIB_HEADERS_); }
 function _plibRoot_() {
@@ -175,19 +186,26 @@ function _plibRows_() {
 }
 function plibList_(p) {
   var a = _mlibUser_(p.token); if (a.err) return a.err;
-  var key = p.key ? _plibKey_(p.key) : '', vals = _plibRows_(), out = { ok: true, max: PLIB_MAX_PER_FOLDER_, me: a.u.username, admin: a.u.admin };
+  var key = p.key ? _plibKey_(p.key) : '', vals = _plibRows_(), infos = _plibInfoRows_(), out = { ok: true, max: PLIB_MAX_PER_FOLDER_, me: a.u.username, admin: a.u.admin };
   if (key) {
     var items = [];
     vals.forEach(function (r) { if (String(r[11]) !== '1' && String(r[1]) === key) items.push(_plibRow_(r)); });
     items.reverse();
     out.key = key; out.items = items.slice(0, PLIB_MAX_PER_FOLDER_); out.n = items.length;
+    out.info = { text: '', by: '', at: '' };
+    infos.forEach(function (r) { if (String(r[0]) === key) out.info = { text: String(r[3] || ''), by: String(r[4] || ''), at: String(r[5] || '') }; });
     return out;
   }
   var counts = {};
   vals.forEach(function (r) {
     if (String(r[11]) === '1') return;
-    var k = String(r[1]), c = counts[k] || (counts[k] = { n: 0, cover: '', name: String(r[2]) });
+    var k = String(r[1]), c = counts[k] || (counts[k] = { n: 0, cover: '', name: String(r[2]), info: '' });
     c.n++; c.cover = String(r[4] || c.cover);   // dong cuoi = anh moi nhat lam anh bia
+  });
+  infos.forEach(function (r) {   // thu muc chi co thong tin (chua co anh) van hien
+    var k = String(r[0]), t = String(r[3] || ''); if (!k || !t) return;
+    var c = counts[k] || (counts[k] = { n: 0, cover: '', name: String(r[1]), info: '' });
+    c.info = t;
   });
   out.counts = counts;
   return out;
@@ -231,11 +249,32 @@ function plibDelete_(d) {
     return { ok: false, error: 'Khong tim thay.' };
   } finally { lock.releaseLock(); }
 }
+function plibInfoSave_(d) {
+  var a = _mlibUser_(d.token); if (a.err) return a.err;
+  if (!a.u.admin) return { ok: false, error: 'Chi admin duoc sua thong tin san pham.' };
+  var pname = _mlibClean_(d.productName, 120).replace(/^'/, ''), key = _plibKey_(pname);
+  if (!key) return { ok: false, error: 'Thieu ten san pham.' };
+  var text = String(d.info == null ? '' : d.info).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/\r\n?/g, '\n').trim();
+  if (text.length > PLIBI_MAX_) return { ok: false, error: 'Thong tin qua dai (toi da ' + PLIBI_MAX_ + ' ky tu).' };
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var sh = _plibInfoSheet_(), vals = _plibInfoRows_(), at = new Date().toISOString(), group = _mlibClean_(d.group, 80);
+    for (var i = 0; i < vals.length; i++) {
+      if (String(vals[i][0]) !== key) continue;
+      var row = sh.getRange(i + 2, 3, 1, 4);   // group, info, updatedBy, updatedAt
+      row.setNumberFormat('@'); row.setValues([[group || String(vals[i][2] || ''), text, a.u.username, at]]);
+      return { ok: true, info: { text: text, by: a.u.username, at: at } };
+    }
+    var nr = sh.getLastRow() + 1, rg = sh.getRange(nr, 1, 1, PLIBI_HEADERS_.length);
+    rg.setNumberFormat('@'); rg.setValues([[key, pname, group, text, a.u.username, at]]);
+    return { ok: true, info: { text: text, by: a.u.username, at: at } };
+  } finally { lock.releaseLock(); }
+}
 function plibDoGet_(action, p) {
   try { return jsonOut_(plibList_(p)); } catch (err) { return jsonOut_({ ok: false, error: 'Loi thu vien san pham: ' + (err && err.message || err) }); }
 }
 function plibDoPost_(action, d) {
-  try { return jsonOut_(action === 'plibUpload' ? plibUpload_(d) : plibDelete_(d)); }
+  try { return jsonOut_(action === 'plibUpload' ? plibUpload_(d) : action === 'plibInfoSave' ? plibInfoSave_(d) : plibDelete_(d)); }
   catch (err) { return jsonOut_({ ok: false, error: 'Loi thu vien san pham: ' + (err && err.message || err) }); }
 }
 

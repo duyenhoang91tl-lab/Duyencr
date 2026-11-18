@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — THƯ VIỆN SẢN PHẨM v2: THÔNG TIN SẢN PHẨM (văn bản) + Ô TÌM TOÀN CỤC RA SP/COMBO) — ĐANG LÀM TỪNG BƯỚC
+- YÊU CẦU MỚI Duyên: (1) ô tìm khách toàn cục (#search-input) cũng ra sản phẩm + combo, bấm là mở thư mục trong Thư viện sản phẩm; (2) mỗi thư mục có thêm THÔNG TIN sản phẩm dạng văn bản Duyên tự cập nhật (vd ý nghĩa), hiện cùng danh sách ảnh; sắp xếp thông minh.
+- ✅ BƯỚC A GAS (`gas_v13.js`, split OK, `tools/test-plib.js` mở rộng xanh): sheet `ThuVienSPInfo` (productKey, productName, group, info, updatedBy, updatedAt), POST `plibInfoSave` (CHỈ ADMIN, ≤4000 ký tự, lưu rỗng = xóa, cell ép định dạng văn bản nên "- ..." / "=..." không thành công thức & không bị thêm dấu '). `plibList` không key: counts kèm `info` (để ô tìm tìm cả trong nội dung; thư mục chỉ có info vẫn hiện n=0); có key: thêm `info:{text,by,at}`.
+- [ ] BƯỚC B client `js/94`: khung "📝 Thông tin sản phẩm" trong thư mục (xem/sửa/chép, nút chèn mục gợi ý Ý nghĩa/Điểm nổi bật/Cách tư vấn/Bảo quản), 📝 trên thẻ, tìm cả trong nội dung (tên khớp xếp trước).
+- [ ] BƯỚC C `js/69-pro-smart-search.js`: thêm khối "🛍️ Sản phẩm / combo" vào hộp gợi ý #cust-suggest → `plibOpen`.
+- [ ] BƯỚC D docs/crm-kb/13 + HANDOFF.
+
 ## 2026-11-18 (phiên Claude — THƯ VIỆN SẢN PHẨM: mỗi sản phẩm/combo 1 thư mục ảnh, tối đa 50 ảnh) — CẢ 4/4 BƯỚC XONG (GAS tự deploy; web cần Ctrl+F5)
 - ĐỀ BÀI Duyên: thêm menu "Thư viện sản phẩm" để up ảnh theo từng sản phẩm của bảng giá (DANH_MUC, giống danh sách sản phẩm trên POS), tối đa 50 ảnh/thư mục. Bổ sung: ô tìm sản phẩm phải tìm được CẢ combo (như ô tìm thông tin khách), và bấm kết quả là nhảy thẳng vào thư mục thư viện sản phẩm.
 - QUYẾT ĐỊNH: 1 sản phẩm = 1 thư mục theo TÊN sản phẩm (cột Tên sản phẩm, fallback Tên thương mại) — các size/chất liệu cùng tên dùng chung thư mục. Combo = thư mục riêng, productName "Combo: <tên>". Khác "Thư viện" cũ (Social > Thư viện, ảnh phẳng không theo sản phẩm) — KHÔNG đụng phần cũ.
