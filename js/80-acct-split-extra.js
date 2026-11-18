@@ -58,7 +58,7 @@ function _aseEnsure_(){
   var ov = document.getElementById('ase-overlay'); if (ov) return ov;
   ov = document.createElement('div'); ov.id = 'ase-overlay';
   ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3500;align-items:center;justify-content:center;padding:12px';
-  ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">' +
+  ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:calc(var(--vh,1vh)*92);display:flex;flex-direction:column;overflow:hidden">' +
     '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #eee"><b style="flex:1">🧮 Chia đơn theo KT (bổ sung)</b><button type="button" class="btn secondary sm" id="ase-close">✕</button></div>' +
     '<div style="padding:10px 14px;font-size:12px;color:#555;line-height:1.5">Mỗi phần tử = <b>1 dòng</b> như file KT: <code>{"code":"268T10/2026","sales":["ninhLTK1984","ninhnga99"],"tong":10780000}</code>. Sale trong 1 dòng chia đều; nhiều dòng cùng mã = chia tay; <b>tong</b> = tiền đơn KT tính (khác giá Pos vẫn dùng), <b>0</b> = đơn không tính doanh số. <b>code</b> = mã bộ đếm hoặc mã đơn Pos (M44707). Dòng ở đây <b>thay</b> dòng cùng mã của file KT và <b>ưu tiên hơn</b> ghép Base. Chỉ cần mã đơn có trong ghi chú Pos.</div>' +
     '<textarea id="ase-ta" spellcheck="false" style="margin:0 14px;min-height:170px;font-family:monospace;font-size:12px;box-sizing:border-box;width:calc(100% - 28px)"></textarea>' +

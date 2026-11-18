@@ -171,7 +171,7 @@ function proTimeline_(notes, scheds, orders, limit){
 }
 function proTimelineHtml_(items, total){
   if (!items.length) return '';
-  return '<details class="pro-tl-d" style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--pro-ink);padding:4px 0">Dòng thời gian ('+total+')</summary><ul class="pro-tl" style="margin-top:8px;max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">'
+  return '<details class="pro-tl-d" style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--pro-ink);padding:4px 0">Dòng thời gian ('+total+')</summary><ul class="pro-tl" style="margin-top:8px;max-height:calc(var(--vh,1vh)*48);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">'
     + items.map(function(it){ return '<li class="'+it.kind+'"><span class="t-when">'+proEsc_(it.when)+'</span>'+proEsc_(it.title)+'</li>'; }).join('') + '</ul></details>';
 }
 

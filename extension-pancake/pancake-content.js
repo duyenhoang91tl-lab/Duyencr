@@ -278,12 +278,42 @@
     setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
+  // Mèo máy Anh lông dài (cùng linh vật với CRM THU HIỀN) — vẽ SVG thuần, không cần file ảnh.
+  // reduced-motion: tắt chớp mắt.
+  function pkCatSvg_(px, blink){
+    var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffc2cf', CX = 32, CY = 35;
+    var puffs = [[CX,CY,20.5]];
+    for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
+    function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+    function eye(cx){
+      var b = blink ? '<animate attributeName="ry" values="4.4;4.4;0.5;4.4;4.4" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+      return '<ellipse cx="'+cx+'" cy="36" rx="4.1" ry="4.4" fill="#2b2420">'+b+'</ellipse>'
+        + '<circle cx="'+(cx+1.4)+'" cy="34.4" r="1.5" fill="#fff"/><circle cx="'+(cx-1.2)+'" cy="37.8" r="0.7" fill="#fff" opacity=".75"/>';
+    }
+    function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.4" stroke-linejoin="round"/>'; }
+    var ears = ear('10,26 13,10 26,16', '14.5,21 15.6,14.5 21,17.5') + ear('54,26 51,10 38,16', '49.5,21 48.4,14.5 43,17.5');
+    var whisk = '<g stroke="'+OUT+'" stroke-width="1" stroke-linecap="round"><path d="M16 45 L9.5 43.6M16 47.2 L9.5 48"/><path d="M48 45 L54.5 43.6M48 47.2 L54.5 48"/></g>';
+    var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="3" fill="#fff" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="1.1" fill="#4fae9a"/>';
+    var antenna = '<line x1="32" y1="15" x2="32" y2="8.6" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle class="pk-cat-ant" cx="32" cy="6.6" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.6" r="0.9" fill="#fff"/>';
+    return '<svg class="pk-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+      + ears + circles(OUT, 1.2) + circles(FUR, 0) + antenna
+      + '<ellipse cx="15.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/><ellipse cx="48.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/>'
+      + eye(23) + eye(41)
+      + '<path d="M30.4 42.2 Q32 41 33.6 42.2 Q32.9 44 32 44.1 Q31.1 44 30.4 42.2Z" fill="#ff8fa0"/>'
+      + '<path d="M32 44.1 L32 45.4 M32 45.4 Q30.2 47.4 28 45.9 M32 45.4 Q33.8 47.4 36 45.9" fill="none" stroke="#7a655a" stroke-width="1.1" stroke-linecap="round"/>'
+      + whisk + collar + '</svg>';
+  }
+  function pkCat_(px) {
+    let rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+    return pkCatSvg_(px, !rm);
+  }
+
   // Doi icon + title cua nut thu gon/mo rong theo trang thai (— khi dang mo, 🤖 khi da thu
   // nho lai thanh 1 icon tron de CS biet bam vao dau de mo lai).
   function _setCollapseBtnIcon_(collapsed) {
     const btn = panelEl && panelEl.querySelector('#pk-ai-collapse');
     if (!btn) return;
-    btn.textContent = collapsed ? '🤖' : '—';
+    if (collapsed) btn.innerHTML = pkCat_(26); else btn.textContent = '—';
     btn.title = collapsed ? 'Mở lại Pancake AI' : 'Thu gọn';
   }
 
@@ -386,7 +416,7 @@
     panelEl.innerHTML = `
       <div id="pk-ai-header">
         <div id="pk-ai-header-title" style="flex:1">
-          <div style="font-weight:700">🤖 Pancake AI</div>
+          <div style="font-weight:700;display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:24px;height:24px;align-items:center">${pkCat_(24)}</span>Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách${(() => { try { return " · v" + chrome.runtime.getManifest().version; } catch (e) { return ""; } })()}</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
@@ -3581,6 +3611,10 @@
   let _ctkmRows = null;       // null = chưa tải; [] = tải rồi nhưng rỗng/GAS cũ chưa hỗ trợ
   let _ctkmLoading = false;
   const PK_CTKM_TTL_MS = 15 * 60 * 1000;
+  // COMBO CO SAN (sheet COMBO, GAS comboList): null = chua tai; [] = rong/GAS cu chua co action (an khoi, khong bao loi).
+  let _comboRows = null;
+  let _comboLoading = false;
+  const PK_COMBO_TTL_MS = 5 * 60 * 1000;
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
@@ -3647,9 +3681,11 @@
         <div class="pk-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
           <input type="text" id="pkb-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
         <div id="pkb-msg" class="pk-price-loading" style="display:none"></div>
+        <div id="pkb-combo"></div>
         <div id="pkb-dyn"></div>`;
       host.querySelector('#pkb-q').addEventListener('input', (e) => {
         _bld = Object.assign(_bldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        renderBuilderCombos_();
         if (_flatMode === 'live') {
           clearTimeout(_liveTimer);
           _liveTimer = setTimeout(() => _liveSearch_(_bld.q), 350);
@@ -3661,7 +3697,72 @@
     }
     if (_flatItems === null && !_flatLoading) loadFlat_();
     if (_ctkmRows === null && !_ctkmLoading) loadCtkm_();
+    if (_comboRows === null && !_comboLoading) loadCombos_();
+    renderBuilderCombos_();
     renderBuilderDyn_();
+  }
+
+  // ── COMBO CÓ SẴN: tải combo ĐANG ÁP DỤNG, lọc theo ô gõ tên, bấm "+ Thêm combo" → thêm cả bộ vào giỏ ──
+  function loadCombos_() {
+    if (_comboLoading || _comboRows !== null) return;
+    _comboLoading = true;
+    chrome.storage.local.get(['pkCombos'], (res) => {
+      const c = res && res.pkCombos;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < PK_COMBO_TTL_MS) {
+        _comboRows = c.rows; _comboLoading = false; renderBuilderCombos_(); return;
+      }
+      safeSendMessage_({ type: 'GET_COMBOS' }, (resp) => {
+        _comboLoading = false;
+        // GAS cu / chua co sheet / loi mang → coi nhu KHONG co combo (an khoi), khong chan luong len don.
+        _comboRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows.filter((r) => r && r.usable) : [];
+        if (_comboRows.length) { try { chrome.storage.local.set({ pkCombos: { ts: Date.now(), rows: _comboRows } }); } catch (e) {} }
+        renderBuilderCombos_();
+      });
+    });
+  }
+  const _comboVndOf_ = (c) => Number(c.priceVnd) || 0;
+  const _fmtVnd_ = (n) => (Number(n) || 0).toLocaleString('vi-VN') + 'đ';
+  function _comboMatches_(rows, q) {
+    const words = _fold_(q).split(' ').filter(Boolean);
+    if (!words.length) return rows;
+    return rows.filter((c) => {
+      const h = _fold_([c.code, c.name, c.keywords, c.itemsText].join(' '));
+      return words.every((w) => h.indexOf(w) !== -1);
+    });
+  }
+  function renderBuilderCombos_() {
+    const host = panelEl && panelEl.querySelector('#pkb-combo');
+    if (!host) return;
+    if (!Array.isArray(_comboRows) || !_comboRows.length) { host.innerHTML = ''; return; }
+    const hits = _comboMatches_(_comboRows, _bld.q);
+    const MAX = 5;
+    let html = `<div class="pk-builder-ctkm-box"><div class="pk-builder-ctkm-title">🎁 Combo có sẵn (${hits.length}/${_comboRows.length} đang áp dụng${_fold_(_bld.q) ? ' — khớp "' + escapeHtml(_bld.q) + '"' : ''}):</div>`;
+    if (!hits.length) html += '<div class="pk-builder-ctkm-row">Không có combo nào khớp từ khoá.</div>';
+    hits.slice(0, MAX).forEach((c) => {
+      const items = (c.items || []).map((it) => (Number(it.qty) > 1 ? it.qty + ' x ' : '') + it.name + [it.chatLieu, it.size].filter(Boolean).map((v) => ' · ' + v).join('')).join('; ');
+      html += `<div class="pk-builder-ctkm-row"><b>${escapeHtml(c.name)}</b> — ${escapeHtml(_fmtVnd_(_comboVndOf_(c)))}${c.statusLabel ? ' · ' + escapeHtml(c.statusLabel) : ''}<br>${escapeHtml(items)}${c.note ? '<br><i>' + escapeHtml(c.note) + '</i>' : ''}<br>` +
+        `<input type="number" min="1" value="1" class="pkb-combo-qty" data-code="${escapeHtml(c.code)}" style="width:52px" title="Số bộ combo" /> ` +
+        `<button class="pk-price-addbtn pkb-combo-add" data-code="${escapeHtml(c.code)}">+ Thêm combo</button></div>`;
+    });
+    if (hits.length > MAX) html += `<div class="pk-builder-ctkm-row">…còn ${hits.length - MAX} combo nữa — gõ thêm ở ô tìm để lọc.</div>`;
+    html += '</div>';
+    host.innerHTML = html;
+    host.querySelectorAll('.pkb-combo-add').forEach((btn) => btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      const combo = _comboRows.find((x) => String(x.code) === code);
+      if (!combo) return;
+      const qEl = Array.from(host.querySelectorAll('.pkb-combo-qty')).find((el) => el.getAttribute('data-code') === code);
+      addComboToCart_(combo, Math.max(1, Math.floor(Number(qEl && qEl.value) || 1)));
+    }));
+  }
+  // Thêm cả combo vào giỏ: 1 dòng TIÊU ĐỀ mang GIÁ COMBO (× số bộ) + mỗi món 1 dòng giá 0đ (SL = SL món × số bộ),
+  // nên tổng đơn = đúng giá combo, vẫn đủ món để CS chọn chất liệu/size/màu từng món như bình thường.
+  function addComboToCart_(combo, qty) {
+    const items = Array.isArray(combo.items) ? combo.items : [];
+    if (!items.length || !(_comboVndOf_(combo) > 0)) { setStatus('⚠ Combo "' + (combo.name || '') + '" thiếu món hoặc giá — kiểm tra sheet COMBO.'); return; }
+    addToCart_({ name: '🎁 Combo ' + combo.name + (combo.code ? ' (' + combo.code + ')' : ''), note: 'Gồm ' + items.length + ' món ở các dòng dưới (giá đã tính vào dòng này)', price: _comboVndOf_(combo), qty });
+    items.forEach((it) => addToCart_({ name: it.name, note: 'Thuộc combo ' + combo.name, price: 0, chatLieu: it.chatLieu || '', size: it.size || '', qty: Math.max(1, Number(it.qty) || 1) * qty }));
+    setStatus('✅ Đã thêm combo "' + combo.name + '" (' + items.length + ' món) vào đơn.');
   }
 
   function loadFlat_() {
@@ -3927,6 +4028,7 @@
       _bld = _bldBlank_();
       const q = panelEl.querySelector('#pkb-q'); if (q) q.value = '';
       if (_flatMode === 'live') _flatItems = [];
+      renderBuilderCombos_();
       renderBuilderDyn_();
     });
   }
