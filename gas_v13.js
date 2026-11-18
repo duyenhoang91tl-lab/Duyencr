@@ -12316,7 +12316,7 @@ function _priceQaSystemPrompt_(q) {
   var info = '';
   try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
   return 'Ban la tro ly ban hang noi bo cua team, tra loi NHAN VIEN SALE ve gia san pham. Tieng Viet, than thien, VAN NGAN: toi da 3 cau (khoang 60 tu), khong tieu de, khong danh so, khong giai thich them. ' +
-    'Neu co NHIEU lua chon chat lieu/size thi moi lua chon 1 dong ngan (chat lieu - size - gia), roi hoi nhan vien khach chon loai nao.' +
+    'Neu co NHIEU lua chon: moi CHAT LIEU 1 dong, cac SIZE cua chat lieu do noi tiep tren CUNG dong theo dang "Chat lieu: size 1 gia X, size 2 gia Y" (KHONG lap lai ten san pham/chat lieu cho tung size, KHONG xuong dong rieng cho tung size), roi hoi nhan vien khach chon loai nao.' +
     '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG bia gia hay suy ra gia khac):\n' + String(info).slice(0, 3500) +
     '\n\nQUY TAC: Gia trong bang tinh bang NGHIN VND (vd 2.310 = 2.310.000d) — hay quy ra dong cho de hieu. ' +
     'Bang da duoc loc san theo loai da (SAPHIA/RUBY) neu cau hoi co nhac; neu khong nhac thi chi la gia MAC DINH, cu the vay ma bao, khong hoi lai ve loai da. ' +

@@ -25,4 +25,7 @@ ok(compact(ai) === ai, 'van tu do cua AI giu NGUYEN, khong bi dong cham');
 ok(compact('') === '' && compact(null) === '', 'rong/null an toan');
 const fb = compact('Giá theo bảng giá (nghìn đồng — vd 2.310 = 2.310.000đ):\n' + raw);
 ok(/^Giá theo bảng giá/.test(fb) && /size 12: 450 · size 13: 480/.test(fb), 'du phong khi AI loi (co dong dan) van gop');
+// prompt backend: AI cung phai gop size tren 1 dong (khong lap ten SP/chat lieu cho tung size)
+const gas = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8'), pi = gas.indexOf('function _priceQaSystemPrompt_('), pe = gas.indexOf('function priceQa_(', pi);
+ok(pi > 0 && /CUNG dong/.test(gas.slice(pi, pe)) && /KHONG lap lai/.test(gas.slice(pi, pe)), 'GAS _priceQaSystemPrompt_ yeu cau AI gop size cua 1 chat lieu tren 1 dong');
 if (bad) { console.error(bad + ' LOI'); process.exit(1); } console.log('ALL PANCAKE PRICE-COMPACT TESTS PASSED');
