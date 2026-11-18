@@ -41,7 +41,9 @@ ok(/Doi soat|ĐỐI SOÁT POS 2026-11-16/.test(ctx.khDiagText_(r)) && ctx.khDiag
   ok(/tier=vip/.test(ctx2.khDiagFilters_()) && /cột\.care\(1\)/.test(ctx2.khDiagFilters_()), 'khDiagFilters_ liet ke tier + cot.care');
   const rr = ctx2.khDiagClassify_(diag, [c], [], B, null, ctx2.khDiagProbe_);
   const row = rr.rows.find(x => x.phone === '0900000002');
-  ok(row.why === 'HIDDEN' && /LOẠI BỞI/.test(row.probe), 'dong HIDDEN mang probe');
+  ok(row.why === 'FILTERED' && /LOẠI BỞI/.test(row.probe), 'probe tim ra bo loc loai khach -> E FILTERED (dung theo bo loc, KHONG con bao la D nghi loi) + mang probe');
+  const rr2 = ctx2.khDiagClassify_(diag, [Object.assign({}, c, { tier: 'vip', careStatus: 'Đã mua' })], [], B, null, ctx2.khDiagProbe_);
+  ok(rr2.rows.find(x => x.phone === '0900000002').why === 'HIDDEN', 'probe KHONG thay bo loc nao loai -> van D (nghi loi that)');
   rr.filters = ctx2.khDiagFilters_();
   ok(/Bộ lọc đang bật: tier=vip/.test(ctx2.khDiagText_(rr)) && /\{LOẠI BỞI/.test(ctx2.khDiagText_(rr)), 'text copy co dong bo loc + probe');
 }
@@ -55,4 +57,25 @@ ok(/client giữ 1 đơn POS/.test(ctx.khDiagText_(rT)), 'text copy ghi so don P
 ctx.posOrdersByPhone = {};
 const rT2 = ctx.khDiagClassify_(diagT, [{ phone: '0387099422', ymList: [], csSet: new Set([B]) }], [], B, null);
 ok(rT2.rows[0].why === 'NO_DAY' && rT2.rows[0].posRows === 0, 'client KHONG giu don POS nao + khong co don Base ngay do -> van la B');
+// LOI THAT 18/11 (Duyen): doi soat ra HIDDEN=68/76 SDT du "bo loc dang bat" chi co taiKhoan=admin. Nguyen nhan: dang loc 1 CS (cs-staff-filter) nhung probe + liet ke bo loc KHONG biet CS/ngay/o tim
+// -> khach cua CS khac (dung la khong hien) bi bao D. Nay probe kiem CS theo che do, liet ke CS + ngay + o tim, va ra E.
+{
+  const els = { 'ymf-date-from': { value: D }, 'ymf-date-to': { value: D }, 'search-input': { value: '' }, 'datasrc-filter': { value: 'all' } };
+  const ctx3 = { console, Array, Object, String, Set, document: { getElementById: id => els[id] || null }, setTimeout() {}, fmtVND: v => v + 'd',
+    currentTier: 'all', currentCare: 'all', currentZalo: 'all', currentBuy: 'all', colFilters: {}, advFilters: {}, currentCF: {}, _inUserScope: () => true,
+    _csFilterList: () => ['duyenht'], _csFilterListMatch: () => ['duyenht'], _csFilterMode: 'seller', _csModeMatch: (a, b, c) => !!a, posOrdersByPhone: {} };
+  ctx3.window = ctx3; vm.createContext(ctx3); vm.runInContext(R('js/86-pos-diag.js'), ctx3);
+  const other = { phone: '0900000007', tier: 'normal', careStatus: '', zaloStatus: '', ymList: [{ ds: D }], csSet: new Set(['ninhnga99']) };
+  const mine = { phone: '0900000008', tier: 'normal', careStatus: '', zaloStatus: '', ymList: [{ ds: D }], csSet: new Set(['duyenht']) };
+  ok(/CS đang lọc \(duyenht\)/.test(ctx3.khDiagProbe_(other)), 'probe: khach cua CS khac -> loai boi CS dang loc');
+  ok(!/LOẠI BỞI/.test(ctx3.khDiagProbe_(mine)) && /không thấy bộ lọc/.test(ctx3.khDiagProbe_(mine)), 'probe: khach dung CS dang loc + dung ngay -> khong bi loai (neu van an = loi that)');
+  ctx3.posOrdersByPhone = { '0900000007': [{ ds: D, sales: ['duyenht'] }] };
+  ok(!/CS đang lọc/.test(ctx3.khDiagProbe_(other)), 'probe: don POS trong khoang ngay do CS dang loc ban -> tinh la khop CS (giong js/90)');
+  const f = ctx3.khDiagFilters_();
+  ok(/CS=duyenht\(seller\)/.test(f) && /ngày=2026-11-16→2026-11-16/.test(f), 'khDiagFilters_ liet ke CS + che do + khoang ngay -> ' + f);
+  els['ymf-date-from'].value = '2026-11-10'; els['ymf-date-to'].value = '2026-11-12';
+  ok(/khoảng ngày/.test(ctx3.khDiagProbe_({ phone: '0900000009', ymList: [{ ds: D }], csSet: new Set(['duyenht']) })), 'probe: ngoai khoang ngay dang loc -> khoang ngay');
+  els['ymf-date-from'].value = D; els['ymf-date-to'].value = D; els['search-input'].value = 'zzz';
+  ok(/ô tìm/.test(ctx3.khDiagProbe_(mine)) && /ôTìm="zzz"/.test(ctx3.khDiagFilters_()), 'probe + liet ke: o tim loai khach');
+}
 console.log(fails ? '\n' + fails + ' LOI' : '\nTAT CA DAT'); process.exit(fails ? 1 : 0);

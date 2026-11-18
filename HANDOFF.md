@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — ĐỐI SOÁT POS 16/11 BÁO HIDDEN=68/76: DANH SÁCH KH CÓ CHUẨN KHÔNG?) — BƯỚC 1/2 XONG (sửa công cụ đối soát `js/86-pos-diag.js` + test); CHỈ client, KHÔNG đổi GAS; ctrl+F5
+- ĐỀ BÀI: Duyên dán báo cáo đối soát POS 2026-11-16: POS 78 đơn/76 SĐT; HIDDEN=68, OK=8; "Bộ lọc đang bật: tàiKhoản=admin"; mọi dòng D đều "không thấy bộ lọc đơn giản nào loại"; ô Sale để trống (mọi sale). Hỏi: danh sách KH đã chuẩn chưa?
+- ĐỌC CODE (js/02 applyFilters, js/90 bọc lọc ngày+CS theo đơn POS, js/86 diag): pipeline lọc ngày/CS theo POS KHÔNG thấy lỗi logic. NGUYÊN NHÂN GỐC NHIỀU KHẢ NĂNG (CHƯA xác nhận bằng dữ liệu thật): công cụ đối soát KHÔNG biết bộ lọc CS (`cs-staff-filter` + chế độ `_csFilterMode`), khoảng ngày, ô tìm → khi danh sách đang lọc 1 CS (8 khách), đối soát "mọi sale" gán nhãn D (nghi lỗi) cho 68 khách của CS KHÁC dù ẩn là ĐÚNG. Dòng "Bộ lọc đang bật" cũng không liệt kê CS/ngày/ô tìm nên trông như không có lọc.
+- ✅ BƯỚC 1 (`js/86-pos-diag.js` + `tools/test-pos-diag.js`): probe nay kiểm CS đang lọc (theo chế độ, tính cả CS của đơn POS trong khoảng ngày — giống js/90), khoảng ngày, ô tìm, nguồn DL; `khDiagFilters_` liệt kê CS/ngày/ô tìm; mã mới **E = FILTERED** ("đúng theo bộ lọc, không phải lỗi") khi probe tìm ra điều kiện loại — D chỉ còn dành cho khách KHÔNG bộ lọc nào loại mà vẫn ẩn (nghi lỗi thật). Test thêm 7 ca → "TẤT CẢ ĐẠT"; test-pos-recon xanh.
+- [ ] **BƯỚC 2 (bump cache `index.html` script js/86 `?v=`)** rồi **VIỆC KẾ TIẾP cho Duyên:** ctrl+F5, chạy lại 🔍 Đối soát POS 16/11 + Copy dán lại → nếu còn dòng D thì đó là lỗi thật (có dòng "LOẠI BỞI" hoặc "không thấy bộ lọc" kèm số đơn POS client giữ) → mình sửa tiếp theo dòng đó. Nếu toàn E: danh sách ĐÚNG, chỉ do đang lọc CS/ngày — bỏ lọc CS rồi đối soát lại sẽ ra OK≈76.
+
 ## 2026-11-18 (phiên Claude — COMBO: ẢNH CHO COMBO, hỏi giá ra combo kèm ảnh) — ĐANG LÀM TỪNG BƯỚC; CẢ 3 BƯỚC XONG (bước 1-2 đã push, bước 3 push cùng HANDOFF này; workflow tự deploy GAS — xem tab Actions xanh)
 Duyên: "update thêm phần combo thì hỏi giá cũng ra combo luôn, add được ảnh vào combo để check giá ra cả ảnh combo tương ứng".
 - GHI CHÚ: hỏi giá RA COMBO ĐÃ CÓ từ combo bước 2 (`priceAsk_` trả `combos` khớp câu hỏi, Trợ lý AI hiện khối "🎁 COMBO CÓ SẴN"); việc mới là ẢNH.

@@ -9,7 +9,8 @@
   function lc_(s) { return String(s || '').trim().toLowerCase(); }
 
   var WHY = { OK: '✓ Có trong danh sách', NO_CUST: 'A — chưa có khách (SĐT không có trong allCustomers)', NO_DAY: 'B — khách không có ngày đơn này ở đơn Base lẫn đơn POS client đang giữ (đơn POS ngoài cửa sổ đã tải? thử chọn khoảng ngày rộng hơn)',
-    NO_CS: 'C — CS không nằm trong csSet của khách', HIDDEN: 'D — có khách + CS + ngày (kể cả ngày đơn POS) nhưng KHÔNG hiện: bị BỘ LỌC KHÁC loại, hoặc danh sách chưa làm mới (thử Ctrl+F5)', EXCL: '— đơn bị loại (Hủy/Hoàn), không tính' };
+    NO_CS: 'C — CS không nằm trong csSet của khách', HIDDEN: 'D — có khách + CS + ngày (kể cả ngày đơn POS) nhưng KHÔNG hiện: bị BỘ LỌC KHÁC loại, hoặc danh sách chưa làm mới (thử Ctrl+F5)', EXCL: '— đơn bị loại (Hủy/Hoàn), không tính',
+    FILTERED: 'E — ĐÚNG THEO BỘ LỌC bạn đang bật (không phải lỗi danh sách): khách bị loại bởi điều kiện ghi trong {…}; tắt/đổi bộ lọc đó sẽ thấy' };
 
   // HAM THUAN. diag: ket qua donDayDiag; customers: allCustomers; shown: mang khach dang hien; sale: ten CS (co the rong); aliasFn(sale) -> mang ten cung nguoi.
   function khDiagClassify_(diag, customers, shown, sale, aliasFn, probeFn) {
@@ -36,7 +37,12 @@
         var csOk = !sale || Array.from(c.csSet || []).some(function (n) { return want[lc_(n)]; });
         why = !csOk ? 'NO_CS' : (!hasDay ? 'NO_DAY' : 'HIDDEN');
         a.posRows = pr.length;
-        if (why === 'HIDDEN' && probeFn) { try { a.probe = probeFn(c); } catch (e) { a.probe = 'probe lỗi: ' + e.message; } }
+        if (why === 'HIDDEN' && probeFn) {
+          try { a.probe = probeFn(c); } catch (e) { a.probe = 'probe lỗi: ' + e.message; }
+          // NGUYEN NHAN GOC them (Duyen 18/11: bao cao doi soat ra HIDDEN=68/76 SDT du "bo loc dang bat" chi co taiKhoan=admin): probe cu KHONG kiem bo loc CS (cs-staff-filter), khoang ngay, o tim
+          // nen khach cua CS KHAC (dung la khong duoc hien khi dang loc 1 CS) bi gan nham "D = co the la loi". Nay probe kiem du cac bo loc do; probe tim ra dieu kien loai -> E (dung theo bo loc), con lai moi la D (nghi loi that).
+          if (/^LOẠI BỞI:/.test(a.probe || '')) why = 'FILTERED';
+        }
       }
       out.push({ phone: a.phone || a.rawPhone, name: a.name, orders: a.orders, rev: a.rev, why: why, text: WHY[why], posRows: a.posRows || 0, probe: a.probe || '' });
     });
@@ -73,6 +79,11 @@
       if (typeof colFilters === 'object' && colFilters) Object.keys(colFilters).forEach(function (k) { var s = colFilters[k]; if (s && s.size > 0) f.push('cột.' + k + '(' + s.size + ')'); });
       if (typeof advFilters === 'object' && advFilters) Object.keys(advFilters).forEach(function (k) { var s = advFilters[k]; if (s && s.size > 0) f.push('nângCao.' + k + '(' + s.size + ')'); });
       if (typeof _lsListFilter !== 'undefined' && _lsListFilter) f.push('mứcNóng=' + _lsListFilter);
+      // Bo loc CS (cs-staff-filter) + che do + khoang ngay + o tim: truoc day KHONG liet ke nen "Bo loc dang bat" nhin nhu trong (Duyen 18/11)
+      var csRaw = (typeof _csFilterList === 'function') ? _csFilterList() : [];
+      if (csRaw.length) f.push('CS=' + csRaw.join('/') + (typeof _csFilterMode !== 'undefined' ? '(' + _csFilterMode + ')' : ''));
+      var d1 = el('ymf-date-from'), d2 = el('ymf-date-to'); if (d1 || d2) f.push('ngày=' + (d1 || '…') + '→' + (d2 || '…'));
+      var qs = el('search-input'); if (qs) f.push('ôTìm="' + qs + '"');
       if (typeof currentUser !== 'undefined' && currentUser) f.push('tàiKhoản=' + currentUser.role);
     } catch (e) {}
     return f.length ? f.join(', ') : '(không có bộ lọc nào ngoài ngày/CS)';
@@ -84,6 +95,35 @@
     try { if (typeof currentBuy !== 'undefined' && currentBuy !== 'all' && (currentBuy === 'bought') !== _isBoughtCustomer(c)) bad.push('loạiKhách'); } catch (e) {}
     if (typeof currentCare !== 'undefined' && currentCare !== 'all' && c.careStatus !== currentCare) bad.push('careStatus');
     if (typeof currentZalo !== 'undefined' && currentZalo !== 'all' && c.zaloStatus !== currentZalo && !(currentZalo === 'block' && ['Chặn', 'Hủy kết bạn'].indexOf(c.zaloStatus) > -1)) bad.push('zalo');
+    // CS dang loc: giong applyFilters — csSet (+ CS cua don POS trong khoang ngay) / careCSSet / _assignAllIndex theo che do _csFilterMode
+    try {
+      var csF = (typeof _csFilterListMatch === 'function') ? _csFilterListMatch() : [];
+      if (csF.length && typeof _csModeMatch === 'function') {
+        var d1 = (document.getElementById('ymf-date-from') || {}).value || '', d2 = (document.getElementById('ymf-date-to') || {}).value || '';
+        var prs = (G.posOrdersByPhone && G.posOrdersByPhone[c.phone]) || [], posCs = {};
+        prs.forEach(function (r) { if (r && r.ds && !(d1 && r.ds < d1) && !(d2 && r.ds > d2)) (r.sales || []).forEach(function (n) { if (n) posCs[n] = 1; }); });
+        var ah = (typeof _assignAllIndex !== 'undefined' && _assignAllIndex) ? _assignAllIndex[c.phone] : null;
+        var hitCs = csF.some(function (n) { return _csModeMatch(!!((c.csSet && c.csSet.has(n)) || posCs[n]), !!(c.careCSSet && c.careCSSet.has(n)), ah ? ah.has(n) : false); });
+        if (!hitCs) bad.push('CS đang lọc (' + csF.join('/') + ')');
+      }
+    } catch (e) {}
+    try {   // khoang ngay: ngay don Base HOAC ngay don POS client giu (giong js/90)
+      var f1 = (document.getElementById('ymf-date-from') || {}).value || '', f2 = (document.getElementById('ymf-date-to') || {}).value || '';
+      if (f1 || f2) {
+        var inR = function (ds) { return !!ds && !(f1 && ds < f1) && !(f2 && ds > f2); };
+        var pr2 = (G.posOrdersByPhone && G.posOrdersByPhone[c.phone]) || [];
+        if (!(c.ymList || []).some(function (o) { return o && inR(o.ds); }) && !pr2.some(function (r) { return r && inR(r.ds); })) bad.push('khoảng ngày');
+      }
+    } catch (e) {}
+    try {   // o tim + nguon du lieu
+      var qv = (document.getElementById('search-input') || {}).value || '';
+      if (qv && String(qv).trim()) {
+        var ql = String(qv).trim().toLowerCase();
+        if (!(String(c.nameLower || c.name || '').toLowerCase().indexOf(ql) > -1 || String(c.phone || '').indexOf(ql) > -1)) bad.push('ô tìm');
+      }
+      var dsf = (document.getElementById('datasrc-filter') || {}).value || 'all', dsrc = c.dataSrc || {};
+      if (dsf !== 'all' && ['dt', 'cs', 'don', 'cskh'].indexOf(dsf) > -1 && !dsrc[dsf]) bad.push('nguồnDL=' + dsf);
+    } catch (e) {}
     try {
       if (typeof colFilters === 'object' && colFilters) {
         if (colFilters.tier && colFilters.tier.size && !colFilters.tier.has(c.tier)) bad.push('cột.tier');
