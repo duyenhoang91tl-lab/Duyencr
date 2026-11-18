@@ -90,7 +90,7 @@ const cctx = { module: { exports: {} }, console, AbortController, setTimeout, cl
   document: { getElementById: el, documentElement: { classList: { contains: () => true } }, querySelectorAll: () => [] }, gsUrl: 'https://script.example/exec',
   fetch: (u, o) => { fetches.push({ u, o }); return fetchImpl(u, o); } };
 vm.createContext(cctx);
-vm.runInContext(fs.readFileSync(path.join(root, 'js/33-pro-profile.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8') + '\nthis.X={proPriceIntent_,proPriceRequest_,proPriceFormat_,proIntent_,proAiSend_,_proDock};', cctx);
+vm.runInContext(fs.readFileSync(path.join(root, 'js/33-pro-profile.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8') + '\nthis.X={proComboImages_,proPriceIntent_,proPriceRequest_,proPriceFormat_,proIntent_,proAiSend_,_proDock};', cctx);
 const X = cctx.X;
 for (const q of ['giá vòng tay phong thủy', 'Bảng giá nhẫn', 'nhẫn này bao nhiêu tiền', 'đơn giá dây chuyền', 'GIÁ?', 'nhiêu tiền vậy']) ok(X.proPriceIntent_(q), 'nhan ra cau hoi gia: ' + q);
 for (const q of ['tóm tắt khách này', 'doanh số kỳ này', 'nên làm gì tiếp', 'ai cần hỗ trợ nhất', 'giao hàng khi nào']) ok(!X.proPriceIntent_(q), 'KHONG phai cau hoi gia: ' + q);
@@ -135,6 +135,17 @@ ok(X.proIntent_('sales', 'tóm tắt doanh số') === 'summary' && X.proIntent_(
   log = await ask('leads', '0912 345 678'); ok(fetches.length === 0, 'so dien thoai: khong tra gia');
   log = await ask('sales', 'ai cần hỗ trợ nhất'); ok(fetches.length === 0, 'cau doanh so da hieu: khong bi cuop sang tra gia');
   fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Giá bán: 450', unit: 'nghin' }) });
+  // ── 2026-11-18: ẢNH COMBO trong Trợ lý AI khi tra giá ──
+  const CBI = { name: 'Combo <Di Lặc>', code: 'CB9', priceVnd: 1990000, items: [{ name: 'Mặt Di Lặc', qty: 1 }], images: ['https://drive.google.com/thumbnail?id=ABCDEFGHIJKL&sz=w600', 'https://cdn.example.com/b.jpg', 'javascript:alert(1)'] };
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: Mặt Di Lặc\n- Giá thường: 14.550', unit: 'nghin', combos: [CBI, { name: 'Không ảnh', items: [] }] }) });
+  log = await ask('price', 'mặt di lặc');
+  ok(log[1].images && log[1].images.length === 2 && log[1].images[0].name === 'Combo <Di Lặc>' && log[1].images[1].url === 'https://cdn.example.com/b.jpg', 'tra giá: tin bot mang ảnh combo (bỏ link không phải http)');
+  const htmlLog = el('pro-ai-log').innerHTML;
+  ok(htmlLog.includes('<img src="https://drive.google.com/thumbnail?id=ABCDEFGHIJKL&amp;sz=w600"') && htmlLog.includes('Combo &lt;Di Lặc&gt;') && !htmlLog.includes('<Di Lặc>') && !htmlLog.includes('javascript:'), 'hiện dải ảnh + tên combo dưới ảnh, escape HTML, không có link javascript:');
+  log = await ask('sales', 'mặt di lặc');
+  ok(log[1].images && log[1].images.length === 2, 'tab khác (tra giá dự phòng) cũng hiện ảnh combo');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Giá bán: 450', unit: 'nghin', combos: [] }) });
+  log = await ask('price', 'giá nhẫn'); ok(Array.isArray(log[1].images) && log[1].images.length === 0 && !el('pro-ai-log').innerHTML.includes('pro-ai-imgs'), 'không có combo: không vẽ khung ảnh');
   log = await ask('customer', 'gia han thanh toan');   // co tu "gia" nhung la Y DINH khach? khong — proIntent_ customer ''
   ok(fetches.length === 1, 'tu "gia" ma khong y dinh khac -> tra gia (da biet: chi thay cho cau tro ly "chua hieu")');
   fetchImpl = async () => ({ json: async () => ({ ok: false, error: 'Bang gia (DANH_MUC) dang rong' }) });

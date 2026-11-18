@@ -97,6 +97,18 @@ function proComboText_(combos){
       (c.note ? '\n   📝 ' + String(c.note).replace(/\s+/g,' ').trim() : '') + (c.end ? '\n   ⏰ đến ' + c.end.split('-').reverse().join('/') : '');
   }).join('\n');
 }
+// ẢNH COMBO (Duyên 18/11/2026): combo khớp câu hỏi giá mang `images` (link ảnh đã đổi sang thumbnail ở server) → dải ảnh dưới câu trả lời, mỗi ảnh có tên combo bên dưới để biết ảnh nào của combo nào.
+function proComboImages_(combos){
+  var out = [];
+  (combos||[]).forEach(function(c){ ((c && c.images) || []).slice(0,4).forEach(function(u){ if (/^https?:\/\/\S+$/i.test(String(u||''))) out.push({ url:String(u), name:String((c && c.name) || '') }); }); });
+  return out.slice(0, 8);
+}
+function proImgsHtml_(imgs){
+  if (!imgs || !imgs.length) return '';
+  return '<div class="pro-ai-imgs" style="display:flex;gap:8px;overflow-x:auto;margin-top:8px">' + imgs.map(function(a){
+    return '<a href="'+proEsc_(a.url)+'" target="_blank" rel="noopener" style="flex:0 0 auto;text-decoration:none;color:inherit;max-width:130px"><img src="'+proEsc_(a.url)+'" alt="'+proEsc_(a.name)+'" loading="lazy" style="display:block;height:96px;max-width:130px;object-fit:cover;border-radius:8px">' +
+      (a.name ? '<span style="display:block;font-size:11px;margin-top:2px;line-height:1.25">'+proEsc_(a.name)+'</span>' : '') + '</a>'; }).join('') + '</div>';
+}
 function proPriceFormat_(r){
   if (!r || !r.ok) return '⚠ ' + ((r && r.error) || 'Không tra được bảng giá');
   var cb = proComboText_(r.combos);
@@ -499,7 +511,7 @@ function proAiLogRender_(){
   var hint = _proDock.mode==='leads' ? 'Hỏi về khách nóng / ấm / nguội trong phạm vi của bạn (nguội = quá 60 ngày chưa chăm). Tính từ số liệu hệ thống, không dùng AI, không gửi dữ liệu đi đâu. Bấm gợi ý bên dưới.' : _proDock.mode==='price' ? 'Gõ tên sản phẩm để tra giá trong bảng giá (có thể kèm chất liệu, size, SAPHIA/RUBY). Giá lấy trực tiếp từ DANH_MUC, không do AI tự nghĩ.' : _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo BÁO CÁO B (Pos). Chọn kỳ bằng thanh lọc phía trên: Hôm nay / Tuần này / Tháng này / Khác… hoặc chọn từ ngày → đến ngày.';
   el.innerHTML = (_proDock.log.length ? '' : '<div class="pro-ai-hint">'+hint+'</div>') + _proDock.log.map(function(m, mi){
     var chips = (m.chips && m.chips.length) ? '<div class="pro-ai-chips">'+m.chips.map(function(c, ci){ return '<button type="button" class="pro-pc'+(c.kind==='reset'?' alt':'')+'" data-pc="'+mi+':'+ci+'">'+proEsc_(c.label)+'</button>'; }).join('')+'</div>' : '';
-    return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+proRichHtml_(m.rich)+chips+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
+    return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+proImgsHtml_(m.images)+proRichHtml_(m.rich)+chips+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
   el.scrollTop = el.scrollHeight;
 }
 function proAiContext_(){
@@ -703,7 +715,7 @@ async function proAiSend_(){
     _proDock.log.push({ role:'bot', text:'⏳ Đang tra bảng giá…' }); proAiLogRender_();
     var pr = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch);
     _proDock.log.pop();
-    var pm = { role:'bot', text:proPriceFormat_(pr), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' };
+    var pm = { role:'bot', text:proPriceFormat_(pr), images:proComboImages_(pr.combos), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' };
     if (pr.ok && !pr.found && (pr.suggestions||[]).length){ pm.text = proPriceNotFoundText_(); pm.chips = pr.suggestions.slice(0,8).map(function(n){ return { kind:'name', label:n }; }); }   // gợi ý thành nút bấm → xem thông tin + giá
     _proDock.log.push(pm);
     _proDock.busy = false; proAiLogRender_(); return;
@@ -715,7 +727,7 @@ async function proAiSend_(){
     _proDock.log.pop();
     if (pr2.ok && (pr2.found || (pr2.combos||[]).length)){
       q.value = '';
-      _proDock.log.push({ role:'bot', text:proPriceFormat_(pr2), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
+      _proDock.log.push({ role:'bot', text:proPriceFormat_(pr2), images:proComboImages_(pr2.combos), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
       _proDock.busy = false; proAiLogRender_(); return;
     }
     _proDock.log.pop(); _proDock.busy = false; proAiLogRender_();   // không thấy sản phẩm → chạy tiếp luồng cũ (trả gợi ý "chưa hiểu")
@@ -751,4 +763,4 @@ async function proAiSend_(){
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 try { proCatFill_(); if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', function(){ try { proCatFill_(); } catch (e) {} }); } catch (e) {}
-if (typeof module!=='undefined') module.exports = { proRuleUnderstands_, proLooksLikeProduct_, proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proComboText_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };
+if (typeof module!=='undefined') module.exports = { proComboImages_, proImgsHtml_, proRuleUnderstands_, proLooksLikeProduct_, proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proComboText_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_, proSalesBLoad_, proSalesBBuild_, proSalesBContext_, proSalesBIntent_, proRuleSalesB_, proRuleSalesBAnswer_, proRichHtml_, proRichSalesB_, proLeadsIntent_, proLeadsAnswer_ };

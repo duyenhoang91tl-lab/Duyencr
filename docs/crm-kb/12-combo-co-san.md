@@ -3,7 +3,7 @@
 Làm xong 6/6 bước (2026-11-17..18) + Zalo AI (2026-11-18). KHÁC `khoCombo` (trừ tồn kho) và AIContext `combo_template` (mẫu tin nhắn) — đừng nhầm.
 
 ## Dữ liệu
-- Sheet **COMBO** trong file bảng giá (`PRICE_SS_ID`, cạnh DANH_MUC/CTKM). Chưa có thì GAS TỰ TẠO. Cột theo VỊ TRÍ: Mã combo | Tên combo | Sản phẩm | Giá combo | Điều kiện/Ghi chú | Từ ngày | Đến ngày | Từ khóa | Hoạt động.
+- Sheet **COMBO** trong file bảng giá (`PRICE_SS_ID`, cạnh DANH_MUC/CTKM). Chưa có thì GAS TỰ TẠO. Cột theo VỊ TRÍ: Mã combo | Tên combo | Sản phẩm | Giá combo | Điều kiện/Ghi chú | Từ ngày | Đến ngày | Từ khóa | Hoạt động | Ảnh.
 - Ô "Sản phẩm": mỗi dòng 1 món `Tên | Chất liệu | Size | SL` hoặc `2 x Tên`.
 - ⚠ **BẪY GIÁ:** server coi số < 100000 là NGHÌN đồng (`_comboVnd_`), ≥ 100000 là đồng đầy đủ. Mọi client dùng `priceVnd` (đồng) để HIỂN THỊ/TÍNH; khi GỬI LƯU lại phải đổi đồng → số lưu (85000 → 85; xem `_cbPriceToSend_` ở js/93) và KHÔNG gửi `priceText` (server sẽ lưu chữ đó thay cho số).
 
@@ -28,3 +28,8 @@ Làm xong 6/6 bước (2026-11-17..18) + Zalo AI (2026-11-18). KHÁC `khoCombo` 
 - Bảng action thêm: `comboList/comboSearch (GET)`, `comboSave/comboDelete (POST, admin)` — combo có sẵn trong sheet COMBO.
 - Quy ước: giá combo < 100000 trên server = nghìn đồng; client luôn nhập/hiển thị đồng đầy đủ, dùng `priceVnd`.
 - Tiền tố/ID: Pancake Soạn đơn dùng `pkb-combo`, `pkb-combo-add`, `pkb-combo-qty`; cache `pkCombos` (storage.local, 5 phút). Zalo dùng `zaib-combo`, `zaib-combo-add`, `zaib-combo-qty`; cache `zaiCombos`.
+
+## 5. Ảnh combo (18/11/2026)
+- Cột 10 **Ảnh** của sheet COMBO: 1–4 link, mỗi link 1 dòng (hoặc cách nhau dấu phẩy/chấm phẩy). Nhận link FILE Drive (`/file/d/ID`, `?id=ID`, `uc?export=view&id=ID`) hoặc link ảnh http(s); link THƯ MỤC Drive không dùng được. Sheet cũ 9 cột tự thêm cột + tiêu đề (`_comboSheet_`).
+- GAS `_comboRow_` trả `images` (link Drive → `drive.google.com/thumbnail?id=ID&sz=w600`) + `imagesText` (nguyên văn); `comboSave` nhận `images:[…]`, bỏ link rác, tối đa 4, tự bật chia sẻ "ai có link" cho file Drive.
+- Admin: tab 🎁 Combo → Thêm/Sửa → "📷 Tải ảnh từ máy" (thu nhỏ ≤1280px, action `uploadTemplateImage`) hoặc dán link. Thẻ combo (js/93) + câu trả lời giá của Trợ lý AI (js/38 `proComboImages_`) hiện ảnh kèm tên combo. Pancake/Zalo "Soạn đơn" chưa hiện ảnh.
