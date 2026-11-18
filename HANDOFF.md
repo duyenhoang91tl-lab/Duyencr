@@ -1,5 +1,16 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — HỎI GIÁ 1 TỪ "điếu" KHÔNG RA, "hạt đồng điếu" LẠI RA + CHUẨN BỊ SỬA HIỂN THỊ COMBO) — BƯỚC 1/? XONG (GAS tự deploy qua workflow, không cần thao tác tay)
+- NGUYÊN NHÂN GỐC: `_priceVariantsForPrompt_` (gas_v13.js, nằm trong gas/02) bắt buộc **≥ 2 từ khớp** tên SP (`hit >= 2`, chống báo giá nhầm). Câu chỉ 1 từ có nghĩa ("điếu" → "dieu") không bao giờ đạt ngưỡng → rớt xuống nhánh "gợi ý" của `priceAskBase_`; câu "hạt đồng điếu" có 3 từ nên đạt.
+- ĐÃ SỬA: thêm tham số `opts.allowSingle` — CHỈ 3 đường HỎI GIÁ chủ động truyền (`priceAskBase_`, `_priceQaSystemPrompt_`, `_crmAskPriceBlock_`); `_buildAISystemPrompt_` (AI chat khách) KHÔNG truyền để tin 1 từ của khách ("vàng", "ok") không kéo bảng giá vào prompt. 1 từ chỉ báo giá khi từ đó dài ≥ 3 ký tự, không phải số, và khớp RÕ (≤ 3 sản phẩm khác tên). Từ chung nhiều SP ("lắc", "vòng", "nhẫn" khi bảng có nhiều loại) vẫn trả chip gợi ý như cũ — đúng thiết kế cũ trong `test-price-ask.js` ("giá lắc" → không báo giá vô đoạn).
+- ⚠ ĐỔI THIẾT KẾ CÓ CHỦ Ý theo yêu cầu Duyên: 2 assertion cũ của `tools/test-price-ask.js` ("giá nhẫn" 1 từ → chỉ gợi ý) đổi thành "khớp rõ 1 SP → báo giá SP đó". Test mới `tools/test-price-single.js` (điếu / hạt đồng điếu / DIEU / lắc / zzzz / số). Tất cả test giá + combo xanh.
+- Cần làm ở phía Duyên: chờ workflow deploy-gas xanh ở tab Actions rồi hỏi lại "điếu" ở Trợ lý AI → 💰 Giá sản phẩm. Nếu VẪN không ra: gửi tên chính xác ô "Tên sản phẩm" của hàng "hạt đồng điếu" trong DANH_MUC (có thể gõ khác dấu: sheet là chữ tổ hợp NFD).
+- [ ] **VIỆC KẾ TIẾP (combo — yêu cầu mới Duyên 18/11, làm từng file, push từng bước):**
+  1. Tìm giá + tick ô combo → kết quả hiện combo (xem lại `priceAsk_`/`_priceAskCombos_`, thêm lựa chọn combo ở UI js/38).
+  2. Hiển thị combo kiểu mới: mỗi dòng SP có ô chọn vàng 10k/14k/18k/24k + chất liệu; dòng quà tặng; freeship; "Giá combo X giảm Y còn Z"; tổng cuối kèm ship. Dữ liệu mẫu Duyên: CHARM BI MẪU SỐ 10 10k SIZE 3 380×2=760 · CHUỖI LAM THỦY 6 LI 1.550 · HẠT ĐỒNG ĐIẾU LAM THỦY 990×1 · ship 40k → 3.140.000đ.
+  3. CTKM dựng sẵn từ sheet CTKM để tick (tặng quà / giảm tiền) + ô tải ảnh quà tối đa 2.
+  4. Ảnh combo tối đa 6 (hiện đang tối đa 4 — `comboSave`, `_comboRow_`, js/93) — "đang làm dở, làm tiếp".
+
 ## 2026-11-18 (phiên Claude — COMBO: FORM CHỌN SẢN PHẨM TỪ DANH SÁCH CÓ SẴN + GIÁ NIÊM YẾT POS/BẢNG GIÁ) — ĐANG LÀM TỪNG BƯỚC; CẢ 4/4 BƯỚC XONG (GAS tự deploy; web cần Ctrl+F5)
 - ĐỀ BÀI Duyên: form Thêm/Sửa combo (tab 🎁 Combo) thay ô gõ tay "Sản phẩm" bằng CHỌN sản phẩm từ danh sách có sẵn, kèm GIÁ NIÊM YẾT = đơn giá của đơn POS gần nhất có sản phẩm đó (hoặc giá theo bảng giá/CTKM), hiển thị từng dòng giống màn lên đơn POS (mã SP, tên, đơn giá × SL, Khuyến mãi, thành tiền; đầu danh sách "Số mẫu mã / Số lượng SP" + ô tìm).
 - QUYẾT ĐỊNH THIẾT KẾ: KHÔNG đổi định dạng lưu của sheet COMBO (vẫn `Tên | Chất liệu | Size | SL` mỗi dòng, cột 3) → Pancake/Zalo "Soạn đơn", Trợ lý AI giá, comboList KHÔNG phải sửa. Form mới chỉ là cách NHẬP: chọn SP → ghi ra đúng chuỗi cũ. Giá niêm yết/khuyến mãi từng dòng chỉ để admin THAM KHẢO khi định GIÁ COMBO (không lưu).

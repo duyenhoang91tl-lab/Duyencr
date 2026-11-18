@@ -186,7 +186,7 @@ function priceAskBase_(q) {
   try { rows = _priceCatalogRowsCached_(); } catch (e) { return { ok: false, error: 'Khong doc duoc bang gia (DANH_MUC): ' + String(e && e.message || e) }; }
   if (!rows.length) return { ok: false, error: 'Bang gia (DANH_MUC) dang rong hoac chua doc duoc.' };
   var info = '';
-  try { info = _priceVariantsForPrompt_(q); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
+  try { info = _priceVariantsForPrompt_(q, { allowSingle: true }); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
   if (info) return { ok: true, found: true, text: info, unit: 'nghin dong (vd 2.310 = 2.310.000d)' };
   // Khong khop du de bao gia chinh xac -> goi y ten san pham gan dung de nguoi dung hoi lai cu the hon
   var toks = _stripVN_(q).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 2 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
@@ -247,7 +247,7 @@ function priceItem_(name) {
 // Prompt he thong cho cau hoi GIA cua NHAN VIEN (Pancake AI "Hoi AI"): van ngan, CHI dung bang gia that, cam bia.
 function _priceQaSystemPrompt_(q) {
   var info = '';
-  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  try { info = _priceVariantsForPrompt_(String(q || ''), { allowSingle: true }); } catch (e) {}
   return 'Ban la tro ly ban hang noi bo cua team, tra loi NHAN VIEN SALE ve gia san pham. Tieng Viet, than thien, VAN NGAN: toi da 3 cau (khoang 60 tu), khong tieu de, khong danh so, khong giai thich them. ' +
     'Neu co NHIEU lua chon: moi CHAT LIEU 1 dong, cac SIZE cua chat lieu do noi tiep tren CUNG dong theo dang "Chat lieu: size 1 gia X, size 2 gia Y" (KHONG lap lai ten san pham/chat lieu cho tung size, KHONG xuong dong rieng cho tung size), roi hoi nhan vien khach chon loai nao.' +
     '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG bia gia hay suy ra gia khac):\n' + String(info).slice(0, 3500) +
@@ -273,7 +273,7 @@ function priceQa_(q) {
 // Khoi bang gia noi them vao prompt he thong cua tro ly (crmAsk) khi client bao withPrices — de AI (engine 'ai') cung chi dung so lieu that.
 function _crmAskPriceBlock_(q) {
   var info = '';
-  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  try { info = _priceVariantsForPrompt_(String(q || ''), { allowSingle: true }); } catch (e) {}
   if (!info) return '\n\nBANG GIA: KHONG tim thay san pham nao khop cau hoi trong bang gia DANH_MUC. Neu nhan vien hoi gia thi noi ro "chua tim thay trong bang gia", TUYET DOI KHONG tu bia gia.';
   return '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — khi tra loi cau hoi ve gia CHI dung so lieu trong day, TUYET DOI KHONG bia gia; gia tinh bang NGHIN VND, vd 2.310 = 2.310.000d, hay quy ra dong cho de hieu; neu cau hoi khong noi ro chat lieu/size thi liet ke DU cac lua chon):\n' + String(info).slice(0, 3500);
 }

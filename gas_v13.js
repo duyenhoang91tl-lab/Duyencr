@@ -631,7 +631,11 @@ function _priceNumWords_(s) {
 var _PRICE_NOISE_ = ['khach','hoi','gia','bao','nhieu','tien','san','pham','cho','minh','ban','em','anh','chi','oi','the','nao','duoc','khong','voi','nay','mua','can','van','tra','loi','giup','xin','vui','long','cac','hang','shop'];
 function _priceWordHit_(blob, w) { return w.length >= 3 && !/^\d+$/.test(w) ? blob.indexOf(w) !== -1 : (' ' + blob + ' ').indexOf(' ' + w + ' ') !== -1; }
 
-function _priceVariantsForPrompt_(userMsg) {
+// opts.allowSingle (CHI cac duong HOI GIA chu dong: priceAsk/priceQa/crmAsk withPrices): cho phep cau hoi chi co 1 TU co nghia (>= 3 ky tu, khong phai so) khop ten SP,
+// NHUNG chi khi tu do khop RO (<= 3 san pham khac ten); tu chung nhieu SP (vd "lac") van tra '' -> goi y ten.
+// NGUYEN NHAN GOC (Duyen 18/11/2026: tim "điếu" khong ra, "hạt đồng điếu" lai ra): nguong hit >= 2 (chong bao gia nham) khien cau 1 tu khong bao gio dat -> rot xuong "goi y".
+// KHONG bat cho _buildAISystemPrompt_ (AI chat khach): tin nhan 1 tu cua khach ("vang", "ok") khong duoc keo bang gia vao prompt.
+function _priceVariantsForPrompt_(userMsg, opts) {
   var rows;
   try {
     var cache = CacheService.getScriptCache();
@@ -655,6 +659,8 @@ function _priceVariantsForPrompt_(userMsg) {
   var allToks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
   var toks = allToks.filter(function (w) { return _PRICE_NOISE_.indexOf(w) === -1; });   // giu ca tu ngan (co, la, bi) va so (4, 8) — khop NGUYEN TU, xem _priceWordHit_
   if (!toks.length) return '';
+  var single = !!(opts && opts.allowSingle) && toks.length === 1 && toks[0].length >= 3 && !/^\d+$/.test(toks[0]);
+  var minHit = single ? 1 : 2, maxNames = 3;
 
   // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
   var scored = [];
@@ -669,7 +675,7 @@ function _priceVariantsForPrompt_(userMsg) {
     if (!nameBlob.trim()) continue;
     var hit = 0;
     for (var t = 0; t < toks.length; t++) if (_priceWordHit_(nameBlob, toks[t])) hit++;
-    if (hit >= 2) {
+    if (hit >= minHit) {
       // cong diem CUM TU LIEN TIEP trong cau hoi (2..4 tu) xuat hien nguyen cum trong ten SP: "lac co 4 la" khop "LAC CO 4 LA" hon "LAC ... 8 BI VANG"
       var bonus = 0, padded = ' ' + nameBlob + ' ';
       for (var n = 2; n <= 4; n++) for (var s0 = 0; s0 + n <= allToks.length; s0++) {
@@ -683,10 +689,20 @@ function _priceVariantsForPrompt_(userMsg) {
   if (!scored.length) return '';
   scored.sort(function (a, b) { return b.hit - a.hit; });
   var bestHit = scored[0].hit;
+  // 1 TU chi bao gia khi khop RO (<= maxNames san pham khac ten): tu CHUNG nhieu SP ("lac", "vong", "nhan" trong bang nhieu loai) van tra goi y de nhan vien chon, khong bao gia vo doan 3 SP bat ky.
+  if (single) {
+    var distinctNames = {}, nDistinct = 0;
+    for (var d0 = 0; d0 < scored.length; d0++) {
+      var fd = _priceFieldPick_(scored[d0].row, ['ten san pham', 'ten thuong mai']);
+      var kd = _stripVN_(fd && fd.val ? fd.val : scored[d0].name);
+      if (kd && !distinctNames[kd]) { distinctNames[kd] = 1; nDistinct++; }
+    }
+    if (nDistinct > maxNames) return '';
+  }
 
   // Lay cac dong diem cao nhat, roi gom theo TEN SAN PHAM chuan hoa de keo ve DU cac bien the
   var topNames = {};
-  for (var s = 0; s < scored.length && Object.keys(topNames).length < 3; s++) {
+  for (var s = 0; s < scored.length && Object.keys(topNames).length < maxNames; s++) {
     if (scored[s].hit < bestHit) break;
     var f = _priceFieldPick_(scored[s].row, ['ten san pham', 'ten thuong mai']);
     if (f && f.val) topNames[_stripVN_(f.val)] = String(f.val).trim();
@@ -12356,7 +12372,7 @@ function priceAskBase_(q) {
   try { rows = _priceCatalogRowsCached_(); } catch (e) { return { ok: false, error: 'Khong doc duoc bang gia (DANH_MUC): ' + String(e && e.message || e) }; }
   if (!rows.length) return { ok: false, error: 'Bang gia (DANH_MUC) dang rong hoac chua doc duoc.' };
   var info = '';
-  try { info = _priceVariantsForPrompt_(q); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
+  try { info = _priceVariantsForPrompt_(q, { allowSingle: true }); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
   if (info) return { ok: true, found: true, text: info, unit: 'nghin dong (vd 2.310 = 2.310.000d)' };
   // Khong khop du de bao gia chinh xac -> goi y ten san pham gan dung de nguoi dung hoi lai cu the hon
   var toks = _stripVN_(q).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 2 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
@@ -12417,7 +12433,7 @@ function priceItem_(name) {
 // Prompt he thong cho cau hoi GIA cua NHAN VIEN (Pancake AI "Hoi AI"): van ngan, CHI dung bang gia that, cam bia.
 function _priceQaSystemPrompt_(q) {
   var info = '';
-  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  try { info = _priceVariantsForPrompt_(String(q || ''), { allowSingle: true }); } catch (e) {}
   return 'Ban la tro ly ban hang noi bo cua team, tra loi NHAN VIEN SALE ve gia san pham. Tieng Viet, than thien, VAN NGAN: toi da 3 cau (khoang 60 tu), khong tieu de, khong danh so, khong giai thich them. ' +
     'Neu co NHIEU lua chon: moi CHAT LIEU 1 dong, cac SIZE cua chat lieu do noi tiep tren CUNG dong theo dang "Chat lieu: size 1 gia X, size 2 gia Y" (KHONG lap lai ten san pham/chat lieu cho tung size, KHONG xuong dong rieng cho tung size), roi hoi nhan vien khach chon loai nao.' +
     '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG bia gia hay suy ra gia khac):\n' + String(info).slice(0, 3500) +
@@ -12443,7 +12459,7 @@ function priceQa_(q) {
 // Khoi bang gia noi them vao prompt he thong cua tro ly (crmAsk) khi client bao withPrices — de AI (engine 'ai') cung chi dung so lieu that.
 function _crmAskPriceBlock_(q) {
   var info = '';
-  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  try { info = _priceVariantsForPrompt_(String(q || ''), { allowSingle: true }); } catch (e) {}
   if (!info) return '\n\nBANG GIA: KHONG tim thay san pham nao khop cau hoi trong bang gia DANH_MUC. Neu nhan vien hoi gia thi noi ro "chua tim thay trong bang gia", TUYET DOI KHONG tu bia gia.';
   return '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — khi tra loi cau hoi ve gia CHI dung so lieu trong day, TUYET DOI KHONG bia gia; gia tinh bang NGHIN VND, vd 2.310 = 2.310.000d, hay quy ra dong cho de hieu; neu cau hoi khong noi ro chat lieu/size thi liet ke DU cac lua chon):\n' + String(info).slice(0, 3500);
 }
