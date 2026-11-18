@@ -227,6 +227,9 @@
     csBarHint.id = 'zai-cs-bar-hint';
     csBarHint.style.cssText = 'font-size:10px;color:#15803d;';
     csRow.appendChild(csBarHint);
+    // Nút "🤖 Hỏi AI" nằm ở hàng CS (Duyên yêu cầu 18/11/2026 — giống Pancake AI: luôn hiện cạnh ô CS). Khối giá của Zalo luôn hiện nên không cần mở mục.
+    addEl(csRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
+      title:'Hỏi AI về giá — gõ câu hỏi ở ô Tra cứu giá (vd: giá nhẫn bạc trơn size 12) rồi bấm; trả lời văn ngắn, giá lấy từ bảng giá', textContent:'🤖 Hỏi AI', style:'flex:none;white-space:nowrap;'});
     csBar.appendChild(csRow);
     const nzRow = document.createElement('div');
     nzRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:5px;border-top:1px solid #bbf7d0;padding-top:5px;';
@@ -392,8 +395,6 @@
     addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size...',
       style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
-    addEl(priceRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
-      title:'Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)', textContent:'🤖 Hỏi AI'});
     addEl(priceSearchMode, 'div', {id:'zai-price-ai', style:'display:none;'});
     addEl(priceSearchMode, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
     const priceBuilderMode = addEl(priceWrap, 'div', {id:'zai-price-builder-mode', style:'display:none;'});
@@ -2855,7 +2856,12 @@
     box.style.display = '';
     const note = (t, cls) => '<div class="' + (cls || 'zai-price-ai-txt') + '">' + escHtml(t) + '</div>';
     if (!GAS_URL) { box.innerHTML = note('Chưa cài đặt URL GAS. Nhấn ⚙.'); return; }
-    if (!q) { box.innerHTML = note('Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).'); return; }
+    if (!q) {
+      box.innerHTML = note('Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).');
+      // Nút ở hàng CS (trên cùng) còn ô hỏi nằm thấp hơn trong panel → cuộn tới + đặt con trỏ vào ô hỏi.
+      const qi = document.getElementById('zai-price-q'); if (qi) { try { qi.scrollIntoView({block:'center'}); qi.focus(); } catch (e) {} }
+      return;
+    }
     const seq = ++_zaiPriceAiSeq;
     box.innerHTML = note('🤖 Đang hỏi AI…');
     let d;
