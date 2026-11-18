@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude — TRA GIÁ "NGŨ ĐIẾU" KHÔNG RA CHARM MINI)
+- NGUYÊN NHÂN GỐC: `_priceVariantsForPrompt_` (gas_v13.js) cắt cứng `maxNames = 3` theo thứ tự sheet; "ngũ điếu" khớp >3 SP cùng điểm nên "CHARM NGŨ ĐIẾU MINI MIX" rớt, chỉ gõ thêm "mini" mới ra.
+- ✅ Đường hỏi giá chủ động (allowSingle) nay liệt kê tới 12 SP + dòng "(Còn N sản phẩm khác…)"; AI chat khách vẫn 3; ngưỡng gợi ý chip cho 1 từ chung giữ 3. Test: tools/test-price-ngudieu.js.
+- ⏳ CẦN LÀM: Duyên DEPLOY LẠI GAS (dán gas_v13.js → Deploy → Manage deployments → New version). Khối gas-code-v9 không còn trong index.html nên không cần đồng bộ.
+
 ## 2026-11-18 (phiên Claude — THƯ VIỆN SẢN PHẨM v2: THÔNG TIN SẢN PHẨM (văn bản) + Ô TÌM TOÀN CỤC RA SP/COMBO) — ĐANG LÀM TỪNG BƯỚC
 - YÊU CẦU MỚI Duyên: (1) ô tìm khách toàn cục (#search-input) cũng ra sản phẩm + combo, bấm là mở thư mục trong Thư viện sản phẩm; (2) mỗi thư mục có thêm THÔNG TIN sản phẩm dạng văn bản Duyên tự cập nhật (vd ý nghĩa), hiện cùng danh sách ảnh; sắp xếp thông minh.
 - ✅ BƯỚC A GAS (`gas_v13.js`, split OK, `tools/test-plib.js` mở rộng xanh): sheet `ThuVienSPInfo` (productKey, productName, group, info, updatedBy, updatedAt), POST `plibInfoSave` (CHỈ ADMIN, ≤4000 ký tự, lưu rỗng = xóa, cell ép định dạng văn bản nên "- ..." / "=..." không thành công thức & không bị thêm dấu '). `plibList` không key: counts kèm `info` (để ô tìm tìm cả trong nội dung; thư mục chỉ có info vẫn hiện n=0); có key: thêm `info:{text,by,at}`.

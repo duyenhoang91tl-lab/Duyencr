@@ -660,7 +660,9 @@ function _priceVariantsForPrompt_(userMsg, opts) {
   var toks = allToks.filter(function (w) { return _PRICE_NOISE_.indexOf(w) === -1; });   // giu ca tu ngan (co, la, bi) va so (4, 8) — khop NGUYEN TU, xem _priceWordHit_
   if (!toks.length) return '';
   var single = !!(opts && opts.allowSingle) && toks.length === 1 && toks[0].length >= 3 && !/^\d+$/.test(toks[0]);
-  var minHit = single ? 1 : 2, maxNames = 3;
+  // NGUYEN NHAN GOC (Duyen 18/11/2026: tim "ngu dieu" khong ra "CHARM NGU DIEU MINI MIX", phai go "ngu dieu mini" moi ra): maxNames = 3 cat cung 3 SP dau theo thu tu sheet,
+  // nen khi >3 SP cung diem (deu chua "ngu dieu") cac SP sau bi rot. Duong HOI GIA chu dong (allowSingle) la CS dang tra cuu → cho toi 12 SP; AI chat khach van 3 de prompt gon.
+  var minHit = single ? 1 : 2, maxNames = (opts && opts.allowSingle) ? 12 : 3, extraNames = 0;
 
   // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
   var scored = [];
@@ -697,15 +699,18 @@ function _priceVariantsForPrompt_(userMsg, opts) {
       var kd = _stripVN_(fd && fd.val ? fd.val : scored[d0].name);
       if (kd && !distinctNames[kd]) { distinctNames[kd] = 1; nDistinct++; }
     }
-    if (nDistinct > maxNames) return '';
+    if (nDistinct > 3) return '';   // 1 tu chung (> 3 SP) van chi goi y chip nhu cu — chi gioi han LIET KE o tren moi nang len 12
   }
 
   // Lay cac dong diem cao nhat, roi gom theo TEN SAN PHAM chuan hoa de keo ve DU cac bien the
   var topNames = {};
-  for (var s = 0; s < scored.length && Object.keys(topNames).length < maxNames; s++) {
+  for (var s = 0; s < scored.length; s++) {
     if (scored[s].hit < bestHit) break;
     var f = _priceFieldPick_(scored[s].row, ['ten san pham', 'ten thuong mai']);
-    if (f && f.val) topNames[_stripVN_(f.val)] = String(f.val).trim();
+    if (!f || !f.val) continue;
+    var kf = _stripVN_(f.val);
+    if (topNames[kf]) continue;
+    if (Object.keys(topNames).length < maxNames) topNames[kf] = String(f.val).trim(); else extraNames++;
   }
   if (!Object.keys(topNames).length) return '';
 
@@ -728,6 +733,7 @@ function _priceVariantsForPrompt_(userMsg, opts) {
     if (variants.length) blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n'));
   }
   if (!blocks.length) return '';
+  if (extraNames > 0) blocks.push('(Còn ' + extraNames + ' sản phẩm khác cũng khớp — gõ thêm từ để thu hẹp, vd tên đầy đủ.)');
   return blocks.join('\n\n');
 }
 
