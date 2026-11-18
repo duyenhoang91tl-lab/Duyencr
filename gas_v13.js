@@ -958,6 +958,88 @@ function comboList_(q) {
     return { ok: true, total: rows.length, count: m.length, rows: m.slice(0, 50) };
   } catch (err) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + (err && err.message || err) }; }
 }
+// ── GIA NIEM YET THEO POS cho form tao combo (Duyen 2026-11-18): chon SP tu bang gia, gia niem yet = DON GIA (cot T "Đơn giá") cua don POS GAN NHAT co SP do. ──
+// KHAC _donListPriceTotal_ (chi tra TONG): o day can don gia TUNG san pham de gan vao tung dong combo. Khong doan: so gia phai khop so luong (hoac 1 gia + 1 so luong), sai thi bo dong.
+var POS_PRICE_MAX_ROWS_ = 8000;   // chi quet N dong CUOI sheet "dữ liệu đơn" (don gan nhat nam duoi cung) cho nhanh
+function _donListPriceParts_(rawDonGia, soLuong) {
+  var prices;
+  if (typeof rawDonGia === 'number') prices = [rawDonGia];
+  else {
+    var str = String(rawDonGia == null ? '' : rawDonGia).trim();
+    if (!str) return null;
+    var q0 = String(soLuong == null ? '' : soLuong).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    var parts = str.split(/[;\n\r|]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (parts.length === 1 && q0.length > 1 && str.indexOf(',') !== -1 && !/^\d{1,3}(,\d{3})+$/.test(str)) parts = str.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    prices = parts.map(_donMoneyToken_);
+  }
+  var qs = String(soLuong == null ? '' : soLuong).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!qs.length) qs = ['1'];
+  if (prices.length !== qs.length) return null;
+  for (var i = 0; i < prices.length; i++) if (!isFinite(prices[i]) || prices[i] < 0) return null;
+  return prices;
+}
+// vals = cac dong A:T cua sheet (cu -> moi, nhu getValues). Tra [{n: ten SP tren don, c: ma SP, p: don gia dong, d: 'yyyy-MM-dd'}] — moi (ten + ma) CHI giu don CO NGAY MOI NHAT (ngang ngay thi dong sau thang). Bo don Huy/Hoan.
+function _posLastPricesFromRows_(vals) {
+  var best = {}, lastYmd = '';
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i], ymd = '', raw = r[1];
+    if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw)) ymd = _vnYmd_(raw);
+    else if (raw !== '' && raw != null) { var pd = parseVNDate_(raw); ymd = pd ? _vnYmd_(pd) : ''; }
+    if (ymd) lastYmd = ymd; else ymd = lastYmd;   // dong thieu ngay ke thua ngay dong tren (giong _donConvertRows_)
+    if (!ymd) continue;
+    if (_donHasExcludedStatus_(r[14] ? String(r[14]).trim() : '')) continue;
+    var names = splitMulti_(r[8] ? String(r[8]) : '', ','), codes = splitMulti_(r[9] ? String(r[9]) : '', ';');
+    var prices = _donListPriceParts_(r[19], r[10]);
+    if (!prices || !names.length || names.length !== prices.length) continue;   // lech so luong (ten SP co dau phay...) -> khong doan
+    for (var k = 0; k < names.length; k++) {
+      var nm = String(names[k] || '').trim(); if (!nm || !(prices[k] > 0)) continue;
+      var code = codes.length === names.length ? String(codes[k] || '').trim() : '';
+      var key = _stripVN_(nm) + '|' + code.toLowerCase(), cur = best[key];
+      if (!cur || ymd >= cur.d) best[key] = { n: nm, c: code, p: Math.round(prices[k]), d: ymd };
+    }
+  }
+  return Object.keys(best).map(function (k) { return best[k]; });
+}
+function readPosLastPrices_() {
+  var cached = _cacheGetBig_('pos_last_price_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var sh = getDTSS_().getSheetByName(DON_CHITIET_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow(); if (last < 2) return [];
+  var first = Math.max(2, last - POS_PRICE_MAX_ROWS_ + 1);
+  var vals = sh.getRange(first, 1, last - first + 1, Math.min(Math.max(DON_CHITIET_WIDTH, DON_COL_DONGIA + 1), sh.getMaxColumns())).getValues();
+  var out = _posLastPricesFromRows_(vals);
+  try { _cachePutBig_('pos_last_price_v1', JSON.stringify(out), 600); } catch (e) {}
+  return out;
+}
+function _posWordsOf_(s) { return ' ' + _stripVN_(String(s == null ? '' : s)).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+function _posTokens_(s) { return _posWordsOf_(s).trim().split(' ').filter(Boolean); }
+function _posAllHit_(hay, toks) { if (!toks.length) return false; for (var i = 0; i < toks.length; i++) if (hay.indexOf(' ' + toks[i] + ' ') < 0) return false; return true; }
+// 1 query {t: ten SP, m: ten thuong mai (tuy chon), c: chat lieu, s: size}. Ten (t HOAC m) phai khop HET tu; size (neu co) cung phai khop HET (gia moi size khac nhau, khong tra gia size khac);
+// chat lieu chi cong diem (tren don thuong viet tat: "NG BICH"). Nhieu dong khop → diem cao nhat, bang diem → don moi nhat.
+function _posMatchOne_(list, q) {
+  var tT = _posTokens_(q && q.t), tM = _posTokens_(q && q.m), tC = _posTokens_(q && q.c), tS = _posTokens_(q && q.s);
+  if (!tT.length && !tM.length) return { found: false };
+  var best = null, bs = -1;
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i], hay = _posWordsOf_(e.n + ' ' + (e.c || ''));
+    if (!(_posAllHit_(hay, tT) || _posAllHit_(hay, tM))) continue;
+    if (tS.length && !_posAllHit_(hay, tS)) continue;
+    var sc = 0; tC.forEach(function (t) { if (hay.indexOf(' ' + t + ' ') >= 0) sc++; });
+    sc = tC.length ? sc / tC.length : 0.5;
+    if (sc > bs || (sc === bs && best && e.d > best.d)) { best = e; bs = sc; }
+  }
+  return best ? { found: true, name: best.n, code: best.c, price: best.p, date: best.d } : { found: false };
+}
+// Action GET posPrice&q=<JSON mang [{t,m,c,s}] toi da 40>. Tra { ok, results:[{found,name,code,price(dong),date}] } SONG SONG voi q.
+function posPrice_(qJson) {
+  try {
+    var qs; try { qs = JSON.parse(String(qJson || '[]')); } catch (e) { return { ok: false, error: 'q phai la JSON mang [{t,m,c,s}]' }; }
+    if (!Array.isArray(qs)) return { ok: false, error: 'q phai la JSON mang [{t,m,c,s}]' };
+    var list = readPosLastPrices_();
+    return { ok: true, results: qs.slice(0, 40).map(function (q) { return _posMatchOne_(list, q); }) };
+  } catch (err) { return { ok: false, error: 'Khong doc duoc gia POS: ' + (err && err.message || err) }; }
+}
 // Gia tri luu o cot Anh: mang c.images (hoac chuoi c.imagesText) -> moi link 1 dong, bo dong rong, toi da 4. Link khong hop le (khong phai http/Drive) bi bo.
 function _comboImageUrlsRaw_(c) {
   var src = Array.isArray(c.images) ? c.images.join('\n') : String(c.imagesText || '');
@@ -2930,6 +3012,7 @@ function doGetCore_(e) {
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
+    if (action === 'posPrice') return jsonOut_(posPrice_(e && e.parameter ? e.parameter.q : ''));   // don gia niem yet cua don POS GAN NHAT theo tung SP (form tao combo, js/93)
     if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
