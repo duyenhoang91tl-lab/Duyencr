@@ -84,5 +84,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  // menu Settings
  const sn=fs.readFileSync(path.join(__dirname,'..','js','29-sidenav.js'),'utf8');
  t('có mục "🏢 Phòng ban" trong menu Settings (admin) gọi openDeptSettings',/ids:\['act:roles','act:dept'/.test(sn)&&/dept:\s*\{ t:'🏢 Phòng ban', f:'openDeptSettings', admin:true \}/.test(sn));
- console.log('\n'+ok+' OK, '+bad+' FAIL');process.exit(bad?1:0);
+ 
+ // LỖI THẬT 19/11 (nguyetTTA1995): sale MỚI chỉ có trong ĐƠN Base/POS (chưa có tài khoản, chưa vào team) → phải TÌM ĐƯỢC ở "Từng người" để xếp phòng
+ {
+  c=mk(); let calls=0;
+  c.w._allCSNames=()=>{calls++;return ['nguyetTTA1995','Thuydinh1995','thuydinh95','An','dung1'];};   // nguồn: csSet đơn Base+POS (js/08)
+  await c.w.openDeptSettings(); c.w.eval("_dp.sec='people'; _dp.q=''");
+  const names=c.w.eval('_dpNames()');
+  t('tên Sale chỉ có trong đơn (nguyetTTA1995) có trong danh sách Từng người',names.includes('nguyetTTA1995'));
+  t('không nhân đôi tên đã có sẵn (An / dung1 chỉ 1 dòng, không phân biệt hoa/thường)',names.filter(n=>n.toLowerCase()==='an').length===1&&names.filter(n=>n.toLowerCase()==='dung1').length===1);
+  c.w.eval("_dp.q='nguyettta'"); const html=c.w.eval('_dpPeopleListHtml()');
+  t('gõ "nguyettta" (không phân biệt hoa/thường) → ra đúng dòng nguyetTTA1995 để chọn phòng',/nguyetTTA1995/.test(html)&&!/Không có tên nào khớp/.test(html));
+  c.w.eval("_dpPeopleListHtml(); _dpNames(); _dpNames()");
+  t('quét toàn bộ khách chỉ 1 lần mỗi lần mở trang (gõ tìm không bị chậm)',calls===1);
+  c.w.eval("_dpSetPerson('nguyetTTA1995','sale')"); await c.w.eval('_dpSave()');
+  t('gán phòng cho sale mới rồi lưu → saleDepts chứa nguyetTTA1995',JSON.parse(c.S.store.saleDepts).nguyetTTA1995==='sale');
+  t('mở lại trang → quét lại (thấy sale mới thêm sau đó)',(await c.w.openDeptSettings(),c.w.eval('_dp.csNames===null')));
+  const c2=mk(); delete c2.w._allCSNames; await c2.w.openDeptSettings();
+  t('thiếu _allCSNames (js/08 chưa nạp) → không lỗi, vẫn ra danh sách cũ',c2.w.eval('_dpNames()').includes('Binh'));
+ }
+console.log('\n'+ok+' OK, '+bad+' FAIL');process.exit(bad?1:0);
 })();

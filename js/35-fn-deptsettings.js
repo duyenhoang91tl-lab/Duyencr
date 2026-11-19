@@ -15,7 +15,7 @@ var DEPT_DEFAULT = [
   { key:'ketoan', label:'Kế toán' }, { key:'hr', label:'HR' }, { key:'media', label:'Media' }
 ];
 var DEPT_LIST = DEPT_DEFAULT.slice();   // cập nhật theo d.deptList mỗi lần tải Tổng quan (js/31) — form tài khoản Quản lý (js/15) dùng danh sách này
-var _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false };
+var _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };
 var _DP_SECS = [['rooms', '🏢 Danh sách phòng'], ['teams', '👥 Gán theo team'], ['people', '🧑‍💼 Từng người']];
 
 // ── mạng: có hạn chờ, đọc JSON chặt chẽ (không nuốt lỗi) ──
@@ -52,7 +52,7 @@ async function openDeptSettings(){
   var ov = document.getElementById('dp-page');
   if (!ov){ ov = document.createElement('div'); ov.id = 'dp-page'; ov.className = 'rs-page'; document.body.appendChild(ov); }
   ov.classList.add('open'); document.body.classList.add('rs-open');
-  _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false };
+  _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };   // csNames: tên Sale trong đơn, tính lười ở _dpNames
   ov.innerHTML = '<div class="rs-loading">Đang tải cấu hình phòng…</div>';
   if (!gsUrl){ _dpLoadFail('Chưa kết nối Google Apps Script (chưa có link GAS).'); return; }
   try {
@@ -101,6 +101,11 @@ function _dpNames(){
   if (typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.people) src = src.concat(_ov.data.people.map(function(p){ return p.name; }));
   if (typeof accounts !== 'undefined' && Array.isArray(accounts)) accounts.forEach(function(a){
     var ns = Array.isArray(a.names) ? a.names : String(a.names || '').split(','); src = src.concat(ns); if (a.name) src.push(a.name); });
+  // NGUYÊN NHÂN GỐC lỗi "sale mới có ở Base + POS nhưng không tìm thấy trong cài đặt phòng" (Duyên 19/11, vd nguyetTTA1995): danh sách chỉ gom từ team / Tổng quan / tài khoản /
+  // người đã gán — sale mới chỉ xuất hiện trong ĐƠN (chưa có tài khoản, chưa vào team) nên không có tên nào để tìm. Thêm mọi tên Sale thấy trong đơn Base + POS + lịch sử gán
+  // (_allCSNames, js/08 — cùng nguồn với modal "Phân loại Sale"). Tính 1 lần mỗi lần mở trang (quét toàn bộ khách nặng, không quét lại mỗi phím gõ).
+  if (!_dp.csNames) { try { _dp.csNames = (typeof _allCSNames === 'function') ? _allCSNames() : []; } catch (e) { _dp.csNames = []; } }
+  src = src.concat(_dp.csNames);
   src = src.concat(Object.keys(_dp.map));
   src.forEach(function(n){ var k = String(n || '').trim().toLowerCase(); if (!k || seen[k]) return; seen[k] = true; out.push(String(n).trim()); });
   return out.sort(function(a, b){ return a.localeCompare(b, 'vi'); });
