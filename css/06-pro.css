@@ -280,7 +280,11 @@ html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color
    NGUYÊN NHÂN GỐC: .dp là cột flex cao đúng bằng màn hình + overflow:hidden (css/01) và CHỈ .dp-body cuộn; khối #dp-pro phía trên (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Việc tiếp theo)
    không co được nên trên điện thoại .dp-body chỉ còn ~100px (form nằm trong khung tí hon) và phần trên không cuộn được. Màn hẹp: cả ngăn #dp cuộn dọc, .dp-body hết cuộn riêng (cao theo nội dung),
    thanh tiêu đề (tên + nút ✕) dính trên cùng để luôn đóng được, chừa đáy cho thanh tab hồ sơ (pro-has-tabs, 44px) khỏi che ô cuối. Ngưỡng 640 = MOBILE_FIT_MAX_W (js/59). */
-@media (max-width:640px){
+/* FIX 19/11 (ảnh Duyên: hồ sơ khách "Huyen Mai Cuốn" không kéo xuống được trên cửa sổ rộng > 640px).
+   NGUYÊN NHÂN GỐC: bản fix 15/11 chỉ bọc trong @media (max-width:640px) nên cửa sổ rộng hơn (máy tính, cửa sổ thu nhỏ 641-900px, ngăn gắn cạnh chat Social) vẫn dùng luật cũ:
+   #dp overflow:hidden + chỉ .dp-body cuộn, mà #dp-pro (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Dòng thời gian) + .dp-tabs không co được → .dp-body còn ~43px, phần trên không cuộn.
+   Đo Chromium 680px cao: .dp-body 43px, scrollTop không đổi. Nay luật cuộn cả #dp áp cho MỌI độ rộng (bỏ @media). */
+@media all{
   html.ui-pro #dp{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   html.ui-pro #dp .dp-hdr{position:sticky;top:0;z-index:3;background:var(--surface)}
   html.ui-pro #dp .dp-body{flex:none;overflow:visible;padding-bottom:72px}

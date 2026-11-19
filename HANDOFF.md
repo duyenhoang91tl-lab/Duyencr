@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-19 (phiên Claude — HỒ SƠ KHÁCH KHÔNG KÉO XUỐNG ĐƯỢC) — XONG 1/1 (chỉ web; Ctrl+F5)
+- ĐỀ BÀI Duyên (ảnh khách "Huyen Mai Cuốn"): bảng hồ sơ khách không cuộn xuống để xem Dòng thời gian / form bên dưới.
+- NGUYÊN NHÂN GỐC: fix 15/11 (css/06) chỉ bọc trong `@media (max-width:640px)`. Cửa sổ rộng hơn (máy tính, cửa sổ thu nhỏ 641-900px, ngăn gắn cạnh chat Social) vẫn dùng luật cũ: `#dp{overflow:hidden}` + chỉ `.dp-body` cuộn, trong khi `#dp-pro` (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Dòng thời gian) + `.dp-tabs` không co → `.dp-body` còn ~43px, `scrollTop` không đổi. Tái hiện bằng Chrome headless (680px cao): trước = body 43px, cuộn 0; sau = cuộn được ở 400/635/700/900/1400px.
+- ĐÃ SỬA: `css/06-pro.css` đổi `@media (max-width:640px)` → `@media all` cho khối cuộn cả `#dp` (header dính trên, `.dp-body` cao theo nội dung, chừa đáy 72px cho thanh tab). Bump `css/06-pro.css?v=20261119a`. `tools/test-dp-mobile-scroll.js` cập nhật (bắt lại việc bó trong max-width:640px). css/01 không đổi.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5, mở hồ sơ 1 khách ở cửa sổ rộng + thu nhỏ, kéo xuống thử; thử cả ngăn hồ sơ gắn cạnh chat (Social > Chat) và tab 💬 Chat Pancake trong hồ sơ.
+
 ## 2026-11-18 (phiên Claude — TRA GIÁ "NGŨ ĐIẾU" KHÔNG RA CHARM MINI)
 - NGUYÊN NHÂN GỐC: `_priceVariantsForPrompt_` (gas_v13.js) cắt cứng `maxNames = 3` theo thứ tự sheet; "ngũ điếu" khớp >3 SP cùng điểm nên "CHARM NGŨ ĐIẾU MINI MIX" rớt, chỉ gõ thêm "mini" mới ra.
 - ✅ Đường hỏi giá chủ động (allowSingle) nay liệt kê tới 12 SP + dòng "(Còn N sản phẩm khác…)"; AI chat khách vẫn 3; ngưỡng gợi ý chip cho 1 từ chung giữ 3. Test: tools/test-price-ngudieu.js.
