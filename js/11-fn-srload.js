@@ -907,15 +907,38 @@ function _srKeepSelectedSales_(rows, sel){
 function _srDrillAttr_(kind, key){
   return ' data-drill="' + kind + '" data-drill-key="' + esc(key == null ? '' : key) + '" title="Bấm để xem đơn chi tiết"';
 }
+// Phạm vi PHÒNG KINH DOANH = đội Online + Văn phòng (Báo cáo E → Phân loại Sale; theo mốc ngày _saleChannelOn_ tại ngày cuối kỳ xem). Duyên chốt 2026-11-20:
+// mục 1 (tổng doanh thu theo Sale) + mục 2 (Tỷ lệ chốt theo Sale + thẻ Tỷ lệ chốt TB) của Báo cáo A/B CHỈ tính người trong phạm vi này;
+// từ mục 3 ("Tỷ lệ chốt theo Sale — từng Page") trở đi vẫn tính TẤT CẢ. Chưa phân loại ai (SALE_CHANNELS rỗng) → không lọc để không ra trống.
+function _srKdInScope_(name){
+  if (typeof _saleChannelOn_ !== 'function') return true;
+  var to = String(_srState.dateTo || ''), m = to.match(/(\d{4})-(\d{2})-(\d{2})/) || to.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  var ymd = ''; if (m) ymd = (m[1].length === 4) ? m[0].slice(0,10) : (m[3] + '-' + m[2] + '-' + m[1]);
+  var ch = _saleChannelOn_(name, ymd);
+  return ch === 'online' || ch === 'offline';
+}
+function _srKdScopeRows_(rows){
+  rows = rows || [];
+  var any = typeof SALE_CHANNELS !== 'undefined' && SALE_CHANNELS && Object.keys(SALE_CHANNELS).some(function(n){ return SALE_CHANNELS[n] === 'online' || SALE_CHANNELS[n] === 'offline'; });
+  if (!any) return rows;
+  return rows.filter(function(r){ return _srKdInScope_(r && r.name); });
+}
+function _srKdScopeData_(d){
+  if (!d) return d;
+  var c = {}; Object.keys(d).forEach(function(k){ c[k] = d[k]; });
+  c.saleCloseRate = _srKdScopeRows_(d.saleCloseRate);
+  return c;
+}
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
+  var dKd_ = _srKdScopeData_(d);   // bản chỉ phòng kinh doanh cho mục 1-2; d gốc giữ cho mục 3 trở đi
   var html = _srZeroDiagA_(d) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"'+_srDrillAttr_('aAll','')+'><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
     (d.totalGiaTriChenh ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTriChenh)+'</div><div class="kpi-label">Trong đó: chênh lệch đơn đổi</div></div>' : '') +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('aAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng đơn (doanh thu, ko ship)</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.trungBinhDon)+'</div><div class="kpi-label">Trung bình đơn (Tổng đơn ÷ số đơn)</div></div>' +
-    _srCloseRateKpiCard_(d) +
+    _srCloseRateKpiCard_(dKd_) +
     '</div>' +
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 10px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" (không ship) của TỪNG đơn + phần "Giá trị chênh lệch" của riêng các đơn đổi hàng — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>' +
     '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-bottom:12px;cursor:pointer">'+
@@ -924,7 +947,7 @@ function _srRenderA(d){
 
   _SR_COLTH_ROWSFN_['aSale'] = function(){ return (_srState.dataA && _srState.dataA.bySale) || []; };
   _SR_COLTH_GETTER_['aSale'] = { name: function(r){ return r.name; } };
-  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.sale), 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKdScopeRows_(_srKeepSelectedSales_(d.bySale||[], _srState.sale)), 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   var saleHtml = '<div class="dash-section-title">Theo Sale bán <span class="sr-sub">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
     '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
@@ -954,7 +977,7 @@ function _srRenderA(d){
   // trở đi (xem saleCloseRateFrom, bo qua nếu chưa từng nạp báo cáo Pancake ngày nào).
   var saleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span class="sr-sub">(Số đơn Base ÷ Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div class="sr-empty sr-empty-lg">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div class="sr-split">'+
     '<div class="sr-col-lg">'+saleHtml+_srSaleNoFbHtml_(d)+'</div>'+
@@ -1295,6 +1318,7 @@ function _srBKpiForSaleFilter_(d, mergedRows, sel, byCreator){
 }
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
+  var dKd_ = _srKdScopeData_(d);
   // Đang lọc Sale: thẻ KPI phải là PHẦN CỦA SALE (khớp bảng "Theo Sale"), không phải giá trị CẢ ĐƠN.
   // NGUYÊN NHÂN GỐC lệch (vd ngocNB2003saleoff 120.527.000 vs 113.812.000): backend giữ nguyên đơn có sale đó nên totalGiaTri/totalCod là cả đơn,
   // còn bySale chia theo frac cho đơn bán chung. Số đơn giữ nguyên (đơn đếm đủ cho từng sale). Không lọc Sale -> giữ nguyên số backend.
@@ -1306,7 +1330,7 @@ function _srRenderB(d){
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(kpi_.giaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
-    _srCloseRateKpiCard_(d) +
+    _srCloseRateKpiCard_(dKd_) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(kpi_.cod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 
@@ -1315,7 +1339,7 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKdScopeRows_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale)), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span class="sr-sub">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
   if (_srState.bSaleView === 'table'){
@@ -1336,7 +1360,7 @@ function _srRenderB(d){
   // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
   var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span class="sr-sub">(Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.bSaleSearch, 'tương tác', d.saleCloseRateExcluded) :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.bSaleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div class="sr-empty sr-empty-lg">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div class="sr-split">'+
     '<div class="sr-col-lg">'+saleHtmlB_+'</div>'+

@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-20 (phiên Claude — BÁO CÁO A/B: DOANH THU THEO SALE + TỶ LỆ CHỐT CHỈ TÍNH PHÒNG KINH DOANH) — XONG 1/1 (chỉ web; Ctrl+F5)
+- ĐỀ BÀI Duyên: biểu đồ Tỷ lệ chốt vẫn hiện người ngoài phòng kinh doanh (Duyen Hoang, Public API, Kieu Ngoc, menbui2002...). Mục 1 (doanh thu theo Sale) + mục 2 (tỷ lệ chốt theo Sale) chỉ tính phòng kinh doanh; từ mục 3 ("Tỷ lệ chốt theo Sale — từng Page") trở đi vẫn TẤT CẢ. Duyên chốt "phòng kinh doanh" = đội Online + Văn phòng (Phân loại Sale).
+- NGUYÊN NHÂN GỐC: server chỉ lọc tỷ lệ chốt theo bộ lọc Sale người dùng chọn (`_srFilterCloseBySale_`); không chọn Sale thì biểu đồ lấy mọi người có tương tác Pancake. Chưa có phạm vi mặc định theo phòng.
+- ĐÃ SỬA: `js/11-fn-srload.js` thêm `_srKdInScope_/_srKdScopeRows_/_srKdScopeData_` (theo `_saleChannelOn_` tại ngày cuối kỳ; chưa phân loại ai thì không lọc). `_srRenderA/_srRenderB`: bảng/biểu đồ "Theo Sale", biểu đồ "Tỷ lệ chốt theo Sale" và thẻ "Tỷ lệ chốt TB" dùng bản đã lọc; mục từng Page/Kênh/... giữ nguyên. Test `node tools/test-kd-scope.js`. Bump js/11 ?v=20261120a. KHÔNG đổi GAS/extension.
+- CHƯA ĐỔI (cố ý): các thẻ KPI đầu báo cáo "Số lượng đơn / Tổng đơn doanh thu" (tổng của mọi đơn, đã có posAdjust/store) — nếu Duyên muốn thẻ này cũng chỉ phòng kinh doanh thì làm bước tiếp.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5, mở Báo cáo A/B: biểu đồ chỉ còn người Online/Văn phòng; "từng Page" vẫn đủ người. Xác nhận có cần lọc cả thẻ KPI tổng doanh thu.
+
 ## 2026-11-20 (phiên Claude — CHUYỂN "KHỚP TÊN PANCAKE ↔ SALE" TỪ TAB BÁO CÁO PANCAKE SANG CÀI ĐẶT TEAM) — XONG 1/1 (chỉ web; Ctrl+F5)
 - ĐỀ BÀI Duyên: phần khớp nhân viên để trong tab "📥 Báo cáo Pancake" không hợp lý → đưa về mục phù hợp.
 - ĐÃ LÀM: file mới `js/67-pancake-namemap-modal.js` → cửa sổ **☰ → 👥 Cài đặt team → "🔗 Khớp tên Pancake"** (admin, mượn khung `.sm-overlay` của Khớp sale). KHÔNG viết lại logic: dùng lại `_pkRenderMapTableHtml` / `_pkMapSaveClose` / `_pkMapNameInline` / `_pkLoadNameMap` (js/09) + sheet PancakeNameMap (action `savePancakeNameMap`), chỉ đổi NƠI HIỂN THỊ. `_pkMapNameInline` gọi `_pnmRender()` sau khi lưu để bảng cập nhật ngay. Tab Báo cáo Pancake: bỏ mục khớp tên, thay bằng 1 dòng chỉ đường + nút "Mở Khớp tên" (admin). Cảnh báo "tên Nhân viên chưa khớp" ở js/10 đổi lời chỉ đường mới. Menu: `act:pancakemap` ở js/29-sidenav.js (nhóm tm, sau Khớp sale).
