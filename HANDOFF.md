@@ -1,5 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-20 (phiên Claude — CHUYỂN "KHỚP TÊN PANCAKE ↔ SALE" TỪ TAB BÁO CÁO PANCAKE SANG CÀI ĐẶT TEAM) — XONG 1/1 (chỉ web; Ctrl+F5)
+- ĐỀ BÀI Duyên: phần khớp nhân viên để trong tab "📥 Báo cáo Pancake" không hợp lý → đưa về mục phù hợp.
+- ĐÃ LÀM: file mới `js/67-pancake-namemap-modal.js` → cửa sổ **☰ → 👥 Cài đặt team → "🔗 Khớp tên Pancake"** (admin, mượn khung `.sm-overlay` của Khớp sale). KHÔNG viết lại logic: dùng lại `_pkRenderMapTableHtml` / `_pkMapSaveClose` / `_pkMapNameInline` / `_pkLoadNameMap` (js/09) + sheet PancakeNameMap (action `savePancakeNameMap`), chỉ đổi NƠI HIỂN THỊ. `_pkMapNameInline` gọi `_pnmRender()` sau khi lưu để bảng cập nhật ngay. Tab Báo cáo Pancake: bỏ mục khớp tên, thay bằng 1 dòng chỉ đường + nút "Mở Khớp tên" (admin). Cảnh báo "tên Nhân viên chưa khớp" ở js/10 đổi lời chỉ đường mới. Menu: `act:pancakemap` ở js/29-sidenav.js (nhóm tm, sau Khớp sale).
+- GIỮ NGUYÊN: mục "Khớp Page Pancake ↔ Kênh bán CRM" vẫn ở tab Báo cáo Pancake (khớp Page, không phải nhân viên). Khớp sale (js/52, salePersonTags) là hệ thống KHÁC, không đụng.
+- ĐÃ TEST: node -c, test-ui-pro, Chromium (stub mạng): mở menu/cửa sổ, tick Sale → Lưu & đóng → POST `savePancakeNameMap` đúng, bảng cập nhật ngay, đóng được, không lỗi JS.
+- LƯU Ý: nhân viên không phải admin không còn thấy bảng khớp tên (trước đây xem được ở dạng chỉ-đọc trong tab Pancake).
+- GỠ/HOÀN TÁC: xoá thẻ script 67 + `act:pancakemap` (2 chỗ) ở js/29 + khôi phục khối `<details>` Khớp tên trong `_pkRenderAll` (js/09) và dòng `_pnmRender` trong `_pkMapNameInline`.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → ☰ Cài đặt team → "🔗 Khớp tên Pancake" thử khớp 1 tên rồi F5. Nếu muốn Khớp Page cũng chuyển về Cài đặt team thì làm tương tự (hàm `_pkRenderPageMapTableHtml`).
+
 ## 2026-11-20 (phiên Claude — KHỚP TÊN PANCAKE ↔ SALE: BẤM LƯU RỒI F5 LẠI THÀNH "CHƯA KHỚP") — XONG 1/1 (chỉ web; Ctrl+F5)
 - ĐỀ BÀI Duyên (ảnh tab 📥 Báo cáo Pancake → Khớp tên): đã chọn Sale, bấm 💾 Lưu & đóng, F5 lại thì hiện "— Chưa khớp —".
 - NGUYÊN NHÂN GỐC: dữ liệu LƯU ĐÚNG ở sheet PancakeNameMap (`savePancakeNameMap_`), nhưng lúc nạp lại, `_pkLoadNameMap` (js/09) gọi GET `pancakeNameMap` qua Cloudflare Worker; Worker cache action này 60s + SWR tới 240s (`TTL_SEC`/`SWR_FACTOR`) và KHÔNG xoá cache khi có POST lưu → F5 trong ~4 phút sau khi lưu nhận lại bản CŨ. Tái hiện bằng mô phỏng `cachePolicy`/`cacheKeyUrl` của cloudflare/worker.mjs: bản cũ trả HIT bản trước khi lưu; thêm tham số `_t` thì MISS và đọc đúng.

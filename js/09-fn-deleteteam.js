@@ -306,11 +306,11 @@ function _pkRenderAll(){
     html += _pkRenderSdtPreviewHtml();
   }
 
-  html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
-    '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
-    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
-    _pkRenderMapTableHtml(isAdmin)+
-  '</details>';
+  // 20/11/2026: phần "Khớp tên Nhân viên Pancake ↔ Sale CRM" đã CHUYỂN sang ☰ Cài đặt team → "🔗 Khớp tên Pancake" (js/67-pancake-namemap-modal.js) — khớp nhân viên là cài đặt nhân sự, không thuộc báo cáo.
+  html += '<div style="margin-top:22px;padding:10px 12px;border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<span>🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM nay nằm ở <b>☰ Cài đặt team → “🔗 Khớp tên Pancake”</b>.</span>'+
+    (isAdmin ? '<button type="button" class="btn sm secondary" onclick="openPancakeNameMapModal()">Mở Khớp tên</button>' : '')+
+  '</div>';
 
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
@@ -1026,6 +1026,7 @@ async function _pkMapNameInline(pancakeName, saleName){
     toast('✓ Đã khớp "'+pancakeName+'" → "'+(shown||'(bỏ khớp)')+'"');
     _pkState.report = null; // ket qua bao cao cu co the da tinh sai ten -> yeu cau xem lai
     _pkRenderAll();
+    if (typeof _pnmRender === 'function') _pnmRender();   // cửa sổ Cài đặt team → Khớp tên Pancake (js/67) cập nhật ngay
   } catch(e){
     toast('❌ Lỗi khớp tên: ' + e.message);
   }

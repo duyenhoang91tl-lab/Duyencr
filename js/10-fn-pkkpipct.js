@@ -216,7 +216,7 @@ function _pkRenderKpiPancake(){
     html += _warnBox('kpi-unmapped-sales', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedSales.length+' tên Nhân viên Pancake chưa khớp Sale CRM (nên đơn/doanh thu của họ đang tính = 0): '+
       rep.unmappedSales.map(function(n){ return esc(n); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
+      ' — vào ☰ Cài đặt team → "🔗 Khớp tên Pancake" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
   }
 
   if (rep.unmappedPages && rep.unmappedPages.length){
