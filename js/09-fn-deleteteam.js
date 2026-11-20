@@ -144,7 +144,9 @@ async function _pkLoadNameMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap', { redirect:'follow' });
+    // `_t` = chống cache Worker: pancakeNameMap được Worker cache 60s (+SWR tới 240s) và Worker KHÔNG xoá cache khi có POST lưu
+    // → F5 ngay sau khi bấm Lưu nhận lại bản CŨ (nhìn như "chưa lưu"). Khoá cache gồm mọi tham số nên thêm `_t` luôn đi thẳng tới GAS.
+    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.nameMap = d.map || {};
     _pkState.serverNames = d.allNames || [];
@@ -159,7 +161,8 @@ async function _pkLoadPageMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakePageMap', { redirect:'follow' });
+    // `_t` chống cache Worker (cùng lý do với pancakeNameMap: lưu xong F5 bị trả bản cũ trong 60-240s)
+    var r = await fetch(gsUrl + sep + 'action=pancakePageMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.pageMap = d.map || {};
     _pkState.serverPages = d.allPages || [];

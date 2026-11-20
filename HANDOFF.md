@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-20 (phiên Claude — KHỚP TÊN PANCAKE ↔ SALE: BẤM LƯU RỒI F5 LẠI THÀNH "CHƯA KHỚP") — XONG 1/1 (chỉ web; Ctrl+F5)
+- ĐỀ BÀI Duyên (ảnh tab 📥 Báo cáo Pancake → Khớp tên): đã chọn Sale, bấm 💾 Lưu & đóng, F5 lại thì hiện "— Chưa khớp —".
+- NGUYÊN NHÂN GỐC: dữ liệu LƯU ĐÚNG ở sheet PancakeNameMap (`savePancakeNameMap_`), nhưng lúc nạp lại, `_pkLoadNameMap` (js/09) gọi GET `pancakeNameMap` qua Cloudflare Worker; Worker cache action này 60s + SWR tới 240s (`TTL_SEC`/`SWR_FACTOR`) và KHÔNG xoá cache khi có POST lưu → F5 trong ~4 phút sau khi lưu nhận lại bản CŨ. Tái hiện bằng mô phỏng `cachePolicy`/`cacheKeyUrl` của cloudflare/worker.mjs: bản cũ trả HIT bản trước khi lưu; thêm tham số `_t` thì MISS và đọc đúng.
+- ĐÃ SỬA: `js/09-fn-deleteteam.js` — `_pkLoadNameMap` và `_pkLoadPageMap` thêm `&_t=Date.now()` (khoá cache Worker gồm mọi tham số trừ token/src/ek nên đi thẳng tới GAS). Bump `js/09?v=20261120a`. KHÔNG đổi GAS/Worker/extension.
+- ⚠ Cùng bẫy còn ở: `js/08` `_mktLoadPages_` (đọc pancakePageMap, chỉ để hiện kênh ở tab Team) và các GET khác có trong `TTL_SEC` mà vừa có nút lưu (teams, mktTeams, saleDirectory, saleGroups…). Chưa sửa (ngoài yêu cầu). Cách gốc: Worker xoá cache key tương ứng khi POST ghi thành công (cần deploy Worker riêng).
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5, khớp 1 tên → Lưu & đóng → F5 ngay → phải còn giữ. Nếu VẪN mất: mở sheet PancakeNameMap xem dòng có được ghi không (khi đó lỗi nằm ở GAS chưa deploy bản có `savePancakeNameMap`).
+
 ## 2026-11-19 (phiên Claude — HỒ SƠ KHÁCH KHÔNG KÉO XUỐNG ĐƯỢC) — XONG 1/1 (chỉ web; Ctrl+F5)
 - ĐỀ BÀI Duyên (ảnh khách "Huyen Mai Cuốn"): bảng hồ sơ khách không cuộn xuống để xem Dòng thời gian / form bên dưới.
 - NGUYÊN NHÂN GỐC: fix 15/11 (css/06) chỉ bọc trong `@media (max-width:640px)`. Cửa sổ rộng hơn (máy tính, cửa sổ thu nhỏ 641-900px, ngăn gắn cạnh chat Social) vẫn dùng luật cũ: `#dp{overflow:hidden}` + chỉ `.dp-body` cuộn, trong khi `#dp-pro` (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Dòng thời gian) + `.dp-tabs` không co → `.dp-body` còn ~43px, `scrollTop` không đổi. Tái hiện bằng Chrome headless (680px cao): trước = body 43px, cuộn 0; sau = cuộn được ở 400/635/700/900/1400px.
