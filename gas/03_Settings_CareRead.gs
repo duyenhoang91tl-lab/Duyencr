@@ -1606,7 +1606,7 @@ function _scopeListServe_(action, p, e) {
 //  (trang thai cua TUNG KHACH van qua saveSingle, khong bi anh huong); saveFollowUpTemplates_ clearContents ca sheet roi ghi lai theo
 //  payload nen 1 CS gui danh sach la xoa/ghi de mau cua tat ca moi nguoi.
 // ═══════════════════════════════════════════════════════════════
-var CFG_ACTIONS_ = { saveTeams: 1, saveMktTeams: 1, saveSaleGroups: 1, saveCareStatus: 1 };
+var CFG_ACTIONS_ = { saveTeams: 1, saveMktTeams: 1, saveSaleGroups: 1, saveCareStatus: 1, saveTopSpExclude: 1 };
 var CFG_ROLES_ = ['admin', 'leader', 'manager'];
 function _cfgGate_(action, token) {
   if (!CFG_ACTIONS_[action] || !token) return null;
