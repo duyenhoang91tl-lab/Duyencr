@@ -467,6 +467,8 @@ function buildTopProducts_(p) {
   var teamNames = [];
   try { readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) { if (t && t.name && teamNames.indexOf(t.name) < 0) teamNames.push(t.name); }); } catch (e) {}
   var excl = readTopSpExclude_();
+  // onlyConfig=1 (2026-11-21, Bao cao B can danh sach team + loai tru ma KHONG quet don): tra nhanh, khong doc "dữ liệu đơn".
+  if (String(p.onlyConfig || '') === '1') return { ok: true, onlyConfig: true, teams: teamNames.concat([TOPSP_UNASSIGNED_TEAM_]), exclude: excl };
   var rows = _mergeTachDon_(readDonChiTiet_());
   var agg = _topSpAggregate_(rows, { dateFrom: from, dateTo: to, teams: teamsRaw, teamOf: resolver, exclude: excl, limit: p.limit });
   agg.ok = true; agg.dateFrom = from; agg.dateTo = to; agg.team = teamsRaw;
