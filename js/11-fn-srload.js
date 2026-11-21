@@ -2089,6 +2089,146 @@ async function _impUpload(kind){
   }
 }
 
+// ═══ NHẬP "BÁO CÁO NGUỒN" TỪ BASE → CẬP NHẬT KÊNH BÁN (cột M) CỦA DT TỔNG (2026-11-21, Duyên) ═══
+// Đơn Pos có nguồn nhưng đơn Base tương ứng chưa có Kênh bán → xuất thêm báo cáo nguồn từ Base rồi nhập ở đây "như update data Base".
+// Không biết trước tên cột nên DÒ THEO TÊN TIÊU ĐỀ (bỏ dấu, không phân biệt hoa/thường): cột mã (Mã đơn / ID / Mã bộ đếm — dùng TẤT CẢ cột mã tìm thấy)
+// + cột nguồn (Kênh bán / Nguồn). Chỉ gửi các cặp {ma, kenh}; backend `importBaseSource` khớp theo cột T (ID) hoặc U (Mã bộ đếm) của DT TỔNG, chỉ ghi cột M.
+// Mã bị Excel đổi sang dạng khoa học (3.46E+14) KHÔNG khớp được → đếm riêng và cảnh báo (xuất lại cột mã dạng văn bản).
+var _IMP_SRC_KENH = ['kenh ban', 'kenh nguon', 'nguon don', 'nguon khach', 'nguon', 'kenh'];   // theo thứ tự ưu tiên
+var _IMP_SRC_MAX = 50000;   // = BASESRC_MAX_ITEMS ở gas_v13.js
+function _impFold_(s){ return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function _impIsSrcKeyHeader_(h){ return h === 'id' || /(^| )ma (don|cong viec|bo dem)( |$)/.test(h) || /(^| )bo dem( |$)/.test(h) || /(^| )id (don|cong viec)( |$)/.test(h) || h === 'order id'; }
+function _impDetectSrcCols_(aoa){
+  var maxScan = Math.min(aoa.length, 10);
+  for (var r = 0; r < maxScan; r++){
+    var hdr = aoa[r] || [], folded = hdr.map(_impFold_), keyCols = [], kenhCol = null, c;
+    for (c = 0; c < folded.length; c++) if (folded[c] && _impIsSrcKeyHeader_(folded[c])) keyCols.push({ col: c, name: String(hdr[c]).trim() });
+    for (var p = 0; p < _IMP_SRC_KENH.length && !kenhCol; p++){ c = folded.indexOf(_IMP_SRC_KENH[p]); if (c > -1) kenhCol = { col: c, name: String(hdr[c]).trim() }; }
+    if (!kenhCol) for (c = 0; c < folded.length && !kenhCol; c++) if (/(^| )(kenh ban|nguon)( |$)/.test(folded[c])) kenhCol = { col: c, name: String(hdr[c]).trim() };
+    if (keyCols.length && kenhCol) return { headerRow: r, keyCols: keyCols, kenhCol: kenhCol };
+  }
+  return null;
+}
+function _impBuildSrcItems_(aoa, det){
+  var items = [], rows = 0, noKenh = 0, sci = 0;
+  for (var r = det.headerRow + 1; r < aoa.length; r++){
+    var row = aoa[r] || [], kenh = String(row[det.kenhCol.col] == null ? '' : row[det.kenhCol.col]).trim(), any = false;
+    for (var k = 0; k < det.keyCols.length; k++){
+      var ma = String(row[det.keyCols[k].col] == null ? '' : row[det.keyCols[k].col]).trim();
+      if (!ma) continue;
+      if (/^\d(\.\d+)?e\+?\d+$/i.test(ma)) { sci++; continue; }
+      any = true;
+      if (kenh) items.push({ ma: ma, kenh: kenh });
+    }
+    if (any){ rows++; if (!kenh) noKenh++; }
+  }
+  return { items: items, rows: rows, noKenh: noKenh, sci: sci };
+}
+function _impParseSrcFile(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, {type:'array'}), headers = null;
+        for (var i = 0; i < wb.SheetNames.length; i++){
+          var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], {header:1, defval:'', raw:false});
+          if (!aoa.length) continue;
+          var det = _impDetectSrcCols_(aoa);
+          if (det){ var b = _impBuildSrcItems_(aoa, det); b.det = det; b.sheet = wb.SheetNames[i]; resolve(b); return; }
+          if (!headers) headers = (aoa[0] || []).map(function(x){ return String(x == null ? '' : x).trim(); }).filter(Boolean).slice(0, 15);
+        }
+        resolve({ items: [], det: null, headers: headers || [] });
+      } catch(err){ reject(err); }
+    };
+    reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+async function _impOnSrcFileSelected(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    var res = await _impParseSrcFile(file);
+    _impState.srcItems = null; _impState.srcFileName = ''; _impState.srcInfo = ''; _impState.srcWarn = ''; _impState.result = null;
+    if (!res.det){
+      toast('⚠️ Không tìm thấy cột MÃ ĐƠN / MÃ BỘ ĐẾM và cột KÊNH BÁN / NGUỒN trong file. Tiêu đề đọc được: ' + (res.headers.length ? res.headers.join(' | ') : '(không có)'));
+    } else if (!res.items.length){
+      toast('⚠️ Tìm thấy cột "' + res.det.kenhCol.name + '" nhưng không dòng nào có cả mã đơn lẫn nguồn' + (res.sci ? ' (' + fmt(res.sci) + ' mã bị Excel đổi sang dạng E+ — xuất lại cột mã dạng văn bản)' : '') + '.');
+    } else if (res.items.length > _IMP_SRC_MAX){
+      toast('⚠️ File quá lớn (' + fmt(res.items.length) + ' cặp mã–nguồn, tối đa ' + fmt(_IMP_SRC_MAX) + ') — chia nhỏ file rồi nhập lại.');
+    } else {
+      _impState.srcItems = res.items; _impState.srcFileName = file.name;
+      _impState.srcInfo = 'Cột mã: ' + res.det.keyCols.map(function(k){ return '"' + k.name + '"'; }).join(' + ') + ' · Cột nguồn: "' + res.det.kenhCol.name + '"' + (res.sheet ? ' · sheet "' + res.sheet + '"' : '') + ' · ' + fmt(res.rows) + ' đơn';
+      var w = [];
+      if (res.noKenh) w.push(fmt(res.noKenh) + ' đơn có mã nhưng ô nguồn TRỐNG — sẽ bỏ qua (không xoá nguồn cũ trên Base).');
+      if (res.sci) w.push(fmt(res.sci) + ' mã bị Excel đổi sang dạng số khoa học (vd 3.46E+14) — không khớp được, đã bỏ qua. Xuất lại file với cột mã dạng văn bản.');
+      _impState.srcWarn = w.join(' ');
+    }
+    _impRender_();
+  } catch(e){
+    toast('❌ Lỗi đọc file: ' + e.message);
+  }
+}
+// Nhập: XEM TRƯỚC (dryRun, thử lại được) → nếu có đơn cần cập nhật thì GHI THẬT ngay (Duyên 11/11: không hỏi lại). Gọi THẲNG Apps Script như _impUpload.
+async function _impUploadBaseSrc(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  var items = _impState.srcItems;
+  if (!items || !items.length) return;
+  if (_impState.uploading) return;
+  _impState.uploading = true; _impRender_();
+  try {
+    var impUrl = _impGasUrl_();
+    var d0 = await _impPost_(impUrl, { action:'importBaseSource', token: _impTok_(), items: items, dryRun: true }, 'preview', 2);
+    if (d0.error) throw new Error(d0.error);
+    if (!d0.dryRun) throw new Error('Máy chủ chưa có bản cập nhật mới (workflow "deploy-gas" chưa xong) — đợi vài phút rồi bấm lại. Chưa ghi gì.');
+    if (!d0.wouldUpdateRows){
+      _impState.result = Object.assign({ kind: 'src', updatedRows: 0, updatedCells: 0 }, d0);
+      toast('ℹ️ Không có đơn nào cần cập nhật: ' + fmt(d0.matchedSame || 0) + ' đơn đã đúng nguồn' + (d0.unmatched ? ', ' + fmt(d0.unmatched) + ' mã không tìm thấy trên Base' : '') + '. Không ghi gì.');
+      return;
+    }
+    var d = await _impPost_(impUrl, { action:'importBaseSource', token: _impTok_(), items: items }, 'write', 0);
+    if (d.error) throw new Error(d.error);
+    _impState.result = Object.assign({ kind: 'src' }, d);
+    toast('✓ Đã cập nhật Kênh bán cho ' + fmt(d.updatedRows || 0) + ' đơn Base' + (d.unmatched ? ' · ' + fmt(d.unmatched) + ' mã không tìm thấy' : '') + (d.updateOverLimit ? ' · còn ' + fmt(d.updateOverLimit) + ' đơn — nhập lại cùng file để làm tiếp' : '') + '.');
+    logAudit('import_basesrc', '', '', 'Nhập báo cáo nguồn Base: cập nhật Kênh bán ' + (d.updatedRows || 0) + ' đơn/' + (d.updatedCells || 0) + ' ô, không tìm thấy ' + (d.unmatched || 0));
+    _impState.srcItems = null; _impState.srcFileName = ''; _impState.srcInfo = ''; _impState.srcWarn = '';
+    var fi = document.getElementById('imp-file-src'); if (fi) fi.value = '';
+    _impHist.items = null;   // có lần nhập mới → tải lại lịch sử (hoàn tác được)
+    _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;   // Kênh bán đổi → báo cáo cache cũ có thể sai
+  } catch(e){
+    var _m = String(e && e.message || e);
+    if (/failed to fetch|networkerror|load failed/i.test(_m)) _m = 'Máy chủ không trả lời kịp. Dữ liệu có thể đã ghi MỘT PHẦN — bấm nhập lại ĐÚNG file này (an toàn: đơn đã đúng nguồn sẽ được bỏ qua) hoặc xem "Lịch sử nhập" bên dưới.';
+    toast('❌ Nhập lỗi: ' + _m);
+  } finally {
+    _impState.uploading = false; _impRender_();
+  }
+}
+function _impSrcCard_(){
+  var items = _impState.srcItems;
+  var html = '<div style="border:1px solid var(--border);border-radius:var(--rsm);padding:14px;flex:1;min-width:280px">';
+  html += '<div style="font-weight:600;margin-bottom:4px">📥 Nguồn đơn từ Base</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Báo cáo nguồn xuất từ Base (cần cột <b>Mã đơn / Mã bộ đếm</b> và cột <b>Kênh bán / Nguồn</b>), .xlsx — chỉ cập nhật cột <b>Kênh bán</b> của sheet <b>"DT TỔNG "</b>, khớp theo mã đơn/mã bộ đếm; không xoá nguồn cũ, hoàn tác được ở Lịch sử nhập.</div>';
+  html += '<input type="file" id="imp-file-src" accept=".xlsx,.xls" onchange="_impOnSrcFileSelected(this)" style="font-size:12px">';
+  if (_impState.srcFileName && items && items.length){
+    html += '<div style="margin-top:8px;font-size:12px">📄 ' + esc(_impState.srcFileName) + '<br><span style="color:var(--muted)">' + esc(_impState.srcInfo) + '</span></div>';
+    if (_impState.srcWarn) html += '<div style="margin-top:6px;padding:6px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:11.5px;color:#9a3412">' + esc(_impState.srcWarn) + '</div>';
+    html += '<button class="btn sm primary" style="margin-top:8px" ' + (_impState.uploading ? 'disabled' : '') + ' onclick="_impUploadBaseSrc()">' + (_impState.uploading ? 'Đang nhập...' : '💾 Cập nhật nguồn cho Base') + '</button>';
+  }
+  var res = _impState.result;
+  if (res && res.kind === 'src'){
+    var li = [];
+    li.push('✓ Đã cập nhật Kênh bán cho <b>' + fmt(res.updatedRows || 0) + '</b> đơn Base' + (res.updatedRows ? ' (giá trị cũ lưu ở sheet "Nhật ký cập nhật nhập file")' : ''));
+    if (res.matchedSame) li.push(fmt(res.matchedSame) + ' đơn đã đúng nguồn — bỏ qua');
+    if (res.unmatched) li.push('<b>' + fmt(res.unmatched) + '</b> mã KHÔNG tìm thấy trên Base' + ((res.unmatchedSample || []).length ? ' (vd: ' + esc(res.unmatchedSample.slice(0, 5).join(', ')) + ')' : ''));
+    if (res.ambiguous) li.push(fmt(res.ambiguous) + ' mã khớp NHIỀU dòng Base — bỏ qua' + ((res.ambiguousSample || []).length ? ' (vd: ' + esc(res.ambiguousSample.slice(0, 5).join(', ')) + ')' : ''));
+    if (res.conflictInFile) li.push(fmt(res.conflictInFile) + ' đơn file ghi 2 nguồn khác nhau — bỏ qua');
+    if (res.updateOverLimit) li.push('còn <b>' + fmt(res.updateOverLimit) + '</b> đơn chưa cập nhật (quá giới hạn mỗi lần) — nhập lại cùng file để làm tiếp');
+    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534;line-height:1.6">' + li.join('<br>• ') + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function _impPickCard_(kind, label, hint, sheetTarget){
   var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
   var fname = kind === 'base' ? _impState.baseFileName : _impState.posFileName;
@@ -2183,6 +2323,7 @@ function renderSalesReportTabJ_(wrap, subTabs){
   html += '<div style="display:flex;gap:14px;flex-wrap:wrap">';
   html += _impPickCard_('base', '📥 Dữ liệu Base', 'File export "Danh sách công việc" (sheet "Tất cả"), .xls/.xlsx', 'DT TỔNG ');
   html += _impPickCard_('pos', '📥 Dữ liệu Pos', 'File export đơn hàng (Pancake POS), .xlsx', 'dữ liệu đơn');
+  html += _impSrcCard_();
   html += '</div>';
   if (_impHist.items === null && !_impHist.loading) setTimeout(_impLoadHist_, 0);   // tai lich su 1 lan khi mo tab (lan nhap moi / bam Tai lai thi dat items=null)
   html += _impHistHtml_();
