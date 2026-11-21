@@ -306,6 +306,7 @@ function doPostCore_(e) {
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
     if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting, _impWho_(data.token));
+    if (action === 'importBaseSource')    return doImportBaseSource_(data.items, data.dryRun, _impWho_(data.token));   // 2026-11-21: cap nhat Kenh ban (cot M) cua Base tu bao cao nguon, khop ma don/ma bo dem
     if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
