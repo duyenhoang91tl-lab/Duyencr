@@ -387,6 +387,7 @@ function doGetCore_(e) {
       return jsonOut_(resCs);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    if (action === 'topProducts') { try { return jsonOut_(buildTopProducts_(e.parameter || {})); } catch (errTp) { return jsonOut_({ ok: false, error: 'Loi Top san pham: ' + (errTp && errTp.message || errTp) }); } }   // 2026-11-21
     // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
     if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {

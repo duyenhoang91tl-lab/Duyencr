@@ -2764,7 +2764,7 @@ function _scopeListServe_(action, p, e) {
 //  (trang thai cua TUNG KHACH van qua saveSingle, khong bi anh huong); saveFollowUpTemplates_ clearContents ca sheet roi ghi lai theo
 //  payload nen 1 CS gui danh sach la xoa/ghi de mau cua tat ca moi nguoi.
 // ═══════════════════════════════════════════════════════════════
-var CFG_ACTIONS_ = { saveTeams: 1, saveMktTeams: 1, saveSaleGroups: 1, saveCareStatus: 1 };
+var CFG_ACTIONS_ = { saveTeams: 1, saveMktTeams: 1, saveSaleGroups: 1, saveCareStatus: 1, saveTopSpExclude: 1 };
 var CFG_ROLES_ = ['admin', 'leader', 'manager'];
 function _cfgGate_(action, token) {
   if (!CFG_ACTIONS_[action] || !token) return null;
@@ -3230,6 +3230,7 @@ function doGetCore_(e) {
       return jsonOut_(resCs);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    if (action === 'topProducts') { try { return jsonOut_(buildTopProducts_(e.parameter || {})); } catch (errTp) { return jsonOut_({ ok: false, error: 'Loi Top san pham: ' + (errTp && errTp.message || errTp) }); } }   // 2026-11-21
     // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
     if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {
@@ -8437,6 +8438,7 @@ function doPostCore_(e) {
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     if (action === 'saveSaleGroups')      return saveSaleGroups_(data.groups);
+    if (action === 'saveTopSpExclude')    return saveTopSpExclude_(data.list);   // 2026-11-21: danh sach san pham KHONG dua vao Top san pham ban
     if (action === 'closePosMonth')       return jsonOut_(closePosMonth_(data.month, data.force));
     // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
     // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
@@ -22702,4 +22704,106 @@ function teamPenaltyIgnore_(d) {
   var a = _tbIgnored_(); if (a.indexOf(key) < 0) a.push(key); if (a.length > 1500) a = a.slice(a.length - 1500);
   setSetting_('tbPenIgnore', JSON.stringify(a));
   return jsonOut_({ ok: true, key: key });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  TOP SAN PHAM BAN (Duyen 2026-11-21): xem san pham ban chay nhat trong 1 ngay / 1 khoang ngay, loc theo TEAM, co DANH SACH LOAI TRU
+//  (san pham khong dua vao thong ke, vd qua tang / phi ship / hang mau). Nguon = "dữ liệu đơn" (Pos) — cung nguon + cung quy tac loai don
+//  (Huy/Da hoan/Dang hoan) + gop don tach voi Bao cao B. Moi don chi co TONG gia tri (khong chia theo tung san pham) nen xep hang theo SO LUONG
+//  ban (kem so don co san pham do), KHONG tinh doanh thu theo san pham.
+//  GET topProducts(dateFrom,dateTo,team[,limit]) — team = ten team cach nhau bang ',' ('' = tat ca; '(chưa có Team)' = don khong thuoc team nao).
+//  POST saveTopSpExclude {list:[{key,name}]} — chi admin/leader/manager (CFG_ACTIONS_). Luu Settings 'topSpExclude'.
+//  Don co nhieu sale thuoc nhieu team: tinh DU cho tung team duoc chon (khong chia), vi day la bang xep hang san pham khong phai doanh thu.
+// ═══════════════════════════════════════════════════════════════
+var TOPSP_UNASSIGNED_TEAM_ = '(chưa có Team)';
+// Gap ten san pham de so khop: bo dau + thuong + gon khoang trang ("Quà  Tặng" = "qua tang"). _normTxt_ KHONG bo dau nen khong dung rieng no.
+function _topSpFold_(s) { return _stripVN_(_normTxt_(s)).replace(/\s+/g, ' ').trim(); }
+function _topSpKey_(code, name) {
+  var c = String(code == null ? '' : code).trim();
+  if (c && c.indexOf('(không rõ mã') !== 0) return 'c:' + c.toUpperCase().replace(/\s+/g, '');
+  return 'n:' + _topSpFold_(name);
+}
+function readTopSpExclude_() {
+  var out = [];
+  try {
+    var raw = getSetting_('topSpExclude');
+    var arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) arr.forEach(function (x) {
+      var key = String((x && x.key) || '').trim();
+      if (key) out.push({ key: key, name: String((x && x.name) || '').trim() });
+    });
+  } catch (e) {}
+  return out;
+}
+function saveTopSpExclude_(list) {
+  if (!Array.isArray(list)) return jsonOut_({ ok: false, error: 'Danh sách loại trừ không hợp lệ' });
+  var clean = [], seen = {};
+  for (var i = 0; i < list.length && clean.length < 500; i++) {
+    var key = String((list[i] && list[i].key) || '').trim();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    clean.push({ key: key, name: String((list[i] && list[i].name) || '').trim().slice(0, 200) });
+  }
+  setSetting_('topSpExclude', JSON.stringify(clean));   // setSetting_ luon tra ok (tu ghi AuditLog)
+  return jsonOut_({ ok: true, count: clean.length, list: clean });
+}
+// Phan TINH TOAN thuan (khong doc sheet) de test bang Node. rows = dong don da gop; opt = { dateFrom, dateTo, teams:[], teamOf:fn(ten sale)->ten team, exclude:[{key,name}], limit }
+function _topSpAggregate_(rows, opt) {
+  opt = opt || {};
+  var wantTeams = (opt.teams || []).filter(Boolean), teamOf = opt.teamOf || function () { return TOPSP_UNASSIGNED_TEAM_; };
+  var exKeys = {}, exNames = {};
+  (opt.exclude || []).forEach(function (x) { if (x && x.key) exKeys[x.key] = 1; if (x && x.name) exNames[_topSpFold_(x.name)] = 1; });
+  var prods = {}, orders = 0, qtyAll = 0, excludedQty = 0, excludedHit = {}, skippedStatus = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (!dateInRange_(parseVNDate_(row.ngayTaoDon), opt.dateFrom, opt.dateTo)) continue;
+    if (_donHasExcludedStatus_(row.trangThai)) { skippedStatus++; continue; }
+    if (wantTeams.length) {
+      var sales = splitMulti_(row.theSale, ',').filter(function (x) { return !_isNumericTag_(x); });
+      var teamSet = {};
+      if (!sales.length) teamSet[TOPSP_UNASSIGNED_TEAM_] = 1;
+      sales.forEach(function (s) { teamSet[teamOf(s) || TOPSP_UNASSIGNED_TEAM_] = 1; });
+      if (!wantTeams.some(function (t) { return teamSet[t]; })) continue;
+    }
+    var names = splitMulti_(row.sanPham, ','), codes = splitMulti_(row.maSanPham, ';'), qtys = splitMulti_(row.soLuong, ',');
+    var len = Math.max(names.length, codes.length, qtys.length);
+    if (!len) continue;
+    var seenInOrder = {}, counted = false;
+    for (var p = 0; p < len; p++) {
+      var name = names[p] || codes[p] || '';
+      var key = _topSpKey_(codes[p], name);
+      var qty = Number(String(qtys[p] || '0').replace(',', '.')) || 0;
+      if (!name && !codes[p]) continue;
+      if (exKeys[key] || exNames[_topSpFold_(name)]) { excludedQty += qty; excludedHit[key] = name || codes[p]; continue; }
+      if (!prods[key]) prods[key] = { key: key, name: name || codes[p], code: codes[p] || '', soLuong: 0, orders: 0 };
+      prods[key].soLuong += qty; qtyAll += qty;
+      if (!seenInOrder[key]) { seenInOrder[key] = 1; prods[key].orders += 1; }
+      counted = true;
+    }
+    if (counted) orders++;
+  }
+  var arr = Object.keys(prods).map(function (k) { return prods[k]; });
+  arr.sort(function (a, b) { return (b.soLuong - a.soLuong) || (b.orders - a.orders) || String(a.name).localeCompare(String(b.name)); });
+  var limit = Math.max(1, Math.min(500, Number(opt.limit) || 100));
+  return { rows: arr.slice(0, limit), totalProducts: arr.length, totalOrders: orders, totalQty: qtyAll, excludedQty: excludedQty,
+           excludedHit: Object.keys(excludedHit).map(function (k) { return { key: k, name: excludedHit[k] }; }), skippedStatus: skippedStatus };
+}
+function buildTopProducts_(p) {
+  p = p || {};
+  var today = _vnYmd_(new Date());
+  var from = String(p.dateFrom || '').trim() || today, to = String(p.dateTo || '').trim() || from;
+  var teamsRaw = String(p.team || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  var resolver = _makeTeamResolver_(TOPSP_UNASSIGNED_TEAM_);
+  var teamNames = [];
+  try { readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) { if (t && t.name && teamNames.indexOf(t.name) < 0) teamNames.push(t.name); }); } catch (e) {}
+  var excl = readTopSpExclude_();
+  // onlyConfig=1 (2026-11-21, Bao cao B can danh sach team + loai tru ma KHONG quet don): tra nhanh, khong doc "dữ liệu đơn".
+  if (String(p.onlyConfig || '') === '1') return { ok: true, onlyConfig: true, teams: teamNames.concat([TOPSP_UNASSIGNED_TEAM_]), exclude: excl };
+  var rows = _mergeTachDon_(readDonChiTiet_());
+  var agg = _topSpAggregate_(rows, { dateFrom: from, dateTo: to, teams: teamsRaw, teamOf: resolver, exclude: excl, limit: p.limit });
+  agg.ok = true; agg.dateFrom = from; agg.dateTo = to; agg.team = teamsRaw;
+  agg.teams = teamNames.concat([TOPSP_UNASSIGNED_TEAM_]);
+  agg.exclude = excl;
+  return agg;
 }
