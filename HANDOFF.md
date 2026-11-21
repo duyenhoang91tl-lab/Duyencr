@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-21 (phiên Claude — BÁO CÁO A/B "TỶ LỆ CHỐT THEO SALE — TỪNG PAGE": THÊM TỶ LỆ RIÊNG PHÒNG KD BÊN CẠNH TỶ LỆ TỔNG PAGE) — XONG 1/1 (chỉ web; Ctrl+F5)
+- ĐỀ BÀI Duyên: mục từng Page hiển thị cả tỷ lệ chốt TỔNG cả Page và tỷ lệ riêng PKD bên cạnh, khi lọc theo PKD.
+- ĐÃ LÀM: `js/11-fn-srload.js` — `_srPageTotals_(scbp, rowsOverride)` tính theo tập dòng tuỳ chọn; `_srPageThHtml_` ở tiêu đề mỗi cột Page + "Tổng cá nhân" hiện 2 dòng: "Tổng x% (đơn/tương tác)" (mọi người, như cũ) và "PKD y% (đơn/tương tác)" (chỉ Online + Văn phòng, `_srKdScopeRows_`). Chỉ hiện dòng PKD khi có phạm vi KD và lọc ra ít hơn tổng người (chưa phân loại ai, hoặc ai cũng là KD → giữ 1 dòng như cũ). Các dòng Sale trong bảng giữ TẤT CẢ (theo chốt 20/11). Dùng chung cho Báo cáo A và B (cùng hàm). Bump js/11 ?v=20261121a. Test `node tools/test-page-pkd-header.js` (Page 31/1000=3.1% vs PKD 30/200=15%) + test-kd-scope + 6 khối script index.html OK. KHÔNG đổi GAS/extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5, mở Báo cáo A/B kéo xuống mục từng Page, xem tiêu đề cột. Việc còn treo từ mục KPI Pancake ngay bên dưới.
+
 ## 2026-11-21 (phiên Claude — BÁO CÁO KPI PANCAKE: "TỶ LỆ CHỐT CHUNG" CHỈ TÍNH PHÒNG KINH DOANH, NGƯỜI NGOÀI KD VẪN HIỆN NHƯNG TÁCH RIÊNG) — XONG 1/1 (chỉ web; Ctrl+F5; chờ Duyên xác nhận đúng ý)
 - ĐỀ BÀI Duyên: báo cáo tỷ lệ chốt đã lọc phòng kinh doanh nhưng vẫn hiển thị tỷ lệ những bạn không thuộc phòng KD và làm giảm tỷ lệ chốt chung.
 - NGUYÊN NHÂN GỐC: commit 20ba546 chỉ lọc ở Báo cáo A/B (js/11). Tab 📈 Báo cáo KPI Pancake (js/10) lấy `rep.tyLeChotChung` từ server = Σ đơn ÷ Σ tương tác của MỌI Page nên tương tác của người ngoài KD (Public API, Duyen Hoang, Kieu Ngoc...) nằm trong mẫu số mà đơn của họ gần như 0 → kéo tỷ lệ chung xuống; bảng "Theo Sale" cũng trộn lẫn họ với Online/Văn phòng.

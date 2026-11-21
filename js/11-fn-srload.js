@@ -611,16 +611,23 @@ function srPickTeam(teamId, saleField, domId){
 
 // Tỷ lệ chốt CHUNG của từng Page (cộng đơn chốt ÷ cộng tương tác của MỌI sale trên Page đó) — hiện ngay trên tiêu đề cột của bảng "Tỷ lệ chốt theo Sale — từng Page"
 // (Duyên yêu cầu 2026-10-25). Lấy cả sale đang bị ô tìm kiếm ẩn để tỷ lệ Page không đổi theo bộ lọc tên. Trả {pages:[{closed,held,rate}], all:{closed,held,rate}}.
-function _srPageTotals_(scbp){
+function _srPageTotals_(scbp, rowsOverride){
   var rate = function(c,h){ return h ? Math.round(c / h * 1000) / 10 : 0; };
-  var pg = scbp.pages.map(function(p){ var c = 0, h = 0; (scbp.rows||[]).forEach(function(r){ var x = r.perPage && r.perPage[p.kenhBan]; if (x && x.held){ c += Number(x.closed)||0; h += Number(x.held)||0; } }); return { closed:c, held:h, rate:rate(c,h) }; });
-  var ac = 0, ah = 0; (scbp.rows||[]).forEach(function(r){ if (r.total){ ac += Number(r.total.closed)||0; ah += Number(r.total.held)||0; } });
+  var rows = rowsOverride || scbp.rows || [];
+  var pg = scbp.pages.map(function(p){ var c = 0, h = 0; rows.forEach(function(r){ var x = r.perPage && r.perPage[p.kenhBan]; if (x && x.held){ c += Number(x.closed)||0; h += Number(x.held)||0; } }); return { closed:c, held:h, rate:rate(c,h) }; });
+  var ac = 0, ah = 0; rows.forEach(function(r){ if (r.total){ ac += Number(r.total.closed)||0; ah += Number(r.total.held)||0; } });
   return { pages: pg, all: { closed:ac, held:ah, rate:rate(ac,ah) } };
 }
+// Tiêu đề cột bảng "Tỷ lệ chốt theo Sale — từng Page": tỷ lệ chốt TỔNG của Page (mọi người) và, khi đang có phạm vi phòng KD
+// (_srKdScopeRows_ lọc được ít nhất 1 người), thêm dòng "PKD" = tỷ lệ riêng người Online + Văn phòng bên cạnh (Duyên yêu cầu 2026-11-21).
 function _srPageThHtml_(scbp){
-  var T = _srPageTotals_(scbp), sub = function(t){ return t.held ? '<div style="font-weight:600;color:var(--green,#15803d);white-space:nowrap">'+t.rate+'% <span style="font-weight:400;color:var(--muted);font-size:10.5px">('+t.closed+'/'+t.held+')</span></div>' : '<div style="font-weight:400;color:var(--muted)">—</div>'; };
-  return scbp.pages.map(function(p,i){ return '<th style="text-align:right">'+esc(p.pageName)+sub(T.pages[i])+'</th>'; }).join('') +
-    '<th style="text-align:right"><b>Tổng cá nhân</b>'+sub(T.all)+'</th>';
+  var allRows = scbp.rows || [], kdRows = _srKdScopeRows_(allRows);
+  var showKd = kdRows.length > 0 && kdRows.length < allRows.length;
+  var T = _srPageTotals_(scbp), K = showKd ? _srPageTotals_(scbp, kdRows) : null;
+  var sub = function(t, lbl, color){ return t.held ? '<div style="font-weight:600;color:'+color+';white-space:nowrap">'+(lbl?'<span style="font-weight:400;font-size:10.5px">'+lbl+' </span>':'')+t.rate+'% <span style="font-weight:400;color:var(--muted);font-size:10.5px">('+t.closed+'/'+t.held+')</span></div>' : '<div style="font-weight:400;color:var(--muted)">'+(lbl?lbl+' ':'')+'—</div>'; };
+  var cell = function(t, k){ return sub(t, showKd ? 'Tổng' : '', 'var(--green,#15803d)') + (showKd ? sub(k, 'PKD', '#0e7490') : ''); };
+  return scbp.pages.map(function(p,i){ return '<th style="text-align:right">'+esc(p.pageName)+cell(T.pages[i], K && K.pages[i])+'</th>'; }).join('') +
+    '<th style="text-align:right"><b>Tổng cá nhân</b>'+cell(T.all, K && K.all)+'</th>';
 }
 function renderSalesReportTab(){
   var wrap = document.getElementById('salesreport-wrap');
