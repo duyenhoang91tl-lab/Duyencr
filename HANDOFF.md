@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-21 (phiên Claude) — PANCAKE AI "HỎI AI": 3 YÊU CẦU CỦA DUYÊN, LÀM TỪNG BƯỚC (reload extension Pancake AI; bước 2 cần GAS deploy)
+Duyên (kèm ảnh): (1) icon Hỏi AI lên ĐẦU Pancake AI cho dễ nhìn; (2) câu trả lời hiện như phần trắng bên dưới (có nhãn rõ ràng); (3) giá size 1, size 2… liệt kê LIÊN TIẾP, không lặp lại cả khối nội dung cho từng size.
+NGUYÊN NHÂN ảnh chụp: dòng "⚠ Lỗi API — hiện danh sách giá gốc" nghĩa là AI đang LỖI (`priceQa_` trả `aiError`) nên CS thấy danh sách THÔ dự phòng của GAS (`_priceVariantsForPrompt_`: mỗi size 1 dòng "- Chất liệu: … | Kiểu/Size: … | Giá thường: 6350" + giá nghìn đồng chưa đổi ra đồng); bên dưới, nút Tìm (`renderPriceRows_`) vẽ MỖI SIZE MỘT THẺ lặp đủ trường (Nhóm/Tên/Chất liệu…).
+- [x] **Bước 1 (đã push) — `extension-pancake/pancake-content.js/.css`, manifest `2026.11.21.1`:** nút `#pk-price-ai-btn` (giữ id + listener `askPriceAi_`) nay là BIỂU TƯỢNG SAMOYED trong vòng tròn trắng ở ĐẦU tiêu đề header (thay chỗ logo, không tốn thêm chỗ). ĐO Chromium thật: thêm nút vào hàng nút bên phải làm header 340px tràn 11px và chữ "Pancake AI" bị xuống dòng (tiêu đề 133px→93px) → đã loại cách đó. Bấm khi panel đang thu gọn → tự mở; có câu hỏi → tự cuộn tới khung trả lời; ô trống → focus ô hỏi. Khung trả lời `#pk-price-ai` đổi từ nền xanh sang THẺ TRẮNG viền trái tím (giống phần kết quả bên dưới). Test Pancake/price/zalo liên quan xanh.
+- [ ] **Bước 2 (kế tiếp) — GAS `priceQa_` fallback:** dựng chữ dự phòng gọn: tên SP một lần, mỗi chất liệu một lần, các SIZE liên tiếp "SIZE 1: 6.350.000đ · SIZE 2: 7.350.000đ…" (đổi nghìn→đồng; dòng chất liệu trống = cùng chất liệu dòng trên vì sheet gộp ô); giữ NGUYÊN chuỗi `_priceVariantsForPrompt_` cho prompt AI (tách hàm dữ liệu). Cần deploy GAS (Actions tự chạy).
+- [ ] **Bước 3 (kế tiếp) — `renderPriceRows_` (nút Tìm):** gom các dòng cùng sản phẩm thành 1 thẻ: trường chung hiện 1 lần, mỗi size 1 dòng "SIZE n — giá [+ Thêm]" (mỗi dòng giữ nút + Thêm và data-* như cũ).
+- Chưa làm (cần Duyên nói): làm song song cho Zalo AI (quy tắc `08-extension-parity.md`).
+
 ## 2026-11-18 (phiên Claude — COMBO: ẢNH CHO COMBO, hỏi giá ra combo kèm ảnh) — ĐANG LÀM TỪNG BƯỚC; CẢ 3 BƯỚC XONG (bước 1-2 đã push, bước 3 push cùng HANDOFF này; workflow tự deploy GAS — xem tab Actions xanh)
 Duyên: "update thêm phần combo thì hỏi giá cũng ra combo luôn, add được ảnh vào combo để check giá ra cả ảnh combo tương ứng".
 - GHI CHÚ: hỏi giá RA COMBO ĐÃ CÓ từ combo bước 2 (`priceAsk_` trả `combos` khớp câu hỏi, Trợ lý AI hiện khối "🎁 COMBO CÓ SẴN"); việc mới là ẢNH.

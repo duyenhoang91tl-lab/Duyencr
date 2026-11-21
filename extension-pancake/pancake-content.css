@@ -715,8 +715,9 @@
 }
 
 #pk-price-ai {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: #fff;
+  border: 1px solid #dbeafe;
+  border-left: 3px solid var(--pk-accent, #7c3aed);
   border-radius: 8px;
   padding: 8px 10px;
   margin-bottom: 6px;
@@ -1608,9 +1609,11 @@
 #pk-ai-body::-webkit-scrollbar { width: 8px; }
 #pk-ai-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 
-/* Nút "🤖 Hỏi AI" nằm ở hàng "CS đang dùng" (Duyên yêu cầu 18/11/2026: đưa ra ô khoanh trong ảnh) — trước đây nằm trong #pk-price-row nên style cũ không còn áp dụng */
-#pk-ai-cs-row #pk-price-ai-btn {
-  flex: none; padding: 4px 9px; border: 1px solid var(--pk-accent, #7c3aed); background: #fff; color: var(--pk-accent, #7c3aed);
-  border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+/* Nút "Hỏi AI" = biểu tượng Samoyed ở ĐẦU tiêu đề header (Duyên 21/11/2026: "đưa lên đầu Pancake AI cho dễ nhìn"; thay chỗ logo nên không tốn thêm chỗ — thêm vào hàng nút làm tiêu đề bị xuống dòng, đo Chromium 133px→93px) — trước đó ở hàng "CS đang dùng" (18/11) và trước nữa trong khung Tra cứu bảng giá. Nền trắng nổi trên nền gradient của header. */
+#pk-ai-header #pk-price-ai-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; margin: -2px 0; border: none; border-radius: 50%;
+  background: #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
 }
-#pk-ai-cs-row #pk-price-ai-btn:hover { background: #f5f3ff; }
+#pk-ai-header #pk-price-ai-btn:hover { background: #f5f3ff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
+#pk-ai-header #pk-price-ai-btn .pk-ai-btn-ico { display: inline-flex; width: 24px; height: 24px; }   /* chỉ biểu tượng: header 340px không đủ chỗ cho nút có chữ (đo Chromium: tràn 11px) */
+#pk-ai-panel.pk-ai-collapsed #pk-price-ai-btn { display: none; }

@@ -416,7 +416,7 @@
     panelEl.innerHTML = `
       <div id="pk-ai-header">
         <div id="pk-ai-header-title" style="flex:1">
-          <div style="font-weight:700;display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:24px;height:24px;align-items:center">${pkCat_(24)}</span>Pancake AI</div>
+          <div style="font-weight:700;display:flex;align-items:center;gap:6px"><button id="pk-price-ai-btn" type="button" aria-label="Hỏi AI về giá" title="🤖 Hỏi AI về giá — gõ câu hỏi (vd: giá nhẫn bạc trơn size 12) ở ô Tra cứu bảng giá rồi bấm biểu tượng này; trả lời gọn, giá lấy từ bảng giá"><span class="pk-ai-btn-ico">${pkCat_(24)}</span></button>Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách${(() => { try { return " · v" + chrome.runtime.getManifest().version; } catch (e) { return ""; } })()}</div>
         </div>
         <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
@@ -432,7 +432,6 @@
             <div id="pk-cs-list"></div>
           </div>
           <select id="pk-cs-sel" style="display:none"></select>
-          <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — gõ câu hỏi (vd: giá nhẫn bạc trơn size 12) rồi bấm; trả lời văn ngắn, giá lấy từ bảng giá">🤖 Hỏi AI</button>
         </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
@@ -2915,6 +2914,11 @@
   // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
   let _priceAiSeq = 0;
   function askPriceAi_() {
+    // Nút nay nằm ở HEADER (luôn thấy, kể cả khi cuộn) → panel đang thu gọn thì mở ra trước, nếu không CS bấm mà không thấy gì.
+    if (panelEl.classList.contains('pk-ai-collapsed')) {
+      panelEl.classList.remove('pk-ai-collapsed'); _setCollapseBtnIcon_(false);
+      try { chrome.storage.local.set({ pkPanelCollapsed: false }); } catch (e) {}
+    }
     // Nút nằm ở hàng "CS đang dùng" (luôn hiện) → bấm khi đang ở mục khác thì tự mở "Tra cứu bảng giá" + chế độ "Gõ tìm" + đưa con trỏ vào ô hỏi,
     // vì khung trả lời #pk-price-ai nằm TRONG mục đó (đang ẩn thì CS bấm mà không thấy gì).
     const _ms = panelEl.querySelector('#pk-menu-sel');
@@ -2924,9 +2928,10 @@
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-ai');
     box.style.display = '';
-    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { panelEl.querySelector('#pk-price-q').focus(); } catch (e) {} return; }
+    const _show = () => { try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} };   // câu trả lời nằm trong mục giá bên dưới → cuộn tới cho CS thấy ngay
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { const qi = panelEl.querySelector('#pk-price-q'); qi.focus(); qi.scrollIntoView({ block: 'nearest' }); } catch (e) {} return; }
     const seq = ++_priceAiSeq;
-    box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
+    box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>'; _show();
     safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
       if (seq !== _priceAiSeq) return;   // đã hỏi câu khác trong lúc chờ
       if (!resp?.ok) { box.innerHTML = `<div class="pk-price-ai-err">⚠ ${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
@@ -2943,6 +2948,7 @@
       box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
         `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
       const cp = box.querySelector('.pk-price-ai-copy');
+      _show();
       cp.addEventListener('click', () => {
         try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
       });
