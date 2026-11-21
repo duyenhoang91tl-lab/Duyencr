@@ -1138,7 +1138,7 @@ function _bprdPickKeys_(products, q){
   return _bprdSorted_(products).filter(function(p){ return !q || _bprdMatch_(p, q); }).map(_bprdKey_);
 }
 function _bprdBodyHtml_(d){
-  var cfg = _bprdCfg_(), all = (d && d.products) || [], q = _srState.productSearch || '';
+  var cfg = _bprdCfg_(), all = _bprdAll_(d), q = _srState.productSearch || '';
   var rows = _bprdRows_(all, cfg, q), searching = !!String(q).trim();
   var totalAll = all.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
   var shown = rows.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
@@ -1147,12 +1147,14 @@ function _bprdBodyHtml_(d){
     ? 'Tìm trên tất cả ' + fmt(all.length) + ' sản phẩm: ' + fmt(rows.length) + ' khớp'
     : 'Đang hiện ' + fmt(rows.length) + '/' + fmt(all.length) + ' ' + what + ' · tổng số lượng tất cả sản phẩm: ' + fmt(totalAll)) + '</div>';
   if (_srState.bProductView === 'table'){
-    html += '<table class="dash-table"><thead><tr>' + (cfg.showCode ? '<th>Mã sản phẩm</th>' : '') + '<th>Tên sản phẩm</th><th class="r">Tổng số lượng</th></tr></thead><tbody>';
-    rows.forEach(function(p){
-      html += '<tr'+(typeof _srDrillAttr_==='function' ? _srDrillAttr_('bProd',p.code) : '')+'>' + (cfg.showCode ? '<td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td>' : '') + '<td>'+esc(p.name)+'</td><td class="r">'+fmt(p.soLuong)+'</td></tr>';
+    var canEx_ = typeof tspCanEdit === 'function' && tspCanEdit(), nCol_ = (cfg.showCode ? 3 : 2) + (canEx_ ? 1 : 0);
+    _srState.bprdShown = rows;   // dòng đang hiện (cho nút 🚫 Loại theo chỉ số)
+    html += '<table class="dash-table"><thead><tr>' + (cfg.showCode ? '<th>Mã sản phẩm</th>' : '') + '<th>Tên sản phẩm</th><th class="r">Tổng số lượng</th>' + (canEx_ ? '<th style="width:70px"></th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function(p, i){
+      html += '<tr'+(typeof _srDrillAttr_==='function' ? _srDrillAttr_('bProd',p.code) : '')+'>' + (cfg.showCode ? '<td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td>' : '') + '<td>'+esc(p.name)+'</td><td class="r">'+fmt(p.soLuong)+'</td>' + (canEx_ ? '<td><button type="button" class="btn sm" style="padding:2px 7px;font-size:11px" title="Không đưa sản phẩm này vào thống kê" onclick="event.stopPropagation();_bprdExclude_('+i+')">🚫 Loại</button></td>' : '') + '</tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="'+(cfg.showCode?3:2)+'" class="sr-empty">' + (!searching && cfg.mode === 'pick' && all.length ? 'Chưa chọn sản phẩm nào (hoặc sản phẩm đã chọn không có trong kỳ này) — bấm 👁 Cài đặt hiển thị để chọn' : 'Không có dữ liệu') + '</td></tr>';
-    else html += _srTotalRowHtml_(cfg.showCode ? ['Tổng', '', fmt(shown)] : [searching ? 'Tổng (kết quả tìm)' : 'Tổng (đang hiện)', fmt(shown)]);
+    if (!rows.length) html += '<tr><td colspan="'+nCol_+'" class="sr-empty">' + (!searching && cfg.mode === 'pick' && all.length ? 'Chưa chọn sản phẩm nào (hoặc sản phẩm đã chọn không có trong kỳ này) — bấm 👁 Cài đặt hiển thị để chọn' : 'Không có dữ liệu') + '</td></tr>';
+    else html += _srTotalRowHtml_((cfg.showCode ? ['Tổng', '', fmt(shown)] : [searching ? 'Tổng (kết quả tìm)' : 'Tổng (đang hiện)', fmt(shown)]).concat(canEx_ ? [''] : []));
     html += '</tbody></table>';
   } else {
     html += _srChartSvg(rows, 'name', 'soLuong', _srState.bProductView, false);
@@ -1161,11 +1163,11 @@ function _bprdBodyHtml_(d){
 }
 function _bprdPickCountText_(d){
   var cfg = _bprdCfg_(), set = {}; cfg.pick.forEach(function(k){ set[k] = 1; });
-  var all = (d && d.products) || [], n = all.filter(function(p){ return set[_bprdKey_(p)]; }).length;
+  var all = _bprdAll_(d), n = all.filter(function(p){ return set[_bprdKey_(p)]; }).length;
   return 'Đã chọn ' + fmt(n) + '/' + fmt(all.length) + ' sản phẩm';
 }
 function _bprdPanelHtml_(d){
-  var cfg = _bprdCfg_(), all = _bprdSorted_((d && d.products) || []), total = all.length, lq = String(_srState.bprdListQ || '').trim().toLowerCase();
+  var cfg = _bprdCfg_(), all = _bprdSorted_(_bprdAll_(d)), total = all.length, lq = String(_srState.bprdListQ || '').trim().toLowerCase();
   function radio(v, labelHtml){ return '<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px"><input type="radio" name="bprd-mode" '+(cfg.mode===v?'checked ':'')+'onchange="_bprdSetMode_(\''+v+'\')"> '+labelHtml+'</label>'; }
   var sel = {}; cfg.pick.forEach(function(k){ sel[k] = 1; });
   var h = '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:0 0 8px;background:var(--surface2);font-size:12px">' +
@@ -1239,10 +1241,10 @@ function _bprdSyncChecks_(){
   for (var i = 0; i < list.length; i++) list[i].checked = !!set[list[i].getAttribute('data-k')];
 }
 function _bprdSetPick_(keys){ var c = _bprdCfg_(); c.pick = keys; _bprdSave_(c); _bprdSyncChecks_(); _bprdUpdatePickUi_(); _bprdRefresh_(); }
-function _bprdPickTopN_(){ _bprdSetPick_(_bprdSorted_((_srState.dataB || {}).products).slice(0, _bprdCfg_().n).map(_bprdKey_)); }
+function _bprdPickTopN_(){ _bprdSetPick_(_bprdSorted_(_bprdAll_(_srState.dataB)).slice(0, _bprdCfg_().n).map(_bprdKey_)); }
 function _bprdPickAll_(){   // gộp thêm các SP đang hiện trong danh sách (đang lọc thì chỉ gộp SP khớp ô lọc), không bỏ các SP đã chọn
   var c = _bprdCfg_(), keys = c.pick.slice();
-  _bprdPickKeys_((_srState.dataB || {}).products, _srState.bprdListQ).forEach(function(k){ if (keys.indexOf(k) === -1) keys.push(k); });
+  _bprdPickKeys_(_bprdAll_(_srState.dataB), _srState.bprdListQ).forEach(function(k){ if (keys.indexOf(k) === -1) keys.push(k); });
   _bprdSetPick_(keys);
 }
 function _bprdPickNone_(){ _bprdSetPick_([]); }
@@ -1256,6 +1258,73 @@ function _bprdReset_(){
   _srState.bprdListQ = '';
   _bprdRefreshPanel_(); _bprdRefresh_();
 }
+// ─── LỌC RIÊNG + LOẠI TRỪ cho "Báo cáo sản phẩm" (Duyên 2026-11-21): xem top SP theo NGÀY + TEAM ngay tại đây, loại SP khỏi thống kê ───
+// Mặc định ("Theo kỳ của B") = d.products của Báo cáo B, chỉ bỏ SP trong danh sách loại trừ (tspIsExcluded, js/95). Bấm Hôm nay/Hôm qua/chọn ngày/chip Team = lọc RIÊNG:
+// lấy từ GAS topProducts (cùng nguồn Pos, bỏ đơn hoàn/huỷ; server tự bỏ SP loại trừ) — KHÔNG phụ thuộc bộ lọc ngày/sale của cả Báo cáo B. Bảng vẫn là _bprdBodyHtml_ nên top N / chọn SP / tìm / cột Mã / biểu đồ dùng như cũ.
+// Danh sách loại trừ + chip Team + hàm ghi nằm ở js/95 (dùng chung với tab "🏆 Top sản phẩm bán").
+function _bprdAll_(d){
+  var st = _srState;
+  if (st.bpOwn && st.bpData && st.bpData.rows) return st.bpData.rows.map(function(r){ return { code:r.code, name:r.name, soLuong:r.soLuong, orders:r.orders }; });
+  var src = (d && d.products) || [];
+  return (typeof tspIsExcluded === 'function') ? src.filter(function(p){ return !tspIsExcluded(p); }) : src;
+}
+function _bprdYmd_(dt){ var p = function(n){ return (n < 10 ? '0' : '') + n; }; return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate()); }
+function _bprdAddDays_(ymd, n){ var m = String(ymd).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? _bprdYmd_(new Date(+m[1], +m[2] - 1, +m[3] + n)) : ymd; }
+function _bprdOwnBarHtml_(){
+  var st = _srState, on = !!st.bpOwn, teams = (typeof _ts !== 'undefined' && _ts.cfg && _ts.cfg.teams) || [], exN = (typeof tspExclude === 'function') ? tspExclude().length : 0;
+  var b = function(label, k, act){ return '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;' + (act ? 'background:#0ea5e9;color:#fff;border-color:#0ea5e9' : '') + '" onclick="_bprdOwnSet_(\'' + k + '\')">' + label + '</button>'; };
+  var h = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0">' +
+    '<span style="font-size:11px;color:var(--muted)">Top theo:</span>' + b('Kỳ của Báo cáo B', 'b', !on) + b('Hôm nay', 'today', on && st.bpKind === 'today') + b('Hôm qua', 'yday', on && st.bpKind === 'yday') + b('7 ngày', '7d', on && st.bpKind === '7d');
+  if (on) h += '<input type="date" class="sr-input" style="width:140px" value="' + esc(st.bpFrom) + '" onchange="_bprdOwnDate_(\'bpFrom\',this.value)"><span style="font-size:11px;color:var(--muted)">→</span><input type="date" class="sr-input" style="width:140px" value="' + esc(st.bpTo) + '" onchange="_bprdOwnDate_(\'bpTo\',this.value)">';
+  h += '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdToggleEx_()">' + (st.bpExOpen ? '▼' : '▶') + ' 🚫 SP loại trừ (' + exN + ')</button></div>';
+  if (on){
+    h += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px"><span style="font-size:11px;color:var(--muted)">Team:</span>' +
+      '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;' + (!(st.bpTeams || []).length ? 'background:#0ea5e9;color:#fff;border-color:#0ea5e9' : '') + '" onclick="_bprdOwnTeam_(\'\')">Tất cả</button>' +
+      teams.map(function(t){ var a = (st.bpTeams || []).indexOf(t) > -1; return '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;' + (a ? 'background:#0ea5e9;color:#fff;border-color:#0ea5e9' : '') + '" onclick="_bprdOwnTeam_(' + JSON.stringify(t).replace(/"/g, '&quot;') + ')">' + esc(t) + '</button>'; }).join('') +
+      (st.bpLoading ? '<span style="font-size:11px;color:var(--muted)">Đang tải…</span>' : '') + (st.bpErr ? '<span style="font-size:11px;color:#b91c1c">' + esc(st.bpErr) + '</span>' : '') + '</div>';
+    if (st.bpData && !st.bpErr) h += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Lọc riêng: ' + esc(st.bpData.dateFrom) + (st.bpData.dateTo !== st.bpData.dateFrom ? ' → ' + esc(st.bpData.dateTo) : '') + ((st.bpTeams || []).length ? ' · Team ' + esc(st.bpTeams.join(', ')) : ' · tất cả team') + ' · ' + fmt(st.bpData.totalOrders) + ' đơn' + (st.bpData.excludedQty ? ' · đã loại ' + fmt(st.bpData.excludedQty) + ' cái' : '') + ' (không phụ thuộc bộ lọc ngày/sale của Báo cáo B)</div>';
+  }
+  return h;
+}
+function _bprdRefreshBar_(){
+  var el = document.getElementById('bprd-bar'); if (el) el.innerHTML = _bprdOwnBarHtml_();
+  var ex = document.getElementById('bprd-ex'); if (ex) ex.innerHTML = (_srState.bpExOpen && typeof tspExcludePanelHtml === 'function') ? tspExcludePanelHtml('b') : '';
+}
+function _bprdRefreshAll_(){ _bprdRefreshBar_(); _bprdRefreshPanel_(); _bprdRefresh_(); }
+async function _bprdOwnLoad_(){
+  var st = _srState; if (typeof gsUrl === 'undefined' || !gsUrl) return;
+  var my = (st.bpSeq = (st.bpSeq || 0) + 1); st.bpLoading = true; st.bpErr = ''; _bprdRefreshBar_();
+  try {
+    var tok = ''; try { tok = localStorage.getItem('ome_sess_token') || ''; } catch(e){}
+    var url = gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=topProducts&dateFrom=' + encodeURIComponent(st.bpFrom) + '&dateTo=' + encodeURIComponent(st.bpTo) + '&team=' + encodeURIComponent((st.bpTeams || []).join(',')) + '&limit=500&token=' + encodeURIComponent(tok);
+    var r = await fetch(url, { redirect:'follow' }), d = await r.json();
+    if (my !== st.bpSeq) return;   // đã bấm lọc mới hơn → bỏ kết quả cũ
+    if (!d || d.ok === false || d.error) st.bpErr = (d && (d.error || d.message)) || 'Không tải được top sản phẩm.'; else st.bpData = d;
+  } catch(e){ if (my === st.bpSeq) st.bpErr = 'Lỗi kết nối: ' + (e && e.message || e); }
+  if (my === st.bpSeq){ st.bpLoading = false; _bprdRefreshAll_(); }
+}
+function _bprdOwnSet_(kind){
+  var st = _srState, t = _bprdYmd_(new Date());
+  if (kind === 'b'){ st.bpOwn = false; st.bpSeq = (st.bpSeq || 0) + 1; st.bpLoading = false; _bprdRefreshAll_(); return; }
+  st.bpOwn = true; st.bpKind = kind;
+  if (kind === 'today'){ st.bpFrom = t; st.bpTo = t; } else if (kind === 'yday'){ st.bpFrom = _bprdAddDays_(t, -1); st.bpTo = st.bpFrom; } else if (kind === '7d'){ st.bpFrom = _bprdAddDays_(t, -6); st.bpTo = t; }
+  if (typeof tspLoadConfig === 'function') tspLoadConfig(_bprdRefreshBar_);
+  _bprdOwnLoad_();
+}
+function _bprdOwnDate_(key, v){
+  var st = _srState; if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  st[key] = v; st.bpKind = 'custom'; if (st.bpFrom > st.bpTo){ if (key === 'bpFrom') st.bpTo = v; else st.bpFrom = v; }
+  _bprdOwnLoad_();
+}
+function _bprdOwnTeam_(name){
+  var st = _srState, a = st.bpTeams || (st.bpTeams = []);
+  if (name === '') st.bpTeams = []; else { var i = a.indexOf(name); if (i < 0) a.push(name); else a.splice(i, 1); }
+  _bprdOwnLoad_();
+}
+function _bprdToggleEx_(){ _srState.bpExOpen = !_srState.bpExOpen; if (typeof tspLoadConfig === 'function') tspLoadConfig(_bprdRefreshBar_); _bprdRefreshBar_(); }
+function _bprdExclude_(i){ var r = (_srState.bprdShown || [])[i]; if (r && typeof tspExcludeSp === 'function') tspExcludeSp(r.code, r.name); }
+// js/95 gọi sau mỗi lần lưu loại trừ: đang lọc riêng → tải lại (server áp loại trừ); không thì chỉ vẽ lại (client lọc d.products).
+function _bprdOnExcludeChange_(changed){ if (changed && _srState.bpOwn) _bprdOwnLoad_(); else _bprdRefreshAll_(); }
 // ═══ BPRD-CFG END ═══
 
 // ── Báo cáo A: mục "Doanh thu theo Sale — loại kênh Facebook" NGAY DƯỚI "Theo Sale bán" (Duyên yêu cầu 2026-10-31). Dữ liệu d.bySaleNoFb / d.noFb do GAS
@@ -1472,6 +1541,8 @@ function _srRenderB(d){
     // Báo cáo sản phẩm: mặc định top 10 bán chạy, ẩn cột Mã, 👁 cài đặt — xem khối BPRD-CFG phía trên (Duyên yêu cầu 2026-10-23).
     html += '<div class="dash-section-title" style="margin-top:18px">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+_bprdEyeBtnHtml_()+'</div>';
     html += '<div id="bprd-cfg">'+(_srState.bprdOpen ? _bprdPanelHtml_(d) : '')+'</div>';
+    html += '<div id="bprd-bar">'+_bprdOwnBarHtml_()+'</div><div id="bprd-ex">'+((_srState.bpExOpen && typeof tspExcludePanelHtml === 'function') ? tspExcludePanelHtml('b') : '')+'</div>';
+    if (typeof tspLoadConfig === 'function' && !(typeof _ts !== 'undefined' && _ts.cfg && _ts.cfg.loaded)) tspLoadConfig(_bprdRefreshAll_);   // nạp danh sách loại trừ + team 1 lần rồi vẽ lại phần sản phẩm
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm (tìm trên tất cả)..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;_bprdRefresh_()" class="sr-input sr-w300">';
     html += '<div id="bprd-body">'+_bprdBodyHtml_(d)+'</div>';
   }

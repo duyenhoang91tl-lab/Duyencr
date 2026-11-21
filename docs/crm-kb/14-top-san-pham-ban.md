@@ -1,5 +1,7 @@
 # 14 — Top sản phẩm bán (xếp hạng SP theo ngày + team, có danh sách loại trừ)
 
+> Có **2 chỗ xem**: tab menu 📊 Báo cáo → 🏆 Top sản phẩm bán (`js/95`) VÀ ngay trong **Báo cáo B → "Báo cáo sản phẩm"** (`js/11`, khối BPRD-CFG, thêm 21/11/2026). Hai nơi dùng CHUNG 1 danh sách loại trừ (Settings `topSpExclude`) và API `tsp*` của js/95.
+
 Menu **📊 Báo cáo → 🏆 Top sản phẩm bán** (21/11/2026, Duyên yêu cầu: xem top SP bán trong ngày, lọc riêng theo team/ngày, cài SP không đưa vào thống kê).
 
 ## Mô hình
@@ -19,6 +21,14 @@ Phần tính toán thuần `_topSpAggregate_(rows,opt)` tách riêng để test 
 
 ## Client (`js/95-top-sp-tab.js`, test `tools/test-top-sp-tab.js`)
 `registerExtraTab('topsp')` + id `'topsp'` trong nhóm `rp` của `js/29`. Nút Loại / Bỏ loại / Thêm tên chỉ hiện với admin/leader/manager (server vẫn kiểm). `_ts.seq` bỏ kết quả cũ khi bấm lọc liên tiếp. Khoá thêm bằng tay: `x:<tên bỏ dấu>` (server khớp qua tên nên vẫn chặn đúng).
+
+## Trong Báo cáo B › "Báo cáo sản phẩm" (js/11, test `tools/test-bprd-top.js`)
+- Thanh **"Top theo:"**: `Kỳ của Báo cáo B` (mặc định = `d.products` của B) · `Hôm nay` · `Hôm qua` · `7 ngày` + ô Từ/Đến + chip Team. Bấm ngày/team = **lọc RIÊNG** (`_srState.bpOwn`): gọi GET `topProducts` (limit 500) — KHÔNG phụ thuộc bộ lọc ngày/sale của cả Báo cáo B.
+- Nguồn SP duy nhất của khối này là `_bprdAll_(d)`: lọc riêng → `_srState.bpData.rows`; không thì `d.products` bỏ SP `tspIsExcluded`. Mọi chỗ trong BPRD-CFG (bảng, đếm, bảng tick chọn, "chọn top N") đều đi qua nó → top N / chọn SP / tìm / cột Mã / biểu đồ vẫn dùng như cũ.
+- Cột **🚫 Loại** (chỉ admin/leader/manager) + nút **🚫 SP loại trừ (N)** mở `tspExcludePanelHtml('b')`. Sau mỗi lần lưu js/95 gọi hook `_bprdOnExcludeChange_(changed)`: đang lọc riêng → tải lại (server áp loại trừ), không thì vẽ lại (client lọc).
+- Chip Team + danh sách loại trừ nạp nhẹ bằng `topProducts&onlyConfig=1` (không quét đơn), 1 lần/phiên (`tspLoadConfig`).
+- **Chưa áp loại trừ:** nút "Xuất Excel" của B (`js/13`, dùng `dB.products`) và drill-down — vẫn xuất đủ mọi SP.
+- Lưu ý: `_srState.bprdShown` = dòng đang hiện, nút Loại dùng chỉ số trong mảng này; số liệu "Kỳ của B" phụ thuộc bộ lọc B (đã có sale/ngày/…), khác "lọc riêng".
 
 ## Việc có thể làm thêm
 Cột doanh thu ước tính theo SP (từ cột T); xuất Excel; so với kỳ trước; lọc theo Nguồn/Page; hiển thị top ngày trên Dashboard.
