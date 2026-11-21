@@ -27,6 +27,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Cập nhật Project knowledge "Crm" cho phần Danh sách KH khớp đơn POS (bản dán sẵn: bảng action, quy ước, cấu trúc js/86–92, bài học biến `let`) | `11-project-knowledge-pos.md` | — |
 | Combo có sẵn (sheet COMBO: action comboList/Save/Delete, tab 🎁 Combo, Trợ lý AI giá, Pancake Soạn đơn thêm combo vào giỏ, bẫy giá nghìn/đồng) | `12-combo-co-san.md` | `gas_v13.js`, `js/93-combo-tab.js`, `js/38-pro-dock.js`, `extension-pancake/*` |
 | Thư viện sản phẩm (menu Social: thư mục ảnh theo SP bảng giá + combo, tối đa 50 ảnh, action plibList/Upload/Delete) | `13-thu-vien-san-pham.md` | `gas_v13.js`, `js/94-plib-tab.js` |
+| Top sản phẩm bán (menu Báo cáo: xếp hạng SP theo SỐ LƯỢNG, lọc ngày + nhiều team, danh sách SP loại trừ; action topProducts / saveTopSpExclude) | `14-top-san-pham-ban.md` | `gas_v13.js`, `js/95-top-sp-tab.js` |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
