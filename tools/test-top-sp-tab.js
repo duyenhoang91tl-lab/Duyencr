@@ -39,12 +39,29 @@ function mk(role) {
   vm.runInContext('_tsUnexclude(0)', c); await new Promise(r => setTimeout(r, 20));
   const post3 = calls.filter(x => x.body).pop(); ok(post3.body.list.length === 0, 'Bo loai muc duy nhat -> gui danh sach rong');
   nextRes = { ok: false, error: 'Chi admin / leader / quan ly moi duoc sua cau hinh nay.' };
-  vm.runInContext('_tsSaveExclude([])', c); await new Promise(r => setTimeout(r, 20));
+  vm.runInContext('tspSaveExclude([])', c); await new Promise(r => setTimeout(r, 20));
   ok(wrap.innerHTML.includes('⚠') && wrap.innerHTML.includes('Chi admin'), 'server tu choi (FORBIDDEN) -> hien canh bao, khong bao da luu');
   nextRes = null;
   c = mk('cs'); reg.fn(); await new Promise(r => setTimeout(r, 20));
   ok(!wrap.innerHTML.includes('🚫 Loại'), 'CS thuong KHONG thay nut Loai');
   vm.runInContext('_ts.showEx = true; _tsRender()', c);
   ok(wrap.innerHTML.includes('Chỉ admin / leader / quản lý được sửa') && !wrap.innerHTML.includes('Bỏ loại'), 'CS xem duoc danh sach loai tru nhung khong sua');
+
+  // --- API dung chung cho Bao cao B ---
+  c = mk('admin');
+  const K = (a, b) => vm.runInContext('tspKey(' + JSON.stringify(a) + ',' + JSON.stringify(b) + ')', c);
+  ok(K('nv 01', 'x') === 'c:NV01' && K('', 'Nhẫn  Vàng') === 'n:nhan vang' && K('(không rõ mã #1)', 'Đá Quý') === 'n:da quy', 'tspKey giong server (ma / ten bo dau / khong ro ma)');
+  nextRes = { ok: true, onlyConfig: true, teams: ['Team A', '(chưa có Team)'], exclude: [{ key: 'c:QT99', name: 'Quà tặng' }, { key: 'x:phi ship', name: 'Phí ship' }] };
+  const before = calls.length;
+  await new Promise(r => vm.runInContext('tspLoadConfig(function(){ globalThis.__done = 1; })', c) || setTimeout(r, 20)); await new Promise(r => setTimeout(r, 20));
+  ok(calls[before].url.includes('onlyConfig=1') && c.__done === 1, 'tspLoadConfig goi onlyConfig=1');
+  vm.runInContext('tspLoadConfig()', c); await new Promise(r => setTimeout(r, 10)); ok(calls.length === before + 1, 'nap 1 lan/phien (khong goi lai)');
+  const X = p => vm.runInContext('tspIsExcluded(' + JSON.stringify(p) + ')', c);
+  ok(X({ code: 'qt99', name: 'abc' }) && X({ code: '', name: 'PHI  SHIP' }) && X({ code: 'ZZ', name: 'QUA TANG' }) && !X({ code: 'NV01', name: 'Nhẫn vàng' }), 'tspIsExcluded: theo ma, theo ten bo dau, khong loai nham SP khac');
+  let hooked = null; c.vm = vm; vm.runInContext('function _bprdOnExcludeChange_(ch){ globalThis.__hook = ch; }', c);
+  nextRes = { ok: true, count: 3, list: [{ key: 'a', name: 'A' }] };
+  await vm.runInContext('tspSaveExclude([{key:"a",name:"A"}])', c);
+  ok(c.__hook === true && vm.runInContext('tspExclude()', c).length === 1, 'luu xong -> cap nhat cfg + goi hook _bprdOnExcludeChange_(true)');
+  ok(vm.runInContext('tspExcludePanelHtml("b")', c).includes('id="ts-exq-b"'), 'khung loai tru co id rieng theo ngu canh');
   console.log(bad ? bad + ' LOI' : 'DAT'); process.exit(bad ? 1 : 0);
 })();
