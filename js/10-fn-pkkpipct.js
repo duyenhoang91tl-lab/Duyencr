@@ -160,6 +160,32 @@ function _pkKpiApplyQuickFilter(key){
   _pkLoadKpiReport();
 }
 
+// Phạm vi PHÒNG KINH DOANH (đội Online + Văn phòng) cho "Tỷ lệ chốt chung" của tab Báo cáo KPI Pancake (Duyên yêu cầu 2026-11-21).
+// NGUYÊN NHÂN GỐC: server (GAS) tính tyLeChotChung = Σ đơn ÷ Σ tương tác của MỌI Page, nên tương tác của người ngoài phòng KD
+// (Public API, Duyen Hoang, Kieu Ngoc...) nằm trong mẫu số mà đơn của họ gần như 0 → kéo tỷ lệ chung xuống. Commit 20ba546 chỉ lọc ở Báo cáo A/B.
+// Cách làm: tách bySale (đã có tongTT + donHangForRate từng Sale) thành trong/ngoài phòng KD, tỷ lệ chung = Σ đơn KD ÷ Σ tương tác KD.
+// Người ngoài KD VẪN HIỆN (bảng Theo Sale, nhóm riêng) nhưng không cộng vào tỷ lệ chung. Chưa phân loại ai ở cả 2 nguồn → không lọc (tránh ra trống).
+// Nguồn phân loại: Phân loại Sale theo mốc ngày (_saleChannelOn_ tại ngày cuối kỳ xem), dự phòng nhóm S/O của SaleDirectory (nhom Văn phòng/Online).
+function _pkKdInScope_(row, ymd){
+  var ch = (typeof _saleChannelOn_ === 'function') ? _saleChannelOn_(row && row.name, ymd || '') : '';
+  if (ch) return ch === 'online' || ch === 'offline';
+  var nh = String((row && row.nhom) || '');
+  return nh === 'Văn phòng' || nh === 'Online';
+}
+function _pkKdSplit_(rows, ymd){
+  rows = rows || [];
+  var anyClassified = rows.some(function(r){ return _pkKdInScope_(r, ymd); });
+  if (!anyClassified) return { kd: rows, out: [], scoped: false };
+  var kd = [], out = [];
+  rows.forEach(function(r){ (_pkKdInScope_(r, ymd) ? kd : out).push(r); });
+  return { kd: kd, out: out, scoped: true };
+}
+function _pkRateOf_(rows){
+  var tt = 0, don = 0;
+  (rows || []).forEach(function(r){ tt += Number(r.tongTT) || 0; don += Number(r.donHangForRate) || 0; });
+  return { tongTT: tt, don: don, rate: tt ? Math.round(don / tt * 1000) / 10 : 0 };
+}
+
 function _pkRenderKpiPancake(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
@@ -228,12 +254,18 @@ function _pkRenderKpiPancake(){
 
   // ── Tổng quan: tách khối "Kết quả bán hàng" nổi bật (chụp gửi sếp) khỏi khối phễu tương tác ──
   var kpiTbDon = rep.totalDonHang ? Math.round(rep.totalDoanhThu/rep.totalDonHang) : 0;
+  var kdSplit_ = _pkKdSplit_(_pkApplyColFilters(rep.bySale || [], 'sale', _PK_COL_GETTERS.sale), rep.to);
+  var kdAll_ = _pkKdSplit_(rep.bySale || [], rep.to);   // tỷ lệ chung KHÔNG phụ thuộc bộ lọc cột của bảng
+  var kdRate_ = kdAll_.scoped ? _pkRateOf_(kdAll_.kd) : null;
   html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng</div>';
   html += '<div class="kpi-grid" style="margin-bottom:14px">'+
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_pkN(rep.totalDonHang)+'</div><div class="kpi-label"><b>Đơn hàng</b> (DT TỔNG)</div></div>'+
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_dfmtV(rep.totalDoanhThu)+'</div><div class="kpi-label"><b>Doanh thu</b></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_dfmtV(kpiTbDon)+'</div><div class="kpi-label">Trung bình đơn</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ chốt chung</div></div>'+
+    (kdRate_
+      ? '<div class="kpi-card" style="border:1.5px solid #0e7490"><div class="kpi-val" style="color:#0e7490">'+kdRate_.rate+'%</div><div class="kpi-label"><b>Tỷ lệ chốt chung — phòng KD</b> ('+_pkN(kdRate_.don)+' đơn ÷ '+_pkN(kdRate_.tongTT)+' tương tác, chỉ Online + Văn phòng)</div></div>'+
+        '<div class="kpi-card"><div class="kpi-val" style="color:var(--muted)">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ gộp mọi người (cả ngoài phòng KD) — chỉ tham khảo</div></div>'
+      : '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ chốt chung</div></div>')+
   '</div>';
   html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💬 Phễu tương tác Pancake</div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
@@ -333,8 +365,8 @@ function _pkRenderKpiPancake(){
   if (!saleRowsF.length){
     html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">'+(rep.bySale.length?'Không có dòng nào khớp bộ lọc cột đang chọn.':'Chưa có dữ liệu.')+'</td></tr>';
   } else {
-    saleRowsF.forEach(function(s){
-      html += '<tr>'+
+    var saleRowHtml_ = function(s, dim){
+      return '<tr'+(dim?' style="opacity:.75"':'')+'>'+
         '<td style="color:var(--muted);font-size:11px">'+esc(s.maSale||'—')+'</td>'+
         '<td>'+esc(s.name)+(s.mapped?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp tên</span>')+'</td>'+
         '<td>'+(s.nhom ? esc(s.nhom) : '<span style="color:#9a3412;font-size:11px">ngoài danh sách</span>')+'</td>'+
@@ -345,7 +377,26 @@ function _pkRenderKpiPancake(){
         '<td style="text-align:right">'+(s.trungBinhDon?_dfmtV(s.trungBinhDon):'—')+'</td>'+
         '<td style="text-align:right;font-weight:700">'+s.tyLeChot+'%</td>'+
         '</tr>';
-    });
+    };
+    if (!kdSplit_.scoped){
+      saleRowsF.forEach(function(s){ html += saleRowHtml_(s, false); });
+    } else {
+      var sumRowHtml_ = function(label, rows){
+        var tt = 0, sdt = 0, dh = 0, dt = 0, don = 0;
+        rows.forEach(function(r){ tt += Number(r.tongTT)||0; sdt += Number(r.sdtMangVe)||0; dh += Number(r.donHang)||0; dt += Number(r.doanhThu)||0; don += Number(r.donHangForRate)||0; });
+        return '<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--surface2)"><td></td><td>'+label+'</td><td></td>'+
+          '<td style="text-align:right">'+_pkN(tt)+'</td><td style="text-align:right">'+_pkN(sdt)+'</td><td style="text-align:right">'+_pkN(dh)+'</td>'+
+          '<td style="text-align:right">'+_dfmtV(dt)+'</td><td style="text-align:right">'+(dh?_dfmtV(Math.round(dt/dh)):'—')+'</td>'+
+          '<td style="text-align:right">'+(tt ? Math.round(don/tt*1000)/10 : 0)+'%</td></tr>';
+      };
+      kdSplit_.kd.forEach(function(s){ html += saleRowHtml_(s, false); });
+      if (kdSplit_.kd.length) html += sumRowHtml_('Tổng phòng KD (Online + Văn phòng) — tính vào tỷ lệ chung', kdSplit_.kd);
+      if (kdSplit_.out.length){
+        html += '<tr><td colspan="9" style="padding:10px 6px 4px;font-size:11.5px;font-weight:700;color:#9a3412">Ngoài phòng KD — chỉ hiển thị, KHÔNG tính vào tỷ lệ chốt chung</td></tr>';
+        kdSplit_.out.forEach(function(s){ html += saleRowHtml_(s, true); });
+        html += sumRowHtml_('Tổng ngoài phòng KD', kdSplit_.out);
+      }
+    }
   }
   html += '</tbody></table></div>';
 
