@@ -6392,6 +6392,7 @@ function _splitBhCodes_(codes) {
 //   { status:'ok', total, shares:[{name,frac}], codes, baseRows:n }  — da ghep xong
 //   { status:'gocBiLoai', codes }                                    — moi don goc Base deu Huy/Hoan -> bo don Pos
 //   { status:'khongKhop'|'trungDonGoc', codes, missing:[...] }       — co ma nhung KHONG ghep duoc (fallback Pos)
+//   { status:'ngChuaCapNhat', codes, missing:[...] }                 — moi ma thieu deu la ma NG (kenh nguon) chua cap nhat tren Base -> fallback Pos (The nhan vien), KHONG tinh la loi
 // QUY TAC (Duyen chot 2026-10-21): doanh thu don ghep = TUNG DON GOC Base chia deu cho nguoi tham gia don goc do (nhu cu) + PHAN CON LAI cua don Pos
 // (gia Pos - tong cac don goc, neu > 1.000d) tinh cho sale ghi tren the Pos NEU CO THE (chia deu giua cac sale tren the). Khong co the -> phan du khong tinh (giu nhu cu:
 // total = tong don goc). Phan du am (Pos < tong goc) khong dieu chinh. posVal/theNames = gia tri Pos va ten sale tren the Pos cua don (tuy chon; bo qua = hanh vi cu).
@@ -6415,7 +6416,13 @@ function _resolveGhepDon_(codes, idx, usedBaseRows, posVal, theNames) {
     }
   }
   // Co ma khong tim thay don goc: KHONG ghep 1 phan (se thieu doanh thu) — chia theo Pos va canh bao de kiem tra tay.
-  if (missing.length) return { status: 'khongKhop', codes: codes, missing: missing };
+  // 2026-11-25 (Duyen): ma "NG..." = don KENH NGUON (Base xuat rieng "bao cao kenh nguon"). Neu Duyen CHUA cap nhat bao cao do len Base thi ma NG khong co tren Base
+  // -> day KHONG phai loi ghep: don van tinh theo The Pos (nhan vien tren the) nhu binh thuong (cung ket qua nhu 'khongKhop' — caller roi ve effRow = dong Pos), chi KHONG bao "khong khop".
+  // Chi ap khi TAT CA ma thieu deu la ma NG; thieu them 1 ma thuong -> van 'khongKhop' nhu cu.
+  if (missing.length) {
+    var ngOnlyMissing = missing.every(function(c) { return /^NG\d/.test(String(c || '').replace(/\s+/g, '').toUpperCase()); });   // chuan hoa tai cho (giong _normCounterCode_) de ham van chay doc lap trong test
+    return { status: ngOnlyMissing ? 'ngChuaCapNhat' : 'khongKhop', codes: codes, missing: missing };
+  }
   for (var u = 0; u < picked.length; u++) {
     if (usedBaseRows[picked[u].rowIndex]) return { status: 'trungDonGoc', codes: codes, missing: [] };
   }
@@ -6920,7 +6927,7 @@ function buildSalesReportB_(filters) {
   // tham). Them 2 bo dem rieng (count) KHONG bi gioi han, tang moi lan bat ke mang vi du co con
   // cho hay khong — dung 2 bo dem nay moi la so that de hien thi/canh bao, 2 mang [] chi de liet
   // ke VI DU (toi da 30 dong) phia sau.
-  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, gocBiLoaiList: [], khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
+  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, gocBiLoaiList: [], khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0, ngChuaCapNhat: [], ngChuaCapNhatCount: 0 };
   var hiddenB_ = _donHiddenChecker_();
   var ovrSaleMap_ = _orderSaleOvrMap_();
   var matched = [];
@@ -6957,6 +6964,7 @@ function buildSalesReportB_(filters) {
       } else {
         var wInfo = { ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, ghiChu: String(rowP.ghiChu || '').substring(0, 120), maCoDon: gh.codes, maKhongTim: gh.missing };
         if (gh.status === 'khongKhop') { ghepStats.khongKhopCount++; if (ghepStats.khongKhop.length < 30) ghepStats.khongKhop.push(wInfo); }
+        else if (gh.status === 'ngChuaCapNhat') { ghepStats.ngChuaCapNhatCount++; if (ghepStats.ngChuaCapNhat.length < 30) ghepStats.ngChuaCapNhat.push(wInfo); }   // 2026-11-25: don ma NG chua co tren Base -> giu effRow = dong Pos (tinh theo The nhan vien), chi dem rieng, khong coi la loi
         else {
           ghepStats.trungDonGocCount++;
           // NGUYEN NHAN GOC (2026-11-13, don #M47323 ghi chu "62T11 + 79T11/2026": Pos 13.973.000 = 8.123.000 + 5.850.000 = dung tong 2 don Base, nhung bao cao check nguoc van bao lech 5.850.000):
