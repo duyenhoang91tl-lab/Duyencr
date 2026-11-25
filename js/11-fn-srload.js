@@ -1859,7 +1859,8 @@ function _srBaseCheckPanelHtml_(d){
   var lechTot = lechOrders.reduce(function(sum, o){ return sum + (_srBcBaseSum_(o) - _srBcPosVal_(o)); }, 0);
   var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — CHỈ hiện đơn Pos lệch Base để check tay &amp; chia tiền tay; đơn khớp thì ẩn)</span></div>';
   h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b> · <span style="color:#c00">Đơn lệch cần check tay <b>' + fmt(lechOrders.length) + '</b> (tổng chênh <b>' + _srMoney(lechTot) + '</b>)</span>' + (t.du ? ' · Phần còn lại tính theo Thẻ Pos <b>' + _srMoney(t.du) + '</b>' : '') +
-    ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>. ' +
+    ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>.' +
+    (g.ngChuaCapNhatCount ? ' <span title="Mã NG = đơn kênh nguồn. Chưa cập nhật báo cáo kênh nguồn lên Base thì đơn vẫn tính theo Thẻ Pos (nhân viên trên thẻ) như bình thường — không phải lỗi.">ℹ Đơn mã NG chưa có trên Base (tính theo Thẻ Pos): <b>' + fmt(g.ngChuaCapNhatCount) + '</b>.</span>' : '') + ' ' +
     '<button class="btn sm" onclick="_srBaseCheckExport_()">📥 Xuất Excel check ngược Base</button></div>';
   if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
   if (!lechOrders.length){ return h + '<div style="font-size:12px;color:var(--muted)">✅ Cả ' + fmt(orders.length) + ' đơn Pos ghép Base đều khớp giá với Base — không có đơn nào cần check tay.</div>'; }
@@ -1909,6 +1910,7 @@ function _srBaseCheckExport_(){
     ['— có mã nhưng KHÔNG khớp Base', g.khongKhopCount || 0],
     ['— mã trùng đơn gốc đã dùng', g.trungDonGocCount || 0],
     ['— bị bỏ vì mọi đơn gốc Base Thất bại', g.gocBiLoai || 0],
+    ['— mã NG (kênh nguồn) chưa có trên Base → tính theo Thẻ Pos (không phải lỗi)', g.ngChuaCapNhatCount || 0],
     ['Nghi ghép nhưng CHƯA ghép', (d.ghepCheck && d.ghepCheck.count) || 0],
     // CHAN DOAN khi "da ghep duoc" = 0: backend doc Base (DT TONG) co that bai khong? (cotBase: -1 = khong tim thay cot ma bo dem, -2 = loi khi doc, so >= 0 = cot da dung)
     ['Chẩn đoán — cột mã bộ đếm trên Base (−1: không thấy cột, −2: lỗi đọc)', g.cotBase === undefined || g.cotBase === null ? '(backend chưa trả — cần deploy bản mới)' : g.cotBase],
