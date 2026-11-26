@@ -1,5 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+
+## 2026-11-26 (phiên Claude — CRM MÀN CHĂM SÓC KHÁCH: Ô GHI CHÚ KHÔNG HIỆN + KHÔNG KÉO ĐƯỢC DANH SÁCH KHÁCH) — BƯỚC 1/2 XONG (ô ghi chú; chỉ web, Ctrl+F5, không đụng GAS)
+- ĐỀ BÀI Duyên: (1) màn chăm sóc khách bấm vào ô ghi chú không hiện chỗ để ghi; (2) thanh công cụ kéo chỉ kéo được menu phía trên, không kéo được danh sách khách phía dưới.
+- ✅ **BƯỚC 1/2 — Ô GHI CHÚ (XONG, đã test):** NGUYÊN NHÂN GỐC: ô `#cs-note-new` nằm trong mục gập "👤 Thông tin chăm sóc" (`.dp-acc`), CSS `.dp-acc:not(.open) > :not(.dp-acc-h){display:none}` ẩn cả ô nhập khi mục gập. Biến toàn cục `_dpAccOpen` (js/03) nhớ trạng thái lần trước (đã gập / đang mở "Lịch") nên nút "📝 Ghi chú" (js/33 `proQuickGo_`) chỉ đổi tab rồi `focus()` vào ô đang display:none → không thấy gì. Ô "Ghi chú gần nhất" ở dòng khách trước đây chỉ là chữ, bấm là mở hồ sơ chung.
+  - Đã sửa: js/03 thêm `dpAccShow_(key)` (mở đúng mục, gập mục kia, cập nhật `_dpAccOpen`) và `openDpNote_(phone)`; js/33 `proQuickGo_` gọi `dpAccShow_` cho 'note' và 'sched' (nút "📅 Đặt lịch" cùng lỗi); js/02 ô `td.col-note` bấm → `openDpNote_` (mở hồ sơ + mở sẵn mục chăm sóc + con trỏ vào ô ghi chú). Bump ?v=20261126a ở index.html cho 3 file.
+  - Test: `NODE_PATH=<jsdom> node tools/test-dp-note-open.js` (5 ca) xanh; `node -c` 3 file OK.
+- 🔧 **ĐANG LÀM — BƯỚC 2/2:** lỗi kéo danh sách (css/16-mobile-list.css). Nghi ngờ: trên điện thoại khi mở "📊 Tổng quan & tác vụ" thì stats-row + toolbar (xuống dòng) + thanh lọc + thanh cột (đều flex-shrink:0) chiếm gần hết chiều cao, `.table-wrap` (flex:1) bị bóp còn ~0 và `#tab-list{overflow:hidden}` cắt mất → chỉ thấy phần menu phía trên. Hướng sửa: ≤900px cho `.main` cuộn dọc khi ở tab Danh sách + `.table-wrap` có chiều cao tối thiểu (calc(var(--vh,1vh)*NN)) để luôn kéo được danh sách. CHƯA tái hiện được bằng trình duyệt thật — nếu Duyên còn lỗi sau khi sửa, gửi: kích thước màn/thiết bị (web hay app Android), đang mở "Tổng quan & tác vụ" hay không.
+- ➡️ **BƯỚC KẾ TIẾP:** sửa CSS bước 2/2 → test → push → Duyên Ctrl+F5 thử: (a) bấm vào ô Ghi chú ở dòng khách → hồ sơ mở và ô ghi chú có con trỏ; (b) mở hồ sơ → gập mục "Thông tin chăm sóc" → bấm nút "📝 Ghi chú" → phải tự mở; (c) vuốt danh sách khách trên điện thoại.
+
 ## 2026-11-26 (phiên Claude — PHÒNG BAN › TỪNG NGƯỜI: 1 NGƯỜI = 1 DÒNG, KHÔNG TÁCH THEO TÊN PHỤ) — XONG bước 1/2 (chỉ web, Ctrl+F5; không đụng GAS)
 - ĐỀ BÀI Duyên: yennth và yenNTH2004 là 1 người nhưng ở Từng người hiện 2 dòng, đếm 2 người; muốn khớp sale theo TÊN GỐC (= tên đăng nhập / "Họ và tên" trong hồ sơ sale), các mục khác chọn theo tên gốc.
 - NGUYÊN NHÂN GỐC: `_dpNames()` chỉ gộp 2 tên khi GIỐNG HỆT (khác hoa/thường), không dùng nhóm "cùng 1 người" hệ thống đã có (tài khoản nhiều tên `names` + Khớp sale `salePersonTags` → `_groupNamesByPerson`, js/08 + js/50). Thẻ số, chip "N người", bộ lọc, danh sách đều đếm theo TÊN.

@@ -192,8 +192,8 @@ function proQuickActionsHtml_(phone){
 // Chỉ số tab trong #dp .dp-tab (khớp _order trong renderDpTab): care 0 · schedule 1 · history 2
 function proQuickGo_(kind){
   var tabs = document.querySelectorAll('#dp .dp-tab'), go = function(i, key){ if (tabs[i] && typeof switchDpTab==='function') switchDpTab(key, tabs[i]); };
-  if (kind==='note'){ go(0,'care'); var n = document.getElementById('cs-note-new'); if (n){ n.focus(); if (n.scrollIntoView) n.scrollIntoView({ block:'center' }); } }
-  else if (kind==='sched'){ go(1,'schedule'); var t = document.getElementById('new-snote'); if (t) t.focus(); }
+  if (kind==='note'){ go(0,'care'); if (typeof dpAccShow_==='function') dpAccShow_('care'); var n = document.getElementById('cs-note-new'); if (n){ n.focus(); if (n.scrollIntoView) n.scrollIntoView({ block:'center' }); } }
+  else if (kind==='sched'){ go(1,'schedule'); if (typeof dpAccShow_==='function') dpAccShow_('sched'); var t = document.getElementById('new-snote'); if (t) t.focus(); }
   else if (kind==='order'){ go(2,'history'); var f = document.getElementById('add-order-form');
     if (f && f.style.display==='none' && typeof _toggleAddOrderForm==='function') _toggleAddOrderForm();   // đã mở rồi thì KHÔNG bật/tắt lại (hàm gốc là toggle)
     var pr = document.getElementById('mo-product'); if (pr){ pr.focus(); if (pr.scrollIntoView) pr.scrollIntoView({ block:'center' }); } }

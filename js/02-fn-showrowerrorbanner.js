@@ -963,7 +963,7 @@ function _rowHtml(c) {
     <td class="col-carecs">${careCSHtml}</td>
     <td class="col-source" style="${srcDisp}"><div class="btags">${srcTags}${srcExtra}</div></td>
     <td class="col-bcstatus" data-phone="${esc(c.phone)}" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal(this.dataset.phone)" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
-    <td class="col-note" style="font-size:11px;color:var(--muted)" title="${noteTitle}">${noteStr}</td>
+    <td class="col-note" data-phone="${esc(c.phone)}" style="font-size:11px;color:var(--muted);cursor:text" title="${noteTitle ? noteTitle + ' — ' : ''}Bấm để thêm ghi chú" onclick="event.stopPropagation();openDpNote_(this.dataset.phone)">${noteStr}</td>
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
     <td class="col-tacdong" style="${tacdongDisp}">${tacdongHtml}</td>

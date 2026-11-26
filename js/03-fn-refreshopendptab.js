@@ -1290,6 +1290,30 @@ function dpAccToggle(h) {
   document.querySelectorAll('#dp-body .dp-acc').forEach(function (x) { x.classList.remove('open'); });
   if (willOpen) { sec.classList.add('open'); _dpAccOpen = sec.getAttribute('data-acc') || ''; } else _dpAccOpen = '';
 }
+// Mở đúng mục của menu gập (care | sched) trong hồ sơ khách đang hiển thị, rồi trả về mục đó.
+// NGUYÊN NHÂN GỐC lỗi "bấm ô ghi chú không hiện chỗ ghi": ô #cs-note-new nằm trong mục "Thông tin chăm sóc" (.dp-acc); CSS `.dp-acc:not(.open) > :not(.dp-acc-h){display:none}`
+// ẩn cả ô nhập khi mục này đang gập. _dpAccOpen là biến TOÀN CỤC giữ trạng thái mục mở lần trước (đã gập / đang mở "Lịch") nên mở hồ sơ khác hoặc bấm nút "📝 Ghi chú"
+// (js/33 proQuickGo_) chỉ đổi tab, không mở mục → focus() vào ô đang display:none = không thấy gì.
+function dpAccShow_(key) {
+  _dpAccOpen = key || '';
+  var sec = null;
+  document.querySelectorAll('#dp-body .dp-acc').forEach(function (x) {
+    var on = x.getAttribute('data-acc') === key;
+    x.classList.toggle('open', on);
+    if (on) sec = x;
+  });
+  return sec;
+}
+// Bấm ô "Ghi chú" ở dòng khách (Danh sách KH): mở hồ sơ, mở sẵn mục chăm sóc và đưa con trỏ vào ô ghi chú mới.
+function openDpNote_(phone) {
+  _dpAccOpen = 'care';          // renderCareTab vẽ mục care ở trạng thái mở
+  openDp(phone);
+  setTimeout(function () {
+    dpAccShow_('care');
+    var n = document.getElementById('cs-note-new');
+    if (n) { try { n.focus({ preventScroll: true }); } catch (e) { n.focus(); } if (n.scrollIntoView) n.scrollIntoView({ block: 'center' }); }
+  }, 60);
+}
 function _dpHm_() { var d = new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
 function _dpAutoMark_(msg, warn) {
   document.querySelectorAll('#dp-body .dp-autosave').forEach(function (el) { el.textContent = msg; el.classList.toggle('warn', !!warn); });
