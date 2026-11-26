@@ -186,8 +186,27 @@ function _acctRoleChange(){
   var nameWrap = document.getElementById('acct-name-wrap'), teamWrap = document.getElementById('acct-team-wrap');
   if (nameWrap) nameWrap.style.display = (role==='admin') ? 'none' : '';
   if (teamWrap) teamWrap.style.display = (_roleBaseOf(role)==='leader') ? '' : 'none';
+  var monthWrap = document.getElementById('acct-months-wrap');
+  if (monthWrap) monthWrap.style.display = (_roleBaseOf(role)==='leader') ? '' : 'none';
   var deptWrap = document.getElementById('acct-dept-wrap');
   if (deptWrap) deptWrap.style.display = (_roleBaseOf(role)==='manager') ? '' : 'none';
+}
+// Truong nhom: chon thang du lieu duoc xem (Users.viewMonths ['yyyy-MM']; khong tich = khong gioi han). Hien nam nay + nam truoc.
+function _acctMonthsHtml_(selected){
+  var sel = {}; (selected || []).forEach(function(m){ sel[m] = 1; });
+  var now = new Date(), y = now.getFullYear(), years = {}; years[y] = 1; years[y - 1] = 1;
+  Object.keys(sel).forEach(function(m){ years[m.slice(0, 4)] = 1; });
+  return Object.keys(years).sort().reverse().map(function(yr){
+    var h = '<div style="display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center;margin-bottom:5px"><b style="font-size:12px">' + yr + ':</b>';
+    for (var i = 1; i <= 12; i++){
+      var k = yr + '-' + (i < 10 ? '0' : '') + i;
+      h += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" class="acct-month-chk" style="width:auto;padding:0;margin:0" data-ym="' + k + '"' + (sel[k] ? ' checked' : '') + '>T' + i + '</label>';
+    }
+    return h + '</div>';
+  }).join('');
+}
+function _acctCollectMonths_(){
+  return Array.prototype.slice.call(document.querySelectorAll('.acct-month-chk:checked')).map(function(o){ return o.getAttribute('data-ym'); }).sort();
 }
 function _acctKey(u){ return String(u == null ? '' : u).trim().toLowerCase(); }
 
@@ -250,7 +269,8 @@ function _acctDetailHtml(a){
     var mem = tm ? [].concat(tm.leader ? [tm.leader] : [], tm.members || []).filter(Boolean) : [];
     teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">'+
       '👥 Team <b>'+esc(a.team || '—')+'</b>'+(mem.length ? ': '+esc(mem.join(', ')) : ' (chưa có thành viên)')+
-      ' — Leader còn xem được dữ liệu của cả team.</div>';
+      ' — Leader còn xem được dữ liệu của cả team.'+
+      '<br>📅 Data team được xem: <b>'+((a.viewMonths && a.viewMonths.length) ? esc(a.viewMonths.map(function(m){ return m.slice(5)+'/'+m.slice(0,4); }).join(', ')) : 'mọi tháng')+'</b> (bấm ✏ Sửa để đổi). Data chia thẳng cho Leader thì luôn xem được.</div>';
   }
 
   // Loại Sale (online/offline) + Ngày bắt đầu — chỉ cho tài khoản CS (từng sale), dùng để
@@ -526,6 +546,7 @@ function renderAcctModal(){
         '<input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
       '<div class="v9-field" id="acct-dept-wrap" style="display:none"><label>Phòng phụ trách (cho Quản lý — xem được nhân viên &amp; leader của các phòng được tích ở màn Tổng quan / Hồ sơ nhân sự)</label><div style="display:flex;gap:12px;flex-wrap:wrap">'+deptOpts+'</div></div>'+
       '<div class="v9-field" id="acct-team-wrap" style="display:none"><label>Team (cho Leader)</label><select id="acct-team-sel">'+teamOpts+'</select></div>'+
+      '<div class="v9-field" id="acct-months-wrap" style="display:none"><label>Leader được xem data team của THÁNG nào (theo ngày đơn hàng; không tích = mọi tháng). Data bạn chia thẳng cho Leader thì luôn xem được. Không áp cho báo cáo doanh số.</label>'+_acctMonthsHtml_(ed ? ed.viewMonths : [])+'</div>'+
       '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">'+(ed?'💾 Lưu thay đổi':'Lưu tài khoản')+'</button>'+
     '</div>';
   _acctRoleChange();
@@ -602,6 +623,7 @@ async function addAccount(){
   // Mat khau (neu co) di theo truong tam _setPw -> pushUsers gui cho may chu tu bam; client KHONG con giu passHash.
   var rec = { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
   if (p) rec._setPw = p;
+  rec.viewMonths = (_roleBaseOf(role) === 'leader') ? _acctCollectMonths_() : [];
   if (existing){ for (var i=0;i<accounts.length;i++){ if (String(accounts[i].username).toLowerCase()===String(existing.username).toLowerCase()){ accounts[i]=rec; break; } } }
   else accounts.push(rec);
   var res = await pushUsers();
