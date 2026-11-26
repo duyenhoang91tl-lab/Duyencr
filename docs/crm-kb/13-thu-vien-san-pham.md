@@ -35,6 +35,6 @@ Duyên có thư mục Drive "Hình ảnh theo File Giá" (id mặc định `PLIB
 | plibLinkSave | POST | CHỈ ADMIN: gắn tay thư mục (link hoặc id) cho SP/combo; `folder` rỗng = gỡ. Sheet `ThuVienSPLink` |
 - **Khớp**: client khớp theo tên thư mục (bỏ dấu/hoa thường) = tên SP, tên thương mại, hoặc tên combo (không kèm "Combo:"); tối đa 3 thư mục/SP. **Gắn tay thắng tự khớp.** Khớp ở client vì client có bảng giá; server chỉ liệt kê.
 - **Thư mục nhóm** (vd "Nhẫn", chứa thư mục con) không tính vào thống kê "chưa khớp" — chỉ thư mục lá.
-- **Điều kiện chạy**: tài khoản Google chạy Apps Script PHẢI có quyền xem thư mục gốc (không thì báo lỗi kèm email cần chia sẻ, quyền Người xem). Ảnh hiện cho nhân viên qua thumbnail Drive nên cần tệp chia sẻ dạng "ai có link" (hoặc nhân viên đăng nhập Google có quyền).
+- **Điều kiện chạy** (hiện đã thỏa: tài khoản chạy script chính là chủ thư mục Drive — Duyên xác nhận 26/11/2026): tài khoản Google chạy Apps Script PHẢI có quyền xem thư mục gốc (không thì báo lỗi kèm email cần chia sẻ, quyền Người xem). Ảnh hiện cho nhân viên qua thumbnail Drive nên cần tệp chia sẻ dạng "ai có link" (hoặc nhân viên đăng nhập Google có quyền).
 - **Giới hạn 50 ảnh** chỉ áp cho ảnh TẢI LÊN CRM; thư mục Drive hiện tối đa 200 ảnh.
 - Bẫy test: mảng trả từ code chạy trong `vm` khác prototype → `deepStrictEqual` fail dù giống nhau, so bằng `JSON.stringify`. Cấu trúc thật của thư mục Drive CHƯA được xem (cần đăng nhập) — quét 3 cấp để chịu được "Nhóm / Sản phẩm" lẫn "Nhóm / Sản phẩm / Chất liệu".
