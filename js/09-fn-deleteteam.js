@@ -42,9 +42,11 @@ function _vnNorm(x){ return String(x||'').toLowerCase().normalize('NFD').replace
 function _teamComboMatches(teamId, q){
   var t = teams.find(function(x){ return x.id===teamId; }); if(!t) return {matches:[], canNew:false, q:''};
   var inTeam = {}; [t.leader].concat(t.members||[]).forEach(function(m){ if(m) inTeam[m]=1; });
-  var all = _allCSNames();
+  var all = _teamCandidateNames();
   var nq = _vnNorm(q);
-  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n).indexOf(nq)!==-1); });
+  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n+' '+(typeof _staffSearchText==='function'?_staffSearchText(n):'')).indexOf(nq)!==-1); });
+  // 1 người nhiều tên (cùng hồ sơ/tài khoản) chỉ hiện 1 dòng — chọn dòng nào addTeamMember cũng thêm đủ các tên cùng người
+  try { matches = _groupNamesByPerson(matches).map(function(g){ return g.primary; }); } catch (eG) {}
   var raw = String(q||'').trim();
   var exists = all.some(function(n){ return _vnNorm(n)===nq; });   // đã có (kể cả đã là thành viên) → không đề nghị tạo mới
   return {matches:matches, canNew: !!raw && !exists, q: raw};
@@ -54,7 +56,7 @@ function _teamComboShow(inp){
   var tid = inp.getAttribute('data-team');
   var r = _teamComboMatches(tid, inp.value);
   var h = r.matches.map(function(n,i){
-    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+'</div>';
+    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+(function(){ var d = (typeof _staffDisplayOf==='function') ? _staffDisplayOf(n) : ''; return d && d.toLowerCase()!==String(n).toLowerCase() ? ' <span style="color:var(--muted);font-size:11px">· '+esc(d)+'</span>' : ''; })()+'</div>';
   }).join('');
   if (r.canNew) h += '<div class="team-combo-item team-combo-new'+(!r.matches.length?' hi':'')+'" data-name="'+esc(r.q)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,true)">＋ Thêm mới “'+esc(r.q)+'”</div>';
   if (!h) h = '<div class="team-combo-empty">Không còn nhân viên nào để thêm</div>';
@@ -144,7 +146,9 @@ async function _pkLoadNameMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap', { redirect:'follow' });
+    // `_t` = chống cache Worker: pancakeNameMap được Worker cache 60s (+SWR tới 240s) và Worker KHÔNG xoá cache khi có POST lưu
+    // → F5 ngay sau khi bấm Lưu nhận lại bản CŨ (nhìn như "chưa lưu"). Khoá cache gồm mọi tham số nên thêm `_t` luôn đi thẳng tới GAS.
+    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.nameMap = d.map || {};
     _pkState.serverNames = d.allNames || [];
@@ -159,7 +163,8 @@ async function _pkLoadPageMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakePageMap', { redirect:'follow' });
+    // `_t` chống cache Worker (cùng lý do với pancakeNameMap: lưu xong F5 bị trả bản cũ trong 60-240s)
+    var r = await fetch(gsUrl + sep + 'action=pancakePageMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.pageMap = d.map || {};
     _pkState.serverPages = d.allPages || [];
@@ -303,11 +308,11 @@ function _pkRenderAll(){
     html += _pkRenderSdtPreviewHtml();
   }
 
-  html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
-    '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
-    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
-    _pkRenderMapTableHtml(isAdmin)+
-  '</details>';
+  // 20/11/2026: phần "Khớp tên Nhân viên Pancake ↔ Sale CRM" đã CHUYỂN sang ☰ Cài đặt team → "🔗 Khớp tên Pancake" (js/67-pancake-namemap-modal.js) — khớp nhân viên là cài đặt nhân sự, không thuộc báo cáo.
+  html += '<div style="margin-top:22px;padding:10px 12px;border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<span>🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM nay nằm ở <b>☰ Cài đặt team → “🔗 Khớp tên Pancake”</b>.</span>'+
+    (isAdmin ? '<button type="button" class="btn sm secondary" onclick="openPancakeNameMapModal()">Mở Khớp tên</button>' : '')+
+  '</div>';
 
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
@@ -1023,6 +1028,7 @@ async function _pkMapNameInline(pancakeName, saleName){
     toast('✓ Đã khớp "'+pancakeName+'" → "'+(shown||'(bỏ khớp)')+'"');
     _pkState.report = null; // ket qua bao cao cu co the da tinh sai ten -> yeu cau xem lai
     _pkRenderAll();
+    if (typeof _pnmRender === 'function') _pnmRender();   // cửa sổ Cài đặt team → Khớp tên Pancake (js/67) cập nhật ngay
   } catch(e){
     toast('❌ Lỗi khớp tên: ' + e.message);
   }

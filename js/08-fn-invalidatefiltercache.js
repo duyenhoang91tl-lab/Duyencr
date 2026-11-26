@@ -78,17 +78,67 @@ async function flushAuditSync(){
   } catch(e){ /* GAS cũ chưa hỗ trợ saveAudit → bỏ qua, audit vẫn có ở localStorage */ }
 }
 
+// Gấp tên để so khớp: bỏ dấu, hoa/thường, gộp khoảng trắng (Ngocnm = ngocnm = "Ngọc nm").
+function _assignFoldName_(n){
+  return String(n == null ? '' : n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+// Khoá "cùng 1 người" CHẶT HƠN _assignFoldName_: bỏ luôn mọi khoảng trắng/ký tự lạ ("Lê Phương Anh" = "lephuonganh" = "Le Phuong Anh").
+// NGUYÊN NHÂN GỐC "chia data cho lephuonganh mà Danh sách KH + Data của tôi vẫn trống" (2026-11-26): đợt chia ghi tên hiển thị có dấu/khoảng trắng
+// ("Lê Phương Anh") còn tài khoản đăng nhập là "lephuonganh" → gấp tên vẫn lệch ("le phuong anh" ≠ "lephuonganh") nên không khớp.
+function _assignCompactKey_(n){
+  return _assignFoldName_(n).replace(/[^a-z0-9]/g, '');
+}
+// Các cách viết tên mà tài khoản/CS đang dùng ở nơi khác (tài khoản đăng nhập, tên CS đang đăng nhập, danh sách CS có sẵn):
+// khoá gọn -> [cách viết]. Mọi tên/bí danh/username của CÙNG 1 tài khoản được coi là 1 người (khớp 1 tên là có cả nhóm).
+function _assignKnownNames_(){
+  var m = {};
+  function put(k, n){ if (!k) return; if (!m[k]) m[k] = []; if (m[k].indexOf(n) === -1) m[k].push(n); }
+  function addGroup(list){
+    var ls = []; (list || []).forEach(function(x){ x = String(x == null ? '' : x).trim(); if (x && ls.indexOf(x) === -1) ls.push(x); });
+    ls.forEach(function(n){ var k = _assignCompactKey_(n); ls.forEach(function(o){ put(k, o); }); });
+  }
+  try {
+    if (typeof currentUser !== 'undefined' && currentUser){
+      addGroup((currentUser.names || []).concat([currentUser.name, currentUser.username]));
+      (currentUser.viewNames || []).forEach(function(n){ addGroup([n]); });   // Quầy/CSKH: tên riêng, KHÔNG gộp thành cùng người với tài khoản
+    }
+    if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; addGroup((a.names || []).concat([a.name, a.username])); });
+    // NGUYÊN NHÂN GỐC "đã chia data cho sale nhưng Danh sách KH không hiện" (2026-11-26, tiếp): chia data chọn người nhận từ "Danh sách Sale" (tên Base/Pancake/Pos)
+    // và 2 tên đó được admin nối với tài khoản qua Quản lý Team › 🔗 Khớp sale (SALE_PERSON_TAGS = {tên chính: [thẻ...]}) — nhưng chỉ mục này chỉ biết nhóm tên của TÀI KHOẢN
+    // (names/name/username) nên đợt chia ghi tên thẻ (vd 'thuydinh95') không khớp tên tài khoản ('thuydinh1995') → _inUserScope/bộ lọc CS loại hết khách. Nay mỗi nhóm thẻ cũng là 1 người.
+    try { if (typeof SALE_PERSON_TAGS !== 'undefined' && SALE_PERSON_TAGS) Object.keys(SALE_PERSON_TAGS).forEach(function(k){ addGroup([k].concat(Array.isArray(SALE_PERSON_TAGS[k]) ? SALE_PERSON_TAGS[k] : [])); }); } catch (eT) {}
+    var sel = (typeof document !== 'undefined') ? document.getElementById('cs-staff-filter') : null;
+    if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') addGroup([o.value]); });
+  } catch (e) {}
+  return m;
+}
+// Mọi cách viết đã biết của CÙNG người với `name` (gồm chính `name`) — dùng cho tab "Data của tôi" gom đủ các đợt chia ghi tên khác nhau.
+function _assignNamesOfPerson_(name){
+  var out = [], n0 = String(name == null ? '' : name);
+  if (n0) out.push(n0);
+  var g = _assignKnownNames_()[_assignCompactKey_(n0)] || [];
+  g.forEach(function(x){ if (out.indexOf(x) === -1) out.push(x); });
+  return out;
+}
 function _rebuildAssignIndex(){
   _assignIndex = {};
   _assignAllIndex = {};
+  var known = _assignKnownNames_(), extraBy = {};
   // duyệt từ CŨ → MỚI để bản ghi mới nhất ghi đè
   var hist = (typeof assignHistory !== 'undefined' && assignHistory) ? assignHistory.slice() : [];
   hist.sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
   hist.forEach(function(e){
+    // NGUYÊN NHÂN GỐC "CS được chia data nhưng Danh sách KH không hiện khách": _inUserScope / bộ lọc CS tra _assignAllIndex bằng
+    // so khớp CHÍNH XÁC từng ký tự tên, trong khi tab "Data của tôi" chọn đúng tên ghi trong đợt chia -> đợt chia ghi tên khác
+    // hoa/thường/dấu với tên tài khoản (vd Ngocnm vs ngocnm) thì Data của tôi có khách mà Danh sách KH trống. Thêm MỌI cách viết
+    // đã biết của cùng tên vào chỉ mục (giữ nguyên tên gốc của đợt chia).
+    var fk = _assignCompactKey_(e.csName), ex = extraBy[fk];
+    if (!ex){ ex = (known[fk] || []).filter(function(n){ return n !== e.csName; }); extraBy[fk] = ex; }
     (e.phones||[]).forEach(function(p){
       _assignIndex[p] = e.csName; // CS mới nhất (dùng cho _heldBy)
-      if (!_assignAllIndex[p]) _assignAllIndex[p] = new Set();
-      _assignAllIndex[p].add(e.csName); // tất cả CS (dùng cho _inUserScope + CS filter)
+      var st = _assignAllIndex[p]; if (!st) st = _assignAllIndex[p] = new Set();
+      st.add(e.csName); // tất cả CS (dùng cho _inUserScope + CS filter)
+      for (var i = 0; i < ex.length; i++) st.add(ex[i]);
     });
   });
 }
@@ -226,6 +276,20 @@ function _allHoldersOf(c){
   if (idx) idx.forEach(function(n){ s.add(n); });
   return s;
 }
+// Truong nhom bi gioi han thang (2026-11-26, Users.viewMonths): khach co it nhat 1 don (Base hoac POS) trong cac thang duoc cap.
+function _leadMonthOk_(c){
+  var ms = currentUser.viewMonths;
+  if (currentUser._monthSrc !== ms){ var set = {}; ms.forEach(function(m){ set[m] = 1; }); currentUser._monthSet = set; currentUser._monthSrc = ms; }   // tinh 1 lan (duong nong)
+  var want = currentUser._monthSet, yl = c.ymList || [], i, o;
+  for (i = 0; i < yl.length; i++){
+    o = yl[i]; if (!o) continue;
+    if (o.ds){ if (want[o.ds.slice(0,7)]) return true; }
+    else if (o.yr && o.mo && want[o.yr + '-' + (o.mo < 10 ? '0' : '') + o.mo]) return true;
+  }
+  var pos = (typeof window !== 'undefined' && window.posOrdersByPhone) ? window.posOrdersByPhone[c.phone] : null;
+  if (pos) for (i = 0; i < pos.length; i++){ if (pos[i].ds && want[pos[i].ds.slice(0,7)]) return true; }
+  return false;
+}
 function _inUserScope(c){
   if (!currentUser || currentUser.role === 'admin') return true;
   // Tài khoản có thể gắn NHIỀU tên (vd đơn "chia" cho nhiều sale, hoặc 1 tài khoản gộp nhiều bí
@@ -255,6 +319,10 @@ function _inUserScope(c){
     return false;
   }
   if (currentUser.role === 'leader'){
+    // Data admin chia thang cho Truong nhom: luon xem duoc (ke ca chua cai team, hoac ngoai thang duoc cap).
+    var _own = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+    if (_own) { for (var _q = 0; _q < myNames.length; _q++) { if (_own.has(myNames[_q])) return true; } }
+    if (currentUser.viewMonths && currentUser.viewMonths.length && !_leadMonthOk_(c)) return false;   // data khac cua team: chi cac thang duoc cap
     var team = null;
     for (var i=0;i<teams.length;i++){
       if (myNames.indexOf(teams[i].leader) !== -1 || teams[i].name === currentUser.team){ team = teams[i]; break; }
@@ -399,6 +467,14 @@ function _allCSNames(){
   teams.forEach(function(t){ if(t.leader) set.add(t.leader); (t.members||[]).forEach(function(m){ set.add(m); }); });
   return [...set].filter(Boolean).sort(function(a,b){ return a.localeCompare(b,'vi'); });
 }
+// Ứng viên chọn vào Team = tên đã có trong dữ liệu + tài khoản CS có hồ sơ chuẩn (js/97) dù chưa có đơn/khách (vd bạn mới). Không đổi _allCSNames (nhiều nơi khác dùng).
+function _teamCandidateNames(){
+  var base = _allCSNames(), seen = {};
+  base.forEach(function(n){ seen[String(n).toLowerCase()] = 1; });
+  var ex = (typeof _staffExtraNames === 'function') ? _staffExtraNames() : [];
+  ex.forEach(function(n){ var k = String(n).toLowerCase(); if (n && !seen[k]){ seen[k] = 1; base.push(n); } });
+  return base.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+}
 // Danh sach ten Kenh ban (kenhBan/source) tung xuat hien trong don hang — dung cho o chon
 // kenh cua Team (Quan ly Team → chon kenh cho team NEU muon gioi han doanh thu team do chi
 // tinh trong 1/vai kenh nhat dinh, vd CS thuoc team khac nhung chi chay 1 kenh FB rieng).
@@ -536,7 +612,8 @@ function _computeCSStats(list, dFrom, dTo){
 // dung khi team co chon kenh (vd 1 so CS thuoc team khac nhung chi chay 1 kenh FB rieng, chi
 // muon tinh doanh thu team theo dung kenh do, khong tinh het moi don cua CS).
 function _revenueByMembersChannels(members, channels){
-  var memberSet = new Set(members);
+  var memberSet = new Set(members), memberLow = {};
+  members.forEach(function(m){ memberLow[String(m).toLowerCase()] = 1; });
   var chanSet = channels && channels.length ? new Set(channels) : null;
   var revenue = 0, orders = 0;
   (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
@@ -549,9 +626,20 @@ function _revenueByMembersChannels(members, channels){
       // nhieu sale bi bo sot hoan toan khoi doanh thu Team.
       var names = splitMulti_(o.cs, ',');
       if (!names.length) return;
-      var mine = names.filter(function(n){ return memberSet.has(n); }).length;
+      // 1 NGƯỜI nhiều tên (hồ sơ chuẩn / thẻ / tài khoản nhiều tên) chỉ được CHIA 1 PHẦN, không phải 1 phần cho mỗi tên:
+      // đơn "ninhnga99, Ninh Nga, thuongBT" = 2 người → Ninh nhận 1/2 (trước đây đếm 3 tên → Ninh nhận 2/3, thuongBT chỉ 1/3).
+      var persons;
+      try { persons = _groupNamesByPerson(names).map(function(g){ return g.names; }); } catch(eP){ persons = names.map(function(n){ return [n]; }); }
+      // Người thuộc team nếu BẤT KỲ tên nào của họ (kể cả tên chưa được thêm vào t.members — Team cũ chỉ lưu tên CRM) nằm trong team.
+      var mine = persons.filter(function(g){
+        return g.some(function(n){
+          if (memberSet.has(n)) return true;
+          var al; try { al = _personAliases(n); } catch(eA){ al = [n]; }
+          return al.some(function(a){ return memberSet.has(a) || memberLow[String(a).toLowerCase()]; });
+        });
+      }).length;
       if (!mine) return;
-      revenue += (+o.revenue||0) * mine / names.length;
+      revenue += (+o.revenue||0) * mine / persons.length;
       orders++;
     });
   });
@@ -1130,7 +1218,7 @@ function renderTeamTab(){
   if (!teams.length){
     html += '<div style="color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--border);border-radius:var(--rsm)">Chưa có team nào.'+(isAdmin?' Bấm “+ Thêm Team”.':'')+'</div>';
   }
-  var allNames = _allCSNames();
+  var allNames = _teamCandidateNames();
   teams.forEach(function(t){
     var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
     var channels = t.channels || [];
@@ -1166,7 +1254,10 @@ function renderTeamTab(){
       var isLeader = g.names.indexOf(t.leader) !== -1;
       var multi = g.names.length > 1;
       var label = esc(g.names[0]) + (multi ? ' <span style="color:var(--muted);font-size:11px">+ '+g.names.slice(1).map(esc).join(', ')+'</span>' : '');
-      html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':'')+'>'+(isLeader?'★ ':'')+label+
+      // Hồ sơ chuẩn (js/97): hiện họ tên chuẩn thay cho tên CRM + "+ tên phụ"; rê chuột thấy tên từng hệ thống. Chưa có hồ sơ → giữ cách hiện cũ.
+      var sinfo = (typeof _staffChipInfo === 'function') ? _staffChipInfo(g.names) : null;
+      if (sinfo) label = esc(sinfo.display);
+      html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(sinfo ? ' title="'+esc(sinfo.title)+'"' : (multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':''))+'>'+(isLeader?'★ ':'')+label+
         (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':(multi?'Xoá người này (cả '+g.names.length+' tên) khỏi team':'Xoá khỏi team'))+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
         (isAdmin ? ' <span class="chip-tag" data-name="'+esc(m)+'" title="Thẻ của người này (tên trong Base/Pos)" style="cursor:pointer" onclick="openPersonTagsModal(this.dataset.name)">🏷️</span>' : '')+
         (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
@@ -1194,9 +1285,10 @@ function renderTeamTab(){
         allNames.forEach(function(n){
           var on = members.indexOf(n)!==-1;
           var isLeader = n===t.leader;
-          html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc(n).toLowerCase()+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
+          var _sd = (typeof _staffDisplayOf === 'function') ? _staffDisplayOf(n) : '', _sx = (typeof _staffSearchText === 'function') ? _staffSearchText(n) : '';
+          html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc((n+' '+_sx).toLowerCase())+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
             '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' data-name="'+esc(n)+'" onchange="setTeamMemberChecked(\''+t.id+'\',this.dataset.name,this.checked)">'+
-            '<span>'+(isLeader?'★ ':'')+esc(n)+'</span></label>';
+            '<span>'+(isLeader?'★ ':'')+esc(n)+(_sd && _sd.toLowerCase()!==String(n).toLowerCase() ? ' <span style="color:var(--muted);font-size:11px">· '+esc(_sd)+'</span>' : '')+'</span></label>';
         });
         html += '</div></div>';
       }

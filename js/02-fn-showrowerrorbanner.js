@@ -963,7 +963,7 @@ function _rowHtml(c) {
     <td class="col-carecs">${careCSHtml}</td>
     <td class="col-source" style="${srcDisp}"><div class="btags">${srcTags}${srcExtra}</div></td>
     <td class="col-bcstatus" data-phone="${esc(c.phone)}" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal(this.dataset.phone)" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
-    <td class="col-note" style="font-size:11px;color:var(--muted)" title="${noteTitle}">${noteStr}</td>
+    <td class="col-note" data-phone="${esc(c.phone)}" style="font-size:11px;color:var(--muted);cursor:text" title="${noteTitle ? noteTitle + ' — ' : ''}Bấm để thêm ghi chú" onclick="event.stopPropagation();openDpNote_(this.dataset.phone)">${noteStr}</td>
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
     <td class="col-tacdong" style="${tacdongDisp}">${tacdongHtml}</td>
@@ -1064,7 +1064,9 @@ function _renderVirtualWindow(force) {
   }
   const wrap = _vtWrap();
   const scrollTop = wrap ? wrap.scrollTop : 0;
-  const vpH = wrap ? wrap.clientHeight : 600;
+  // Chặn vpH quá lớn: nếu khung bảng bị giãn theo toàn bộ nội dung (bảng ảo cao total*VT_ROW_H) thì vpH ~ cả chục nghìn px → vẽ HẾT mọi dòng → điện thoại đơ, không bấm được.
+  const _vpMax = Math.max(window.innerHeight || 600, 400) * 1.5;
+  const vpH = Math.min(wrap ? wrap.clientHeight : 600, _vpMax);
   const total = list.length;
   let start = Math.max(0, Math.floor(scrollTop / VT_ROW_H) - VT_BUFFER);
   const visible = Math.ceil(vpH / VT_ROW_H) + VT_BUFFER * 2;

@@ -4,7 +4,7 @@ const fs = require('fs'), vm = require('vm'), path = require('path'), cp = requi
 const ROOT = path.join(__dirname, '..'); const R = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 let fail = 0; const t = (c, m) => { if (c) console.log('ok   ' + m); else { fail++; console.log('FAIL ' + m); } };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const NAMES = ['_dpStatsInner_', '_dpStatsHtml_', '_dpCntHtml_', '_dpRoomsHtml', '_dpCount', '_dpNames', '_dpTeams', '_dpOpts'];
+const NAMES = ['_dpStatsInner_', '_dpStatsHtml_', '_dpCntHtml_', '_dpRoomsHtml', '_dpCount', '_dpNames', '_dpTeams', '_dpOpts', '_dpGroups_', '_dpRoomOfGroup_', '_dpIsAssigned_'];
 function fn(src, name) { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } return ''; }
 function load(src, withKit, dp) {
   const ctx = { console, esc, teams: [], accounts: [], document: { readyState: 'complete', addEventListener() {}, getElementById: () => null }, location: { search: '' } };
@@ -29,7 +29,7 @@ t(/ui-chip/.test(A._dpCntHtml_(2)) && /2 người/.test(A._dpCntHtml_(2)) && /ui
 t(B._dpCntHtml_(5) === '<span class="dpg-cnt">5 người</span>', 'thiếu js/68: "N người" y hệt bản cũ');
 let old = ''; try { old = cp.execSync('git show HEAD:js/35-fn-deptsettings.js', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 27 }).toString(); } catch (e) {}
 if (old && old !== NEW) {
-  const g = s => ['_dpSave', '_dpPost', '_dpGet', '_dpAssignTeam', '_dpSetPerson', '_dpAddPerson', '_dpDelRoom', '_dpPeopleListHtml', '_dpTeamsHtml'].map(n => fn(s, n)).join('\n');
+  const g = s => ['_dpSave', '_dpPost', '_dpGet', '_dpAddPerson', '_dpDelRoom', '_dpTeamsHtml'].map(n => fn(s, n)).join('\n');
   t(g(old) === g(NEW), 'thân hàm lưu/gán/đọc KHÔNG đổi so với HEAD');
   const oldRooms = load(old, false, DP)._dpRoomsHtml();
   t(B._dpRoomsHtml() === oldRooms, 'thiếu js/68: danh sách phòng HTML y hệt HEAD từng ký tự');

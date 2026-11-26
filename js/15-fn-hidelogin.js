@@ -186,8 +186,27 @@ function _acctRoleChange(){
   var nameWrap = document.getElementById('acct-name-wrap'), teamWrap = document.getElementById('acct-team-wrap');
   if (nameWrap) nameWrap.style.display = (role==='admin') ? 'none' : '';
   if (teamWrap) teamWrap.style.display = (_roleBaseOf(role)==='leader') ? '' : 'none';
+  var monthWrap = document.getElementById('acct-months-wrap');
+  if (monthWrap) monthWrap.style.display = (_roleBaseOf(role)==='leader') ? '' : 'none';
   var deptWrap = document.getElementById('acct-dept-wrap');
   if (deptWrap) deptWrap.style.display = (_roleBaseOf(role)==='manager') ? '' : 'none';
+}
+// Truong nhom: chon thang du lieu duoc xem (Users.viewMonths ['yyyy-MM']; khong tich = khong gioi han). Hien nam nay + nam truoc.
+function _acctMonthsHtml_(selected){
+  var sel = {}; (selected || []).forEach(function(m){ sel[m] = 1; });
+  var now = new Date(), y = now.getFullYear(), years = {}; years[y] = 1; years[y - 1] = 1;
+  Object.keys(sel).forEach(function(m){ years[m.slice(0, 4)] = 1; });
+  return Object.keys(years).sort().reverse().map(function(yr){
+    var h = '<div style="display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center;margin-bottom:5px"><b style="font-size:12px">' + yr + ':</b>';
+    for (var i = 1; i <= 12; i++){
+      var k = yr + '-' + (i < 10 ? '0' : '') + i;
+      h += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer"><input type="checkbox" class="acct-month-chk" style="width:auto;padding:0;margin:0" data-ym="' + k + '"' + (sel[k] ? ' checked' : '') + '>T' + i + '</label>';
+    }
+    return h + '</div>';
+  }).join('');
+}
+function _acctCollectMonths_(){
+  return Array.prototype.slice.call(document.querySelectorAll('.acct-month-chk:checked')).map(function(o){ return o.getAttribute('data-ym'); }).sort();
 }
 function _acctKey(u){ return String(u == null ? '' : u).trim().toLowerCase(); }
 
@@ -250,7 +269,8 @@ function _acctDetailHtml(a){
     var mem = tm ? [].concat(tm.leader ? [tm.leader] : [], tm.members || []).filter(Boolean) : [];
     teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">'+
       '👥 Team <b>'+esc(a.team || '—')+'</b>'+(mem.length ? ': '+esc(mem.join(', ')) : ' (chưa có thành viên)')+
-      ' — Leader còn xem được dữ liệu của cả team.</div>';
+      ' — Leader còn xem được dữ liệu của cả team.'+
+      '<br>📅 Data team được xem: <b>'+((a.viewMonths && a.viewMonths.length) ? esc(a.viewMonths.map(function(m){ return m.slice(5)+'/'+m.slice(0,4); }).join(', ')) : 'mọi tháng')+'</b> (bấm ✏ Sửa để đổi). Data chia thẳng cho Leader thì luôn xem được.</div>';
   }
 
   // Loại Sale (online/offline) + Ngày bắt đầu — chỉ cho tài khoản CS (từng sale), dùng để
@@ -514,7 +534,7 @@ function renderAcctModal(){
         (ed ? 'value="'+esc(ed.username)+'" readonly style="background:var(--surface2);color:var(--muted)"' : '')+'></div>'+
       '<div class="v9-field"><label>Mật khẩu</label><input id="acct-password" type="text" placeholder="'+(ed?'để trống nếu không đổi mật khẩu':'đặt mật khẩu cho tài khoản mới')+'"></div>'+
       '<div class="v9-field"><label>Vai trò</label><select id="acct-role" onchange="_acctRoleChange()">'+roleOpts+'</select></div>'+
-      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (gõ để tìm, tích để chọn NHIỀU — bỏ tích là cắt bớt)</label>'+
+      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (gõ để tìm, tích để chọn NHIỀU — bỏ tích là cắt bớt). Để TRỐNG = dùng chính tên tài khoản làm tên CS (tạo tk đội CSKH rồi chia data sau)</label>'+
         '<input id="acct-name-search" autocomplete="off" placeholder="🔍 Gõ tên sale để tìm… (Enter = tích dòng đầu tiên)" oninput="_acctNameFilter(this.value)" onkeydown="_acctNameSearchKey(event,this)" style="margin-bottom:6px">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
           '<span style="font-size:11px;color:var(--muted)">Đang chọn: <b id="acct-name-count">0</b>/'+csSorted.length+'</span>'+
@@ -526,6 +546,7 @@ function renderAcctModal(){
         '<input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
       '<div class="v9-field" id="acct-dept-wrap" style="display:none"><label>Phòng phụ trách (cho Quản lý — xem được nhân viên &amp; leader của các phòng được tích ở màn Tổng quan / Hồ sơ nhân sự)</label><div style="display:flex;gap:12px;flex-wrap:wrap">'+deptOpts+'</div></div>'+
       '<div class="v9-field" id="acct-team-wrap" style="display:none"><label>Team (cho Leader)</label><select id="acct-team-sel">'+teamOpts+'</select></div>'+
+      '<div class="v9-field" id="acct-months-wrap" style="display:none"><label>Leader được xem data team của THÁNG nào (theo ngày đơn hàng; không tích = mọi tháng). Data bạn chia thẳng cho Leader thì luôn xem được. Không áp cho báo cáo doanh số.</label>'+_acctMonthsHtml_(ed ? ed.viewMonths : [])+'</div>'+
       '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">'+(ed?'💾 Lưu thay đổi':'Lưu tài khoản')+'</button>'+
     '</div>';
   _acctRoleChange();
@@ -574,6 +595,29 @@ function _acctCollectNames(){
   });
   return out;
 }
+// TÊN GỐC = TÊN TRÊN PANCAKE (Duyên 26/11: yennth + yenNTH2004 là 1 người nhưng bị tách 2 dòng; chốt lấy gốc theo tên Pancake).
+// _pkState.nameMap = { 'Tên nhân viên trên Pancake': 'saleA' | 'saleA|saleB' } (Khớp tên Pancake). Một tên Pancake được coi là CỦA NGƯỜI NÀY khi
+// MỌI sale nó gắn vào đều nằm trong danh sách tên của người đó (tên Pancake chia cho nhiều người khác nhau thì KHÔNG lấy làm gốc, tránh gộp nhầm).
+// Nhiều tên Pancake cùng khớp → lấy tên đầu theo thứ tự chữ cái (kết quả ổn định). Không có tên Pancake nào khớp → trả '' (giữ nguyên thứ tự cũ).
+function _pkOrigNameOf_(names){
+  var nm = (typeof _pkState !== 'undefined' && _pkState && _pkState.nameMap) ? _pkState.nameMap : null;
+  if (!nm || !names || !names.length) return '';
+  var fold = function(x){ return String(x == null ? '' : x).trim().toLowerCase(); }, mine = {};
+  names.forEach(function(n){ if (fold(n)) mine[fold(n)] = 1; });
+  var keys = Object.keys(nm).sort(function(a, b){ return a.localeCompare(b, 'vi'); }), hit = [];
+  keys.forEach(function(k){
+    if (mine[fold(k)]) { hit.unshift(k); return; }   // chính tên này đã là tên Pancake
+    var sales = String(nm[k] || '').split('|').map(fold).filter(Boolean);
+    if (sales.length && sales.every(function(x){ return mine[x]; })) hit.push(k);
+  });
+  return hit[0] || '';
+}
+// Đưa tên Pancake lên ĐẦU danh sách (tên chính của tài khoản = names[0]); chưa có trong danh sách thì thêm vào. Các tên còn lại giữ thứ tự.
+function _acctPancakeFirst_(names){
+  var orig = _pkOrigNameOf_(names); if (!orig) return (names || []).slice();
+  var f = orig.toLowerCase();
+  return [orig].concat((names || []).filter(function(n){ return String(n).trim().toLowerCase() !== f; }));
+}
 async function addAccount(){
   var u = (_aval('acct-username')||'').trim();
   var p = _aval('acct-password');
@@ -581,6 +625,13 @@ async function addAccount(){
   var namesArr = _acctCollectNames();
   var name = namesArr[0] || '';
   var team = _aval('acct-team-sel') || '';
+  var pkNote = '';
+  if (_roleBaseOf(role) === 'cs' && namesArr.length && typeof _pkOrigNameOf_ === 'function'){   // tên gốc = tên Pancake: đưa lên đầu (tên chính), không làm mất các tên khác
+    try { if (typeof _pkState !== 'undefined' && !_pkState.nameMapLoaded && typeof _pkLoadNameMap === 'function') await _pkLoadNameMap(); } catch (e) {}
+    var pk = _pkOrigNameOf_(namesArr);
+    if (pk) pkNote = ' — tên gốc theo Pancake: “' + pk + '”';
+    namesArr = _acctPancakeFirst_(namesArr); name = namesArr[0] || '';
+  }
   if (!u){ toast('Nhập tên tài khoản.'); return; }
   if (/\s/.test(u)){ toast('Tên tài khoản không nên có dấu cách.'); return; }
   if (role === 'admin'){ name = name || 'Admin'; namesArr = ['Admin']; team = ''; }
@@ -588,7 +639,10 @@ async function addAccount(){
     team = Array.prototype.slice.call(document.querySelectorAll('.acct-dept-chk:checked')).map(function(o){ return o.getAttribute('data-key'); }).join(',');
     if (!team){ toast('Chọn ít nhất 1 phòng phụ trách cho tài khoản Quản lý.'); return; }
   }
-  if (role !== 'admin' && _roleBaseOf(role) !== 'manager' && _roleBaseOf(role) !== 'viewer' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
+  // 2026-11-21 (Duyên: tạo tài khoản cho đội CSKH rồi CHIA DATA sau nên chưa có Sale nào để tích): không chọn/nhập tên nào → lấy CHÍNH TÊN TÀI KHOẢN làm tên CS.
+  // Vẫn có phạm vi hẹp (chỉ thấy khách/đơn gán cho tên đó) — KHÔNG để names rỗng vì rỗng ở một số chỗ nghĩa là "thấy tất cả". Tên này hiện trong Chia data (js/07 _assignAllCSNames).
+  var autoName = false;
+  if (role !== 'admin' && _roleBaseOf(role) !== 'manager' && _roleBaseOf(role) !== 'viewer' && !namesArr.length){ namesArr = [u]; name = u; autoName = true; }
   if (_roleBaseOf(role) === 'cs'){
     var t = null;
     for (var ni=0; ni<namesArr.length && !t; ni++){ t = (typeof _teamOf==='function' ? _teamOf(namesArr[ni]) : null); }
@@ -599,6 +653,7 @@ async function addAccount(){
   // Mat khau (neu co) di theo truong tam _setPw -> pushUsers gui cho may chu tu bam; client KHONG con giu passHash.
   var rec = { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
   if (p) rec._setPw = p;
+  rec.viewMonths = (_roleBaseOf(role) === 'leader') ? _acctCollectMonths_() : [];
   if (existing){ for (var i=0;i<accounts.length;i++){ if (String(accounts[i].username).toLowerCase()===String(existing.username).toLowerCase()){ accounts[i]=rec; break; } } }
   else accounts.push(rec);
   var res = await pushUsers();
@@ -612,7 +667,7 @@ async function addAccount(){
   _acctOpen[_acctKey(u)] = true;
   renderAcctModal();
   _renderAuthHeader();
-  toast('✓ Đã lưu tài khoản ' + u + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
+  toast('✓ Đã lưu tài khoản ' + u + pkNote + (autoName ? ' — chưa chọn Sale nên dùng chính “' + u + '” làm tên CS: vào Chia data, chọn CS này để chia khách' : '') + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
 }
 function deleteAccount(u){
   var acct = _findAccount(u); if (!acct) return;

@@ -385,7 +385,7 @@ document.addEventListener('click', function(e){
 //  đúng sheet rồi tự khử trùng TUYỆT ĐỐI (dùng chung hàm với trigger onChange có sẵn, xem
 //  _autoDedupExactRowsInSheet_ trong gas_v13.js) — không cần copy tay, không lo dán trùng 2 lần.
 // ═══════════════════════════════════════════════════════
-var _impState = { baseRows: null, baseFileName: '', baseWarn: '', posRows: null, posFileName: '', posWarn: '', uploading: false, result: null };
+var _impState = { baseRows: null, baseFileName: '', baseWarn: '', posRows: null, posFileName: '', posWarn: '', srcItems: null, srcFileName: '', srcInfo: '', srcWarn: '', uploading: false, result: null };   // src* = file 'Báo cáo nguồn' Base (cập nhật Kênh bán DT TỔNG, 2026-11-21)
 
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
 // Dùng lại chính dataF.rows đang có (đã gồm ĐỦ mọi Sale trong SaleDirectory, kể cả 0 doanh thu

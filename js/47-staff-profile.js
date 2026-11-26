@@ -12,6 +12,23 @@
   function myUser(){ return (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) || ''; }
   function canPick(){ var r = role(); return r === 'admin' || r === 'manager' || r === 'leader'; }
   function toastS(m){ if (typeof toast === 'function') toast(m); }
+  // TEN THEO HE THONG (yeu cau Duyen 26/11/2026): 1 ho so chuan = ten Pancake + CRM + Base + POS cua cung 1 nguoi. Chi admin sua; backend gop vao salePersonTags de bao cao gop theo NGUOI.
+  var NAME_SYS = [ ['pancake', '🥞 Tên Pancake', 'tên sale trên Pancake'], ['crm', '🏷️ Tên CRM', 'tên đăng nhập / tên trong CRM'], ['base', '📦 Tên Base', 'cột Sale bán trên Base'], ['pos', '🧾 Tên POS', 'cột Thẻ trên POS'] ];
+  function namesOf(p){ var n = (p && p.names) || {}, o = {}; NAME_SYS.forEach(function(x){ o[x[0]] = Array.isArray(n[x[0]]) ? n[x[0]] : []; }); return o; }
+  function splitNames(v){ var seen = {}, out = []; String(v == null ? '' : v).split(/[,;\n]+/).forEach(function(x){ x = x.replace(/\s+/g, ' ').trim(); var k = x.toLowerCase(); if (x && !seen[k]){ seen[k] = 1; out.push(x); } }); return out; }
+  function namesFromForm(){ var o = {}; NAME_SYS.forEach(function(x){ var el = document.getElementById('sp-nm-' + x[0]); o[x[0]] = splitNames(el ? el.value : ''); }); return o; }
+  function namesHtml(d, p){
+    var nm = namesOf(p), ed = !!d.canEditNames, h = '<div class="sp-sec sp-names"><div class="sp-st">🔗 Tên theo từng hệ thống</div>' +
+      '<div class="sp-mu sp-wn">Điền tên của <b>cùng 1 người</b> ở mỗi hệ thống (nhiều tên cách nhau dấu phẩy). Cài Team sẽ chọn theo hồ sơ này; doanh thu / đơn của mọi tên được gộp cho nhân viên.' + (ed ? '' : ' Chỉ admin sửa được.') + '</div>';
+    NAME_SYS.forEach(function(x){
+      var val = nm[x[0]].slice();
+      if (ed && x[0] === 'crm' && !val.length && d.username) val = [d.username];   // goi y san ten CRM = ten dang nhap
+      h += '<label class="sp-lb" for="sp-nm-' + x[0] + '">' + e(x[1]) + '</label>';
+      if (ed) h += '<input id="sp-nm-' + x[0] + '" class="sp-in" maxlength="400" placeholder="' + e(x[2]) + '" value="' + e(val.join(', ')) + '">';
+      else h += '<div class="sp-ro">' + (val.length ? e(val.join(', ')) : '<span class="sp-mu">Chưa cập nhật</span>') + '</div>';
+    });
+    return h + '</div>';
+  }
   function rangeOf(key){
     if (key === 'custom') return { from:S.from, to:S.to };
     var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(key) : null;
@@ -97,6 +114,7 @@
     if (ed) h += '<input id="sp-facebook" class="sp-in" type="url" maxlength="300" placeholder="https://facebook.com/ten-ban" value="' + e(p.facebook) + '">';
     else h += '<div class="sp-ro">' + (/^https:\/\//i.test(p.facebook || '') ? '<a href="' + e(p.facebook) + '" target="_blank" rel="noopener noreferrer">' + e(p.facebook) + '</a>' : (p.facebook ? e(p.facebook) : '<span class="sp-mu">Chưa cập nhật</span>')) + '</div>';
     h += '</div>';
+    h += namesHtml(d, p);
     if (ed) h += '<div class="sp-act"><button type="button" class="btn" id="sp-save">💾 Lưu hồ sơ</button><span class="sp-mu" id="sp-upd">' + (p.updatedAt ? 'Cập nhật lần cuối: ' + e(new Date(p.updatedAt).toLocaleString('vi-VN')) : 'Chưa có hồ sơ — hãy điền và bấm Lưu') + '</span></div>';
     else h += '<div class="sp-act"><span class="sp-mu">' + (p.updatedAt ? 'Cập nhật lần cuối: ' + e(new Date(p.updatedAt).toLocaleString('vi-VN')) : 'Nhân viên chưa cập nhật hồ sơ') + '</span></div>';
     // ── Kết quả làm việc ── (cot phai tren man rong)
@@ -153,10 +171,12 @@
   function save(){
     var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
     var btn = document.getElementById('sp-save'); if (btn) btn.disabled = true;
-    var body = JSON.stringify({ action:'profileSave', username:S.username, profile:{ fullName:g('sp-fullName'), phone:g('sp-phone'), email:g('sp-email'), facebook:g('sp-facebook') } });
+    var payload = { action:'profileSave', username:S.username, profile:{ fullName:g('sp-fullName'), phone:g('sp-phone'), email:g('sp-email'), facebook:g('sp-facebook') } };
+    if (S.data && S.data.canEditNames) payload.names = namesFromForm();   // chi admin; nguoi khac khong gui -> server giu nguyen ten cu
+    var body = JSON.stringify(payload);
     fetch(gsUrl, { method:'POST', redirect:'follow', body:body }).then(function(r){ return r.json(); }).catch(function(){ return { ok:false, error:'Không kết nối được máy chủ.' }; }).then(function(r){
       if (btn) btn.disabled = false;
-      if (r && r.ok){ if (S.data) S.data.profile = r.profile; toastS('✓ Đã lưu hồ sơ'); render(); }
+      if (r && r.ok){ if (S.data) S.data.profile = r.profile; toastS('✓ Đã lưu hồ sơ'); render(); if (typeof window._staffNamesReload === 'function') window._staffNamesReload(); }
       else toastS('⚠ ' + ((r && r.error) || 'Lưu không thành công'));
     });
   }
@@ -167,4 +187,5 @@
     load(typeof username === 'string' && username ? username : (S.username || myUser()));
   };
   window._spCustStats = custStats;   // dùng cho test
+  window._spSplitNames = splitNames;  // dùng cho test
 })();

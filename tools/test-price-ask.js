@@ -41,7 +41,9 @@ r = e.run("priceAsk_('Giá RUBY vòng tay phong thủy')");
 ok(r.found && /3\.100/.test(r.text) && /không có giá riêng cho RUBY/.test(r.text), 'RUBY: bien the khong co gia RUBY thi noi ro');
 r = e.run("priceAsk_('nhẫn bạc trơn bao nhiêu tiền')"); ok(r.found && /450/.test(r.text) && !/Vòng tay/.test(r.text), 'tra dung san pham khac');
 // khong khop du -> goi y ten; khong co gi -> mang rong
-r = e.run("priceAsk_('giá nhẫn')"); ok(r.ok && !r.found && r.suggestions.length === 1 && r.suggestions[0] === 'Nhẫn Bạc Trơn', 'chi 1 tu khoa: khong bao gia vo doan, goi y ten: ' + JSON.stringify(r));
+// Duyen 18/11/2026 DOI THIET KE: hoi gia chi 1 tu ("điếu") phai ra SP nhu "hạt đồng điếu" (truoc day chi goi y ten) — nhung KHONG bia: tu khong co trong bang van found:false
+r = e.run("priceAsk_('giá nhẫn')"); ok(r.ok && r.found && /450/.test(r.text) && /Nhẫn Bạc Trơn/.test(r.text) && !/Vòng tay|Dây chuyền/.test(r.text), 'chi 1 tu khoa khop ro 1 SP: bao gia SP do: ' + JSON.stringify(r));
+r = e.run("priceAsk_('giá xe')"); ok(r.ok && !r.found, 'chi 1 tu khong co trong bang: khong bia gia');
 r = e.run("priceAsk_('giá xe máy')"); ok(r.ok && !r.found && r.suggestions.length === 0, 'khong co san pham: khong goi y bua');
 r = e.run("priceAsk_('   ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
 r = e.run("priceAsk_('" + 'x'.repeat(500) + "')"); ok(r.ok, 'q dai bi cat 200 ky tu, khong loi');
@@ -68,9 +70,10 @@ r = e.run("priceQa_('giá nhẫn bạc trơn')");
 ok(r.ok && r.found && r.text === 'Nhẫn Bạc Trơn size 12 giá 450.000đ ạ.' && r.provider === 'Groq' && /450/.test(r.base) && !r.aiError && aiCalls === 1, 'tim thay -> AI tra loi van ngan: ' + JSON.stringify(r));
 ok(/toi da 3 cau/.test(e.sys) && /BANG GIA CHINH THUC/.test(e.sys) && /450/.test(e.sys) && /KHONG bia gia/.test(e.sys) && !/SAN PHAM:|QUY TRINH CSKH|MAU TIN NHAN/.test(e.sys) && e.msg === 'giá nhẫn bạc trơn', 'prompt rieng: van ngan + bang gia that + cam bia; KHONG keo kien thuc/FAQ cua luong tra loi khach');
 aiCalls = 0; r = e.run("priceQa_('giá xe máy')"); ok(r.ok && !r.found && r.suggestions.length === 0 && aiCalls === 0, 'khong co san pham -> KHONG goi AI (khong ton token, khong co hoi bia)');
-aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && !r.found && r.suggestions[0] === 'Nhẫn Bạc Trơn' && aiCalls === 0, 'chi 1 tu khoa -> goi y ten, khong goi AI');
+aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && r.found && aiCalls === 1 && /450/.test(e.sys) && /Nhẫn Bạc Trơn/.test(e.sys), 'chi 1 tu khoa khop SP -> AI tra loi tu bang gia that (prompt co SP do)');
+aiCalls = 0; r = e.run("priceQa_('giá xe')"); ok(r.ok && !r.found && aiCalls === 0, 'chi 1 tu khong co trong bang -> KHONG goi AI');
 aiMode = 'err'; r = e.run("priceQa_('giá nhẫn bạc trơn')");
-ok(r.ok && r.found && /450/.test(r.text) && /nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
+ok(r.ok && r.found && /450\.000đ/.test(r.text) && !/nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC (da quy ra DONG, 21/11: truoc day hien so nghin tho) thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
 aiMode = 'throw'; r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(r.ok && r.found && /450/.test(r.text) && /mat mang/.test(r.aiError), 'AI nem loi -> van tra gia chinh xac');
 r = e.run("priceQa_('  ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
 e = makeEnv({ cat: [] }); r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(!r.ok && /rong|chua doc/.test(r.error), 'bang gia rong -> bao ro');

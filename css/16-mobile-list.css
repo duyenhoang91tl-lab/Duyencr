@@ -52,3 +52,17 @@
 @media (max-width:900px){
   #main-table th{white-space:normal;line-height:1.25;overflow:visible;}
 }
+
+/* ═══ KHÔNG KÉO ĐƯỢC DANH SÁCH KHÁCH (Duyên 2026-11-26: "thanh công cụ kéo chỉ kéo được menu phía trên, không kéo được danh sách khách phía dưới") ═══
+   NGUYÊN NHÂN GỐC: #data-view (inline overflow:hidden) xếp dọc: thanh tab · lov-bar · stats-row · #tab-list. Mọi khối phía trên đều flex-shrink:0, và #tab-list (inline flex:1;overflow:hidden)
+   bị co lại còn phần dư. Trên điện thoại, khi mở "📊 Tổng quan & tác vụ" (6 ô thống kê 2 hàng + toolbar xuống dòng + thanh lọc + thanh cột) phần dư gần 0 → .table-wrap (flex:1) bị bóp còn
+   ~0px và bị #tab-list/#data-view cắt (overflow:hidden) → vuốt chỉ thấy các thanh phía trên, danh sách khách không có chỗ để kéo.
+   CÁCH SỬA (chỉ ≤900px, chỉ tab Danh sách KH — class lov-on-list do js/05 _lovSync_ đặt): #data-view được cuộn dọc, #tab-list không co dưới nội dung của nó, .table-wrap luôn cao tối thiểu
+   ~55% màn hình thật (--vh do js/59 đặt, rơi về 1vh) → luôn vuốt được danh sách; phần thanh phía trên vuốt đi được. Có chỗ dư thì .table-wrap vẫn tự giãn (flex:1) như cũ. Máy tính KHÔNG đổi.
+   LƯU Ý: KHÔNG đổi chiều cao dòng bảng (cuộn ảo VT_ROW_H js/02) — chỉ đổi chiều cao khung chứa. Cần !important vì #data-view và #tab-list đặt overflow/flex bằng style inline. */
+@media (max-width:900px){
+  body.lov-on-list #data-view{overflow-y:auto !important;overflow-x:hidden !important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;}
+  body.lov-on-list #tab-list{flex:1 0 auto !important;overflow:visible !important;}
+  /* CHIỀU CAO CỐ ĐỊNH (không dùng flex:1/min-height): #tab-list cao theo nội dung nên flex-basis 0% của .table-wrap bị hiểu là 'content' → khung giãn bằng cả bảng ảo (total*58px) → js/02 vẽ HẾT dòng → đơ máy. */
+  body.lov-on-list #tab-list > .table-wrap{flex:0 0 auto !important;height:calc(var(--vh,1vh)*70);max-height:calc(var(--vh,1vh)*70);min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto;}
+}
