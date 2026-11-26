@@ -127,6 +127,27 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const c3=mk(); await c3.w.openDeptSettings(); c3.w.eval("_dp.f='_none'"); await c3.w.openDeptSettings();
   t('mở lại trang → bộ lọc về "Tất cả"',c3.w.eval('_dp.f')==='');
  }
+ // MỖI NGƯỜI 1 DÒNG: yennth + yenNTH2004 là 1 người (Duyên 26/11)
+ {
+  const c=mk(); await c.w.openDeptSettings();
+  // dùng đúng hàm gom thật của js/08 + js/50 (tài khoản nhiều tên + Khớp sale) bằng bản thu nhỏ tương đương
+  c.w.eval(`
+    var _ALIAS=[['yennth','yenNTH2004']];
+    function _personAliases(n){var k=String(n).toLowerCase();for(var i=0;i<_ALIAS.length;i++)if(_ALIAS[i].some(function(x){return x.toLowerCase()===k}))return _ALIAS[i];return [n];}
+    function _groupNamesByPerson(names){var low=names.map(function(n){return n.toLowerCase()}),used={},out=[];names.forEach(function(n,i){if(used[i])return;var al=_personAliases(n).map(function(x){return x.toLowerCase()}),g=[];al.forEach(function(a){names.forEach(function(nm,j){if(!used[j]&&low[j]===a){used[j]=1;g.push(nm)}})});if(!used[i]){used[i]=1;g.unshift(n)}out.push({names:g,primary:g[0]})});return out;}
+    _dp.csNames=['yennth','yenNTH2004','Zed']; _dp.sec='people'; _dp.q=''; _dp.f=''; _dpRender();`);
+  const rows=()=>Array.from(c.$('dp-people-list').querySelectorAll('select[data-n]')).map(x=>x.dataset.n);
+  t('yennth + yenNTH2004 (cùng 1 người) chỉ ra 1 dòng, tên gốc = tên chính',rows().filter(n=>/^yen/i.test(n)).length===1&&rows().includes('yennth'));
+  t('dòng đó ghi chú tên phụ yenNTH2004 (biết là cùng 1 người)',/yenNTH2004/.test(c.$('dp-people-list').textContent));
+  t('gõ tên phụ "2004" vẫn ra đúng người đó',(c.w.eval("_dp.q='2004'"),c.w.eval('_dpPeopleList()'),rows().join()==='yennth'));
+  c.w.eval("_dp.q=''; _dpSetPerson('yennth','hr')");
+  t('gán phòng cho người → ghi cho MỌI tên (yennth + yenNTH2004) để báo cáo tra tên nào cũng ra',c.w.eval("_dp.map.yennth==='hr'&&_dp.map.yenNTH2004==='hr'"));
+  t('số người ở phòng = 1 (không đếm 2 tên thành 2 người)',c.w.eval("_dpCount('hr')")===1);
+  c.w.eval("_dpSetPerson('yennth','')");
+  t('bỏ phòng → xóa ở mọi tên',c.w.eval("!_dp.map.yennth&&!_dp.map.yenNTH2004"));
+  c.w.eval("_dp.map.yenNTH2004='sale'");
+  t('chỉ tên phụ có phòng → cả người tính là đã có phòng đó (hiện đúng phòng ở dòng tên chính)',c.w.eval("_dpRoomOfGroup_({names:['yennth','yenNTH2004'],primary:'yennth'})")==='sale');
+ }
  }
 console.log('\n'+ok+' OK, '+bad+' FAIL');process.exit(bad?1:0);
 })();

@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — PHÒNG BAN › TỪNG NGƯỜI: 1 NGƯỜI = 1 DÒNG, KHÔNG TÁCH THEO TÊN PHỤ) — XONG bước 1/2 (chỉ web, Ctrl+F5; không đụng GAS)
+- ĐỀ BÀI Duyên: yennth và yenNTH2004 là 1 người nhưng ở Từng người hiện 2 dòng, đếm 2 người; muốn khớp sale theo TÊN GỐC (= tên đăng nhập / "Họ và tên" trong hồ sơ sale), các mục khác chọn theo tên gốc.
+- NGUYÊN NHÂN GỐC: `_dpNames()` chỉ gộp 2 tên khi GIỐNG HỆT (khác hoa/thường), không dùng nhóm "cùng 1 người" hệ thống đã có (tài khoản nhiều tên `names` + Khớp sale `salePersonTags` → `_groupNamesByPerson`, js/08 + js/50). Thẻ số, chip "N người", bộ lọc, danh sách đều đếm theo TÊN.
+- ĐÃ LÀM (js/35-fn-deptsettings.js, ?v=20261126b): `_dpGroups_` / `_dpGroupOf_` / `_dpRoomOfGroup_`. Danh sách, thẻ số, chip, bộ lọc đều theo NGƯỜI; dòng hiện tên chính + "+ tên phụ". Gán phòng (từng người + gán theo team) ghi cho MỌI tên của người đó (báo cáo tra tên nào cũng ra); bỏ phòng thì xóa ở mọi tên. `_dpCount` không quét đơn (trang Danh sách phòng vẫn mở nhanh).
+- TEST: test-dept-settings (+7 ca, 53 ca), test-dept-frame (bỏ `_dpAssignTeam/_dpSetPerson` khỏi danh sách canh "không đổi so với HEAD" vì đổi cố ý), test-phongban-nhansu đều xanh.
+- LƯU Ý: chỉ gộp được khi 2 tên đã được nối ở đâu đó — tài khoản có cả 2 tên (role CS) hoặc Cài đặt team › 🔗 Khớp sale. Nếu vẫn thấy 2 dòng → 2 tên đó CHƯA được nối ở 2 chỗ này.
+- [ ] **VIỆC KẾ TIẾP (bước 2/2 — chờ Duyên chốt cách làm):** từ phần TẠO TÀI KHOẢN (js/15 addAccount): bắt tên gốc = tên đăng nhập / Họ và tên hồ sơ sale (js/47, gas/28_StaffProfile.gs), tên khác của Pancake/Base/Pos nối vào tên gốc qua `salePersonTags`; rồi báo cáo/chọn phòng/chia data đều lấy theo tên gốc. Cần Duyên cho biết: tên gốc lấy từ ô nào (tên đăng nhập hay Họ và tên) khi 2 cái khác nhau?
+
 ## 2026-11-26 (phiên Claude — PHÒNG BAN › TỪNG NGƯỜI: BỘ LỌC "CHƯA PHÂN PHÒNG") — XONG 1/1 (chỉ web, Ctrl+F5; KHÔNG đụng GAS nên không cần deploy lại)
 - ĐỀ BÀI Duyên: ở mục Từng người muốn lọc ra những ai chưa có phòng để phân lại cho dễ (thẻ số báo 51 người chưa phân phòng nhưng phải cuộn cả danh sách mới thấy).
 - NGUYÊN NHÂN GỐC: danh sách Từng người chỉ có ô tìm tên, không có bộ lọc theo phòng nên người chưa gán nằm lẫn với 34 người đã gán.
