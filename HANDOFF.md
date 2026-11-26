@@ -1,6 +1,15 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
 
+## 2026-11-26 (phiên Claude — XUẤT DOANH THU BÁO CÁO B: CẢ TEAM / TỪNG SALE ĐỂ CÁC BẠN TỰ CHECK) — BƯỚC 1/2 XONG (hàm dựng file); còn bước 2/2 giao diện
+- ĐỀ BÀI Duyên: cho quyền xuất file doanh thu của Báo cáo B, xuất được cả team hoặc từng sale để các bạn check doanh thu.
+- HIỆN CÓ SẴN (không đổi): "📊 Xuất Excel" B (js/13 `exportSalesReport`, file đối chiếu 7 sheet cho kế toán) + "📄 Xuất ra Sheet" (admin) + "📗 Excel đối soát". Chưa có: lọc riêng theo từng sale / theo team để gửi cho bạn sale.
+- THIẾT KẾ: tái dùng `_srBuildExportB_` (js/13) → `allocRows` (mỗi đơn × mỗi sale 1 dòng, giá trị chia chính xác, cộng lại = bảng "Theo Sale" web). File mới chỉ LỌC các dòng đó theo sale được chọn nên số luôn khớp màn hình; mỗi file có dòng TỔNG (công thức SUM) + dòng "KHỚP bảng web".
+- ✅ **BƯỚC 1/2 XONG — `js/98-b-export-sale.js` (hàm thuần, chưa gắn vào web, chưa có thẻ script nên chưa ảnh hưởng gì):** `_srBxPlan_(dB, {mode, names, label, info})` trả `{files:[{file, sale, sheets:[{name,rows,widths}]}], count, missing, saleList}`. 3 chế độ: `team` (1 file: Tổng hợp + Chi tiết chung của các sale chọn), `sheets` (1 file: Tổng hợp + mỗi sale 1 sheet), `files` (mỗi sale 1 file riêng — file của sale nào CHỈ chứa dòng của sale đó). Gồm cả sale chỉ có ở dòng chia (vd "(chưa gán sale)") và đánh dấu "không hiện ở bảng web". Test `node tools/test-b-export-sale.js` (19 ca) xanh.
+- 🔧 **ĐANG LÀM:** bước 2/2.
+- ➡️ **BƯỚC KẾ TIẾP (2/2, web only, Ctrl+F5):** file mới `js/99-b-export-sale-ui.js` + thẻ script trong index.html (+ sw.js nếu danh sách cache có liệt kê js) + 1 dòng menu Tác vụ Báo cáo B trong `_srbSubCfg_` (js/13 ~dòng 1104): "📤 Xuất doanh thu (cả team / từng sale)" CHỈ hiện cho admin + leader. Hộp thoại: danh sách sale từ `_srState.dataB` (tick nhiều, ô tìm), nút chọn nhanh theo Team (`teams` + `_teamMembersList`), 3 lựa chọn chế độ (1 file cả team / 1 file nhiều sheet / mỗi sale 1 file — tải lần lượt cách nhau ~600ms) rồi `XLSX.writeFile`. Bắt buộc đã bấm "Lọc" (có `dataB`). Test jsdom hoặc hàm thuần cho phần chọn theo team.
+
+
 ## 2026-11-26 (phiên Claude — ĐÃ CHIA DATA CHO SALE NHƯNG KHÔNG HIỆN Ở DANH SÁCH KH, LẦN 3: TÊN THẺ "KHỚP SALE") — XONG 2/2 (web Ctrl+F5 + GAS cần deploy lại; chờ Duyên thử thật)
 - ĐỀ BÀI Duyên: đã chia data cho sale nhưng Danh sách KH không hiện khách.
 - NGUYÊN NHÂN GỐC (tìm được thêm, sau 2 lần sửa hoa/thường + dấu/khoảng trắng): chia data chọn người nhận từ "Danh sách Sale" (tên Base/Pancake/Pos); 2 tên đó được admin nối với tài khoản bằng Quản lý Team › 🔗 Khớp sale (`SALE_PERSON_TAGS` = {tên chính: [thẻ...]}). Nhưng `_assignKnownNames_` (js/08) chỉ biết nhóm tên của TÀI KHOẢN (names/name/username) → đợt chia ghi tên thẻ (vd `thuydinh95`) không khớp tài khoản `thuydinh1995` → `_inUserScope`/bộ lọc CS loại hết khách (client), và server (`_scopePhoneSet_`/`_scopeVerdict_`) cũng chỉ so tên tài khoản.
