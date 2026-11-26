@@ -3,7 +3,7 @@
 // Chạy: node tools/test-combo-tab.js -> "ALL COMBO TAB TESTS PASSED".
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const wrap = { innerHTML: '' }; const catCalls = [], posCalls = []; let catReply = null, posReply = null, ctkmReply = { ok: true, rows: [] }; const ctkmCalls = []; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
+const wrap = { innerHTML: '' }; const catCalls = [], posCalls = []; let catReply = null, posReply = null, ctkmReply = { ok: true, rows: [] }, kmReply = { ok: true, rows: [] }; const ctkmCalls = [], kmCalls = []; const calls = []; const bodies = []; let confirmAns = true; const toasts = []; let reply = null; const resolvers = [];
 const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeout, clearTimeout, encodeURIComponent,
   gsUrl: 'https://x/exec', esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   document: { getElementById: id => id === 'xt-wrap-combo' ? wrap : null, activeElement: null },
@@ -11,6 +11,7 @@ const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeo
   _authAccount: { role: 'admin' }, confirm: () => confirmAns, toast: m => toasts.push(m),
   fetch: (url, o) => {
     if (/action=priceCatalogFlat/.test(url)){ catCalls.push(url); return Promise.resolve({ json: async () => catReply }); }
+    if (/action=ctkmComboList/.test(url)){ kmCalls.push(url); return Promise.resolve({ json: async () => kmReply }); }
     if (/action=ctkmCatalog/.test(url)){ ctkmCalls.push(url); return Promise.resolve({ json: async () => ctkmReply }); }
     if (/action=posPrice/.test(url)){ posCalls.push(url); return Promise.resolve({ json: async () => posReply(JSON.parse(decodeURIComponent(url.split('action=posPrice&q=')[1]))) }); }
     calls.push(url); bodies.push(o && o.body); return new Promise(res => resolvers.push(() => res({ json: async () => reply(url) }))); } };
@@ -124,10 +125,10 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   linkEl.value = 'abc'; run('_cbImgAddLink()'); ok(run('_cb.edit.images.length') === 1, 'chữ rác bị từ chối');
   linkEl.value = 'https://drive.google.com/file/d/' + FID + '/view'; run('_cbImgAddLink()'); ok(run('_cb.edit.images.length') === 2, 'link file Drive được thêm');
   linkEl.value = 'https://x.com/1.png'; run('_cbImgAddLink()'); linkEl.value = 'https://x.com/2.png'; run('_cbImgAddLink()');
-  ok(run('_cb.edit.images.length') === 4, 'thêm đủ 4 ảnh');
-  linkEl.value = 'https://x.com/3.png'; run('_cbImgAddLink()'); ok(run('_cb.edit.images.length') === 4 && wrap.innerHTML.includes('Tối đa 4'), 'quá 4 ảnh bị chặn');
+  ok(run('_cb.edit.images.length') === 4, 'đang có 4 ảnh'); linkEl.value = 'https://x.com/3.png'; run('_cbImgAddLink()'); linkEl.value = 'https://x.com/4.png'; run('_cbImgAddLink()'); ok(run('_cb.edit.images.length') === 6, 'thêm đủ 6 ảnh (tối đa 6)');
+  linkEl.value = 'https://x.com/5.png'; run('_cbImgAddLink()'); ok(run('_cb.edit.images.length') === 6 && wrap.innerHTML.includes('Tối đa 6'), 'quá 6 ảnh bị chặn');
   bodies.length = 0; reply = () => ({ ok: true, code: 'CB3' }); let pz = run('_cbSave()'); resolvers.shift()(); await pz;
-  const bi = JSON.parse(bodies[0]); ok(bi.action === 'comboSave' && Array.isArray(bi.combo.images) && bi.combo.images.length === 4 && bi.combo.images[0] === 'https://cdn.example.com/b.jpg', 'comboSave gửi images: ' + bodies[0].slice(0, 200));
+  const bi = JSON.parse(bodies[0]); ok(bi.action === 'comboSave' && Array.isArray(bi.combo.images) && bi.combo.images.length === 6 && bi.combo.images[0] === 'https://cdn.example.com/b.jpg', 'comboSave gửi images: ' + bodies[0].slice(0, 200));
   while (resolvers.length) resolvers.shift()();
   ctx.FileReader = function(){ this.readAsDataURL = () => { this.result = 'data:image/png;base64,QUJD'; setTimeout(() => this.onload(), 0); }; };
   ctx.Image = function(){ Object.defineProperty(this, 'src', { set: () => setTimeout(() => this.onerror(), 0) }); };
@@ -193,7 +194,7 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   run("_cbEF('name','Combo vòng + nhẫn'); _cbEF('price','10000000')"); bodies.length = 0; reply = () => ({ ok: true, code: 'CBX', created: true });
   let pn = run('_cbSave()'); await tick(); while (resolvers.length) resolvers.shift()(); await pn;
   const bn = JSON.parse(bodies[0]);
-  ok(bn.action === 'comboSave' && bn.combo.itemsText === 'Vòng cuốn 3 | Ngọc bích |  | 1\nTrang sức nhẫn túi tiền | Ngọc bích |  | 1' && bn.combo.price === 10000000 && !('priceText' in bn.combo), 'comboSave: itemsText đúng định dạng cũ, không kèm giá dòng: ' + bodies[0]);
+  ok(bn.action === 'comboSave' && bn.combo.itemsText === 'Vòng cuốn 3 | Ngọc bích |  | 1 |  | 4550000 | \nTrang sức nhẫn túi tiền | Ngọc bích |  | 1 |  | 6350000 | ' && bn.combo.price === 10000000 && !('priceText' in bn.combo), 'comboSave: itemsText 7 trường (đơn giá đã chọn được lưu), bn.combo.ship/freeship/ctkmCodes có mặt: ' + bodies[0]);
   while (resolvers.length) resolvers.shift()();
   // SỬA combo cũ: đọc lại chữ → dòng, ghép bảng giá + POS; SP không có trong bảng giá → nhập tay; ghi lại KHÔNG đổi chữ
   reply = () => ({ ok: true, total: 1, rows: [C1] }); let pl = run('_cbLoad()'); resolvers.shift()(); await pl;
@@ -201,7 +202,7 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   ok(run('_cb.edit.items.length') === 2 && run('_cb.edit.items[1].qty') === 2 && run('_cb.edit.items[1].chatLieu') === '' && run('_cb.edit.items[1].size') === 'Size 12', 'combo cũ: parse đúng tên/chất liệu/size/SL');
   ok(run('_cb.edit.items[1].price') === 450000 && run('_cb.edit.items[1].src') === 'pos' && run('_cb.edit.items[1].bg.sp') === 500000, 'combo cũ: Nhẫn bạc trơn Size 12 ghép bảng giá (SAPHIA 500.000) + giá POS 450.000');
   ok(run('_cb.edit.items[0].price') === 0 && run('_cb.edit.items[0].src') === '' && mk('cb-items').innerHTML.includes('chưa có giá — nhập tay'), 'SP cũ không có trong bảng giá/POS: báo nhập tay');
-  ok(run('_cbItemsText(_cb.edit)') === C1.itemsText, 'ghi lại combo cũ KHÔNG đổi chữ (round-trip)');
+  ok(run('_cbItemsText(_cb.edit)').split('\n').map(l => l.split(' | ').slice(0, 4).join(' | ')).join('\n') === C1.itemsText, 'ghi lại combo cũ giữ NGUYÊN 4 trường đầu (tên/chất liệu/size/SL), chỉ thêm giá đã chọn');
   // chế độ chữ (dự phòng)
   run('_cbRawToggle()'); ok(run('_cb.edit.rawMode') === true && wrap.innerHTML.includes('<textarea') && wrap.innerHTML.includes('Lắc cỏ 4 lá | Bạc 925 | 16cm | 1'), 'chuyển sang nhập chữ giữ nội dung');
   run("_cbEF('itemsText','2 x Nhẫn bạc trơn | | Size 12')"); run('_cbRawToggle()'); await tick();
@@ -228,5 +229,55 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   run('_cbNew()'); await tick(); ok(ctkmCalls.length === 1, 'CTKM đã nạp thì không gọi lại');
   run('_cbCtkm.loaded=false; _cbCtkm.rows=[]'); ctkmReply = { error: 'Unknown action' }; run('_cbNew()'); await tick();
   run("_cbPickSet('vong cuon'); _cbPickAdd(0)"); ok(!mk('cb-items').innerHTML.includes('CTKM liên quan') && !wrap.innerHTML.includes('Unknown action'), 'GAS cũ/không có CTKM: ẩn khối, không báo lỗi');
+
+  {
+  // ═══ 2026-11-18 lượt 2: COMBO v2 — tích vàng/quà mỗi dòng, ship/freeship, tích CTKM combo, xem trước theo mẫu, quản lý CTKM combo ═══
+  ctx.document.getElementById = id => id === 'xt-wrap-combo' ? wrap : ['cb-items', 'cb-pick-res', 'cb-pick-st', 'cb-pick-q', 'cb-price', 'cb-ctkm', 'cb-preview', 'km-img-link'].includes(id) ? mk(id) : id === 'cb-img-link' ? linkEl : null;
+  kmReply = { ok: true, rows: [ { code: 'KM1', name: 'Giảm 200k', type: 'giam', amount: 200000, gift: '', images: [], imagesText: '', active: true },
+    { code: 'KMQ', name: 'Tặng túi', type: 'qua', amount: 0, gift: 'Túi tiền lam thủy', images: ['https://x.com/g1.png'], imagesText: 'https://x.com/g1.png', active: true },
+    { code: 'KMOFF', name: 'CTKM cũ tắt', type: 'giam', amount: 50000, gift: '', images: [], imagesText: '', active: false } ] };
+  run('_cbKm.loaded=false; _cbKm.rows=[]'); kmCalls.length = 0; run('_cbNew()'); await tick();
+  ok(kmCalls.length === 1 && kmCalls[0].includes('action=ctkmComboList'), 'mở form nạp CTKM combo 1 lần');
+  ok(mk('cb-ctkm').innerHTML.includes('Giảm 200k') && mk('cb-ctkm').innerHTML.includes('Tặng túi') && !mk('cb-ctkm').innerHTML.includes('CTKM cũ tắt'), 'danh sách tích CTKM: chỉ CTKM đang hoạt động');
+  ok(wrap.innerHTML.includes('Phí ship') && wrap.innerHTML.includes('Freeship') && wrap.innerHTML.includes('Xem trước'), 'form có ship / freeship / xem trước');
+  // ví dụ Duyên: Vòng cầu đơn
+  run(`_cbEF('name','Vòng cầu đơn'); _cbEF('code','CB261118171102'); _cbEF('price','3300000'); _cb.edit.items = [
+    Object.assign(_cbMkItem({ name: 'CHARM BI MẪU SỐ 10 SIZE 3', chatLieu: '(mặc định)', qty: 2 }), { price: 380000, src: 'tay' }),
+    Object.assign(_cbMkItem({ name: 'CHUỖI LAM THỦY 6 LI', size: '1 VÒNG ĐƠN', qty: 1 }), { price: 1550000, src: 'tay' }),
+    Object.assign(_cbMkItem({ name: 'HẠT ĐỒNG ĐIẾU LAM THỦY', size: '(mặc định)', qty: 1 }), { price: 990000, src: 'tay' }) ]`);
+  run("_cbLineVang(0,'14k')"); run("_cbLineVang(0,'14k')"); ok(run('_cb.edit.items[0].vang') === '', 'bấm lại tuổi vàng = bỏ tích'); run("_cbLineVang(0,'10k')");
+  ok(run('_cb.edit.items[0].vang') === '10k', 'tích vàng 10k');
+  run("_cbEF('ship','40000')"); run("_cbKmTick('KM1', true)");
+  const want = ['🎁 Vòng cầu đơn (CB261118171102)', 'Giá combo: 3.300.000đ giảm 200k còn 3.100.000đ', '- CHARM BI MẪU SỐ 10 10k SIZE 3 380 × 2 = 760', '- CHUỖI LAM THỦY 6 LI · 1 VÒNG ĐƠN 1.550', '- HẠT ĐỒNG ĐIẾU LAM THỦY 990', '- 40k ship tổng: 3.140.000đ'].join('\n');
+  ok(mk('cb-preview').textContent === want, 'xem trước khớp mẫu Duyên:\n' + mk('cb-preview').textContent);
+  ok(run("_cbFormatText({ name: 'A', priceVnd: 1000000, discount: 0, finalPrice: 1000000, ship: 0, freeship: false, total: 1000000, items: [{ name: 'X', qty: 1 }], gifts: [] })") === '🎁 A\nGiá combo: 1.000.000đ\n- X', 'combo không giảm/ship: chữ gọn');
+  run("_cbEF('freeship',true); _cbItemsRefresh()"); ok(mk('cb-preview').textContent.endsWith('- Freeship tổng: 3.100.000đ'), 'freeship: bỏ ship');
+  run("_cbKmTick('KMQ', true)"); ok(mk('cb-preview').textContent.includes('- 🎁 Quà tặng: Túi tiền lam thủy'), 'CTKM quà hiện dòng quà tặng');
+  run("_cbLineGift(2, true)"); ok(mk('cb-preview').textContent.includes('- 🎁 HẠT ĐỒNG ĐIẾU LAM THỦY (quà tặng)') && run('_cbTotals(_cb.edit.items).models') === 2 && run('_cbTotals(_cb.edit.items).list') === 2310000, 'dòng tích quà tặng: không tính vào tổng niêm yết');
+  run("_cbLineGift(2, false); _cbKmTick('KMQ', false)");
+  // lưu: payload có ship/freeship/CTKM + dòng 7 trường
+  bodies.length = 0; reply = () => ({ ok: true, code: 'CBX', created: true });
+  let pv = run('_cbSave()'); await tick(); while (resolvers.length) resolvers.shift()(); await pv;
+  const bv = JSON.parse(bodies[0]);
+  ok(bv.action === 'comboSave' && bv.combo.ship === 40000 && bv.combo.freeship === true && bv.combo.ctkmCodes.join() === 'KM1' && bv.combo.itemsText.split('\n')[0] === 'CHARM BI MẪU SỐ 10 SIZE 3 | (mặc định) |  | 2 | 10k | 380000 | ' && bv.combo.itemsText.split('\n')[2] === 'HẠT ĐỒNG ĐIẾU LAM THỦY |  | (mặc định) | 1 |  | 990000 | ', 'comboSave gửi ship/freeship/ctkm + dòng SP đủ vàng/giá: ' + bodies[0].slice(0, 400));
+  while (resolvers.length) resolvers.shift()();
+  // đọc lại dòng đã lưu
+  const pit = JSON.parse(JSON.stringify(run("_cbParseItems('A | | | 1 | 14k | 500000 | qua\\nB | | | 2')")));
+  ok(pit[0].vang === "14k" && pit[0].price === 500000 && pit[0].gift === true && pit[0].saved === true && pit[0].src === "tay" && pit[1].vang === "" && pit[1].price === 0 && pit[1].gift === false, 'đọc lại dòng 7 trường + dòng cũ 4 trường');
+  // ── QUẢN LÝ CTKM COMBO ──
+  run('_cb.edit = null; _cbKmOpen()'); await tick();
+  ok(wrap.innerHTML.includes('CTKM combo (tạo sẵn') && wrap.innerHTML.includes('Giảm 200k') && wrap.innerHTML.includes('Tặng túi') && wrap.innerHTML.includes('đã tắt'), 'màn quản lý CTKM combo liệt kê');
+  run('_cbKmNew()'); run("_cbKmEF('name','Giảm sốc')"); bodies.length = 0; run('_cbKmSave()'); ok(wrap.innerHTML.includes('cần số tiền giảm') && !bodies.length, 'giảm tiền thiếu số tiền → báo, không gửi');
+  run("_cbKmType('qua'); _cbKmEF('name','Tặng 2 quà'); _cb.__x = 1"); run('_cbKmSave()'); ok(wrap.innerHTML.includes('cần tên quà hoặc ảnh quà') && !bodies.length, 'tặng quà thiếu quà/ảnh → báo');
+  run("_cbKmEF('gift','Túi + dây'); _cbKm.edit.images = ['https://x.com/a.png','https://x.com/b.png']"); mk('km-img-link').value = 'https://x.com/c.png'; run('_cbKmImgAddLink()');
+  ok(run('_cbKm.edit.images.length') === 2 && wrap.innerHTML.includes('Tối đa 2 ảnh quà'), 'ảnh quà tối đa 2');
+  kmReply = { ok: true, rows: [] }; let pk = run('_cbKmSave()'); await tick(); while (resolvers.length) resolvers.shift()(); await pk;
+  const bk = JSON.parse(bodies[0]);
+  ok(bk.action === 'ctkmComboSave' && bk.ctkm.type === 'qua' && bk.ctkm.gift === 'Túi + dây' && bk.ctkm.images.length === 2 && bk.ctkm.amount === 0, 'ctkmComboSave payload: ' + bodies[0].slice(0, 300));
+  kmReply = { ok: true, rows: [{ code: 'KM1', name: 'Giảm 200k', type: 'giam', amount: 200000, gift: '', images: [], imagesText: '', active: true }] }; run('_cbKm.loaded=false'); run('_cbKmOpen()'); await tick();
+  bodies.length = 0; confirmAns = true; let pd = run('_cbKmDelete(0)'); await tick(); while (resolvers.length) resolvers.shift()(); await pd;
+  ok(JSON.parse(bodies[0]).action === 'ctkmComboDelete' && JSON.parse(bodies[0]).code === 'KM1', 'xóa CTKM gọi ctkmComboDelete');
+  run('_cbKmClose()'); ok(!wrap.innerHTML.includes('CTKM combo (tạo sẵn'), 'về danh sách combo');
+  }
   console.log('ALL COMBO TAB TESTS PASSED');
 })().catch(e => { console.error(e); process.exit(1); });
