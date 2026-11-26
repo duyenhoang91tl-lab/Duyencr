@@ -18,6 +18,7 @@ let _advAssign = {
   srcSet: new Set(),      // lọc theo NGUỒN dữ liệu (c.dataSrc: dt|don|cs|cskh) — rỗng = mọi nguồn. Khách chưa có ngày đơn (vd CSKH-Duyên) vẫn được lấy khi đã chọn nguồn
   selectMode: 'cs',       // 'cs' (chọn CS riêng lẻ) | 'team' (chia theo Team, tỷ lệ nội bộ theo %)
   selectedCS: new Set(),  // multi select
+  recvSrc: 'all',         // nguồn danh sách người nhận ở chế độ CS riêng lẻ: 'all' (mọi CS) | 'sale' (Danh sách Sale) | 'acct' (Tài khoản đăng nhập CRM)
   selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
   distMode: 'equal',      // 'equal' | 'custom' — áp dụng cho CS (khi selectMode='cs') hoặc Team (khi selectMode='team')
   customDist: {},         // csName|teamId -> count (số KH ở cấp phân phối trên cùng)
@@ -40,6 +41,7 @@ function openAssignModal() {
   _advAssign.selectedCS = new Set();
   _advAssign.selectedTeams = new Set();
   _advAssign.selectMode = 'cs';
+  _advAssign.recvSrc = 'all';
   _advAssign.sourceMode = 'filter';
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
@@ -199,6 +201,56 @@ function _assignAllCSNames(){
   return list;
 }
 
+// ── 2026-11-26: người nhận data lấy được từ 3 nguồn — mọi CS (cũ) / Danh sách Sale (cùng danh sách ở "Quản lý tài khoản") / Tài khoản đăng nhập CRM ──
+// Tài khoản → tên CS nhận data = tên chính của tài khoản (names[0] → name → username), đúng tên mà phạm vi xem của tài khoản đó đang dùng nên
+// khách được chia sẽ hiện đúng ở tài khoản đó. Bỏ tài khoản bị khoá và tài khoản chỉ xem; 2 tài khoản trùng tên CS chỉ giữ 1 dòng.
+function _assignSaleNames(){
+  var base = (typeof _allCSNames === 'function') ? _allCSNames() : [];
+  var out = [], seen = {};
+  (base || []).forEach(function(n){ n = String(n || '').trim(); var k = n.toLowerCase(); if (n && !/^\d+$/.test(n) && !seen[k]) { seen[k] = 1; out.push(n); } });
+  return out.sort(function(x, y){ return x.localeCompare(y, 'vi'); });
+}
+function _assignAcctEntries(){
+  var out = [], seen = {};
+  ((typeof accounts !== 'undefined' && accounts) ? accounts : []).forEach(function(a){
+    if (!a || a.active === false) return;
+    var base = (typeof _roleBaseOf === 'function') ? _roleBaseOf(a.role) : a.role;
+    if (base === 'viewer') return;
+    var nm = ((a.names && a.names.length) ? a.names[0] : (a.name || a.username)) || '';
+    nm = String(nm).trim();
+    var k = nm.toLowerCase();
+    if (!nm || /^\d+$/.test(nm) || seen[k]) return;
+    seen[k] = 1;
+    var role = (typeof _roleLabel === 'function') ? _roleLabel(a.role) : (a.role || '');
+    out.push({ cs: nm, label: String(a.username || nm), sub: (String(a.username || '').toLowerCase() !== k ? 'CS: ' + nm + ' · ' : '') + role });
+  });
+  return out.sort(function(x, y){ return x.label.localeCompare(y.label, 'vi'); });
+}
+// Trả [{cs, label, sub}] cho chip người nhận theo nguồn đang chọn
+function _assignRecvList(src){
+  if (src === 'acct') return _assignAcctEntries();
+  if (src === 'sale') return _assignSaleNames().map(function(n){ return { cs: n, label: n, sub: '' }; });
+  return _assignAllCSNames().map(function(n){ return { cs: n, label: n, sub: '' }; });
+}
+function _advAssignSetRecvSrc(src){
+  _advAssign.recvSrc = (src === 'sale' || src === 'acct') ? src : 'all';
+  renderAssignCreate();
+}
+// Tích / bỏ tích các chip đang hiện (đang lọc theo ô tìm) trong nguồn hiện tại
+function _advAssignPickVisible(on){
+  var els = document.querySelectorAll('#assign-cs-chips .assign-cs-chip-multi');
+  Array.prototype.forEach.call(els, function(el){
+    if (el.style.display === 'none') return;
+    var cs = el.dataset.cs; if (!cs) return;
+    if (on) _advAssign.selectedCS.add(cs); else { _advAssign.selectedCS.delete(cs); delete _advAssign.customDist[cs]; }
+  });
+  renderAssignCreate();
+}
+function _advAssignClearCS(){
+  _advAssign.selectedCS = new Set(); _advAssign.customDist = {};
+  renderAssignCreate();
+}
+
 // ── Helper: get sorted pool based on advAssign settings ──
 function _getAssignPool() {
   let pool = [..._advAssignDateFilteredList()];
@@ -283,6 +335,9 @@ function renderAssignCreate() {
     _advAssign.customCount = _assignFilteredList.length;
   }
   const allCS = _assignAllCSNames();
+  const recvSrc = _advAssign.recvSrc || 'all';
+  const recvList = _assignRecvList(recvSrc);
+  const recvCnt = { all: allCS.length, sale: _assignSaleNames().length, acct: _assignAcctEntries().length };
 
   const dateFilteredList = _advAssignDateFilteredList();
   const totalFiltered = dateFilteredList.length;
@@ -404,12 +459,22 @@ function renderAssignCreate() {
     </div>
 
     ${!isTeamMode ? `
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
-    <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
+    <div class="as-lbl">Lấy người nhận từ <span class="as-sub">(bấm để đổi nguồn — người đã chọn ở nguồn khác vẫn được giữ)</span>:</div>
+    <div class="assign-sort-row" style="margin-bottom:8px">
+      ${[['all','👤 Tất cả CS'],['sale','🧑‍💼 Danh sách Sale'],['acct','🔑 Tài khoản đăng nhập CRM']].map(([k,l])=>`<div class="assign-sort-btn ${recvSrc===k?'active':''}" onclick="_advAssignSetRecvSrc('${k}')">${l} (${recvCnt[k]})</div>`).join('')}
+    </div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều người${recvSrc==='acct'?'; chọn tài khoản = chia cho tên CS của tài khoản đó':''})</div>
+    <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted)">Đang chọn: <b>${_advAssign.selectedCS.size}</b> người</span>
+      <button type="button" class="btn sm" onclick="_advAssignPickVisible(true)">✓ Chọn các dòng đang hiện</button>
+      <button type="button" class="btn sm" onclick="_advAssignPickVisible(false)">✕ Bỏ các dòng đang hiện</button>
+      ${_advAssign.selectedCS.size>0?'<button type="button" class="btn sm" onclick="_advAssignClearCS()">Xoá hết lựa chọn</button>':''}
+    </div>
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
-      ${allCS.map(cs => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(cs)?'selected':''}" data-cs="${esc(cs)}" onclick="_advAssignToggleCS(this.dataset.cs)">${esc(cs)}</div>`).join('')}
-      ${allCS.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có CS trong hệ thống</span>':''}
+      ${recvList.map(r => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(r.cs)?'selected':''}" data-cs="${esc(r.cs)}" onclick="_advAssignToggleCS(this.dataset.cs)" title="${esc(r.sub||r.label)}">${esc(r.label)}${r.sub?` <span style="opacity:.6;font-size:10px">${esc(r.sub)}</span>`:''}</div>`).join('')}
+      ${recvList.length===0?`<span style="color:var(--hint);font-size:12px">${recvSrc==='acct'?'Chưa có tài khoản đăng nhập nào đang hoạt động (vào "Quản lý tài khoản" để tạo).':(recvSrc==='sale'?'Chưa có Sale nào trong dữ liệu':'Chưa có CS trong hệ thống')}</span>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:11px;color:var(--muted)">Thêm CS mới:</span>
