@@ -23,6 +23,7 @@ eq(r.names.crm, ['ninhnga99'], 'chuoi 1 ten -> mang');
 eq(r.names.base, ['Ninh Nga', 'Ninh Thị Ngà'], 'tach theo ; va xuong dong, bo trung ninh nga');
 ok(!clean({ base: ['=SUM(1)'] }).ok, 'chan ten mo dau bang =');
 ok(!clean({ pos: ['x'.repeat(61)] }).ok, 'ten qua dai');
+ok(!clean({ pancake: ['8'] }).ok && !clean({ pancake: ['STT 13'] }).ok, 'ten toan so / STT Pancake bi tu choi (khong co sale ten toan so)');
 ok(!clean({ pos: Array.from({ length: 21 }, (_, i) => 'n' + i) }).ok, 'qua 20 ten/he thong');
 eq(clean(undefined).names, { pancake: [], crm: [], base: [], pos: [] }, 'khong gui gi -> 4 mang rong');
 
@@ -99,4 +100,44 @@ eq(nn.all, ['Ngà Ninh', 'Ninh Nga', 'ninhnga99 pos'], 'all = hop ten 4 he thong
 const th = l.list.filter((x) => x.username === 'thuydinh95')[0]; eq(th.display, 'thuydinh95', 'chua co ho so -> hien ten tai khoan');
 ok(run('staffNamesList_({token:"lead1"})').ok, 'leader xem duoc'); ok(run('staffNamesList_({token:"ninhnga99"})').code === 'FORBIDDEN', 'sale khong xem duoc danh sach');
 ok(run('staffNamesList_({token:"zzz"})').code === 'AUTH', 'khong token -> AUTH');
+
+// ---- 3) BUOC 4/5: gop doanh thu theo HO SO bang vi du that (Ninh Thi Nga co 4 ten o 4 he thong) ----
+vm.runInContext('readSaleDirectory_ = function() { return { list: [] }; }; readPancakeMap_ = function() { return {}; };', ctx);
+s = sv('admin1', 'ninhnga99', { pancake: ['Ngà Ninh'], crm: ['ninhnga99'], base: ['Ninh Nga'], pos: ['ninhnga99 pos'] });
+ok(s.ok, 'luu lai ho so day du: ' + JSON.stringify(s));
+const id = run('_salePersonIdentity_()');
+const keys = ['ninhnga99', 'Ngà Ninh', 'Ninh Nga', 'NINHNGA99 POS'].map((n) => id.key(n));
+ok(keys.every((k) => k === keys[0]), 'ca 4 ten (ke ca viet hoa) cung 1 khoa nguoi: ' + JSON.stringify(keys));
+ok(id.key('dungNTK1987') !== keys[0] && id.key('thuongBT') !== keys[0], 'nguoi khac KHONG bi gop nham');
+eq(id.primary('Ninh Nga'), 'ninhnga99', 'ten chinh hien thi = ten CRM (username) du tra bang ten Base');
+const folded = run('_foldRevMapByPerson_(' + JSON.stringify({ 'ninhnga99': 1000000, 'Ngà Ninh': 2000000, 'Ninh Nga': 3000000, 'ninhnga99 pos': 4000000, 'thuongBT': 500000 }) + ')');
+eq(folded['ninhnga99'], 10000000, 'doanh thu 4 ten gop thanh 1 nguoi = 1+2+3+4 trieu'); eq(folded['thuongBT'], 500000, 'nguoi khac giu nguyen');
+eq(Object.keys(folded).length, 2, 'chi con 2 nguoi trong ban do doanh thu');
+
+// ---- 4) BUOC 5/5: cong cu gom ten cu — merge:true (giu SDT) + adoptTags (nhan nhom the cu) ----
+const raw = (o) => run('profileSave_(' + JSON.stringify(o) + ')');
+// 4a) merge:true chi doi ho ten, GIU SDT da co
+sv('admin1', 'thuydinh95', undefined, { fullName: 'Thùy', phone: '0988777666' });
+s = raw({ token: 'admin1', username: 'thuydinh95', merge: true, profile: { fullName: 'Nguyễn Thùy Dinh' } });
+ok(s.ok && s.profile.fullName === 'Nguyễn Thùy Dinh' && s.profile.phone === '0988777666', 'merge: doi ho ten, giu nguyen SDT: ' + JSON.stringify(s.profile));
+s = raw({ token: 'admin1', username: 'thuydinh95', merge: true, profile: {} });
+ok(s.ok && s.profile.fullName === 'Nguyễn Thùy Dinh', 'merge voi profile rong: khong xoa gi');
+// 4b) ten Thuydinh1995 dang thuoc nhom 'manhTay' -> khong adopt thi bi tu choi
+let before = ctx.__set__.salePersonTags;
+s = raw({ token: 'admin1', username: 'thuydinh95', merge: true, profile: {}, names: { crm: ['thuydinh95'], base: ['Thuydinh1995', 'manhTay'] } });
+ok(s.ok === false && /manhTay/.test(s.error), 'khong adopt -> xung dot nhom the cu');
+// 4c) adopt nhung thieu ten (manhTay) trong ho so -> bao loi, khong am tham lam mat lien ket
+s = raw({ token: 'admin1', username: 'thuydinh95', merge: true, profile: {}, names: { crm: ['thuydinh95'], base: ['Thuydinh1995'] }, adoptTags: ['manhTay'] });
+ok(s.ok === false && /manhTay/.test(s.error) && /chưa đưa vào hồ sơ/.test(s.error), 'adopt thieu ten -> bao loi ro: ' + s.error);
+eq(ctx.__set__.salePersonTags, before, 'loi -> salePersonTags khong doi');
+// 4d) adopt day du -> gop nhom cu vao ho so, xoa key cu
+s = raw({ token: 'admin1', username: 'thuydinh95', merge: true, profile: {}, names: { crm: ['thuydinh95'], base: ['Thuydinh1995', 'manhTay'] }, adoptTags: ['manhTay'] });
+ok(s.ok, 'adopt day du: ' + JSON.stringify(s));
+ok(tags().manhTay === undefined, 'nhom cu manhTay da duoc gop (xoa key cu)');
+eq(tags().thuydinh95, ['Thuydinh1995', 'manhTay'], 'ho so thuydinh95 nhan day du ten cua nhom cu');
+const id2 = run('_salePersonIdentity_()'); ok(id2.key('Thuydinh1995') === id2.key('thuydinh95') && id2.key('manhTay') === id2.key('thuydinh95'), 'sau gop: 3 ten van cung 1 nguoi');
+// 4e) adopt chi dung duoc voi admin
+s = raw({ token: 'thuydinh95', username: 'thuydinh95', merge: true, profile: {}, names: { crm: ['x'] }, adoptTags: ['dungNTK1987'] });
+ok(s.code === 'FORBIDDEN', 'nhan vien khong tu gop nhom the');
+ok(tags().dungNTK1987 && tags().dungNTK1987.length === 1, 'nhom cua nguoi khac khong bi dong toi');
 console.log('ALL STAFF NAMES TESTS PASSED');

@@ -64,6 +64,7 @@ function _profNamesClean_(n) {
       if (!x) return;
       if (x.length > 60) { err.push('Tên "' + x.slice(0, 20) + '…" quá dài (tối đa 60 ký tự).'); return; }
       if (/^[=+\-@]/.test(x)) { err.push('Tên "' + x + '" không được bắt đầu bằng = + - @.'); return; }
+      if (_isNumericTag_(x)) { err.push('Tên "' + x + '" chỉ gồm chữ số (STT Pancake) — không dùng làm tên sale.'); return; }   // Duyên chot 2026-10-25: khong co sale ten toan so
       var kk = _normTxt_(x); if (seen[kk]) return; seen[kk] = 1; list.push(x);
     });
     if (list.length > 20) err.push('Mỗi hệ thống tối đa 20 tên.');
@@ -79,13 +80,14 @@ function _profNamesAll_(names) {
 }
 // Ten dang bi nguoi KHAC giu (de khong vo tinh gop 2 nguoi thanh 1): ten nam trong nhom 'salePersonTags' cua khoa khac, hoac la ten/username tai khoan khac.
 // Tra mang [{name, owner}] (rong = khong xung dot).
-function _profNameConflicts_(username, allNames, users, tags) {
+function _profNameConflicts_(username, allNames, users, tags, adopt) {
   var me = _normTxt_(username), out = [];
+  adopt = adopt || {};   // { khoaChuanHoa: 1 } = nhom the cu ma admin DONG Y gop vao ho so nay (cong cu gom ten cu, buoc 5/5)
   allNames.forEach(function(nm) {
     var k = _normTxt_(nm); if (!k || k === me) return;
     var hit = '';
     Object.keys(tags || {}).forEach(function(key) {
-      if (hit || _normTxt_(key) === me) return;
+      if (hit || _normTxt_(key) === me || adopt[_normTxt_(key)]) return;
       if (_normTxt_(key) === k || (tags[key] || []).some(function(t) { return _normTxt_(t) === k; })) hit = 'nhóm thẻ "' + key + '"';
     });
     if (!hit) (users || []).forEach(function(u) {
@@ -97,13 +99,13 @@ function _profNameConflicts_(username, allNames, users, tags) {
   });
   // chinh ten chinh (username) cung khong duoc la the cua nguoi khac
   Object.keys(tags || {}).forEach(function(key) {
-    if (_normTxt_(key) !== me && (tags[key] || []).some(function(t) { return _normTxt_(t) === me; })) out.push({ name: username, owner: 'nhóm thẻ "' + key + '"' });
+    if (_normTxt_(key) !== me && !adopt[_normTxt_(key)] && (tags[key] || []).some(function(t) { return _normTxt_(t) === me; })) out.push({ name: username, owner: 'nhóm thẻ "' + key + '"' });
   });
   return out;
 }
 // Dong bo ten ho so -> Settings 'salePersonTags' { "<ten chinh>": [the...] } (nguon DUY NHAT ma backend _userAliasGroups_ va client _personAliases dang dung de gop doanh thu/don theo NGUOI).
 // oldAll = cac ten ho so da dong bo lan truoc (de xoa dung nhung ten ho so tu bo, KHONG dung toi the admin gan tay o Quan ly Team).
-function _profSyncTags_(primary, oldAll, newAll) {
+function _profSyncTags_(primary, oldAll, newAll, adoptKeys) {
   var tags = {}; try { var raw = getSetting_('salePersonTags'); if (raw) tags = JSON.parse(raw) || {}; } catch (e) { tags = {}; }
   var me = _normTxt_(primary), key = primary;
   Object.keys(tags).forEach(function(k) { if (_normTxt_(k) === me) key = k; });
@@ -116,6 +118,8 @@ function _profSyncTags_(primary, oldAll, newAll) {
     seen[kk] = 1; list.push(x);
   });
   if (list.length) tags[key] = list; else delete tags[key];
+  // Nhom the cu da duoc gop vao ho so nay (admin duyet o cong cu gom ten cu): xoa de khong con 2 nhom cung nguoi.
+  (adoptKeys || []).forEach(function(ak) { Object.keys(tags).forEach(function(k) { if (k !== key && _normTxt_(k) === _normTxt_(ak)) delete tags[k]; }); });
   setSetting_('salePersonTags', JSON.stringify(tags));
   return tags;
 }
@@ -246,7 +250,14 @@ function profileSave_(d) {
   var target = _profFindUser_(users, d.username || viewer.username);
   if (!target) return jsonOut_({ ok: false, error: 'Không tìm thấy tài khoản.' });
   if (String(viewer.username).toLowerCase() !== String(target.username).toLowerCase() && viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Bạn chỉ sửa được hồ sơ của chính mình.', code: 'FORBIDDEN' });
-  var c = _profClean_(d.profile);
+  // merge:true = chi doi cac truong gui kem, GIU nguyen SDT/email/facebook/ho ten cu (cong cu gom ten cu chi muon dat ho ten + ten he thong).
+  var rawProf = d.profile;
+  if (d.merge) {
+    var cur = _profRead_(target.username), mp = d.profile || {};
+    rawProf = { fullName: cur.fullName, phone: cur.phone, email: cur.email, facebook: cur.facebook };
+    ['fullName', 'phone', 'email', 'facebook'].forEach(function(f) { if (mp[f] !== undefined) rawProf[f] = mp[f]; });
+  }
+  var c = _profClean_(rawProf);
   if (!c.ok) return jsonOut_({ ok: false, error: c.error });
   // Ten theo he thong: CHI admin sua (nhan vien tu them ten = co the ke khai nham doanh thu cua nguoi khac). Khong gui names = giu nguyen ten cu.
   var wantNames = d.names !== undefined && d.names !== null;
@@ -268,7 +279,18 @@ function profileSave_(d) {
     var oldNames = _profRead_(target.username).names, namesToStore = oldNames, conflicts = [];
     if (wantNames) {
       var tagsNow = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tagsNow = JSON.parse(rawT) || {}; } catch (eT) {}
-      conflicts = _profNameConflicts_(target.username, _profNamesAll_(nc.names), users, tagsNow);
+      var adoptKeys = Array.isArray(d.adoptTags) ? d.adoptTags.map(function(x) { return String(x || '').trim(); }).filter(Boolean) : [], adoptSet = {};
+      adoptKeys.forEach(function(k) { adoptSet[_normTxt_(k)] = 1; });
+      // Nhom the cu duoc nhan phai con DU ten trong ho so, neu khong nguoi do mat lien ket (bao loi thay vi am tham lam mat).
+      var newAllNow = _profNamesAll_(nc.names).map(_normTxt_).concat([_normTxt_(target.username)]), lost = [];
+      adoptKeys.forEach(function(ak) {
+        Object.keys(tagsNow).forEach(function(k) {
+          if (_normTxt_(k) !== _normTxt_(ak)) return;
+          [k].concat(tagsNow[k] || []).forEach(function(n) { if (newAllNow.indexOf(_normTxt_(n)) === -1) lost.push(n); });
+        });
+      });
+      if (lost.length) return jsonOut_({ ok: false, error: 'Nhóm thẻ cũ còn tên chưa đưa vào hồ sơ: ' + lost.join(', ') + '. Thêm các tên đó vào 1 ô hệ thống rồi lưu lại.' });
+      conflicts = _profNameConflicts_(target.username, _profNamesAll_(nc.names), users, tagsNow, adoptSet);
       if (conflicts.length) return jsonOut_({ ok: false, error: 'Tên đang thuộc người khác: ' + conflicts.map(function(x) { return '"' + x.name + '" (' + x.owner + ')'; }).join(', ') + '. Gỡ khỏi hồ sơ/nhóm thẻ kia trước.', conflicts: conflicts });
       namesToStore = nc.names;
     }
@@ -276,7 +298,7 @@ function profileSave_(d) {
     rng.setNumberFormat('@');   // giu so 0 dau cua SDT, khong cho Sheets tu doi kieu
     rng.setValues([[target.username, c.profile.fullName, c.profile.phone, c.profile.email, c.profile.facebook, new Date().toISOString(), viewer.username, JSON.stringify(namesToStore)]]);
     // Gop ten ho so vao 'salePersonTags' -> bao cao doanh thu/don/ty le chot gop theo NGUOI (dung nguon co san, khong them logic gop moi).
-    if (wantNames) _profSyncTags_(target.username, _profNamesAll_(oldNames), _profNamesAll_(namesToStore));
+    if (wantNames) _profSyncTags_(target.username, _profNamesAll_(oldNames), _profNamesAll_(namesToStore), adoptKeys);
   } finally { try { lock.releaseLock(); } catch (eR) {} }
   return jsonOut_({ ok: true, profile: _profRead_(target.username) });
 }

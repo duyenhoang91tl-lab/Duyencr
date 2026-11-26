@@ -608,7 +608,8 @@ function _computeCSStats(list, dFrom, dTo){
 // dung khi team co chon kenh (vd 1 so CS thuoc team khac nhung chi chay 1 kenh FB rieng, chi
 // muon tinh doanh thu team theo dung kenh do, khong tinh het moi don cua CS).
 function _revenueByMembersChannels(members, channels){
-  var memberSet = new Set(members);
+  var memberSet = new Set(members), memberLow = {};
+  members.forEach(function(m){ memberLow[String(m).toLowerCase()] = 1; });
   var chanSet = channels && channels.length ? new Set(channels) : null;
   var revenue = 0, orders = 0;
   (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
@@ -621,9 +622,20 @@ function _revenueByMembersChannels(members, channels){
       // nhieu sale bi bo sot hoan toan khoi doanh thu Team.
       var names = splitMulti_(o.cs, ',');
       if (!names.length) return;
-      var mine = names.filter(function(n){ return memberSet.has(n); }).length;
+      // 1 NGƯỜI nhiều tên (hồ sơ chuẩn / thẻ / tài khoản nhiều tên) chỉ được CHIA 1 PHẦN, không phải 1 phần cho mỗi tên:
+      // đơn "ninhnga99, Ninh Nga, thuongBT" = 2 người → Ninh nhận 1/2 (trước đây đếm 3 tên → Ninh nhận 2/3, thuongBT chỉ 1/3).
+      var persons;
+      try { persons = _groupNamesByPerson(names).map(function(g){ return g.names; }); } catch(eP){ persons = names.map(function(n){ return [n]; }); }
+      // Người thuộc team nếu BẤT KỲ tên nào của họ (kể cả tên chưa được thêm vào t.members — Team cũ chỉ lưu tên CRM) nằm trong team.
+      var mine = persons.filter(function(g){
+        return g.some(function(n){
+          if (memberSet.has(n)) return true;
+          var al; try { al = _personAliases(n); } catch(eA){ al = [n]; }
+          return al.some(function(a){ return memberSet.has(a) || memberLow[String(a).toLowerCase()]; });
+        });
+      }).length;
       if (!mine) return;
-      revenue += (+o.revenue||0) * mine / names.length;
+      revenue += (+o.revenue||0) * mine / persons.length;
       orders++;
     });
   });
