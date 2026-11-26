@@ -42,9 +42,11 @@ function _vnNorm(x){ return String(x||'').toLowerCase().normalize('NFD').replace
 function _teamComboMatches(teamId, q){
   var t = teams.find(function(x){ return x.id===teamId; }); if(!t) return {matches:[], canNew:false, q:''};
   var inTeam = {}; [t.leader].concat(t.members||[]).forEach(function(m){ if(m) inTeam[m]=1; });
-  var all = _allCSNames();
+  var all = _teamCandidateNames();
   var nq = _vnNorm(q);
-  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n).indexOf(nq)!==-1); });
+  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n+' '+(typeof _staffSearchText==='function'?_staffSearchText(n):'')).indexOf(nq)!==-1); });
+  // 1 người nhiều tên (cùng hồ sơ/tài khoản) chỉ hiện 1 dòng — chọn dòng nào addTeamMember cũng thêm đủ các tên cùng người
+  try { matches = _groupNamesByPerson(matches).map(function(g){ return g.primary; }); } catch (eG) {}
   var raw = String(q||'').trim();
   var exists = all.some(function(n){ return _vnNorm(n)===nq; });   // đã có (kể cả đã là thành viên) → không đề nghị tạo mới
   return {matches:matches, canNew: !!raw && !exists, q: raw};
@@ -54,7 +56,7 @@ function _teamComboShow(inp){
   var tid = inp.getAttribute('data-team');
   var r = _teamComboMatches(tid, inp.value);
   var h = r.matches.map(function(n,i){
-    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+'</div>';
+    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+(function(){ var d = (typeof _staffDisplayOf==='function') ? _staffDisplayOf(n) : ''; return d && d.toLowerCase()!==String(n).toLowerCase() ? ' <span style="color:var(--muted);font-size:11px">· '+esc(d)+'</span>' : ''; })()+'</div>';
   }).join('');
   if (r.canNew) h += '<div class="team-combo-item team-combo-new'+(!r.matches.length?' hi':'')+'" data-name="'+esc(r.q)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,true)">＋ Thêm mới “'+esc(r.q)+'”</div>';
   if (!h) h = '<div class="team-combo-empty">Không còn nhân viên nào để thêm</div>';

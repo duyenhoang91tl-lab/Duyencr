@@ -463,6 +463,14 @@ function _allCSNames(){
   teams.forEach(function(t){ if(t.leader) set.add(t.leader); (t.members||[]).forEach(function(m){ set.add(m); }); });
   return [...set].filter(Boolean).sort(function(a,b){ return a.localeCompare(b,'vi'); });
 }
+// Ứng viên chọn vào Team = tên đã có trong dữ liệu + tài khoản CS có hồ sơ chuẩn (js/97) dù chưa có đơn/khách (vd bạn mới). Không đổi _allCSNames (nhiều nơi khác dùng).
+function _teamCandidateNames(){
+  var base = _allCSNames(), seen = {};
+  base.forEach(function(n){ seen[String(n).toLowerCase()] = 1; });
+  var ex = (typeof _staffExtraNames === 'function') ? _staffExtraNames() : [];
+  ex.forEach(function(n){ var k = String(n).toLowerCase(); if (n && !seen[k]){ seen[k] = 1; base.push(n); } });
+  return base.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+}
 // Danh sach ten Kenh ban (kenhBan/source) tung xuat hien trong don hang — dung cho o chon
 // kenh cua Team (Quan ly Team → chon kenh cho team NEU muon gioi han doanh thu team do chi
 // tinh trong 1/vai kenh nhat dinh, vd CS thuoc team khac nhung chi chay 1 kenh FB rieng).
@@ -1194,7 +1202,7 @@ function renderTeamTab(){
   if (!teams.length){
     html += '<div style="color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--border);border-radius:var(--rsm)">Chưa có team nào.'+(isAdmin?' Bấm “+ Thêm Team”.':'')+'</div>';
   }
-  var allNames = _allCSNames();
+  var allNames = _teamCandidateNames();
   teams.forEach(function(t){
     var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
     var channels = t.channels || [];
@@ -1230,7 +1238,10 @@ function renderTeamTab(){
       var isLeader = g.names.indexOf(t.leader) !== -1;
       var multi = g.names.length > 1;
       var label = esc(g.names[0]) + (multi ? ' <span style="color:var(--muted);font-size:11px">+ '+g.names.slice(1).map(esc).join(', ')+'</span>' : '');
-      html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':'')+'>'+(isLeader?'★ ':'')+label+
+      // Hồ sơ chuẩn (js/97): hiện họ tên chuẩn thay cho tên CRM + "+ tên phụ"; rê chuột thấy tên từng hệ thống. Chưa có hồ sơ → giữ cách hiện cũ.
+      var sinfo = (typeof _staffChipInfo === 'function') ? _staffChipInfo(g.names) : null;
+      if (sinfo) label = esc(sinfo.display);
+      html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(sinfo ? ' title="'+esc(sinfo.title)+'"' : (multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':''))+'>'+(isLeader?'★ ':'')+label+
         (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':(multi?'Xoá người này (cả '+g.names.length+' tên) khỏi team':'Xoá khỏi team'))+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
         (isAdmin ? ' <span class="chip-tag" data-name="'+esc(m)+'" title="Thẻ của người này (tên trong Base/Pos)" style="cursor:pointer" onclick="openPersonTagsModal(this.dataset.name)">🏷️</span>' : '')+
         (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
@@ -1258,9 +1269,10 @@ function renderTeamTab(){
         allNames.forEach(function(n){
           var on = members.indexOf(n)!==-1;
           var isLeader = n===t.leader;
-          html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc(n).toLowerCase()+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
+          var _sd = (typeof _staffDisplayOf === 'function') ? _staffDisplayOf(n) : '', _sx = (typeof _staffSearchText === 'function') ? _staffSearchText(n) : '';
+          html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc((n+' '+_sx).toLowerCase())+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
             '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' data-name="'+esc(n)+'" onchange="setTeamMemberChecked(\''+t.id+'\',this.dataset.name,this.checked)">'+
-            '<span>'+(isLeader?'★ ':'')+esc(n)+'</span></label>';
+            '<span>'+(isLeader?'★ ':'')+esc(n)+(_sd && _sd.toLowerCase()!==String(n).toLowerCase() ? ' <span style="color:var(--muted);font-size:11px">· '+esc(_sd)+'</span>' : '')+'</span></label>';
         });
         html += '</div></div>';
       }
