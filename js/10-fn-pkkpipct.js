@@ -167,10 +167,11 @@ function _pkKpiApplyQuickFilter(key){
 // Người ngoài KD VẪN HIỆN (bảng Theo Sale, nhóm riêng) nhưng không cộng vào tỷ lệ chung. Chưa phân loại ai ở cả 2 nguồn → không lọc (tránh ra trống).
 // Nguồn phân loại: Phân loại Sale theo mốc ngày (_saleChannelOn_ tại ngày cuối kỳ xem), dự phòng nhóm S/O của SaleDirectory (nhom Văn phòng/Online).
 function _pkKdInScope_(row, ymd){
+  if (row && typeof row.kd === 'boolean') return row.kd;   // 2026-11-26: ưu tiên cờ của server (GAS buildKpiReport_ → _srKdMark_), CÙNG nguồn Báo cáo A/B: Online + Văn phòng + Thử việc + Phòng ban Sale, khớp theo NGƯỜI
   var ch = (typeof _saleChannelOn_ === 'function') ? _saleChannelOn_(row && row.name, ymd || '') : '';
-  if (ch) return ch === 'online' || ch === 'offline';
+  if (ch) return ch === 'online' || ch === 'offline' || ch === 'probation';
   var nh = String((row && row.nhom) || '');
-  return nh === 'Văn phòng' || nh === 'Online';
+  return nh === 'Văn phòng' || nh === 'Online' || nh === 'Thử việc';
 }
 function _pkKdSplit_(rows, ymd){
   rows = rows || [];

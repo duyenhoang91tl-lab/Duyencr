@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — FIX: TAB KPI PANCAKE LỌC "PHÒNG KINH DOANH" LÀM MẤT BẠN MỚI (ngocNM) KHỎI DOANH THU) — XONG 1/1 (GAS tự deploy + Ctrl+F5; chờ Duyên thử thật)
+- ĐỀ BÀI Duyên: đã lọc phòng kinh doanh đội sale mà các bạn mới (vd ngocnm) vẫn không hiện doanh thu.
+- NGUYÊN NHÂN GỐC: bộ lọc KD mình thêm ở tab 📈 Báo cáo KPI Pancake (11-21, `_pkKdInScope_` ở js/10) chỉ nhận kênh `online`/`offline` hoặc nhóm SaleDirectory Văn phòng/Online → KHÔNG nhận **Thử việc** và **Phòng ban Sale** (ngocNM thuộc phòng ban Sale theo file nhân sự) nên bị đẩy xuống khối "Ngoài phòng KD" và không cộng vào "Tỷ lệ chốt chung — phòng KD". Báo cáo A/B không bị vì đã dùng cờ `kd` của server (fix 11-21).
+- ĐÃ SỬA: (1) GAS `buildKpiReport_` (gas_v13.js + gas/14_KpiReport_Users_Assign.gs): gắn `kd:true/false` vào `bySale` bằng `_srKdMark_(bySale,{dateTo:to})` — CÙNG nguồn A/B: Online + Văn phòng + Thử việc + Phòng ban Sale, khớp theo NGƯỜI. (2) `js/10-fn-pkkpipct.js` (?v=20261126a): `_pkKdInScope_` ưu tiên cờ `kd` của server; dự phòng cũng nhận Thử việc. Test `node tools/test-pk-kd-scope.js` (thêm ca ngocNM kd:true) + test-kd-mark + test-kd-scope + test-page-pkd-header OK; `split-gas --check` OK.
+- [ ] **VIỆC KẾ TIẾP:** chờ GAS deploy xanh (tab Actions) + Ctrl+F5 → KPI Pancake: ngocNM phải nằm trong nhóm KD. Nếu vẫn thiếu: xem dòng "Ngoài phòng KD" có ngocNM không → tên Pancake chưa khớp 1 người Sale có phân loại/phòng ban Sale (Báo cáo E › Phân loại Sale, bảng khớp tên Sale↔Pancake). Nếu Duyên đang nói tab/báo cáo khác (A, B, K...) → báo đúng tên tab + khoảng ngày để dò tiếp. Báo cáo K cố ý chưa tính Thử việc.
+
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
