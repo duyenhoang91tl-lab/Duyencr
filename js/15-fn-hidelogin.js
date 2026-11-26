@@ -595,6 +595,29 @@ function _acctCollectNames(){
   });
   return out;
 }
+// TÊN GỐC = TÊN TRÊN PANCAKE (Duyên 26/11: yennth + yenNTH2004 là 1 người nhưng bị tách 2 dòng; chốt lấy gốc theo tên Pancake).
+// _pkState.nameMap = { 'Tên nhân viên trên Pancake': 'saleA' | 'saleA|saleB' } (Khớp tên Pancake). Một tên Pancake được coi là CỦA NGƯỜI NÀY khi
+// MỌI sale nó gắn vào đều nằm trong danh sách tên của người đó (tên Pancake chia cho nhiều người khác nhau thì KHÔNG lấy làm gốc, tránh gộp nhầm).
+// Nhiều tên Pancake cùng khớp → lấy tên đầu theo thứ tự chữ cái (kết quả ổn định). Không có tên Pancake nào khớp → trả '' (giữ nguyên thứ tự cũ).
+function _pkOrigNameOf_(names){
+  var nm = (typeof _pkState !== 'undefined' && _pkState && _pkState.nameMap) ? _pkState.nameMap : null;
+  if (!nm || !names || !names.length) return '';
+  var fold = function(x){ return String(x == null ? '' : x).trim().toLowerCase(); }, mine = {};
+  names.forEach(function(n){ if (fold(n)) mine[fold(n)] = 1; });
+  var keys = Object.keys(nm).sort(function(a, b){ return a.localeCompare(b, 'vi'); }), hit = [];
+  keys.forEach(function(k){
+    if (mine[fold(k)]) { hit.unshift(k); return; }   // chính tên này đã là tên Pancake
+    var sales = String(nm[k] || '').split('|').map(fold).filter(Boolean);
+    if (sales.length && sales.every(function(x){ return mine[x]; })) hit.push(k);
+  });
+  return hit[0] || '';
+}
+// Đưa tên Pancake lên ĐẦU danh sách (tên chính của tài khoản = names[0]); chưa có trong danh sách thì thêm vào. Các tên còn lại giữ thứ tự.
+function _acctPancakeFirst_(names){
+  var orig = _pkOrigNameOf_(names); if (!orig) return (names || []).slice();
+  var f = orig.toLowerCase();
+  return [orig].concat((names || []).filter(function(n){ return String(n).trim().toLowerCase() !== f; }));
+}
 async function addAccount(){
   var u = (_aval('acct-username')||'').trim();
   var p = _aval('acct-password');
@@ -602,6 +625,13 @@ async function addAccount(){
   var namesArr = _acctCollectNames();
   var name = namesArr[0] || '';
   var team = _aval('acct-team-sel') || '';
+  var pkNote = '';
+  if (_roleBaseOf(role) === 'cs' && namesArr.length && typeof _pkOrigNameOf_ === 'function'){   // tên gốc = tên Pancake: đưa lên đầu (tên chính), không làm mất các tên khác
+    try { if (typeof _pkState !== 'undefined' && !_pkState.nameMapLoaded && typeof _pkLoadNameMap === 'function') await _pkLoadNameMap(); } catch (e) {}
+    var pk = _pkOrigNameOf_(namesArr);
+    if (pk) pkNote = ' — tên gốc theo Pancake: “' + pk + '”';
+    namesArr = _acctPancakeFirst_(namesArr); name = namesArr[0] || '';
+  }
   if (!u){ toast('Nhập tên tài khoản.'); return; }
   if (/\s/.test(u)){ toast('Tên tài khoản không nên có dấu cách.'); return; }
   if (role === 'admin'){ name = name || 'Admin'; namesArr = ['Admin']; team = ''; }
@@ -637,7 +667,7 @@ async function addAccount(){
   _acctOpen[_acctKey(u)] = true;
   renderAcctModal();
   _renderAuthHeader();
-  toast('✓ Đã lưu tài khoản ' + u + (autoName ? ' — chưa chọn Sale nên dùng chính “' + u + '” làm tên CS: vào Chia data, chọn CS này để chia khách' : '') + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
+  toast('✓ Đã lưu tài khoản ' + u + pkNote + (autoName ? ' — chưa chọn Sale nên dùng chính “' + u + '” làm tên CS: vào Chia data, chọn CS này để chia khách' : '') + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
 }
 function deleteAccount(u){
   var acct = _findAccount(u); if (!acct) return;

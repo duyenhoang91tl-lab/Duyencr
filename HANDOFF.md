@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — TÊN GỐC = TÊN TRÊN PANCAKE) — BƯỚC A/B XONG: TẠO/SỬA TÀI KHOẢN (chỉ web, Ctrl+F5; không đụng GAS)
+- ĐỀ BÀI Duyên: khớp sale phải lấy tên gốc ngay từ phần tạo tài khoản; chốt "lấy gốc theo tên trên Pancake cho dễ".
+- NGUYÊN NHÂN GỐC: tên chính của tài khoản = ô đầu tiên được tick/gõ (`names[0]`), không liên quan tới tên Pancake → cùng 1 người có thể mang tên chính khác nhau ở từng nơi, các mục chọn theo tên rồi tách đôi.
+- ĐÃ LÀM (js/15-fn-hidelogin.js, ?v=20261126b): `_pkOrigNameOf_(names)` tìm tên Pancake của người (trong `_pkState.nameMap` — Khớp tên Pancake — một tên Pancake chỉ được tính khi MỌI sale nó gắn vào đều thuộc người này; nhiều tên thì lấy tên đầu theo chữ cái); `_acctPancakeFirst_` đưa tên đó lên đầu (thêm vào nếu chưa có, không nhân đôi, giữ thứ tự các tên khác); `addAccount` áp cho vai trò CS, tự tải Khớp tên Pancake nếu chưa tải, toast báo "tên gốc theo Pancake: …". Không có tên Pancake khớp → giữ nguyên như cũ.
+- TEST: `node tools/test-acct-pancake-orig.js` (10 ca) + test-acct-autoname/extra/split-confirm vẫn xanh.
+- [ ] **VIỆC KẾ TIẾP — Bước B/B:** trang Phòng ban › Từng người hiển thị + gom theo tên Pancake (dùng `_pkOrigNameOf_`, tải Khớp tên Pancake khi mở trang). Sau đó: nút "chuẩn hóa tên gốc" cho TÀI KHOẢN ĐÃ CÓ (hiện chỉ áp khi bấm lưu tài khoản).
+
 ## 2026-11-26 (phiên Claude — HỒ SƠ NHÂN VIÊN CHUẨN: TÊN PANCAKE/CRM/BASE/POS → TEAM CHỌN THEO HỒ SƠ) — BƯỚC 3/5 XONG (GAS + web nhập tên + Cài đặt Team theo hồ sơ)
 - ĐỀ BÀI Duyên: trong Cài đặt hồ sơ nhân viên chọn được tên Pancake, tên CRM, tên Base, tên POS cho 1 người (vd Ninh Thị Ngà) để ra hồ sơ chuẩn; khi cài Team thì danh sách ra đúng hồ sơ đó. Hiện Team hiện tên CRM + "+ tên phụ" (16 thành viên = 19 tên) vì chưa có hồ sơ chuẩn.
 - THIẾT KẾ (tái dùng cái có sẵn, KHÔNG thêm logic gộp mới): tên theo hệ thống lưu ở cột mới `namesJson` (cột 8) của sheet StaffProfiles = {pancake:[],crm:[],base:[],pos:[]}. Khi admin lưu, server GỘP mọi tên đó vào Settings `salePersonTags` { "<tên chính = username>": [thẻ...] } — chính là nguồn mà `_userAliasGroups_` (backend) và `_personAliases` (js/50) đã dùng để gộp doanh thu/đơn/tỷ lệ chốt theo NGƯỜI → bước 4 (gộp doanh thu) gần như có sẵn, chỉ cần test bằng ví dụ thật.
