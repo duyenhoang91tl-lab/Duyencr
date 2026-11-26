@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — THƯ VIỆN SẢN PHẨM v3: CHỌN THƯ MỤC ẢNH CÓ SẴN TRÊN GOOGLE DRIVE "Hình ảnh theo File Giá") — ĐANG LÀM TỪNG BƯỚC
+- ĐỀ BÀI Duyên: ngoài tải ảnh lên, muốn chọn được thư mục ảnh ĐÃ CÓ trên Drive (link https://drive.google.com/drive/folders/1Do-SdTTHKORNYBumpJYNUzl_H1u_x8rh, chia thư mục giống file giá) để xem trong Thư viện sản phẩm. Cấu trúc thư mục bên trong CHƯA xem được (trang Drive cần đăng nhập, WebFetch không đọc) → code quét tới 3 cấp, khớp theo TÊN thư mục.
+- QUYẾT ĐỊNH: CRM CHỈ ĐỌC thư mục Drive của Duyên (không tải về/di chuyển/đổi quyền chia sẻ). Khớp tự động: tên thư mục (bỏ dấu/hoa thường) = tên SP hoặc tên thương mại (làm ở CLIENT vì client có bảng giá); thư mục tên khác → admin GẮN TAY (dán link hoặc chọn trong danh sách). Gắn tay thắng khớp tự động. Ảnh Drive hiện RIÊNG với ảnh tải lên (giới hạn 50 chỉ áp cho ảnh tải lên; thư mục Drive hiện tối đa 200 ảnh).
+- ✅ BƯỚC 1/3 GAS (`gas_v13.js` + split OK, `tools/test-plib.js` mở rộng xanh): GET `plibDriveScan` (quét cây gốc ≤3 cấp, ≤3000 thư mục, cache 10 phút, `fresh=1` bỏ cache; trả folders[{id,name,path}] + links), GET `plibFolderImages(folderId)` (liệt kê ảnh image/*, CHỈ nhận thư mục nằm trong cây gốc — `_plibInRoot_` — để không đọc được thư mục Drive tuỳ ý), POST `plibLinkSave` (CHỈ ADMIN, link/id; để trống = gỡ). Sheet `ThuVienSPLink`. `plibList` trả thêm `links` (không key) / `link` (có key). Thư mục gốc mặc định trong code `PLIB_SRC_DEFAULT_`, đổi bằng Script Property `PLIB_SRC_FOLDER_ID`.
+- ⚠ ĐIỀU KIỆN: tài khoản Google CHẠY Apps Script phải có quyền xem thư mục gốc đó. Nếu chưa → app báo lỗi kèm email tài khoản cần chia sẻ (quyền Người xem). Ảnh chỉ hiện cho nhân viên nếu tệp được chia sẻ dạng "ai có link" (hoặc nhân viên đăng nhập Google có quyền).
+- [ ] BƯỚC 2/3 client `js/94`: khớp tên tự động, hiện ảnh Drive trong thư mục SP, nút "📂 Gắn thư mục Drive" (admin, ô tìm + dán link), gỡ gắn, dòng thống kê thư mục Drive chưa khớp.
+- [ ] BƯỚC 3/3: docs/crm-kb/13 + HANDOFF.
+
 ## 2026-11-26 (phiên Claude — HỒ SƠ NHÂN VIÊN: (1) KẾT QUẢ LÀM VIỆC CHỈ TẢI KHI BẤM NÚT; (2) SALE TỰ CHỌN/GÕ "TÊN THEO TỪNG HỆ THỐNG") — BƯỚC 1/2 XONG (chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: vào Hồ sơ nhân viên bị lag; chỉ tải "Kết quả làm việc" khi bấm nút. Mục "Tên theo từng hệ thống" (Pancake/CRM/Base/POS) cho Sale được tick chọn từ danh sách hoặc tự gõ tên (hiện chỉ admin sửa được).
 - NGUYÊN NHÂN GỐC lag: `js/47-staff-profile.js` `load()` luôn gọi `loadOverview()` (action `staffOverview` của GAS — tính doanh thu/hoa hồng/thưởng/Pancake/xếp hạng, nặng) ngay khi mở hồ sơ, đổi nhân viên hay đổi kỳ.
