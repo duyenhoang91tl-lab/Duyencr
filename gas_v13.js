@@ -2568,6 +2568,14 @@ function _scopeVerdict_(user, phone, namesFn) {
     if (!_phoneHasOrderInMonths_(phone, months)) return false;
   }
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
+  // Dot chia (AssignData) khop khong phan biet hoa/thuong/khoang trang - cung tieu chi voi _scopePhoneSet_ va client (_rebuildAssignIndex).
+  try {
+    var asg2 = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
+    if (asg2.length) {
+      var mineN = {}; mine.forEach(function (k) { mineN[_normTxt_(k)] = 1; });
+      for (var b = 0; b < asg2.length; b++) { if (mineN[_normTxt_(asg2[b])]) return true; }
+    }
+  } catch (eAs) {}
   return false;
 }
 function _scopeKey_() { return 'scp_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
@@ -2754,7 +2762,9 @@ function _scopePhoneSet_(user, allowed) {
   try { readCareLeads_().forEach(function (r) { if (_scopeHit_(r.cs, allowed)) add(r.phone); }); } catch (e7) {}
   try {
     var ai = _scopeAssignIndex_();
-    Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]]) { set[ph] = 1; break; } } });
+    // KHOP TEN DOT CHIA KHONG PHAN BIET HOA/THUONG/KHOANG TRANG (cung tieu chi action=assign&csName=): dot chia ghi 'Ngocnm', tai khoan 'ngocnm' van thuoc pham vi.
+    var allowedN = {}; Object.keys(allowed).forEach(function (k) { allowedN[_normTxt_(k)] = 1; });
+    Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]] || allowedN[_normTxt_(ai[ph][i])]) { set[ph] = 1; break; } } });
   } catch (e8) {}
   if (months.length) set = _leadMonthFilterSet_(user, set, months);
   try { _cachePutBig_(ckey, JSON.stringify(Object.keys(set)), 60); } catch (e9) {}
