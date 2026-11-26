@@ -116,7 +116,7 @@ function _rsCatalog(){
     g.ids.forEach(function(id){
       if (id.indexOf('act:') === 0) {
         var a = (window._SN_ACTS || {})[id.slice(4)];
-        if (!a || a.admin) return;                               // tác vụ chỉ Admin: không cấp cho vai trò khác
+        if (!a || a.admin || a.lead) return;                     // tác vụ chỉ Admin / chỉ Trưởng nhóm: cố định theo vai trò, không tick cấp được
         var t = typeof a.t === 'function' ? a.t() : a.t;
         items.push({ id:id, label:String(t).replace(/^\s*\S+\s/, function(m){ return /^[\wÀ-ỹ]/.test(m) ? m : ''; }) });
       } else if (labelOf[id]) items.push({ id:id, label:labelOf[id] });
