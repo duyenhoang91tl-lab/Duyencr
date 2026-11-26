@@ -6,7 +6,7 @@
 //  số khách đang giữ + đã kết bạn đếm tại đây từ allCustomers (cùng nguồn danh sách KH).
 // ═══════════════════════════════════════════════════════
 (function(){
-  var S = { username:'', quick:'thisMonth', from:'', to:'', data:null, ov:null, err:'', loading:false, seq:0 };
+  var S = { username:'', quick:'thisMonth', from:'', to:'', data:null, ov:null, err:'', loading:false, seq:0, opts:null, optsLoading:false };
   function e(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function role(){ return (typeof currentUser !== 'undefined' && currentUser && currentUser.role) || ''; }
   function myUser(){ return (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) || ''; }
@@ -19,15 +19,44 @@
   function namesFromForm(){ var o = {}; NAME_SYS.forEach(function(x){ var el = document.getElementById('sp-nm-' + x[0]); o[x[0]] = splitNames(el ? el.value : ''); }); return o; }
   function namesHtml(d, p){
     var nm = namesOf(p), ed = !!d.canEditNames, h = '<div class="sp-sec sp-names"><div class="sp-st">🔗 Tên theo từng hệ thống</div>' +
-      '<div class="sp-mu sp-wn">Điền tên của <b>cùng 1 người</b> ở mỗi hệ thống (nhiều tên cách nhau dấu phẩy). Cài Team sẽ chọn theo hồ sơ này; doanh thu / đơn của mọi tên được gộp cho nhân viên.' + (ed ? '' : ' Chỉ admin sửa được.') + '</div>';
+      '<div class="sp-mu sp-wn">Điền tên của <b>cùng 1 người</b> ở mỗi hệ thống (nhiều tên cách nhau dấu phẩy). Cài Team sẽ chọn theo hồ sơ này; doanh thu / đơn của mọi tên được gộp cho nhân viên.' + (ed ? ' <b>Bấm chọn tên có sẵn bên dưới ô hoặc tự gõ</b> (tên đang thuộc người khác sẽ bị từ chối khi lưu).' : ' Bạn chỉ xem được, không sửa.') + '</div>';
     NAME_SYS.forEach(function(x){
       var val = nm[x[0]].slice();
       if (ed && x[0] === 'crm' && !val.length && d.username) val = [d.username];   // goi y san ten CRM = ten dang nhap
       h += '<label class="sp-lb" for="sp-nm-' + x[0] + '">' + e(x[1]) + '</label>';
-      if (ed) h += '<input id="sp-nm-' + x[0] + '" class="sp-in" maxlength="400" placeholder="' + e(x[2]) + '" value="' + e(val.join(', ')) + '">';
+      if (ed) h += '<input id="sp-nm-' + x[0] + '" class="sp-in" maxlength="400" placeholder="' + e(x[2]) + '" value="' + e(val.join(', ')) + '" autocomplete="off"><div class="sp-chips" id="sp-ch-' + x[0] + '"></div>';
       else h += '<div class="sp-ro">' + (val.length ? e(val.join(', ')) : '<span class="sp-mu">Chưa cập nhật</span>') + '</div>';
     });
     return h + '</div>';
+  }
+  // ── Gợi ý tick chọn tên (sale tự chọn tên của mình ở từng hệ thống) ──
+  function foldN(x){ return String(x == null ? '' : x).replace(/\s+/g, ' ').trim().toLowerCase(); }
+  function refreshChips(sys){
+    var box = document.getElementById('sp-ch-' + sys), inp = document.getElementById('sp-nm-' + sys); if (!box || !inp) return;
+    var cur = splitNames(inp.value), curK = {}; cur.forEach(function(x){ curK[foldN(x)] = 1; });
+    var opt = (S.opts && Array.isArray(S.opts[sys])) ? S.opts[sys] : [], seen = {}, list = [];
+    opt.forEach(function(x){ var k = foldN(x); if (k && !seen[k]){ seen[k] = 1; list.push(x); } });
+    cur.forEach(function(x){ var k = foldN(x); if (k && !seen[k]){ seen[k] = 1; list.push(x); } });   // tên đã chọn/gõ nhưng không có trong gợi ý vẫn hiện để bỏ chọn được
+    var more = list.length > 80 ? list.length - 80 : 0; list = list.slice(0, 80);
+    var h = list.map(function(x){ var on = !!curK[foldN(x)];
+      return '<button type="button" class="sp-chip' + (on ? ' on' : '') + '" data-sys="' + e(sys) + '" data-name="' + e(x) + '" aria-pressed="' + on + '">' + (on ? '✓ ' : '') + e(x) + '</button>'; }).join('');
+    if (!opt.length) h += S.optsLoading ? '<span class="sp-mu">Đang tải gợi ý…</span>' : (S.opts ? '<span class="sp-mu">Chưa có gợi ý — hãy tự gõ tên ở ô trên.</span>' : '');
+    if (more) h += '<span class="sp-mu">…và ' + more + ' tên nữa (gõ tên vào ô để thêm)</span>';
+    box.innerHTML = h;
+  }
+  function refreshAllChips(){ NAME_SYS.forEach(function(x){ refreshChips(x[0]); }); }
+  function toggleName(sys, name){
+    var inp = document.getElementById('sp-nm-' + sys); if (!inp) return;
+    var cur = splitNames(inp.value), k = foldN(name), out = cur.filter(function(x){ return foldN(x) !== k; });
+    if (out.length === cur.length) out.push(name);   // chưa có → chọn; đã có → bỏ chọn
+    inp.value = out.join(', '); refreshChips(sys);
+  }
+  function loadOptions(username, seq){
+    S.opts = null; S.optsLoading = true; refreshAllChips();
+    getJson({ action:'profileNameOptions', username:username }).then(function(r){
+      if (seq !== S.seq || username !== S.username) return;
+      S.optsLoading = false; S.opts = (r && r.ok && r.options) ? r.options : {}; refreshAllChips();
+    });
   }
   function rangeOf(key){
     if (key === 'custom') return { from:S.from, to:S.to };
@@ -72,6 +101,7 @@
     document.body.appendChild(ov);
     document.getElementById('sp-close').addEventListener('click', close);
     document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') close(); });
+    ov.addEventListener('input', function(ev){ var t = ev.target; if (t && /^sp-nm-/.test(t.id || '')) refreshChips(t.id.slice(6)); });   // gõ tay → chip tự đổi trạng thái chọn
     ov.addEventListener('change', function(ev){
       var t = ev.target;
       if (t.id === 'sp-pick') load(t.value);
@@ -81,7 +111,8 @@
     ov.addEventListener('click', function(ev){
       var t = ev.target.closest ? ev.target : null; if (!t) return;
       if (t.closest('#sp-save')) save();
-      else if (t.closest('#sp-load-ov')) loadOverview();   // CHỈ tải kết quả làm việc khi bấm nút (Duyên 26/11: đỡ lag)
+      else if (t.closest('#sp-load-ov')) loadOverview();
+      else { var ch = t.closest('.sp-chip'); if (ch) toggleName(ch.getAttribute('data-sys'), ch.getAttribute('data-name')); }   // CHỈ tải kết quả làm việc khi bấm nút (Duyên 26/11: đỡ lag)
     });
     return ov;
   }
@@ -155,6 +186,7 @@
     }
     h += '</div>';
     body.innerHTML = top + '<div class="sp-layout"><div class="sp-colL">' + left + '</div><div class="sp-colR">' + h + '</div></div>';
+    refreshAllChips();
   }
   // Đổi nhân viên / khoảng ngày: bỏ kết quả cũ (huỷ yêu cầu đang chạy) và chờ người dùng bấm "Tải kết quả làm việc".
   function resetOverview(){ S.seq++; S.loading = false; S.ov = null; S.ovErr = ''; }
@@ -169,13 +201,14 @@
     });
   }
   function load(username){
-    S.username = username || myUser(); S.data = null; S.ov = null; S.err = ''; S.ovErr = ''; S.loading = true;
+    S.username = username || myUser(); S.data = null; S.ov = null; S.err = ''; S.ovErr = ''; S.loading = true; S.opts = null; S.optsLoading = false;
     var r = rangeOf(S.quick); if (S.quick !== 'custom'){ S.from = r.from; S.to = r.to; }
     var seq = ++S.seq; render();
     getJson({ action:'profileGet', username:S.username }).then(function(p){
       if (seq !== S.seq) return;
       if (!p || !p.ok){ S.loading = false; S.err = (p && p.error) || 'Không tải được hồ sơ.'; render(); return; }
       S.data = p; S.loading = false; render();   // KHÔNG tự tải kết quả làm việc — chờ bấm nút
+      if (p.canEditNames) loadOptions(S.username, seq);   // gợi ý tên (nhẹ, chỉ khi được sửa tên)
     });
   }
   function save(){
