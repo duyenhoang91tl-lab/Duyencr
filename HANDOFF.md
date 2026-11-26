@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — FILE WORD YÊU CẦU GỬI BÊN CRM, 11 HẠNG MỤC) — XONG, ĐÃ PUSH
+- Nguyên nhân làm: bản thử còn 11 hạng mục chưa có quy tắc/khoá (Zalo OA, EMS, đẩy đơn POS, webhook Pancake, tổng đài, AI+Sheets, hoa hồng/thưởng, KPI, hạng+điểm, chia doanh thu/ghi nhận đơn, số mặc định ticket/giờ làm/hạn trả lời tin). Bên CRM cần tài liệu nêu rõ yêu cầu + cách tính để hoàn thiện.
+- ✅ Đã xong: `docs/Yeu-cau-gui-ben-CRM-11-hang-muc.docx` (viết giọng Duyên gửi bên CRM). Mỗi mục: hiện trạng / yêu cầu + cách tính đề nghị / điểm cần chốt. Phần "đang chạy" lấy từ code (`BIZ_RULES_DEFAULT_`, `SALE_TIER_DEFAULT_TARGETS_`, `_computeSaleTierTimeline_`, `_TIER_DEFAULT_`, tỷ lệ chốt, quầy 30/70); phần chưa có quy tắc (điểm 150.000đ=1 điểm, ngưỡng 15/30/50tr, công thức KPI nhiều chỉ tiêu, KPI tự cam kết, SLA ticket, giờ làm việc) là ĐỀ XUẤT, đã ghi rõ trong file.
+- Không đổi code: không cần deploy GAS, không cần reload extension.
+- [ ] **VIỆC KẾ TIẾP (Duyên):** (1) đọc lại 2 chỗ mình diễn giải: "nơi xử lý" nhận 70% = quầy/cửa hàng; hạng Super VVip chưa xác minh ngưỡng trong code; (2) gửi file cho bên CRM; (3) trả lời các điểm "cần chốt" (ngày ghi nhận doanh thu, bảng % hoa hồng, mức thưởng, trọng số KPI, quyền lợi hạng, "điểm tiêu theo năm"); (4) revoke token GitHub đã dán nhiều lần và tạo token mới.
+- Phiên sau: khi có phản hồi từ CRM/Duyên, cập nhật `docs/ROADMAP-YEU-CAU.md` (tick mục tương ứng) rồi code tiếp theo thứ tự P1→P2.
+
 ## 2026-11-26 (phiên Claude — BÁO CÁO B THIẾU PHẦN ĐƠN CỬA HÀNG Ở "THEO TEAM SALE") — BƯỚC 1/2 XONG (GAS)
 - Hỏi của Duyên: "Báo cáo B đã có doanh thu đơn qua cửa hàng chia 30% chưa?" (±1 ngày ghép sheet "Khách Sale qua cửa hàng" là chuẩn, KHÔNG đổi).
 - Kết quả kiểm tra: web ĐÃ cộng phần Sale 30% đơn quầy (Báo cáo L) vào bảng/biểu đồ **Theo Sale** + KPI của B (client `_srMergeStoreIntoBySale_` js/63, từ 03/11). CHƯA có ở bảng **Theo Team Sale** (js/11 dùng thẳng `d.byTeamSale` của GAS, mà `buildSalesReportB_` không gọi logic sheet cửa hàng) → team lệch so với Theo Sale. NGUYÊN NHÂN GỐC: phần cửa hàng được ghép ở client, không có bước tương ứng cho team; client không biết team của sale (team nằm ở sheet Team + bảng khớp Pancake phía GAS).
