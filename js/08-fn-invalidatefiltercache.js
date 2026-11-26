@@ -82,20 +82,39 @@ async function flushAuditSync(){
 function _assignFoldName_(n){
   return String(n == null ? '' : n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
 }
+// Khoá "cùng 1 người" CHẶT HƠN _assignFoldName_: bỏ luôn mọi khoảng trắng/ký tự lạ ("Lê Phương Anh" = "lephuonganh" = "Le Phuong Anh").
+// NGUYÊN NHÂN GỐC "chia data cho lephuonganh mà Danh sách KH + Data của tôi vẫn trống" (2026-11-26): đợt chia ghi tên hiển thị có dấu/khoảng trắng
+// ("Lê Phương Anh") còn tài khoản đăng nhập là "lephuonganh" → gấp tên vẫn lệch ("le phuong anh" ≠ "lephuonganh") nên không khớp.
+function _assignCompactKey_(n){
+  return _assignFoldName_(n).replace(/[^a-z0-9]/g, '');
+}
 // Các cách viết tên mà tài khoản/CS đang dùng ở nơi khác (tài khoản đăng nhập, tên CS đang đăng nhập, danh sách CS có sẵn):
-// gấp tên -> [cách viết]. Dùng để đợt chia ghi "Ngocnm" vẫn tính là của tài khoản "ngocnm".
+// khoá gọn -> [cách viết]. Mọi tên/bí danh/username của CÙNG 1 tài khoản được coi là 1 người (khớp 1 tên là có cả nhóm).
 function _assignKnownNames_(){
   var m = {};
-  function add(n){ n = String(n == null ? '' : n).trim(); if (!n) return; var k = _assignFoldName_(n); if (!m[k]) m[k] = []; if (m[k].indexOf(n) === -1) m[k].push(n); }
+  function put(k, n){ if (!k) return; if (!m[k]) m[k] = []; if (m[k].indexOf(n) === -1) m[k].push(n); }
+  function addGroup(list){
+    var ls = []; (list || []).forEach(function(x){ x = String(x == null ? '' : x).trim(); if (x && ls.indexOf(x) === -1) ls.push(x); });
+    ls.forEach(function(n){ var k = _assignCompactKey_(n); ls.forEach(function(o){ put(k, o); }); });
+  }
   try {
     if (typeof currentUser !== 'undefined' && currentUser){
-      (currentUser.names || []).forEach(add); add(currentUser.name); add(currentUser.username); (currentUser.viewNames || []).forEach(add);
+      addGroup((currentUser.names || []).concat([currentUser.name, currentUser.username]));
+      (currentUser.viewNames || []).forEach(function(n){ addGroup([n]); });   // Quầy/CSKH: tên riêng, KHÔNG gộp thành cùng người với tài khoản
     }
-    if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; (a.names || []).forEach(add); add(a.name); add(a.username); });
+    if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; addGroup((a.names || []).concat([a.name, a.username])); });
     var sel = (typeof document !== 'undefined') ? document.getElementById('cs-staff-filter') : null;
-    if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') add(o.value); });
+    if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') addGroup([o.value]); });
   } catch (e) {}
   return m;
+}
+// Mọi cách viết đã biết của CÙNG người với `name` (gồm chính `name`) — dùng cho tab "Data của tôi" gom đủ các đợt chia ghi tên khác nhau.
+function _assignNamesOfPerson_(name){
+  var out = [], n0 = String(name == null ? '' : name);
+  if (n0) out.push(n0);
+  var g = _assignKnownNames_()[_assignCompactKey_(n0)] || [];
+  g.forEach(function(x){ if (out.indexOf(x) === -1) out.push(x); });
+  return out;
 }
 function _rebuildAssignIndex(){
   _assignIndex = {};
@@ -109,7 +128,7 @@ function _rebuildAssignIndex(){
     // so khớp CHÍNH XÁC từng ký tự tên, trong khi tab "Data của tôi" chọn đúng tên ghi trong đợt chia -> đợt chia ghi tên khác
     // hoa/thường/dấu với tên tài khoản (vd Ngocnm vs ngocnm) thì Data của tôi có khách mà Danh sách KH trống. Thêm MỌI cách viết
     // đã biết của cùng tên vào chỉ mục (giữ nguyên tên gốc của đợt chia).
-    var fk = _assignFoldName_(e.csName), ex = extraBy[fk];
+    var fk = _assignCompactKey_(e.csName), ex = extraBy[fk];
     if (!ex){ ex = (known[fk] || []).filter(function(n){ return n !== e.csName; }); extraBy[fk] = ex; }
     (e.phones||[]).forEach(function(p){
       _assignIndex[p] = e.csName; // CS mới nhất (dùng cho _heldBy)

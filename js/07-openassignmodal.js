@@ -1586,9 +1586,17 @@ function exportAssignReport() {
   XLSX.writeFile(wb, `BaoCao_ChiaData_${_ymd(new Date())}.xlsx`);
 }
 
+// Các đợt chia của CÙNG 1 người (đợt ghi "Lê Phương Anh" / "lephuonganh" đều tính) — so theo khoá gọn _assignCompactKey_ (js/08).
+function _myBatchesOf_(csName){
+  if (!csName) return [];
+  if (typeof _assignNamesOfPerson_ !== 'function') return assignHistory.filter(h => h.csName === csName);
+  const keys = {}; _assignNamesOfPerson_(csName).forEach(n => { keys[_assignCompactKey_(n)] = 1; });
+  return assignHistory.filter(h => h.csName === csName || keys[_assignCompactKey_(h.csName)]);
+}
+
 function exportMyDataReport() {
   const csName = document.getElementById('mydata-cs-sel')?.value || '';
-  const myBatches = assignHistory.filter(h => h.csName === csName);
+  const myBatches = _myBatchesOf_(csName);
   const allPhones = [...new Set(myBatches.flatMap(h=>h.phones))];
   const rows = [['Tên KH','SĐT','Phân loại',FIELD_LABEL_CS,'Zalo','Đã chăm xong','Batch']];
   for (const p of allPhones) {
@@ -1612,7 +1620,7 @@ function renderMyDataTab() {
     body.innerHTML = '<div class="guide-text" style="padding:40px;text-align:center;color:var(--hint)">Chọn tên CS của bạn để xem data được chia</div>';
     return;
   }
-  const myBatches = assignHistory.filter(h => h.csName === csName);
+  const myBatches = _myBatchesOf_(csName);
   if (myBatches.length === 0) {
     body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--hint)">Chưa có data nào được chia cho <strong>${esc(csName)}</strong></div>`;
     return;
@@ -1716,8 +1724,9 @@ function careBadgeText(st) {
 function toggleMyDataDone(phone, csName, isDone) {
   // Update in all batches for this CS
   const touched = [];
+  const _mine = new Set(_myBatchesOf_(csName));
   for (const h of assignHistory) {
-    if (h.csName !== csName || !h.phones.includes(phone)) continue;
+    if (!_mine.has(h) || !h.phones.includes(phone)) continue;
     if (!h.donePhones) h.donePhones = [];
     if (isDone && !h.donePhones.includes(phone)) {
       h.donePhones.push(phone);
@@ -1748,7 +1757,16 @@ function updateMyDataBadge() {
   if (sel) {
     const allCS = [...new Set(assignHistory.map(h=>h.csName))].sort();
     const cur = sel.value;
-    sel.innerHTML = '<option value="">-- Chọn tên CS --</option>' + allCS.map(cs=>`<option value="${esc(cs)}" ${cs===cur?'selected':''}>${esc(cs)}</option>`).join('');
+    // Tài khoản CS/Trưởng nhóm: tự chọn sẵn tên của chính mình (khớp theo người: "Lê Phương Anh" = "lephuonganh") để không phải tự tìm trong danh sách.
+    let pick = cur;
+    try {
+      if (!pick && typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin' && typeof _assignCompactKey_ === 'function') {
+        const mine = {}; ((currentUser.names || []).concat([currentUser.name, currentUser.username])).forEach(n => { if (n) mine[_assignCompactKey_(n)] = 1; });
+        pick = allCS.find(cs => mine[_assignCompactKey_(cs)]) || '';
+      }
+    } catch(e) {}
+    sel.innerHTML = '<option value="">-- Chọn tên CS --</option>' + allCS.map(cs=>`<option value="${esc(cs)}" ${cs===pick?'selected':''}>${esc(cs)}</option>`).join('');
+    if (pick && !cur && typeof renderMyDataTab === 'function') { try { renderMyDataTab(); } catch(e) {} }
   }
   // Refresh campaign filter dropdown in list tab
   if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
