@@ -1,11 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-26 (phiên Claude — CHIA DATA CHO lephuonganh MÀ "DANH SÁCH KH" + "DATA CỦA TÔI" VẪN TRỐNG) — BƯỚC 1/2 XONG (web, Ctrl+F5); BƯỚC 2/2 (GAS) ĐANG LÀM
+## 2026-11-26 (phiên Claude — CHIA DATA CHO lephuonganh MÀ "DANH SÁCH KH" + "DATA CỦA TÔI" VẪN TRỐNG) — XONG 2/2 (web Ctrl+F5 + GAS workflow tự deploy; chờ Duyên thử thật)
 - ĐỀ BÀI Duyên: chia data cho lephuonganh rồi nhưng vào Danh sách KH và Data của tôi vẫn không hiện khách.
 - NGUYÊN NHÂN GỐC (suy ra từ code, KHÔNG có dữ liệu thật để tái hiện): lần fix trước (eeed775/add8d86) chỉ gấp hoa/thường/dấu/khoảng trắng thừa. Đợt chia ghi tên hiển thị "Lê Phương Anh" còn tài khoản/tên là "lephuonganh" → sau gấp vẫn lệch ("le phuong anh" ≠ "lephuonganh") nên `_assignAllIndex`/`_inUserScope` không khớp; tab "Data của tôi" lọc `h.csName === csName` chính xác nên cũng trống nếu CS chọn tên khác cách viết, và không tự chọn sẵn tên của mình.
 - ✅ **BƯỚC 1/2 XONG (web, `?v=20261126b` js/07 + js/08):** js/08 thêm `_assignCompactKey_` (bỏ dấu + MỌI khoảng trắng/ký tự lạ), `_assignKnownNames_` khoá theo khoá gọn và gộp mọi tên/bí danh/username của CÙNG 1 tài khoản là 1 người, `_assignNamesOfPerson_`; `_rebuildAssignIndex` dùng khoá gọn. js/07 thêm `_myBatchesOf_` (gom các đợt chia của cùng người) dùng cho Data của tôi / xuất Excel / tích "xong"; `updateMyDataBadge` tự chọn sẵn tên của chính CS/Trưởng nhóm trong ô "Chọn tên CS". Test `node tools/test-cs-assigned-visible.js` (thêm 3 ca Lê Phương Anh ↔ lephuonganh, ca người khác vẫn KHÔNG thấy) + test-assign-recv/team/acct-autoname + test-lead-scope xanh.
-- 🔧 **ĐANG LÀM — BƯỚC 2/2 (GAS):** server (`_scopePhoneSet_`, `_scopeVerdict_`, `action=assign&csName=`) vẫn khớp đợt chia bằng `_normTxt_` (chỉ hoa/thường) nên khi scopeMode=enforce vẫn lọc mất khách → đổi sang khoá gọn bỏ dấu + khoảng trắng.
-- ➡️ **BƯỚC KẾ TIẾP:** xong bước 2 → chờ GAS deploy xanh + Ctrl+F5 → Duyên thử đăng nhập lephuonganh. Nếu vẫn trống: gửi đúng tên ghi trong "Lịch sử chia" + tên/username tài khoản + 1 SĐT khách.
+- ✅ **BƯỚC 2/2 XONG (GAS, `gas_v13.js` + gas/03, gas/04):** thêm `_scopeNameKey_` (bỏ dấu + mọi khoảng trắng/ký tự lạ); `_scopePhoneSet_`, `_scopeVerdict_` (cả nhánh Trưởng nhóm giới hạn tháng) và `action=assign&csName=` khớp tên đợt chia theo khoá này (vẫn giữ khớp cũ). Test `node tools/test-scope-assign-case.js` (thêm 3 ca) + test-lead-scope + test-search-scope xanh; `split-gas --check` OK 33 file.
+- ➡️ **BƯỚC KẾ TIẾP:** chờ GAS deploy xanh (tab Actions) + Ctrl+F5 → Duyên đăng nhập lephuonganh xem Danh sách KH + Data của tôi (tên của bạn ấy phải tự được chọn sẵn). Nếu vẫn trống: gửi đúng tên ghi trong "Lịch sử chia" + tên/username tài khoản + 1 SĐT khách.
 
 
 ## 2026-11-26 (phiên Claude — CRM MÀN CHĂM SÓC KHÁCH: Ô GHI CHÚ KHÔNG HIỆN + KHÔNG KÉO ĐƯỢC DANH SÁCH KHÁCH) — BƯỚC 1/2 XONG (ô ghi chú; chỉ web, Ctrl+F5, không đụng GAS)

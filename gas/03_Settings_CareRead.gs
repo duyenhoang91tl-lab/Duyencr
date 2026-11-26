@@ -1391,6 +1391,11 @@ function _scopeNamesForPhone_(phone) {
   return names;
 }
 // true = trong pham vi | false = NGOAI pham vi | null = khong kiem duoc (leader) -> cho qua.
+// KHOA "CUNG 1 NGUOI" cho ten dot chia (2026-11-26): bo dau + MOI khoang trang/ky tu la -> 'Le Phuong Anh' = 'lephuonganh'. Truoc day chi _normTxt_ (hoa/thuong) nen dot chia ghi
+// ten hien thi co dau/khoang trang ma tai khoan la 'lephuonganh' bi loc mat khach o server (cung tieu chi voi client _assignCompactKey_ trong js/08).
+function _scopeNameKey_(s) {
+  return _stripVN_(String(s == null ? '' : s).normalize('NFC')).replace(/[^a-z0-9]/g, '');
+}
 function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
@@ -1404,7 +1409,8 @@ function _scopeVerdict_(user, phone, namesFn) {
   if (months.length) {
     // Data admin chia thang cho Truong nhom: luon xem duoc. Data khac cua team: chi khi co don trong thang duoc cap.
     var own = _leadOwnNames_(user), asg = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
-    for (var a = 0; a < asg.length; a++) { if (own[_normTxt_(asg[a])]) return true; }
+    var ownK = {}; Object.keys(own).forEach(function (k) { ownK[_scopeNameKey_(k)] = 1; });
+    for (var a = 0; a < asg.length; a++) { if (own[_normTxt_(asg[a])] || ownK[_scopeNameKey_(asg[a])]) return true; }
     if (!_phoneHasOrderInMonths_(phone, months)) return false;
   }
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
@@ -1412,8 +1418,8 @@ function _scopeVerdict_(user, phone, namesFn) {
   try {
     var asg2 = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
     if (asg2.length) {
-      var mineN = {}; mine.forEach(function (k) { mineN[_normTxt_(k)] = 1; });
-      for (var b = 0; b < asg2.length; b++) { if (mineN[_normTxt_(asg2[b])]) return true; }
+      var mineN = {}; mine.forEach(function (k) { mineN[_normTxt_(k)] = 1; mineN[_scopeNameKey_(k)] = 1; });
+      for (var b = 0; b < asg2.length; b++) { if (mineN[_normTxt_(asg2[b])] || mineN[_scopeNameKey_(asg2[b])]) return true; }
     }
   } catch (eAs) {}
   return false;
@@ -1603,8 +1609,8 @@ function _scopePhoneSet_(user, allowed) {
   try {
     var ai = _scopeAssignIndex_();
     // KHOP TEN DOT CHIA KHONG PHAN BIET HOA/THUONG/KHOANG TRANG (cung tieu chi action=assign&csName=): dot chia ghi 'Ngocnm', tai khoan 'ngocnm' van thuoc pham vi.
-    var allowedN = {}; Object.keys(allowed).forEach(function (k) { allowedN[_normTxt_(k)] = 1; });
-    Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]] || allowedN[_normTxt_(ai[ph][i])]) { set[ph] = 1; break; } } });
+    var allowedN = {}; Object.keys(allowed).forEach(function (k) { allowedN[_normTxt_(k)] = 1; allowedN[_scopeNameKey_(k)] = 1; });
+    Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]] || allowedN[_normTxt_(ai[ph][i])] || allowedN[_scopeNameKey_(ai[ph][i])]) { set[ph] = 1; break; } } });
   } catch (e8) {}
   if (months.length) set = _leadMonthFilterSet_(user, set, months);
   try { _cachePutBig_(ckey, JSON.stringify(Object.keys(set)), 60); } catch (e9) {}

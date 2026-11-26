@@ -5,7 +5,7 @@ function fn(name){ const i = s.search(new RegExp('function ' + name + '\\s*\\(')
 function run(assignNames, userNames, phone){
   const ctx = { console, _leadMonths_: () => [], _scopeAllowedNames_: u => { const o = {}; u.names.forEach(n => o[n] = 1); return o; },
     _scopeNamesForPhone_: () => ({}), _scopeAssignIndex_: () => ({ '0901': assignNames }), normPhone_: p => String(p), _phoneHasOrderInMonths_: () => false, _leadOwnNames_: () => ({}) };
-  vm.createContext(ctx); vm.runInContext(fn('_normTxt_') + '\n' + fn('_scopeVerdict_'), ctx);
+  vm.createContext(ctx); vm.runInContext(fn('_normTxt_') + '\n' + fn('_stripVN_') + '\n' + fn('_scopeNameKey_') + '\n' + fn('_scopeVerdict_'), ctx);
   ctx.u = { role: 'cs', names: userNames }; return vm.runInContext("_scopeVerdict_(u, '" + phone + "')", ctx);
 }
 let fail = 0; function ok(c, m){ if (!c){ fail++; console.log('FAIL', m); } else console.log('ok  ', m); }
@@ -14,4 +14,8 @@ ok(run(['Ngocnm'], ['ngocnm'], '0901') === true, "dot chia 'Ngocnm', tai khoan '
 ok(run([' NGOCNM '], ['ngocnm'], '0901') === true, 'viet hoa + du khoang trang -> trong pham vi');
 ok(run(['nguoikhac'], ['ngocnm'], '0901') === false, 'dot chia cho nguoi khac -> NGOAI pham vi');
 ok(run([], ['ngocnm'], '0901') === false, 'khong co dot chia -> NGOAI pham vi');
+// 2026-11-26: ten hien thi co dau + khoang trang vs tai khoan khong khoang trang
+ok(run(['Lê Phương Anh'], ['lephuonganh'], '0901') === true, "dot chia 'Lê Phương Anh', tai khoan 'lephuonganh' -> trong pham vi");
+ok(run(['Le Phuong Anh'], ['lephuonganh'], '0901') === true, "khong dau 'Le Phuong Anh' -> trong pham vi");
+ok(run(['Lê Phương Anh'], ['tuoipham1993'], '0901') === false, 'ten khac hoan toan -> NGOAI pham vi');
 console.log(fail ? fail + ' loi' : 'TAT CA OK'); process.exit(fail ? 1 : 0);
