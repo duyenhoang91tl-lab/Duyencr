@@ -191,7 +191,7 @@ function _stripVN_(s) {
   s = s.replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o');
   s = s.replace(/[ùúụủũưừứựửữ]/g, 'u');
   s = s.replace(/[ỳýỵỷỹ]/g, 'y');
-  s = s.replace(/đ/g, 'd');
+  s = s.replace(/[đð]/g, 'd');   // ð = Eth U+00F0 (Ð) hay lẫn trong tên SP, trông giống đ — gõ "điếu" mới ra "ÐIẾU" (18/11/2026)
   return s;
 }
 

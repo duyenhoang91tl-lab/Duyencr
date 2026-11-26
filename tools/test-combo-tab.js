@@ -169,7 +169,7 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   run("_cbPickSet('charm'); _cbPickAdd(0); _cbPickSet('tui tien'); _cbPickAdd(0); _cbPickSet('vong cuon'); _cbPickAdd(0)"); await tick();
   ok(run('_cb.edit.items.length') === 3 && run('_cb.edit.items[0].qty') === 2, 'chọn trùng → SL+1, không thêm dòng');
   run("_cbLineSet(0,'qty','1'); _cbLineSet(1,'qty','3')");
-  ok(run('_cb.edit.items[2].src') === 'bg' && run('_cb.edit.items[2].posState') === 'none' && mk('cb-items').innerHTML.includes('chưa có đơn POS khớp'), 'SP chưa từng bán trên POS → dùng bảng giá + ghi chú rõ');
+  ok(run('_cb.edit.items[2].src') === 'bg' && run('_cb.edit.items[2].posState') === 'none' && mk('cb-items').innerHTML.includes('Bảng giá') && !mk('cb-items').innerHTML.includes('chưa có đơn POS khớp'), 'SP chưa từng bán trên POS → dùng bảng giá, KHÔNG ghi chú thừa');
   // KHUYẾN MÃI như màn Pos (ví dụ Duyên gửi: 10% / 0đ / 50.000đ)
   run("_cbLineDiscMode(0); _cbLineSet(0,'disc','10'); _cbLineSet(2,'disc','50.000')");
   const T = JSON.parse(JSON.stringify(run('_cbTotals(_cb.edit.items)')));
@@ -208,6 +208,11 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   ok(run('_cb.edit.rawMode') === false && run('_cb.edit.items.length') === 1 && run('_cb.edit.items[0].qty') === 2, 'quay lại chọn: chữ → dòng');
   ok(!run("_cbLineHtml(_cbMkItem({ name: '<b>x</b>', chatLieu: '<i>' }), 0)").includes('<b>x</b>'), 'escape HTML tên SP');
 
+  // Ð (U+00D0) lẫn trong tên SP vẫn tìm được bằng "dieu"/"điếu"
+  ok(run("_cbFold('HẠT \u00d0ỒNG \u00d0IỀU')") === 'hat dong dieu' && run("_cbFold('điếu')") === 'dieu', 'fold đổi cả Ð/ð về d');
+  catReply = { ok: true, items: [{ n: 'Hạt', t: 'HẠT \u00d0ỒNG \u00d0IẾU', m: '', s: '', c: 'LAM THỦY', p: 990, sp: 0, r: 0 }] }; run('_cbCat.loaded=false; _cbCat.items=[]'); run('_cbNew()'); await tick();
+  run("_cbPickSet('điếu')"); ok(mk('cb-pick-res').innerHTML.includes('LAM THỦY') || mk('cb-pick-res').innerHTML.includes('HẠT'), 'gõ "điếu" ra HẠT ĐỒNG ĐIẾU (tên có ký tự Ð)');
+  catReply = { ok: true, count: CAT.length, items: JSON.parse(JSON.stringify(CAT)) }; run('_cbCat.loaded=false; _cbCat.items=[]'); run('_cbNew()'); await tick();
   // ── bước 3/4: CTKM tham khảo dưới dòng SP (chỉ CTKM đang áp dụng, khớp tên SP; không tự tính giảm giá) ──
   ctkmReply = { ok: true, rows: [
     { STT: 1, 'Chương trình': 'Giảm 10% vòng cuốn dịp 20/11', 'Nội dung': 'Áp dụng vòng cuốn mọi chất liệu', __ctkmExpired: false },
