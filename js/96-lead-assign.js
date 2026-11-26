@@ -243,5 +243,9 @@
   G.ldaReload = load_;
   G.ldaSubmit = submit_;
   G.ldaSales = function () { G.closeLeadModal(); if (typeof switchTab === 'function') switchTab('salesreport', document.querySelector('[data-bar-id="reportsgroup"]')); };
+  // Menu "Data cua team" chi hien voi Truong nhom -> ve lai menu sau khi biet vai tro dang nhap.
+  function relayout_() { setTimeout(function () { try { if (typeof G._snLayout === 'function') G._snLayout(); } catch (e) {} }, 0); }
+  if (typeof G._applyAuthIdentity === 'function') { var prev_ = G._applyAuthIdentity; G._applyAuthIdentity = function () { var r = prev_.apply(this, arguments); relayout_(); return r; }; }
+  relayout_();
   G.ldaPool_ = ldaPool_; G.ldaSplit_ = ldaSplit_; G.ldaEven_ = ldaEven_; G.ldaReport_ = ldaReport_;
 })();
