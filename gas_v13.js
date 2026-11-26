@@ -18935,6 +18935,10 @@ function buildStoreCaseReport_(filters) {
   }
 
   var ctx = _storeCaseBuildCtx_(posNameSet);
+  // TEAM CUA TUNG SALE (Duyen 2026-11-26, Bao cao B "Theo Team Sale" thieu phan 30% don quay): moi phan chia gan kem TEN TEAM
+  // (cung bo giai quyet team voi Bao cao B: _makeTeamResolver_) de client gop dung team, khong phai tu doan team phia web.
+  var teamOfStoreSale_ = null;
+  try { teamOfStoreSale_ = _makeTeamResolver_('(chưa có Team)'); } catch (eTm) { teamOfStoreSale_ = null; }
   var acct = _loadAcctCodeSet_(fresh);   // file ke toan: tap Ma bo dem da ghi (moi tab)
 
   // 3) Ghep tung dong + tinh chia
@@ -18987,7 +18991,7 @@ function buildStoreCaseReport_(filters) {
           sales.forEach(function(s) {
             var dup = theNames.some(function(tn) { return ctx.same(tn, s.name); });
             if (dup) nDup++;
-            o.credits.push({ sale: s.name, raw: s.raw, amount: dup ? 0 : Math.round(per), wouldBe: Math.round(per), dup: dup });
+            o.credits.push({ sale: s.name, raw: s.raw, amount: dup ? 0 : Math.round(per), wouldBe: Math.round(per), dup: dup, team: teamOfStoreSale_ ? teamOfStoreSale_(s.name) : '' });
           });
           o.status = nDup === 0 ? 'tinh' : (nDup === sales.length ? 'trung' : 'mot-phan');
           if (o.status === 'trung') o.note = 'Đã có thẻ Sale trên Pos → đơn trùng, bỏ qua (đã tính ở Báo cáo Pos)';
