@@ -1575,6 +1575,10 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
+  // NGUYEN NHAN GOC "da chia data (ghi ten dang nhap, vd thaoptp) nhung Danh sach KH khong hien khach" (2026-11-26, lan 5): client (js/08 _assignKnownNames_)
+  // coi names + name + USERNAME cua tai khoan la CUNG 1 nguoi, nen tab "Data cua toi" co khach; nhung server chi lay cot names (hoac name) -> dot chia ghi
+  // theo ten dang nhap bi _scopePhoneSet_/_scopeVerdict_ loc mat khach truoc khi ve toi trinh duyet (khong con gi de client loc). Them name + username de khop client.
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
   if (role === 'leader') {
     try {
       readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) {

@@ -295,6 +295,8 @@ function _inUserScope(c){
   // Tài khoản có thể gắn NHIỀU tên (vd đơn "chia" cho nhiều sale, hoặc 1 tài khoản gộp nhiều bí
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
+  // 2026-11-26 (lan 5): tai khoan khong co ten nao thi lay TEN DANG NHAP (khop server _scopeAllowedNames_ trong gas_v13.js, vi data duoc chia ghi theo ten dang nhap).
+  if (!myNames.length && currentUser.username) myNames = [currentUser.username];
   if (!myNames.length) return false;
   // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
   var _vn = currentUser.viewNames;
