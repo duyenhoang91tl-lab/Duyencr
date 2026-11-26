@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-18 (phiên Claude, lượt 2 — COMBO: SỬA TÌM "ĐIẾU" + THIẾT KẾ LẠI HIỂN THỊ COMBO/CTKM COMBO/ẢNH QUÀ + TICK COMBO Ở AI GIÁ) — ĐANG LÀM TỪNG BƯỚC
+- YÊU CẦU Duyên (lượt 2): (1) bỏ 2 dòng ghi chú "(chưa có đơn POS khớp)"; (2) gõ "điếu" không ra "HẠT ĐỒNG ĐIẾU"; (3) hiển thị combo kiểu: `🎁 Tên (MÃ)` / `Giá combo: 3.300.000đ giảm 200k còn 3.100.000đ` / dòng SP có ô tích VÀNG 10k·14k·18k·24k + "quà" + `380 × 2 = 760` (nghìn) / `- 40k ship tổng: 3.140.000đ` (hoặc freeship nếu có); (4) tạo sẵn CTKM combo (giảm tiền / tặng quà) để tích chọn, ô tải ẢNH QUÀ tối đa 2; ảnh combo tối đa 6 (hiện 4); (5) ô AI tra giá có ô tích "Combo" → chỉ ra combo.
+- ✅ BƯỚC 1 (nguyên nhân gốc lỗi tìm "điếu"): tên SP trong sheet lẫn ký tự **Ð/ð (U+00D0/F0, "Eth")** trông giống Đ nhưng khác mã; hàm bỏ dấu chỉ đổi `đ/Đ` → `d` nên "ÐIẾU" thành "ðieu" ≠ "dieu". Đã sửa `_cbFold` (js/93: đổi cả đĐðÐ + bỏ ký tự rỗng U+200B..) và GAS `_stripVN_` (dòng ~194: `[đð]`, dùng chung cho priceSearch/posPrice/…). ✅ bỏ ghi chú "(chưa có đơn POS khớp)/(không tra được POS)" ở `_cbSrcNote`. Test mới trong test-combo-tab (Ð). ⚠ CÒN CÁC HÀM FOLD KHÁC có cùng lỗi (grep `replace(/đ/g` — js/38 `proNorm_`, js/69 `ssFold_`, extension `_csFold_`, zalo `zaiFold_`…): chưa sửa vì chưa ai báo; nếu Duyên gõ "điếu" ở ô AI giá/tìm SP khác mà vẫn không ra thì sửa các hàm đó (đổi `/đ/g` → `/[đð]/g` sau toLowerCase).
+- [ ] BƯỚC 2 GAS: mở rộng dữ liệu combo (dòng SP thêm vàng/giá/quà; combo thêm giảm, ship, freeship, CTKM đã tích, ảnh quà; ảnh combo 6) + sheet/action CTKM combo (tạo sẵn).
+- [ ] BƯỚC 3 form combo: tick vàng/quà, lưu đơn giá, giảm/ship/freeship, chọn CTKM, ảnh quà ≤2, ảnh combo ≤6, quản lý CTKM combo.
+- [ ] BƯỚC 4 hiển thị/copy combo theo mẫu mới (CRM web + Pancake/Zalo + trợ lý AI).
+- [ ] BƯỚC 5 ô tích "Combo" ở AI tra giá (CRM web js/38 + Pancake/Zalo nếu có ô Hỏi AI giá).
 
 ## 2026-11-26 (phiên Claude — XUẤT DOANH THU BÁO CÁO B: CẢ TEAM / TỪNG SALE ĐỂ CÁC BẠN TỰ CHECK) — BƯỚC 1/2 XONG (hàm dựng file); còn bước 2/2 giao diện
 - ĐỀ BÀI Duyên: cho quyền xuất file doanh thu của Báo cáo B, xuất được cả team hoặc từng sale để các bạn check doanh thu.

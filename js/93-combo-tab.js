@@ -178,7 +178,7 @@ async function _cbDelete(i){
 //  LƯU: KHÔNG đổi định dạng sheet COMBO — vẫn "Tên | Chất liệu | Size | SL" mỗi dòng (_cbItemsText) nên Pancake/Zalo "Soạn đơn", Trợ lý AI giá, comboList dùng nguyên. Giá niêm yết/khuyến mãi chỉ để admin tham khảo khi định GIÁ COMBO, không lưu.
 var _cbCat = { items: [], loaded: false, loading: false, err: '' };
 var _cbPick = { q: '', list: [] };
-function _cbFold(s){ try { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase(); } catch(e){ return String(s == null ? '' : s).toLowerCase(); } }
+function _cbFold(s){ try { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f\u200b-\u200d\ufeff]/g, '').replace(/[đĐðÐ]/g, 'd').toLowerCase(); } catch(e){ return String(s == null ? '' : s).toLowerCase(); } }   // Ð/ð (U+00D0/F0, hay lẫn trong tên SP dán từ nơi khác) trông giống Đ nhưng khác mã → phải đổi về d, không thì gõ "điếu" không ra "HẠT ĐỒNG ĐIẾU" (18/11/2026)
 function _cbWords(s){ return ' ' + _cbFold(s).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
 function _cbKToVnd(n){ n = Math.round(Number(n) || 0); return n > 0 && n < 100000 ? n * 1000 : n; }   // bảng giá ghi nghìn (1.299 = 1.299.000đ); ≥100000 coi là đồng đầy đủ (giống GAS _comboVnd_)
 function _cbNum(v){ return parseInt(String(v == null ? '' : v).replace(/[^\d]/g, ''), 10) || 0; }
@@ -323,7 +323,7 @@ function _cbUseTotal(){
 function _cbSrcNote(it){
   if (it.posState === 'loading') return 'đang tra giá POS…';
   if (it.src === 'pos') return 'POS đơn ' + _cbDateVN(it.posDate).slice(0, 5);
-  if (it.src === 'bg') return it.posState === 'none' ? 'Bảng giá (chưa có đơn POS khớp)' : it.posState === 'err' ? 'Bảng giá (không tra được POS)' : 'Bảng giá';
+  if (it.src === 'bg') return 'Bảng giá';   // KHÔNG ghi chú "(chưa có đơn POS khớp)/(không tra được POS)" — Duyên yêu cầu bỏ cho gọn
   if (it.src === 'saphia') return 'Bảng giá SAPHIA'; if (it.src === 'ruby') return 'Bảng giá RUBY';
   return it.src === 'tay' ? 'nhập tay' : 'chưa có giá — nhập tay';
 }
