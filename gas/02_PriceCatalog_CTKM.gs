@@ -489,7 +489,7 @@ function _priceVariantsForPrompt_(userMsg, opts) {
 
   var blocks = [];
   for (var nk2 in topNames) {
-    var variants = [];
+    var variants = [], vobjs = [];
     for (var j = 0; j < rows.length && variants.length < 15; j++) {
       var rr = rows[j];
       var fn = _priceFieldPick_(rr, ['ten san pham', 'ten thuong mai']);
@@ -499,13 +499,15 @@ function _priceVariantsForPrompt_(userMsg, opts) {
       var sz = _priceFieldPick_(rr, ['kieu', 'size']);
       var prices = _priceAllPrices_(rr, stoneFilter);
       if (!prices.length) continue;
+      vobjs.push({ mat: (mat && mat.val) ? String(mat.val) : '', size: (sz && sz.val) ? String(sz.val) : '', prices: prices.slice() });
       variants.push('- Chất liệu: ' + ((mat && mat.val) ? mat.val : '(không ghi)') +
                     ' | Kiểu/Size: ' + ((sz && sz.val) ? sz.val : '(mặc định)') +
                     ' | ' + prices.join(' · '));
     }
-    if (variants.length) blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n'));
+    if (variants.length) { blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n')); if (opts && opts.out) opts.out.push({ name: topNames[nk2], variants: vobjs }); }
   }
   if (!blocks.length) return '';
+  if (opts && opts.out) opts.out.extra = extraNames;
   if (extraNames > 0) blocks.push('(Còn ' + extraNames + ' sản phẩm khác cũng khớp — gõ thêm từ để thu hẹp, vd tên đầy đủ.)');
   return blocks.join('\n\n');
 }
