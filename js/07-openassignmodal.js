@@ -181,15 +181,21 @@ function _everAssignedSet(){
 }
 function _assignAllCSNames(){
   // csSet/careCSSet da tinh san trong buildCustomers — khong goi lai _buildCsSet_ cho tung KH moi lan ve modal
-  if (_asgCache.csList && _asgCache.csRef === allCustomers && _asgCache.csLen === allCustomers.length && _asgCache.csDV === _dataVersion) return _asgCache.csList;
+  // 2026-11-21: tài khoản CS MỚI (chưa có khách nào) phải hiện trong Chia data — thêm tên các tài khoản vai trò cs; chữ ký tài khoản nằm trong khoá cache để tạo tk xong là thấy ngay.
+  var accSig_ = (typeof accounts !== 'undefined' && accounts) ? accounts.map(function(a){ return (a && _roleBaseOf(a.role) === 'cs' && a.active !== false) ? ((a.names && a.names.length) ? a.names.join(',') : (a.name || a.username || '')) : ''; }).join(';') : '';
+  if (_asgCache.csList && _asgCache.csRef === allCustomers && _asgCache.csLen === allCustomers.length && _asgCache.csDV === _dataVersion && _asgCache.csAcc === accSig_) return _asgCache.csList;
   var names = new Set();
+  if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){
+    if (!a || _roleBaseOf(a.role) !== 'cs' || a.active === false) return;
+    ((a.names && a.names.length) ? a.names : [a.name || a.username]).forEach(function(n){ n = String(n || '').trim(); if (n && !/^\d+$/.test(n)) names.add(n); });
+  });
   for (var i = 0; i < allCustomers.length; i++) {
     var c = allCustomers[i];
     if (c.csSet) c.csSet.forEach(function(n){ if (n) names.add(n); });
     if (c.careCSSet) c.careCSSet.forEach(function(n){ if (n) names.add(n); });
   }
   var list = [...names].sort();
-  _asgCache.csRef = allCustomers; _asgCache.csLen = allCustomers.length; _asgCache.csDV = _dataVersion; _asgCache.csList = list;
+  _asgCache.csRef = allCustomers; _asgCache.csLen = allCustomers.length; _asgCache.csDV = _dataVersion; _asgCache.csAcc = accSig_; _asgCache.csList = list;
   return list;
 }
 

@@ -514,7 +514,7 @@ function renderAcctModal(){
         (ed ? 'value="'+esc(ed.username)+'" readonly style="background:var(--surface2);color:var(--muted)"' : '')+'></div>'+
       '<div class="v9-field"><label>Mật khẩu</label><input id="acct-password" type="text" placeholder="'+(ed?'để trống nếu không đổi mật khẩu':'đặt mật khẩu cho tài khoản mới')+'"></div>'+
       '<div class="v9-field"><label>Vai trò</label><select id="acct-role" onchange="_acctRoleChange()">'+roleOpts+'</select></div>'+
-      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (gõ để tìm, tích để chọn NHIỀU — bỏ tích là cắt bớt)</label>'+
+      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (gõ để tìm, tích để chọn NHIỀU — bỏ tích là cắt bớt). Để TRỐNG = dùng chính tên tài khoản làm tên CS (tạo tk đội CSKH rồi chia data sau)</label>'+
         '<input id="acct-name-search" autocomplete="off" placeholder="🔍 Gõ tên sale để tìm… (Enter = tích dòng đầu tiên)" oninput="_acctNameFilter(this.value)" onkeydown="_acctNameSearchKey(event,this)" style="margin-bottom:6px">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
           '<span style="font-size:11px;color:var(--muted)">Đang chọn: <b id="acct-name-count">0</b>/'+csSorted.length+'</span>'+
@@ -588,7 +588,10 @@ async function addAccount(){
     team = Array.prototype.slice.call(document.querySelectorAll('.acct-dept-chk:checked')).map(function(o){ return o.getAttribute('data-key'); }).join(',');
     if (!team){ toast('Chọn ít nhất 1 phòng phụ trách cho tài khoản Quản lý.'); return; }
   }
-  if (role !== 'admin' && _roleBaseOf(role) !== 'manager' && _roleBaseOf(role) !== 'viewer' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
+  // 2026-11-21 (Duyên: tạo tài khoản cho đội CSKH rồi CHIA DATA sau nên chưa có Sale nào để tích): không chọn/nhập tên nào → lấy CHÍNH TÊN TÀI KHOẢN làm tên CS.
+  // Vẫn có phạm vi hẹp (chỉ thấy khách/đơn gán cho tên đó) — KHÔNG để names rỗng vì rỗng ở một số chỗ nghĩa là "thấy tất cả". Tên này hiện trong Chia data (js/07 _assignAllCSNames).
+  var autoName = false;
+  if (role !== 'admin' && _roleBaseOf(role) !== 'manager' && _roleBaseOf(role) !== 'viewer' && !namesArr.length){ namesArr = [u]; name = u; autoName = true; }
   if (_roleBaseOf(role) === 'cs'){
     var t = null;
     for (var ni=0; ni<namesArr.length && !t; ni++){ t = (typeof _teamOf==='function' ? _teamOf(namesArr[ni]) : null); }
@@ -612,7 +615,7 @@ async function addAccount(){
   _acctOpen[_acctKey(u)] = true;
   renderAcctModal();
   _renderAuthHeader();
-  toast('✓ Đã lưu tài khoản ' + u + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
+  toast('✓ Đã lưu tài khoản ' + u + (autoName ? ' — chưa chọn Sale nên dùng chính “' + u + '” làm tên CS: vào Chia data, chọn CS này để chia khách' : '') + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
 }
 function deleteAccount(u){
   var acct = _findAccount(u); if (!acct) return;
