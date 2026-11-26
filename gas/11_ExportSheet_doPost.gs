@@ -326,7 +326,8 @@ function doPostCore_(e) {
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
-    if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
+    if (action === 'saveAssignHistory')   return saveAssignHistoryGuarded_(data);
+    if (action === 'leadAssign')          return leadAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
     if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);

@@ -389,7 +389,8 @@ function _auditUserSig_(u) {
   return 'vai trò ' + (u.role || 'cs') + ', ' + (u.active === false ? 'KHÓA' : 'hoạt động') + ', team ' + (u.team || '-') +
     ', tên [' + ((u.names && u.names.length) ? u.names : (u.name ? [u.name] : [])).join('/') + ']' +
     ', quyền tab ' + (Array.isArray(u.perms) ? '[' + u.perms.join(',') + ']' : 'không giới hạn') +
-    (u.saleType ? ', loại ' + u.saleType : '');
+    (u.saleType ? ', loại ' + u.saleType : '') +
+    (u.viewMonths && u.viewMonths.length ? ', xem tháng [' + u.viewMonths.join(',') + ']' : '');
 }
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
@@ -752,7 +753,10 @@ function readUsers_(sh) {
     // het menu khi nang cap len ban co tinh nang nay.
     var permsArr = null;
     try { var pRaw = v[i][7]; if (pRaw) { var pParsed = JSON.parse(pRaw); if (Array.isArray(pParsed)) permsArr = pParsed; } } catch (e) { permsArr = null; }
+    var monthsArr = [];
+    try { monthsArr = v[i][11] ? _viewMonthsNorm_(JSON.parse(v[i][11])) : []; } catch (eVm) { monthsArr = []; }
     out.push({
+      viewMonths: monthsArr,   // Truong nhom: cac thang don hang 'YYYY-MM' duoc xem data team; [] = khong gioi han
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
@@ -962,7 +966,7 @@ function _sessUser_(tok) {
 function _usersForClient_(users, full) {
   return (users || []).map(function(u) {
     var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
-    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.hasPass = !!u.passHash; }
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.viewMonths = u.viewMonths || []; o.hasPass = !!u.passHash; }
     if (full) { try { o.viewNames = _viewExtraNames_(u).names; } catch (eVn) { o.viewNames = []; } }   // ten nhom Sale "Quay" + phong CSKH ma doi sale Online/Van phong duoc xem them (web: _inUserScope + bao cao)
     return o;
   });
@@ -1369,13 +1373,20 @@ function _scopeNamesForPhone_(phone) {
 // true = trong pham vi | false = NGOAI pham vi | null = khong kiem duoc (leader) -> cho qua.
 function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
-  var role = String(user.role || '');
+  var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
   if (role === 'admin') return true;
   if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
   var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
   var mine = Object.keys(allowed);
   if (!mine.length) return false;
   var have = (namesFn || _scopeNamesForPhone_)(phone);
+  var months = (user.viewMonths && user.viewMonths.length) ? _leadMonths_(user) : [];
+  if (months.length) {
+    // Data admin chia thang cho Truong nhom: luon xem duoc. Data khac cua team: chi khi co don trong thang duoc cap.
+    var own = _leadOwnNames_(user), asg = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
+    for (var a = 0; a < asg.length; a++) { if (own[_normTxt_(asg[a])]) return true; }
+    if (!_phoneHasOrderInMonths_(phone, months)) return false;
+  }
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
   return false;
 }
@@ -1397,10 +1408,11 @@ function _scopeNote_(user, action, phone, verdict) {
 function _scopeGate_(action, token, phone, via) {
   if (!SCOPE_ACTIONS_[action] || !token || !phone) return null;
   var mode = _scopeMode_();
-  if (mode === 'off') return null;
   try {
     var u = _sessUser_(token);
     if (!u) return null;
+    if (u.viewMonths && u.viewMonths.length && _leadMonths_(u).length) mode = 'enforce';   // tai khoan bi gioi han thang -> luon chan o server, khong phu thuoc scopeMode
+    if (mode === 'off') return null;
     // TRA CUU CHU DICH (Duyen yeu cau 2026-10-21): sale go DUNG SDT / ma don vao o tim kiem thi duoc xem ho so khach du khach khong thuoc ten minh.
     // Chi bo qua cho request do client danh dau via=search; moi truong hop khac (mo ho so tu danh sach, extension...) van bi chan nhu cu.
     // Van ghi log 'search-out' de admin biet ai tra cuu khach ngoai pham vi (xemLogPhamVi).
@@ -1510,7 +1522,7 @@ function _viewExtraNames_(user) {
 }
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
-  var role = String(user.role || '');
+  var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');
   if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
@@ -1536,7 +1548,8 @@ function _scopeHit_(str, allowed) {
 }
 // Tap SDT (da chuan hoa) thuoc pham vi cua `allowed`; cache 60s theo username.
 function _scopePhoneSet_(user, allowed) {
-  var ckey = 'scope_ps_' + String(user.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 40);
+  var months = (user.viewMonths && user.viewMonths.length) ? _leadMonths_(user) : [];
+  var ckey = 'scope_ps_' + String(user.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 40) + (months.length ? '_' + months.join('').replace(/-/g, '').slice(-150) : '');
   var cached = null; try { cached = _cacheGetBig_(ckey); } catch (e) {}
   if (cached) { try { var arr0 = JSON.parse(cached); var o0 = {}; arr0.forEach(function (x) { o0[x] = 1; }); return o0; } catch (e2) {} }
   var set = {};
@@ -1563,6 +1576,7 @@ function _scopePhoneSet_(user, allowed) {
     var ai = _scopeAssignIndex_();
     Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]]) { set[ph] = 1; break; } } });
   } catch (e8) {}
+  if (months.length) set = _leadMonthFilterSet_(user, set, months);
   try { _cachePutBig_(ckey, JSON.stringify(Object.keys(set)), 60); } catch (e9) {}
   return set;
 }
@@ -1579,6 +1593,9 @@ function _scopeFilterObj_(action, obj, phoneSet) {
 function _scopeListServe_(action, p, e) {
   if (!SCOPE_LIST_ACTIONS_[action] || !p.token) return null;
   var mode = _scopeMode_();
+  var monthUser = null;
+  try { var _mu = _sessUser_(p.token); if (_mu && _mu.viewMonths && _mu.viewMonths.length && _leadMonths_(_mu).length) monthUser = _mu; } catch (eMu) {}
+  if (monthUser) mode = 'enforce';   // tai khoan bi gioi han thang -> luon loc o server, khong phu thuoc scopeMode
   if (mode === 'off') return null;
   // searchOrder = TIM THEO MA DON (Duyen yeu cau 2026-10-21): sale tim ma don bat ky van thay ket qua (de nhay toi khach), khong loc theo pham vi.
   // Nguyen nhan goc khong ra: action nay nam trong SCOPE_LIST_ACTIONS_ nen enforce loc het dong co SDT ngoai ten sale. Toi da 30 dong/lan, chuoi >= 3 ky tu.

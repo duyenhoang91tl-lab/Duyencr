@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
+- ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
+- CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
+- ✅ **ĐÃ XONG:** Bước 1/7 — backend gas_v13.js (+gas/ đã split): cột Users.viewMonths, GET leadAssignInfo, POST leadAssign, lọc tháng phía server, saveAssignHistory chỉ admin ghi đè. Test tools/test-lead-assign.js.
+- 🔧 **ĐANG LÀM:** Bước 2/7.
+- ➡️ **BƯỚC KẾ TIẾP:** js/96-lead-assign.js (màn Lead: chia lại + báo cáo nhân viên) → js/08 lọc tháng → js/14 → js/15 ô chọn tháng → js/07 → js/29 + index.html → tài liệu.
+
 ## 2026-11-21 (phiên Claude) — PANCAKE AI "HỎI AI": GÔM SIZE NGAY TẠI GAS (danh sách giá dự phòng khi AI lỗi) — bước 1/2 XONG; cần GAS deploy (Actions tự chạy); KHÔNG đổi extension
 - **Trùng việc (lần 2 trong ngày):** Duyên gửi ảnh + 3 yêu cầu (Hỏi AI lên đầu / trả lời nền trắng / size liệt kê liên tiếp). Phiên khác ĐÃ đẩy `75ba69e` (thanh `#pk-ask-top` đầu panel + `compactPriceText_` + trả lời nền trắng) trong lúc mình làm nút Hỏi AI ở header → mình bỏ bản của mình (giữ ở nhánh tham chiếu `wip/pk-askai-claude`, KHÔNG merge). Mình ĐO: nếu thêm nút vào hàng nút header (340px) thì tràn 11px và "Pancake AI" xuống dòng — chỉ để tham khảo, họ không dùng cách đó.
 - **KHOẢNG TRỐNG THẬT trong bản của họ (kiểm bằng chính chuỗi trong ảnh):** `compactPriceText_` chạy trên dữ liệu ảnh cho ra SIZE 1 vẫn là dòng THÔ vỡ ("Đá moon trắng | Kiểu/Size: SIZE 1 | Giá thường: 6350"), SIZE 2–3 bị gộp dưới "(không ghi)", giá vẫn "6350" (nghìn). NGUYÊN NHÂN: ô Chất liệu NHIỀU DÒNG làm dòng đầu không khớp regex theo từng dòng, và sheet GỘP Ô nên size 2–3 để trống chất liệu.

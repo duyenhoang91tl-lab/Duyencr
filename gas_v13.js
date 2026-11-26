@@ -98,7 +98,7 @@ var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones','part'];
 // 1 o Google Sheet toi da 50.000 ky tu; JSON 1 SDT ~13 ky tu => 3000 SDT ~39k. Dot chia lon hon se duoc tach nhieu dong (cot 'part').
 var ASSIGN_CHUNK = 3000;
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate','viewMonths'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
@@ -1549,7 +1549,8 @@ function _auditUserSig_(u) {
   return 'vai trò ' + (u.role || 'cs') + ', ' + (u.active === false ? 'KHÓA' : 'hoạt động') + ', team ' + (u.team || '-') +
     ', tên [' + ((u.names && u.names.length) ? u.names : (u.name ? [u.name] : [])).join('/') + ']' +
     ', quyền tab ' + (Array.isArray(u.perms) ? '[' + u.perms.join(',') + ']' : 'không giới hạn') +
-    (u.saleType ? ', loại ' + u.saleType : '');
+    (u.saleType ? ', loại ' + u.saleType : '') +
+    (u.viewMonths && u.viewMonths.length ? ', xem tháng [' + u.viewMonths.join(',') + ']' : '');
 }
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
@@ -1912,7 +1913,10 @@ function readUsers_(sh) {
     // het menu khi nang cap len ban co tinh nang nay.
     var permsArr = null;
     try { var pRaw = v[i][7]; if (pRaw) { var pParsed = JSON.parse(pRaw); if (Array.isArray(pParsed)) permsArr = pParsed; } } catch (e) { permsArr = null; }
+    var monthsArr = [];
+    try { monthsArr = v[i][11] ? _viewMonthsNorm_(JSON.parse(v[i][11])) : []; } catch (eVm) { monthsArr = []; }
     out.push({
+      viewMonths: monthsArr,   // Truong nhom: cac thang don hang 'YYYY-MM' duoc xem data team; [] = khong gioi han
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
@@ -2122,7 +2126,7 @@ function _sessUser_(tok) {
 function _usersForClient_(users, full) {
   return (users || []).map(function(u) {
     var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
-    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.hasPass = !!u.passHash; }
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.viewMonths = u.viewMonths || []; o.hasPass = !!u.passHash; }
     if (full) { try { o.viewNames = _viewExtraNames_(u).names; } catch (eVn) { o.viewNames = []; } }   // ten nhom Sale "Quay" + phong CSKH ma doi sale Online/Van phong duoc xem them (web: _inUserScope + bao cao)
     return o;
   });
@@ -2529,13 +2533,20 @@ function _scopeNamesForPhone_(phone) {
 // true = trong pham vi | false = NGOAI pham vi | null = khong kiem duoc (leader) -> cho qua.
 function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
-  var role = String(user.role || '');
+  var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
   if (role === 'admin') return true;
   if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
   var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
   var mine = Object.keys(allowed);
   if (!mine.length) return false;
   var have = (namesFn || _scopeNamesForPhone_)(phone);
+  var months = (user.viewMonths && user.viewMonths.length) ? _leadMonths_(user) : [];
+  if (months.length) {
+    // Data admin chia thang cho Truong nhom: luon xem duoc. Data khac cua team: chi khi co don trong thang duoc cap.
+    var own = _leadOwnNames_(user), asg = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
+    for (var a = 0; a < asg.length; a++) { if (own[_normTxt_(asg[a])]) return true; }
+    if (!_phoneHasOrderInMonths_(phone, months)) return false;
+  }
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
   return false;
 }
@@ -2557,10 +2568,11 @@ function _scopeNote_(user, action, phone, verdict) {
 function _scopeGate_(action, token, phone, via) {
   if (!SCOPE_ACTIONS_[action] || !token || !phone) return null;
   var mode = _scopeMode_();
-  if (mode === 'off') return null;
   try {
     var u = _sessUser_(token);
     if (!u) return null;
+    if (u.viewMonths && u.viewMonths.length && _leadMonths_(u).length) mode = 'enforce';   // tai khoan bi gioi han thang -> luon chan o server, khong phu thuoc scopeMode
+    if (mode === 'off') return null;
     // TRA CUU CHU DICH (Duyen yeu cau 2026-10-21): sale go DUNG SDT / ma don vao o tim kiem thi duoc xem ho so khach du khach khong thuoc ten minh.
     // Chi bo qua cho request do client danh dau via=search; moi truong hop khac (mo ho so tu danh sach, extension...) van bi chan nhu cu.
     // Van ghi log 'search-out' de admin biet ai tra cuu khach ngoai pham vi (xemLogPhamVi).
@@ -2670,7 +2682,7 @@ function _viewExtraNames_(user) {
 }
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
-  var role = String(user.role || '');
+  var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');
   if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
@@ -2696,7 +2708,8 @@ function _scopeHit_(str, allowed) {
 }
 // Tap SDT (da chuan hoa) thuoc pham vi cua `allowed`; cache 60s theo username.
 function _scopePhoneSet_(user, allowed) {
-  var ckey = 'scope_ps_' + String(user.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 40);
+  var months = (user.viewMonths && user.viewMonths.length) ? _leadMonths_(user) : [];
+  var ckey = 'scope_ps_' + String(user.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 40) + (months.length ? '_' + months.join('').replace(/-/g, '').slice(-150) : '');
   var cached = null; try { cached = _cacheGetBig_(ckey); } catch (e) {}
   if (cached) { try { var arr0 = JSON.parse(cached); var o0 = {}; arr0.forEach(function (x) { o0[x] = 1; }); return o0; } catch (e2) {} }
   var set = {};
@@ -2723,6 +2736,7 @@ function _scopePhoneSet_(user, allowed) {
     var ai = _scopeAssignIndex_();
     Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]]) { set[ph] = 1; break; } } });
   } catch (e8) {}
+  if (months.length) set = _leadMonthFilterSet_(user, set, months);
   try { _cachePutBig_(ckey, JSON.stringify(Object.keys(set)), 60); } catch (e9) {}
   return set;
 }
@@ -2739,6 +2753,9 @@ function _scopeFilterObj_(action, obj, phoneSet) {
 function _scopeListServe_(action, p, e) {
   if (!SCOPE_LIST_ACTIONS_[action] || !p.token) return null;
   var mode = _scopeMode_();
+  var monthUser = null;
+  try { var _mu = _sessUser_(p.token); if (_mu && _mu.viewMonths && _mu.viewMonths.length && _leadMonths_(_mu).length) monthUser = _mu; } catch (eMu) {}
+  if (monthUser) mode = 'enforce';   // tai khoan bi gioi han thang -> luon loc o server, khong phu thuoc scopeMode
   if (mode === 'off') return null;
   // searchOrder = TIM THEO MA DON (Duyen yeu cau 2026-10-21): sale tim ma don bat ky van thay ket qua (de nhay toi khach), khong loc theo pham vi.
   // Nguyen nhan goc khong ra: action nay nam trong SCOPE_LIST_ACTIONS_ nen enforce loc het dong co SDT ngoai ten sale. Toi da 30 dong/lan, chuoi >= 3 ky tu.
@@ -3262,6 +3279,8 @@ function doGetCore_(e) {
                  cs: pD.cs ? pD.cs.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [] };
       return jsonOut_(buildCareLeadReport_(fD));
     }
+
+    if (action === 'leadAssignInfo') return leadAssignInfo_(e);   // Truong nhom: team + data duoc chia + tien do nhan vien (can token)
 
     // SUA 2026-10-08: them loc tuy chon theo ?csName= — dung cho Pancake AI (muc "Data duoc chia",
     // xem renderAssignTab_ trong pancake-content.js) de CHI tai ve cac dot chia CUA DUNG 1 CS thay
@@ -8457,7 +8476,8 @@ function doPostCore_(e) {
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
-    if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
+    if (action === 'saveAssignHistory')   return saveAssignHistoryGuarded_(data);
+    if (action === 'leadAssign')          return leadAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
     if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
@@ -10889,7 +10909,10 @@ function saveUsers_(users) {
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
   var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
-  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; _oUM[String(x.username)] = _auditUserSig_(x); });
+  var oldMonths = {};
+  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; oldMonths[String(x.username || '').trim().toLowerCase()] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  // Web ban cu (chua Ctrl+F5) khong gui viewMonths -> giu gia tri dang luu, tranh xoa mat gioi han thang admin da cai.
+  users.forEach(function(x) { if (x) x.viewMonths = _viewMonthsNorm_(x.viewMonths === undefined ? oldMonths[String(x.username || '').trim().toLowerCase()] : x.viewMonths); });
   users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });
   var _uAudit = _auditDiffRows_('users', _oUM, _nUM);
   sh.clearContents();
@@ -10905,7 +10928,8 @@ function saveUsers_(users) {
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
-                 u.saleType||'', u.startDate||'', u.joinDate||'']);
+                 u.saleType||'', u.startDate||'', u.joinDate||'',
+                 (u.viewMonths && u.viewMonths.length) ? JSON.stringify(u.viewMonths) : '']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   _auditCfg_(_uAudit);
@@ -11037,6 +11061,158 @@ function saveAssignHistory_(history) {
   sh.clearContents();
   sh.getRange(1, 1, matrix.length, ASSIGN_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: history.length });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRUONG NHOM (LEAD): NHAN DATA — CHIA LAI CHO TEAM — XEM TIEN DO — GIOI HAN THANG (2026-11-26)
+//  Nguyen nhan goc: truoc day chi admin chia data; Truong nhom chi XEM data team (moi thang), khong chia lai duoc va admin khong
+//  gioi han duoc thang du lieu. Ngoai ra saveAssignHistory ghi de CA sheet AssignData voi bat ky tai khoan nao nen ban lich su cu
+//  tren may 1 nhan vien co the xoa mat dot chia moi.
+//  - Users.viewMonths (JSON ['2026-04',...]): chi ap cho vai tro goc leader. Rong = khong gioi han.
+//    Khach xem duoc = khach duoc chia cho CHINH Truong nhom (moi thang) + khach cua team co don trong cac thang do.
+//    KHONG ap cho cac bao cao doanh so (van theo pham vi team nhu cu).
+//  - GET leadAssignInfo&token: team, thanh vien, thang duoc xem, cac dot chia cua minh + thanh vien (ban moi nhat tren sheet).
+//  - POST leadAssign {token, label, entries:[{csName, phones}]}: chi chia SDT da duoc chia cho minh, chi cho thanh vien team minh.
+// ═══════════════════════════════════════════════════════════════
+var LEAD_ASSIGN_MAX_ = 20000;
+function _viewMonthsNorm_(a) {
+  if (!Array.isArray(a)) return [];
+  var seen = {}, out = [];
+  a.forEach(function (x) { x = String(x || '').trim(); if (/^\d{4}-(0[1-9]|1[0-2])$/.test(x) && !seen[x]) { seen[x] = 1; out.push(x); } });
+  return out.sort().slice(-36);
+}
+function _leadMonths_(user) {
+  if (!user || !user.viewMonths || !user.viewMonths.length) return [];
+  return _roleBase_(user.role) === 'leader' ? user.viewMonths : [];
+}
+// Ten cua chinh tai khoan: {ten chuan hoa: ten goc}
+function _leadOwnNames_(user) {
+  var o = {};
+  ((user.names && user.names.length) ? user.names : [user.name]).forEach(function (n) { n = String(n || '').trim(); if (n) o[_normTxt_(n)] = n; });
+  return o;
+}
+// Team minh lam truong (ten minh = teams.leader, hoac team trung user.team). members KHONG gom chinh minh.
+function _leadTeam_(user, teams) {
+  var own = _leadOwnNames_(user), teamNames = [], members = [], seen = {};
+  (teams || readTeams_(getCrmSS_().getSheetByName(SH_TEAM))).forEach(function (t) {
+    if (!(own[_normTxt_(t.leader || '')] || (user.team && String(t.name || '') === String(user.team)))) return;
+    teamNames.push(String(t.name || ''));
+    [t.leader].concat(t.members || []).forEach(function (m) {
+      m = String(m || '').trim(); var k = _normTxt_(m);
+      if (m && !own[k] && !seen[k]) { seen[k] = 1; members.push(m); }
+    });
+  });
+  return { own: own, teamNames: teamNames, members: members };
+}
+function _ymOfOrderDate_(s) {
+  var d = parseVNDate_(s);
+  if (!d) return '';
+  var p = _vnYmdParts_(d);
+  return p ? p.y + '-' + ('0' + p.mo).slice(-2) : '';
+}
+function _phoneHasOrderInMonths_(phone, months) {
+  var want = {}; months.forEach(function (m) { want[m] = 1; });
+  try { if (readOrdersByPhone_(phone).some(function (o) { return want[_ymOfOrderDate_(o.date)]; })) return true; } catch (e1) {}
+  try { if (findDonRowsByPhone_(phone).some(function (r) { return want[_ymOfOrderDate_(r.ngayTaoDon || r.date)]; })) return true; } catch (e2) {}
+  return false;
+}
+// Thu hep tap SDT cua team: giu SDT duoc chia cho chinh Truong nhom + SDT co don (DT tong hoac du lieu don) trong cac thang duoc cap.
+function _leadMonthFilterSet_(user, set, months) {
+  var want = {}, out = {}, own = _leadOwnNames_(user);
+  months.forEach(function (m) { want[m] = 1; });
+  var ai = _scopeAssignIndex_();
+  Object.keys(ai).forEach(function (ph) { if (ai[ph].some(function (n) { return own[_normTxt_(n)]; })) out[ph] = 1; });
+  function add(ph, date) { var k = normPhone_(String(ph || '')); if (k && set[k] && !out[k] && want[_ymOfOrderDate_(date)]) out[k] = 1; }
+  try {
+    var oc = _cacheGetBig_('orders_v1'), ords = null;
+    if (oc) { try { ords = (JSON.parse(oc) || {}).orders; } catch (e0) {} }
+    (ords || readAllOrders_() || []).forEach(function (o) { if (o) add(o.phone, o.date); });
+  } catch (e1) { Logger.log('_leadMonthFilterSet_ orders: ' + e1); }
+  try { readDonChiTiet_().forEach(function (r) { add(r.soDienThoai, r.ngayTaoDon); }); } catch (e2) { Logger.log('_leadMonthFilterSet_ don: ' + e2); }
+  return out;
+}
+function _leadUser_(token) {
+  var u = _sessUser_(token);
+  if (!u) return { error: 'Phien dang nhap het han — dang nhap lai.', code: 'AUTH' };
+  if (_roleBase_(u.role) !== 'leader') return { error: 'Chi tai khoan Truong nhom moi dung duoc muc nay.', code: 'FORBIDDEN' };
+  return { user: u };
+}
+function leadAssignInfo_(e) {
+  var a = _leadUser_(e && e.parameter && e.parameter.token);
+  if (a.error) return jsonOut_(a);
+  var t = _leadTeam_(a.user), keys = {};
+  Object.keys(t.own).forEach(function (k) { keys[k] = 1; });
+  t.members.forEach(function (m) { keys[_normTxt_(m)] = 1; });
+  var hist = readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).filter(function (h) { return keys[_normTxt_(h.csName)]; });
+  var own = Object.keys(t.own).map(function (k) { return t.own[k]; });
+  return jsonOut_({ ok: true, own: own, teams: t.teamNames, members: t.members, viewMonths: _leadMonths_(a.user), assignHistory: hist });
+}
+function leadAssign_(data) {
+  var a = _leadUser_(data && data.token);
+  if (a.error) return jsonOut_(a);
+  var req = (data && Array.isArray(data.entries)) ? data.entries : [];
+  if (!req.length) return jsonOut_({ error: 'Chua co data nao de chia.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    var t = _leadTeam_(a.user), memberByKey = {};
+    t.members.forEach(function (m) { memberByKey[_normTxt_(m)] = m; });
+    var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), pool = {};
+    readAssign_(sh).forEach(function (h) {
+      if (!t.own[_normTxt_(h.csName)]) return;
+      (h.phones || []).forEach(function (p) { var k = normPhone_(String(p)); if (k) pool[k] = String(p); });
+    });
+    var used = {}, entries = [], total = 0;
+    var date = Utilities.formatDate(new Date(), 'GMT', 'yyyy-MM-dd HH:mm');   // cung quy uoc UTC voi web (toISOString) de thu tu "moi nhat" dung
+    var who = String(a.user.name || a.user.username || '');
+    var label = String(data.label || '').trim().slice(0, 120);
+    for (var i = 0; i < req.length; i++) {
+      var name = memberByKey[_normTxt_((req[i] && req[i].csName) || '')];
+      if (!name) return jsonOut_({ error: 'Nguoi nhan "' + String((req[i] && req[i].csName) || '') + '" khong thuoc team cua ban.', code: 'FORBIDDEN' });
+      var phones = [];
+      var list = Array.isArray(req[i].phones) ? req[i].phones : [];
+      for (var j = 0; j < list.length; j++) {
+        var k = normPhone_(String(list[j]));
+        if (!k || !pool[k]) return jsonOut_({ error: 'Co SDT chua duoc chia cho ban nen khong chia lai duoc. Tai lai trang roi thu lai.', code: 'FORBIDDEN' });
+        if (!used[k]) { used[k] = 1; phones.push(pool[k]); }
+      }
+      if (!phones.length) continue;
+      total += phones.length;
+      if (total > LEAD_ASSIGN_MAX_) return jsonOut_({ error: 'Moi lan chia toi da ' + LEAD_ASSIGN_MAX_ + ' khach.' });
+      entries.push({ id: Date.now() + '_L' + i + Math.random().toString(36).slice(2, 6), date: date, csName: name, phones: phones,
+                     label: 'Lead ' + who + ': ' + (label || 'Chia ' + phones.length + ' KH'), donePhones: [] });
+    }
+    if (!entries.length) return jsonOut_({ error: 'Chua co data nao de chia.' });
+    var rows = [];
+    entries.forEach(function (en) { rows = rows.concat(assignRowsOf_(en)); });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, ASSIGN_HEADERS.length).setValues(rows);
+    return jsonOut_({ ok: true, entries: entries, total: total });
+  } finally {
+    lock.releaseLock();
+  }
+}
+// Ghi de ca sheet AssignData chi danh cho admin. Tai khoan khac (web ban cu gui ca lich su khi bam "xong"): chi cap nhat
+// donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
+function saveAssignHistoryGuarded_(data) {
+  var u = (data && data.token) ? _sessUser_(data.token) : null;
+  if (!u || u.role === 'admin') return saveAssignHistory_(data && data.history);
+  var own = _leadOwnNames_(u), incoming = {};
+  ((data && data.history) || []).forEach(function (h) { if (h && h.id && own[_normTxt_(h.csName)]) incoming[String(h.id)] = h; });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    var changed = 0;
+    readAssign_(getSheet_(SH_ASSIGN, ASSIGN_HEADERS)).forEach(function (h) {
+      var n = incoming[String(h.id)];
+      if (!n || !own[_normTxt_(h.csName)]) return;
+      var done = n.donePhones || [];
+      if (JSON.stringify(done.slice().sort()) === JSON.stringify((h.donePhones || []).slice().sort())) return;
+      h.donePhones = done; saveAssignEntry_(h); changed++;
+    });
+    return jsonOut_({ ok: true, written: changed, doneOnly: true });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

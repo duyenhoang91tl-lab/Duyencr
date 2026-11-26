@@ -64,8 +64,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
-- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
-- Hằng/biến: `_PW_SALT_`, `_PW_SALT_OLD_`
+- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `_viewMonthsNorm_`, `_leadMonths_`, `_leadOwnNames_`, `_leadTeam_`, `_ymOfOrderDate_`, `_phoneHasOrderInMonths_`, `_leadMonthFilterSet_`, `_leadUser_`, `leadAssignInfo_`, `leadAssign_`, `saveAssignHistoryGuarded_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
+- Hằng/biến: `LEAD_ASSIGN_MAX_`, `_PW_SALT_`, `_PW_SALT_OLD_`
 
 ## 15_ProductSheets_Drive.gs
 - Hàm: `_psheetNoAccent_`, `_careMapByPhone_`, `_pMatchAny_`, `_foldTermsCSV_`, `_productSheetIndexForTab_`, `readFaqSheet_`, `readExternalProductSheet_`, `callGroqAI_`, `_posEarliestValidDayByPhone_`, `_posIsResale_`, `_posSaleFractions_`, `posMetrics_`, `xemChiSoPos`, `_taNum_`, `_taClamp_`, `_taMedian_`, `buildTeamMetrics_`, `scoreTeam_`, `_taCallAI_`, `_taParseJson_`, `teamAnalysis_`, `_orgAgg_`, `readDeptList_`, `readSaleDepts_`, `_orgApplyDepts_`, `_phongBanNhanSuPlan_`, `datPhongBanTuFileNhanSu`, `_nsFold_`, `_nsDate_`, `_nsPhone_`, `_nsBuildRows_`, `nhapHoSoNhanSu`, `orgOverview_`, `_driveFolderIdFromUrl_`, `_chunkText_`, `_driveKnowFullTextCacheKey_`, `_cacheDriveKnowFullText_`, `_extractPdfText_`, `_driveKnowChunkText_`, `_driveKnowledgeFileIndex_`, `readDriveKnowledgeFolder_`, `_driveImageIndex_`, `_driveImageFromLink_`, `findProductSheetImage_`, `findDriveProductImage_`, `_driveImageBase64_`, `comboImage_`
