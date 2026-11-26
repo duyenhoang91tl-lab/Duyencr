@@ -64,6 +64,7 @@ function _profNamesClean_(n) {
       if (!x) return;
       if (x.length > 60) { err.push('Tên "' + x.slice(0, 20) + '…" quá dài (tối đa 60 ký tự).'); return; }
       if (/^[=+\-@]/.test(x)) { err.push('Tên "' + x + '" không được bắt đầu bằng = + - @.'); return; }
+      if (_isNumericTag_(x)) { err.push('Tên "' + x + '" chỉ gồm chữ số (STT Pancake) — không dùng làm tên sale.'); return; }   // Duyên chot 2026-10-25: khong co sale ten toan so
       var kk = _normTxt_(x); if (seen[kk]) return; seen[kk] = 1; list.push(x);
     });
     if (list.length > 20) err.push('Mỗi hệ thống tối đa 20 tên.');

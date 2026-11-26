@@ -23,6 +23,7 @@ eq(r.names.crm, ['ninhnga99'], 'chuoi 1 ten -> mang');
 eq(r.names.base, ['Ninh Nga', 'Ninh Thị Ngà'], 'tach theo ; va xuong dong, bo trung ninh nga');
 ok(!clean({ base: ['=SUM(1)'] }).ok, 'chan ten mo dau bang =');
 ok(!clean({ pos: ['x'.repeat(61)] }).ok, 'ten qua dai');
+ok(!clean({ pancake: ['8'] }).ok && !clean({ pancake: ['STT 13'] }).ok, 'ten toan so / STT Pancake bi tu choi (khong co sale ten toan so)');
 ok(!clean({ pos: Array.from({ length: 21 }, (_, i) => 'n' + i) }).ok, 'qua 20 ten/he thong');
 eq(clean(undefined).names, { pancake: [], crm: [], base: [], pos: [] }, 'khong gui gi -> 4 mang rong');
 
@@ -99,4 +100,17 @@ eq(nn.all, ['Ngà Ninh', 'Ninh Nga', 'ninhnga99 pos'], 'all = hop ten 4 he thong
 const th = l.list.filter((x) => x.username === 'thuydinh95')[0]; eq(th.display, 'thuydinh95', 'chua co ho so -> hien ten tai khoan');
 ok(run('staffNamesList_({token:"lead1"})').ok, 'leader xem duoc'); ok(run('staffNamesList_({token:"ninhnga99"})').code === 'FORBIDDEN', 'sale khong xem duoc danh sach');
 ok(run('staffNamesList_({token:"zzz"})').code === 'AUTH', 'khong token -> AUTH');
+
+// ---- 3) BUOC 4/5: gop doanh thu theo HO SO bang vi du that (Ninh Thi Nga co 4 ten o 4 he thong) ----
+vm.runInContext('readSaleDirectory_ = function() { return { list: [] }; }; readPancakeMap_ = function() { return {}; };', ctx);
+s = sv('admin1', 'ninhnga99', { pancake: ['Ngà Ninh'], crm: ['ninhnga99'], base: ['Ninh Nga'], pos: ['ninhnga99 pos'] });
+ok(s.ok, 'luu lai ho so day du: ' + JSON.stringify(s));
+const id = run('_salePersonIdentity_()');
+const keys = ['ninhnga99', 'Ngà Ninh', 'Ninh Nga', 'NINHNGA99 POS'].map((n) => id.key(n));
+ok(keys.every((k) => k === keys[0]), 'ca 4 ten (ke ca viet hoa) cung 1 khoa nguoi: ' + JSON.stringify(keys));
+ok(id.key('dungNTK1987') !== keys[0] && id.key('thuongBT') !== keys[0], 'nguoi khac KHONG bi gop nham');
+eq(id.primary('Ninh Nga'), 'ninhnga99', 'ten chinh hien thi = ten CRM (username) du tra bang ten Base');
+const folded = run('_foldRevMapByPerson_(' + JSON.stringify({ 'ninhnga99': 1000000, 'Ngà Ninh': 2000000, 'Ninh Nga': 3000000, 'ninhnga99 pos': 4000000, 'thuongBT': 500000 }) + ')');
+eq(folded['ninhnga99'], 10000000, 'doanh thu 4 ten gop thanh 1 nguoi = 1+2+3+4 trieu'); eq(folded['thuongBT'], 500000, 'nguoi khac giu nguyen');
+eq(Object.keys(folded).length, 2, 'chi con 2 nguoi trong ban do doanh thu');
 console.log('ALL STAFF NAMES TESTS PASSED');
