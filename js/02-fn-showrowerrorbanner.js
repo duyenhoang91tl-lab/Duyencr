@@ -1064,7 +1064,9 @@ function _renderVirtualWindow(force) {
   }
   const wrap = _vtWrap();
   const scrollTop = wrap ? wrap.scrollTop : 0;
-  const vpH = wrap ? wrap.clientHeight : 600;
+  // Chặn vpH quá lớn: nếu khung bảng bị giãn theo toàn bộ nội dung (bảng ảo cao total*VT_ROW_H) thì vpH ~ cả chục nghìn px → vẽ HẾT mọi dòng → điện thoại đơ, không bấm được.
+  const _vpMax = Math.max(window.innerHeight || 600, 400) * 1.5;
+  const vpH = Math.min(wrap ? wrap.clientHeight : 600, _vpMax);
   const total = list.length;
   let start = Math.max(0, Math.floor(scrollTop / VT_ROW_H) - VT_BUFFER);
   const visible = Math.ceil(vpH / VT_ROW_H) + VT_BUFFER * 2;
