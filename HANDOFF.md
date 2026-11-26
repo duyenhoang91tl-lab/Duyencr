@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — PHÒNG BAN › TỪNG NGƯỜI: BỘ LỌC "CHƯA PHÂN PHÒNG") — XONG 1/1 (chỉ web, Ctrl+F5; KHÔNG đụng GAS nên không cần deploy lại)
+- ĐỀ BÀI Duyên: ở mục Từng người muốn lọc ra những ai chưa có phòng để phân lại cho dễ (thẻ số báo 51 người chưa phân phòng nhưng phải cuộn cả danh sách mới thấy).
+- NGUYÊN NHÂN GỐC: danh sách Từng người chỉ có ô tìm tên, không có bộ lọc theo phòng nên người chưa gán nằm lẫn với 34 người đã gán.
+- ĐÃ LÀM (js/35-fn-deptsettings.js, bump ?v=20261126a ở index.html): thêm ô chọn lọc cạnh ô tìm tên — Tất cả (N) / ❓ Chưa phân phòng (N) / từng phòng (N). Lọc kết hợp được với ô tìm tên. "Chưa phân phòng" tính cả người đang trỏ vào phòng ĐÃ XÓA (cùng cách đếm với thẻ số — hàm `_dpIsAssigned_`). Gán phòng khi đang lọc thì dòng KHÔNG nhảy mất ngay (tránh bấm nhầm dòng); đổi lại bộ lọc là cập nhật. Mở lại trang → bộ lọc về "Tất cả". Không đổi logic lưu (`_dpSave/_dpPost/_dpGet/_dpSetPerson` y nguyên).
+- TEST: `NODE_PATH=<jsdom> node tools/test-dept-settings.js` (46 ca, thêm 10 ca bộ lọc); `test-dept-frame.js` bỏ `_dpPeopleListHtml` khỏi danh sách hàm canh "không đổi so với HEAD" vì hàm này cố ý đổi (các hàm lưu/gán/đọc vẫn được canh); `test-phongban-nhansu.js` xanh.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → Cài đặt › Phòng ban › Từng người → chọn "❓ Chưa phân phòng" → chọn phòng từng người → 💾 Lưu phòng. Nếu muốn: thêm chọn nhiều dòng rồi gán 1 lần cho nhanh (51 người), hoặc nút "gán cả nhóm đang lọc vào phòng X" — chờ Duyên báo.
+
 ## 2026-11-26 (phiên Claude — CS ĐƯỢC CHIA DATA PHẢI THẤY KHÁCH Ở "DANH SÁCH KH", KHÔNG CHỈ Ở "DATA CỦA TÔI") — XONG 2/2 (web Ctrl+F5 + GAS workflow tự deploy; chờ Duyên thử thật)
 - ĐỀ BÀI Duyên: các bạn CS được chia data thì vào Danh sách khách hàng phải hiện khách để chăm ở đó, không chỉ thấy ở phần data chia cho tôi.
 - NGUYÊN NHÂN GỐC (tìm được 2, KHÔNG tái hiện được từ dữ liệu thật — chưa có tài khoản CS thật để thử): (1) `_rebuildAssignIndex` (js/08) tra `_assignAllIndex` theo tên KHỚP CHÍNH XÁC từng ký tự; tab "Data của tôi" chọn đúng tên ghi trong đợt chia nên vẫn có khách, còn `_inUserScope` + bộ lọc CS dùng tên TÀI KHOẢN → đợt chia ghi "Ngocnm" mà tài khoản là "ngocnm" thì Danh sách KH trống (dữ liệu thật có kiểu lệch hoa/thường này, xem commit 42a527f). (2) `_csModeMatch` (js/01) ở chế độ "Chăm sóc" không tính khách được chia → bấm "Chăm sóc" là khách chỉ có trong đợt chia biến mất.

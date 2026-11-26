@@ -102,6 +102,31 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   t('mở lại trang → quét lại (thấy sale mới thêm sau đó)',(await c.w.openDeptSettings(),c.w.eval('_dp.csNames===null')));
   const c2=mk(); delete c2.w._allCSNames; await c2.w.openDeptSettings();
   t('thiếu _allCSNames (js/08 chưa nạp) → không lỗi, vẫn ra danh sách cũ',c2.w.eval('_dpNames()').includes('Binh'));
+ // Bộ lọc "Chưa phân phòng" ở mục Từng người (Duyên 26/11: lọc người chưa có phòng để phân lại cho dễ)
+ {
+  const c=mk(); await c.w.openDeptSettings(); c.w.eval("_dp.sec='people'; _dp.q=''; _dp.f=''; _dpRender()");
+  // An→sale; Binh, Chi, dung1, dung2... chưa gán. Thêm 1 người trỏ vào phòng đã bị xóa → phải tính là chưa phân phòng.
+  c.w.eval("_dp.map['Ma']='phong-da-xoa'");
+  const all=c.w.eval('_dpNames()'), none=all.filter(n=>!c.w.eval('_dpIsAssigned_('+JSON.stringify(n)+')'));
+  t('_dpIsAssigned_: An (phòng sale) = đã gán; Binh = chưa; Ma (phòng đã xóa) = chưa',c.w.eval("_dpIsAssigned_('An')")===true&&c.w.eval("_dpIsAssigned_('Binh')")===false&&c.w.eval("_dpIsAssigned_('Ma')")===false);
+  c.w.eval("_dpSetFilter('_none')");
+  const rows=()=>Array.from(c.$('dp-people-list').querySelectorAll('select[data-n]')).map(x=>x.dataset.n);
+  t('lọc "Chưa phân phòng": chỉ ra người chưa có phòng (không có An)',rows().length===none.length&&!rows().includes('An')&&rows().includes('Binh')&&rows().includes('Ma'));
+  c.w.eval('_dpRender()');
+  t('số trong ô lọc "Chưa phân phòng (N)" = số dòng khi lọc',c.$('dp-filter').options[1].textContent.includes('('+none.length+')')&&c.$('dp-filter').value==='_none');
+  c.w.eval("_dp.q='bin'; _dpPeopleList()");
+  t('lọc chưa phân phòng + gõ tìm tên cùng lúc → chỉ Binh',rows().join()==='Binh');
+  c.w.eval("_dp.q=''; _dpSetFilter('sale')");
+  t('lọc theo 1 phòng cụ thể → chỉ người của phòng đó',rows().join()==='An');
+  c.w.eval("_dpSetFilter('')");
+  t('bỏ lọc (Tất cả) → đủ mọi người',rows().length===all.length);
+  c.w.eval("_dpSetFilter('_none')"); c.w.eval("_dpSetPerson('Binh','hr')");
+  t('gán phòng khi đang lọc: dòng vẫn còn (không nhảy), bộ lọc chỉ cập nhật khi đổi lọc',rows().includes('Binh'));
+  c.w.eval("_dpSetFilter('_none')");
+  t('lọc lại sau khi gán → Binh biến khỏi danh sách chưa phân phòng',!rows().includes('Binh'));
+  const c3=mk(); await c3.w.openDeptSettings(); c3.w.eval("_dp.f='_none'"); await c3.w.openDeptSettings();
+  t('mở lại trang → bộ lọc về "Tất cả"',c3.w.eval('_dp.f')==='');
+ }
  }
 console.log('\n'+ok+' OK, '+bad+' FAIL');process.exit(bad?1:0);
 })();

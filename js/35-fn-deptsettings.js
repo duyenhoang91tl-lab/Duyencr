@@ -15,7 +15,7 @@ var DEPT_DEFAULT = [
   { key:'ketoan', label:'Kế toán' }, { key:'hr', label:'HR' }, { key:'media', label:'Media' }
 ];
 var DEPT_LIST = DEPT_DEFAULT.slice();   // cập nhật theo d.deptList mỗi lần tải Tổng quan (js/31) — form tài khoản Quản lý (js/15) dùng danh sách này
-var _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };
+var _dp = { list: [], map: {}, q: '', f: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };
 var _DP_SECS = [['rooms', '🏢 Danh sách phòng'], ['teams', '👥 Gán theo team'], ['people', '🧑‍💼 Từng người']];
 
 // ── mạng: có hạn chờ, đọc JSON chặt chẽ (không nuốt lỗi) ──
@@ -52,7 +52,7 @@ async function openDeptSettings(){
   var ov = document.getElementById('dp-page');
   if (!ov){ ov = document.createElement('div'); ov.id = 'dp-page'; ov.className = 'rs-page'; document.body.appendChild(ov); }
   ov.classList.add('open'); document.body.classList.add('rs-open');
-  _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };   // csNames: tên Sale trong đơn, tính lười ở _dpNames
+  _dp = { list: [], map: {}, q: '', f: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };   // csNames: tên Sale trong đơn, tính lười ở _dpNames
   ov.innerHTML = '<div class="rs-loading">Đang tải cấu hình phòng…</div>';
   if (!gsUrl){ _dpLoadFail('Chưa kết nối Google Apps Script (chưa có link GAS).'); return; }
   try {
@@ -90,6 +90,12 @@ function _dpOpts(sel, blank){
   return '<option value="">' + blank + '</option>' + _dp.list.filter(function(g){ return String(g.label || '').trim(); }).map(function(g){
     return '<option value="' + esc(g.key) + '"' + (sel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('');
 }
+// Người "chưa phân phòng" = chưa có phòng HOẶC phòng đã gán đã bị xóa/để trống tên (cùng cách đếm với thẻ số _dpStatsInner_ — hai chỗ phải khớp nhau).
+function _dpIsAssigned_(n){
+  var k = _dp.map[n]; if (!k) return false;
+  return _dp.list.some(function(g){ return g.key === k && String(g.label || '').trim(); });
+}
+function _dpSetFilter(v){ _dp.f = v || ''; _dpPeopleList(); }
 function _dpCount(key){ return Object.keys(_dp.map).filter(function(n){ return _dp.map[n] === key; }).length; }
 function _dpTeams(){
   var t = (typeof teams !== 'undefined' && Array.isArray(teams) && teams.length) ? teams : ((typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.teams) || []);
@@ -118,7 +124,7 @@ function _dpStatsInner_(){
     var rooms = _dp.list.filter(function(g){ return String(g.label || '').trim(); });
     var ok = {}; rooms.forEach(function(g){ ok[g.key] = true; });
     var names = _dpNames(), assigned = 0;
-    names.forEach(function(n){ if (_dp.map[n] && ok[_dp.map[n]]) assigned++; });
+    names.forEach(function(n){ if (_dp.map[n] && ok[_dp.map[n]]) assigned++; });   // = _dpIsAssigned_
     var left = names.length - assigned;
     return uiStatGrid_([
       { icon: '🏢', label: 'Số phòng', value: String(rooms.length), tone: 'brand' },
@@ -179,15 +185,30 @@ function _dpPeopleHtml(){
   return '<h3>🧑‍💼 Từng người</h3>' +
     '<div class="dpg-bar"><input type="text" placeholder="🔍 Tìm tên…" value="' + esc(_dp.q || '') + '" oninput="_dp.q=this.value;_dpPeopleList()" class="dpg-in" style="min-width:140px">' +
     '<input type="text" id="dp-new-name" placeholder="+ Thêm người (kế toán, HR…)" class="dpg-in" style="min-width:150px">' +
+    '<select id="dp-filter" onchange="_dpSetFilter(this.value)" style="width:190px" title="Lọc danh sách theo phòng">' + _dpFilterOpts_() + '</select>' +
     '<select id="dp-new-room" style="width:150px">' + _dpOpts('', '— phòng —') + '</select><button class="btn sm" onclick="_dpAddPerson()">Thêm</button></div>' +
     '<div id="dp-people-list">' + _dpPeopleListHtml() + '</div>';
 }
 function _dpPeopleListHtml(){
   var q = (_dp.q || '').toLowerCase();
-  var rows = _dpNames().filter(function(n){ return !q || n.toLowerCase().indexOf(q) !== -1; });
-  return '<div style="max-height:calc(var(--vh,1vh)*60);overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
+  var f = _dp.f || '';
+  var rows = _dpNames().filter(function(n){
+    if (q && n.toLowerCase().indexOf(q) === -1) return false;
+    if (f === '_none') return !_dpIsAssigned_(n);
+    if (f) return _dp.map[n] === f;
+    return true;
+  });
+  var head = (f === '_none' ? '<div class="dpg-banner" style="margin-bottom:8px">Đang lọc <b>chưa phân phòng</b>: ' + rows.length + ' người. Chọn phòng ở cột bên phải — người vừa gán vẫn hiện đến khi bạn đổi bộ lọc (để khỏi nhảy dòng), nhớ bấm <b>💾 Lưu phòng</b>.</div>' : '');
+  return head + '<div style="max-height:calc(var(--vh,1vh)*60);overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
     rows.map(function(n){ return '<tr><td>' + esc(n) + '</td><td><select data-n="' + esc(n) + '" onchange="_dpSetPerson(this.dataset.n,this.value)" style="width:180px">' + _dpOpts(_dp.map[n] || '', '— chưa phân phòng —') + '</select></td></tr>'; }).join('') +
     (rows.length ? '' : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
+}
+function _dpFilterOpts_(){
+  var names = _dpNames(), none = names.filter(function(n){ return !_dpIsAssigned_(n); }).length, f = _dp.f || '';
+  return '<option value=""' + (f === '' ? ' selected' : '') + '>Tất cả (' + names.length + ')</option>' +
+    '<option value="_none"' + (f === '_none' ? ' selected' : '') + '>❓ Chưa phân phòng (' + none + ')</option>' +
+    _dp.list.filter(function(g){ return String(g.label || '').trim(); }).map(function(g){
+      return '<option value="' + esc(g.key) + '"' + (f === g.key ? ' selected' : '') + '>' + esc(g.label) + ' (' + _dpCount(g.key) + ')</option>'; }).join('');
 }
 function _dpPeopleList(){ var el = document.getElementById('dp-people-list'); if (el) el.innerHTML = _dpPeopleListHtml(); }
 function _dpSetPerson(n, key){ if (key) _dp.map[n] = key; else delete _dp.map[n]; _dpMarkDirty(); }
