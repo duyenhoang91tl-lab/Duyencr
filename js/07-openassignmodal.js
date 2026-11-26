@@ -1651,6 +1651,7 @@ function careBadgeText(st) {
 
 function toggleMyDataDone(phone, csName, isDone) {
   // Update in all batches for this CS
+  const touched = [];
   for (const h of assignHistory) {
     if (h.csName !== csName || !h.phones.includes(phone)) continue;
     if (!h.donePhones) h.donePhones = [];
@@ -1659,9 +1660,11 @@ function toggleMyDataDone(phone, csName, isDone) {
     } else if (!isDone) {
       h.donePhones = h.donePhones.filter(p => p !== phone);
     }
+    touched.push(h);
   }
   saveLS('ome_assign_hist', assignHistory);
-  if (gsUrl) pushAssignHistToGS();
+  // Chi ghi cac dot bi doi (saveAssign): ghi ca lich su tu ban tren may co the xoa dot moi chia (vd Truong nhom vua chia lai) va de mat tien do cua nguoi khac.
+  if (gsUrl) (async function(){ for (const _e of touched) { await pushAssignToGS(_e); } })();
   updateMyDataBadge();
   renderMyDataTab();
 }

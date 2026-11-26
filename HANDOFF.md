@@ -3,9 +3,9 @@
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
-- ✅ **ĐÃ XONG:** Bước 1-5/7: backend, js/96, js/08, js/14, js/15 (ô chọn tháng khi tạo/sửa tài khoản Lead).
-- 🔧 **ĐANG LÀM:** Bước 6/7.
-- ➡️ **BƯỚC KẾ TIẾP:** js/07 (bấm 'xong' không ghi đè cả lịch sử chia) → js/29 + index.html → tài liệu. LƯU Ý phiên khác đang sửa js/07 (nguồn người nhận Sale/Tài khoản CRM).
+- ✅ **ĐÃ XONG:** Bước 1-6/7: backend, js/96, js/08, js/14, js/15, js/07 (bấm 'xong' chỉ ghi đợt bị đổi).
+- 🔧 **ĐANG LÀM:** Bước 7/7.
+- ➡️ **BƯỚC KẾ TIẾP:** js/29 menu + index.html nạp js/96 → tài liệu → Duyên thử thật.
 
 ## 2026-11-26 (phiên Claude — CHIA DATA: CHỌN NGƯỜI NHẬN THEO DANH SÁCH SALE / TÀI KHOẢN ĐĂNG NHẬP CRM) — XONG BƯỚC 1/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: ở modal "Chia data nâng cao" muốn chia data theo Team có sẵn HOẶC theo danh sách Sale, tài khoản đăng nhập CRM.
