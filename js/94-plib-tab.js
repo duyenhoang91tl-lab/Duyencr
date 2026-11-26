@@ -3,9 +3,11 @@
 //  Mỗi SẢN PHẨM trong bảng giá (priceCatalogFlat, gộp theo TÊN: các size/chất liệu cùng tên chung 1 thư mục) hoặc mỗi COMBO (comboList) = 1 thư mục ảnh, TỐI ĐA 50 ảnh (server chặn ảnh thứ 51).
 //  Ô tìm tìm CẢ sản phẩm lẫn combo (không dấu, gõ dở, nhiều từ); bấm 1 kết quả = mở thẳng thư mục. Hàm dùng chung cho ô tìm nhanh toàn cục (bước 3): plibOpen(name, group).
 //  KEY thư mục = tên bỏ dấu/thường/gọn — PHẢI giống server `_plibKey_` (đổi 1 bên là lệch thư mục). Combo: tên gửi lên "Combo: <tên>", group "Combo".
+//  v3 (26/11/2026) ẢNH CÓ SẴN TRÊN GOOGLE DRIVE: thư mục gốc "Hình ảnh theo File Giá" (GAS plibDriveScan/plibFolderImages/plibLinkSave, CRM chỉ ĐỌC). Thư mục Drive TỰ KHỚP khi tên = tên SP hoặc tên thương mại (combo: tên combo); tên khác → admin 📂 gắn tay (gắn tay thắng tự khớp). Ảnh Drive hiện riêng với ảnh tải lên (giới hạn 50 chỉ áp cho ảnh tải lên).
 //  Ảnh thu nhỏ ≤1600px trước khi gửi (như Thư viện cũ js/48); tải tuần tự từng ảnh, dừng khi thư mục đầy. Xóa: người tải lên hoặc admin (server kiểm).
 // ════════════════════════════════════════════════════════════════════
-var _pl = { prods:[], combos:[], counts:{}, q:'', cur:null, items:[], n:0, max:50, me:'', admin:false, loading:false, loadingFolder:false, err:'', up:'', loadedCat:false, timer:0, hi:0, info:{ text:'', by:'', at:'' }, editInfo:false, draft:'', infoMsg:'', savingInfo:false };
+var _pl = { prods:[], combos:[], counts:{}, q:'', cur:null, items:[], n:0, max:50, me:'', admin:false, loading:false, loadingFolder:false, err:'', up:'', loadedCat:false, timer:0, hi:0, info:{ text:'', by:'', at:'' }, editInfo:false, draft:'', infoMsg:'', savingInfo:false,
+  src:{ folders:[], loaded:false, err:'', root:'', truncated:false, leaf:[] }, srcIdx:{}, srcById:{}, srcPk:{}, links:{}, srcImgs:[], srcTok:0, srcMsg:'', pick:false, pickQ:'', pickShown:[], linking:false };
 var _PL_INFO_MAX = 4000;
 var _PL_INFO_SECTIONS = ['Ý nghĩa', 'Điểm nổi bật', 'Cách tư vấn', 'Phù hợp tặng ai', 'Chất liệu & bảo quản'];
 var _PL_SHOW_MAX = 120;
@@ -20,13 +22,13 @@ function _plBuildList(){
     var name = String(x.t || x.m || '').trim(); if (!name) return;
     var k = _plKey(name); if (!k) return;
     if (map[k]){ map[k].variants++; return; }
-    map[k] = { key:k, name:name, group:String(x.n || '').trim(), combo:false, variants:1, info:(_pl.counts[k] || {}).info || '' };
+    map[k] = { key:k, name:name, group:String(x.n || '').trim(), combo:false, variants:1, info:(_pl.counts[k] || {}).info || '', alt:(function(){ var a = _plKey(x.m || ''); return a && a !== k ? a : ''; })() };
     out.push(map[k]);
   });
   _pl.combos.forEach(function(c){
     var nm = 'Combo: ' + String(c.name || '').trim(); var k = _plKey(nm);
     if (!c.name || map[k]) return;
-    map[k] = { key:k, name:nm, group:'Combo', combo:true, variants:(c.items || []).length, info:(_pl.counts[k] || {}).info || '' };
+    map[k] = { key:k, name:nm, group:'Combo', combo:true, variants:(c.items || []).length, info:(_pl.counts[k] || {}).info || '', alt:_plKey(c.name) };
     out.push(map[k]);
   });
   // Thư mục đã có ảnh nhưng SP không còn trong bảng giá (đổi tên/xóa dòng) vẫn hiện để không "mất" ảnh.
@@ -64,13 +66,18 @@ async function _plEnsureData(force){
     if (force || !_pl.loadedCat){
       jobs.push(fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=priceCatalogFlat', { redirect:'follow' }).then(function(r){ return r.json(); }).catch(function(){ return null; }));
       jobs.push(fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=comboList&q=', { redirect:'follow' }).then(function(r){ return r.json(); }).catch(function(){ return null; }));
+      jobs.push(fetch(_plUrl('action=plibDriveScan' + (force ? '&fresh=1' : '')), { redirect:'follow' }).then(function(r){ return r.json(); }).catch(function(){ return null; }));
     }
     var res = await Promise.all(jobs), L = res[0];
     if (!L || L.ok === false) _pl.err = (L && L.error) || 'GAS chưa có action plibList (chờ workflow deploy-gas xanh ở tab Actions rồi tải lại).';
-    else { _pl.counts = L.counts || {}; _pl.max = L.max || 50; _pl.me = L.me || ''; _pl.admin = !!L.admin; }
+    else { _pl.counts = L.counts || {}; _pl.max = L.max || 50; _pl.me = L.me || ''; _pl.admin = !!L.admin; _pl.links = L.links || {}; }
     if (res.length > 1){
       if (res[1] && res[1].ok && Array.isArray(res[1].items)) _pl.prods = res[1].items;
       if (res[2] && res[2].ok && Array.isArray(res[2].rows)) _pl.combos = res[2].rows;
+      var S = res[3];
+      if (S && S.ok){ _pl.src.err = ''; _pl.src.folders = S.folders || []; _pl.src.root = S.rootName || ''; _pl.src.truncated = !!S.truncated; if (S.links) _pl.links = S.links; _plSrcIndex(); }
+      else _pl.src.err = (S && S.error) || 'GAS chưa có action plibDriveScan (chờ workflow deploy-gas xanh rồi Làm mới).';
+      _pl.src.loaded = true;
       _pl.loadedCat = true;
       if (!_pl.prods.length && !_pl.combos.length && !_pl.err) _pl.err = 'Chưa tải được bảng giá / combo.';
     }
@@ -82,13 +89,15 @@ async function _plLoadFolder(){
   _pl.loadingFolder = true; _plRender();
   try {
     var r = await fetch(_plUrl('action=plibList&key=' + encodeURIComponent(_pl.cur.name)), { redirect:'follow' }), d = await r.json();
-    if (d && d.ok !== false){ _pl.items = d.items || []; _pl.n = d.n || _pl.items.length; _pl.max = d.max || 50; _pl.me = d.me || _pl.me; _pl.admin = !!d.admin; _pl.err = ''; _pl.info = d.info || { text:'', by:'', at:'' }; if (!_pl.editInfo) _pl.draft = _pl.info.text; }
+    if (d && d.ok !== false){ _pl.items = d.items || []; _pl.n = d.n || _pl.items.length; _pl.max = d.max || 50; _pl.me = d.me || _pl.me; _pl.admin = !!d.admin; _pl.err = ''; _pl.info = d.info || { text:'', by:'', at:'' }; if (!_pl.editInfo) _pl.draft = _pl.info.text; if (d.link) _pl.links[_pl.cur.key] = d.link; else delete _pl.links[_pl.cur.key]; }
     else _pl.err = (d && d.error) || 'Không tải được thư mục.';
   } catch(e){ _pl.err = 'Không tải được thư mục: ' + (e && e.message || e); }
-  _pl.loadingFolder = false; _plRender();
+  _pl.loadingFolder = false; _plRender(); await _plLoadSrc();
 }
 function _plOpenIdx(i){ var f = _pl.shown && _pl.shown[i]; if (f) _plOpenFolder(f); }
-function _plResetInfo(k){ var c = _pl.counts[k] || {}; _pl.info = { text:c.info || '', by:'', at:'' }; _pl.editInfo = false; _pl.draft = _pl.info.text; _pl.infoMsg = ''; }
+function _plResetInfo(k){ var c = _pl.counts[k] || {}; _pl.info = { text:c.info || '', by:'', at:'' }; _pl.editInfo = false; _pl.draft = _pl.info.text; _pl.infoMsg = '';
+  _pl.srcImgs = []; _pl.srcMsg = ''; _pl.pick = false; _pl.pickQ = ''; _pl.srcTok++; if (_pl.cur) _pl.cur.alt = _plAltFor(k); }
+function _plAltFor(k){ try { var l = _plBuildList(); for (var i = 0; i < l.length; i++) if (l[i].key === k) return l[i].alt || ''; } catch(e){} return ''; }
 function _plOpenFolder(f){ _pl.cur = { key:f.key, name:f.name, group:f.group, combo:f.combo }; _pl.items = []; _pl.n = (_pl.counts[f.key] || {}).n || 0; _pl.up = ''; _plResetInfo(f.key); _plLoadFolder(); }
 function _plBack(){ _pl.cur = null; _pl.up = ''; _plEnsureData(); }
 // Mở thư mục theo tên (dùng cho ô tìm nhanh toàn cục): chuyển sang tab rồi vào thẳng thư mục.
@@ -157,6 +166,137 @@ function _plCopyLink(i){
   var done = function(){ if (typeof toast === 'function') toast('Đã chép link ảnh'); };
   try { navigator.clipboard.writeText(it.url).then(done, done); } catch(e){ done(); }
 }
+// ── Ảnh có sẵn trên Google Drive (CRM chỉ đọc) ──
+function _plIdFromUrl(s){
+  s = String(s || '').trim(); if (!s) return '';
+  var m = /\/folders\/([-\w]{10,})/.exec(s) || /[?&]id=([-\w]{10,})/.exec(s) || /^([-\w]{10,})$/.exec(s);
+  return m ? m[1] : '';
+}
+// Chỉ mục: khoá tên thư mục (bỏ dấu) → các thư mục. Thư mục "lá" (không chứa thư mục con) mới tính là thư mục sản phẩm khi thống kê chưa khớp.
+function _plSrcIndex(){
+  var idx = {}, byId = {}, parents = {}, F = _pl.src.folders;
+  F.forEach(function(f){ var k = _plKey(f.name); if (k) (idx[k] = idx[k] || []).push(f); byId[f.id] = f; var i = f.path.lastIndexOf(' / '); if (i > -1) parents[f.path.slice(0, i)] = 1; });
+  _pl.srcIdx = idx; _pl.srcById = byId; _pl.srcPk = {};
+  _pl.src.leaf = F.filter(function(f){ return !parents[f.path]; });
+}
+// Thư mục Drive của 1 SP/combo: gắn tay (nếu có) thắng; không thì tự khớp theo tên (tên SP, tên thương mại / tên combo), tối đa 3.
+function _plSrcFor(key, alt){
+  var man = _pl.links[key];
+  if (man && man.folderId){ var b = _pl.srcById[man.folderId]; return [{ id:man.folderId, name:man.name || (b && b.name) || '', path:(b && b.path) || man.name || '', manual:true }]; }
+  var out = [], seen = {};
+  [key, alt].forEach(function(k){ (k && _pl.srcIdx[k] || []).forEach(function(x){ if (!seen[x.id]){ seen[x.id] = 1; out.push(x); } }); });
+  return out.slice(0, 3);
+}
+async function _plLoadSrc(){
+  if (!_pl.cur) return;
+  var tok = ++_pl.srcTok, list = _plSrcFor(_pl.cur.key, _pl.cur.alt);
+  _pl.srcImgs = list.map(function(x){ return { id:x.id, name:x.name, path:x.path, manual:!!x.manual, items:null, more:false, err:'' }; });
+  _plRenderSrc();
+  var groups = _pl.srcImgs;
+  await Promise.all(groups.map(async function(g){
+    try {
+      var r = await fetch(_plUrl('action=plibFolderImages&folderId=' + encodeURIComponent(g.id)), { redirect:'follow' }), d = await r.json();
+      if (d && d.ok){ g.items = d.items || []; g.more = !!d.more; } else g.err = (d && d.error) || 'Không đọc được thư mục Drive.';
+    } catch(e){ g.err = 'Lỗi kết nối.'; }
+  }));
+  if (tok === _pl.srcTok) _plRenderSrc();
+}
+// Chỉ vẽ lại khối Drive (không đụng ô đang gõ thông tin / ô tìm thư mục).
+function _plRenderSrc(){
+  if (!_pl.cur) return;
+  var el = document.getElementById('pl-src');
+  if (!el){ _plRender(); return; }
+  if (document.activeElement && document.activeElement.id === 'pl-pq') return;
+  el.innerHTML = _plSrcHtml();
+}
+function _plCopySrc(gi, i){
+  var g = _pl.srcImgs[gi], it = g && g.items && g.items[i]; if (!it) return;
+  var done = function(){ if (typeof toast === 'function') toast('Đã chép link ảnh'); };
+  try { navigator.clipboard.writeText(it.url).then(done, done); } catch(e){ done(); }
+}
+function _plPickOpen(){ _pl.pick = true; _pl.pickQ = ''; _pl.srcMsg = ''; _plRenderSrc(); var i = document.getElementById('pl-pq'); if (i && i.focus) i.focus(); }
+function _plPickClose(){ _pl.pick = false; _pl.pickQ = ''; _plRenderSrc(); }
+// Gợi ý thông minh: thư mục có nhiều từ trùng với tên sản phẩm đang mở lên trước; có gõ thì lọc (mọi từ phải có, không dấu) trên cả đường dẫn.
+function _plPickCandidates(){
+  var toks = _plKey(_pl.pickQ).split(' ').filter(Boolean), pt = _plKey(String(_pl.cur.name).replace(/^Combo:\s*/i, '')).split(' ').filter(Boolean), out = [];
+  _pl.src.folders.forEach(function(f){
+    var pk = _pl.srcPk[f.id] || (_pl.srcPk[f.id] = ' ' + _plKey(f.path) + ' ');
+    if (toks.length && !toks.every(function(w){ return pk.indexOf(w) > -1; })) return;
+    var sc = pt.filter(function(w){ return pk.indexOf(' ' + w) > -1; }).length;
+    if (!toks.length && !sc) return;
+    out.push({ f:f, sc:sc });
+  });
+  out.sort(function(a, b){ return b.sc - a.sc || (a.f.path < b.f.path ? -1 : 1); });
+  return out.slice(0, 40).map(function(o){ return o.f; });
+}
+function _plPickListHtml(){
+  var q = _pl.pickQ.trim();
+  if (/drive\.google\.com|\/folders\//.test(q) && _plIdFromUrl(q)) { _pl.pickShown = []; return '<div class="ml-act"><button class="btn primary" onclick="_plLinkRaw()">➕ Gắn link này cho “' + esc(_pl.cur.name) + '”</button></div>'; }
+  _pl.pickShown = _plPickCandidates();
+  if (!_pl.pickShown.length) return '<div class="ml-m" style="padding:6px 0">' + (q ? 'Không có thư mục Drive khớp “' + esc(q) + '”.' : 'Chưa có gợi ý — gõ tên thư mục hoặc dán link.') + '</div>';
+  return '<div class="ml-m" style="padding:4px 0">' + (q ? _pl.pickShown.length + ' thư mục khớp' : 'Gợi ý theo tên sản phẩm') + ':</div>' + _pl.pickShown.map(function(f, i){
+    return '<div class="css-i" style="cursor:pointer;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px" onclick="_plLinkIdx(' + i + ')">📁 <b>' + esc(f.name) + '</b> <span class="ml-m">' + esc(f.path) + '</span></div>';
+  }).join('');
+}
+function _plPickHtml(){
+  return '<div class="ml-form" style="margin-bottom:8px"><input id="pl-pq" class="ml-q" type="search" placeholder="🔍 Gõ tên thư mục Drive, hoặc dán link thư mục…" value="' + esc(_pl.pickQ) + '" oninput="_plPickInput(this.value)">' +
+    '<div id="pl-pick-list" style="max-height:260px;overflow:auto;margin-top:6px">' + _plPickListHtml() + '</div><div class="ml-act"><button class="btn" onclick="_plPickClose()">Đóng</button></div></div>';
+}
+function _plPickInput(v){ _pl.pickQ = v || ''; var el = document.getElementById('pl-pick-list'); if (el) el.innerHTML = _plPickListHtml(); }
+function _plLinkIdx(i){ var f = _pl.pickShown[i]; if (f) return _plLink(f.id); }
+function _plLinkRaw(){ return _plLink(_pl.pickQ); }
+async function _plUnlink(){ if (!confirm('Gỡ thư mục Drive đã gắn khỏi sản phẩm này? (Ảnh trên Drive không bị xóa.)')) return; await _plLink(''); }
+async function _plLink(raw){
+  if (_pl.linking || !_pl.cur) return;
+  _pl.linking = true; _pl.srcMsg = '⏳ Đang lưu…'; _plRenderSrc();
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body:JSON.stringify({ action:'plibLinkSave', token:_plTok(), productName:_pl.cur.name, group:_pl.cur.group, folder:raw }) }), d = await r.json();
+    if (d && d.ok){
+      if (d.link) _pl.links[_pl.cur.key] = d.link; else delete _pl.links[_pl.cur.key];
+      _pl.pick = false; _pl.pickQ = ''; _pl.srcMsg = d.link ? '✓ Đã gắn thư mục “' + d.link.name + '”.' : '✓ Đã gỡ gắn.';
+    } else _pl.srcMsg = '⚠ ' + ((d && d.error) || 'Không lưu được.');
+  } catch(e){ _pl.srcMsg = '⚠ Lỗi kết nối.'; }
+  _pl.linking = false; await _plLoadSrc();
+}
+function _plSrcHtml(){
+  var c = _pl.cur; if (!c) return '';
+  var man = _pl.links[c.key], h = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0 6px"><div style="font-weight:700;font-size:14px;flex:1">📂 Ảnh từ Google Drive</div>';
+  if (_pl.admin){
+    h += '<button class="btn sm" onclick="_plPickOpen()">📂 ' + (man ? 'Đổi thư mục Drive' : 'Gắn thư mục Drive') + '</button>';
+    if (man) h += '<button class="btn sm" onclick="_plUnlink()">✖ Gỡ gắn</button>';
+  }
+  h += '</div>';
+  if (_pl.srcMsg) h += '<div style="font-size:12px;margin-bottom:6px;color:' + (/^⚠/.test(_pl.srcMsg) ? '#b91c1c' : '#2b7a4b') + '">' + esc(_pl.srcMsg) + '</div>';
+  if (_pl.pick) h += _plPickHtml();
+  if (_pl.src.err) h += '<div class="ml-empty" style="color:#b91c1c">' + esc(_pl.src.err) + '</div>';
+  else if (!_pl.src.loaded) h += '<div class="ml-m">Đang quét thư mục Drive…</div>';
+  else if (!_pl.srcImgs.length) h += '<div class="ml-empty">Chưa có thư mục Drive khớp tên “' + esc(c.name) + '”' + (_pl.admin ? ' — bấm “Gắn thư mục Drive” để chọn.' : ' — nhờ admin gắn thư mục.') + '</div>';
+  _pl.srcImgs.forEach(function(g, gi){
+    h += '<div class="ml-m" style="margin:6px 0">📁 ' + esc(g.path) + (g.manual ? ' · gắn tay' : ' · tự khớp tên') + (g.items ? ' · ' + g.items.length + (g.more ? '+' : '') + ' ảnh' : '') + '</div>';
+    if (g.err) h += '<div class="ml-empty" style="color:#b91c1c">' + esc(g.err) + '</div>';
+    else if (!g.items) h += '<div class="ml-empty">Đang tải ảnh…</div>';
+    else if (!g.items.length) h += '<div class="ml-empty">Thư mục Drive này chưa có ảnh.</div>';
+    else h += '<div class="ml-grid">' + g.items.map(function(it, i){
+      return '<div class="ml-card"><a href="' + esc(it.url) + '" target="_blank" rel="noopener"><img class="ml-th" loading="lazy" src="' + esc(_plThumb(it.fileId, 400)) + '" alt=""></a>' +
+        '<div class="ml-m">' + esc(it.name) + '</div><div class="ml-act"><button class="btn sm" onclick="_plCopySrc(' + gi + ',' + i + ')">🔗 Chép link</button></div></div>';
+    }).join('') + '</div>';
+    if (g.more) h += '<div class="ml-m">Chỉ hiện 200 ảnh đầu — mở thư mục trên Drive để xem đủ.</div>';
+  });
+  return h;
+}
+// Thống kê cho màn danh sách: thư mục Drive (lá) đã khớp / chưa khớp sản phẩm nào.
+function _plSrcStats(list){
+  var used = {}; list.forEach(function(f){ _plSrcFor(f.key, f.alt).forEach(function(x){ used[x.id] = 1; }); });
+  var miss = _pl.src.leaf.filter(function(f){ return !used[f.id]; });
+  return { matched:_pl.src.leaf.length - miss.length, miss:miss };
+}
+function _plSrcStatHtml(all){
+  if (!_pl.src.loaded) return '';
+  if (_pl.src.err) return '<div class="ml-m" style="color:#b91c1c;margin-bottom:8px">📂 ' + esc(_pl.src.err) + '</div>';
+  var st = _plSrcStats(all);
+  return '<div class="ml-m" style="margin-bottom:8px">📂 Thư mục Drive “' + esc(_pl.src.root) + '”: ' + st.matched + ' đã khớp sản phẩm' + (st.miss.length ? ' · <details style="display:inline"><summary style="display:inline;cursor:pointer">' + st.miss.length + ' chưa khớp</summary><div style="margin-top:4px;max-height:160px;overflow:auto">' +
+    st.miss.slice(0, 80).map(function(f){ return '📁 ' + esc(f.path); }).join('<br>') + (st.miss.length > 80 ? '<br>…' : '') + '<div>Mở sản phẩm tương ứng → “Gắn thư mục Drive” để nối.</div></div></details>' : '') + (_pl.src.truncated ? ' · ⚠ quét chưa hết' : '') + '</div>';
+}
 // ── Thông tin sản phẩm (văn bản; chỉ admin sửa, server kiểm) ──
 function _plInfoHtml(t){
   return String(t || '').split('\n').map(function(l){
@@ -224,7 +364,7 @@ function _plFolderCard(f, i){
   return '<div class="ml-card pick" onclick="_plOpenIdx(' + i + ')" title="Mở thư mục"' + (_pl.q && i === _pl.hi ? ' style="border-color:#2b7a4b;box-shadow:0 0 0 2px #cfe9d8"' : '') + '>' + th +
     '<div class="ml-n">' + (f.combo ? '🎁 ' : '') + esc(f.name) + '</div>' +
     '<div class="ml-m">' + esc(f.group || '') + (f.variants > 1 && !f.combo ? ' · ' + f.variants + ' size/chất liệu' : '') + '</div>' +
-    '<div class="ml-m" style="color:' + (n ? '#2b7a4b' : '#9ca3af') + ';font-weight:600">' + n + '/' + _pl.max + ' ảnh' + (f.info ? ' · 📝' : '') + (_pl.q && f._sc === 1 ? ' · khớp trong thông tin' : '') + '</div></div>';
+    '<div class="ml-m" style="color:' + (n ? '#2b7a4b' : '#9ca3af') + ';font-weight:600">' + n + '/' + _pl.max + ' ảnh' + (f.info ? ' · 📝' : '') + (_plSrcFor(f.key, f.alt).length ? ' · 📂' : '') + (_pl.q && f._sc === 1 ? ' · khớp trong thông tin' : '') + '</div></div>';
 }
 function _plRenderFolder(){
   var f = _pl.cur, full = _pl.n >= _pl.max;
@@ -238,6 +378,7 @@ function _plRenderFolder(){
     (full ? '<span style="color:#b45309;font-size:12px">Thư mục đã đủ ' + _pl.max + ' ảnh — xóa bớt để tải thêm.</span>' : '') + '</div>';
   if (_pl.up) h += '<div style="font-size:13px;margin-bottom:8px;color:' + (/^⚠/.test(_pl.up) ? '#b91c1c' : '#2b7a4b') + '">' + esc(_pl.up) + '</div>';
   if (_pl.err) h += '<div class="ml-empty" style="color:#b91c1c">' + esc(_pl.err) + '</div>';
+  h += '<div style="font-weight:700;font-size:14px;margin:10px 0 6px">📷 Ảnh tải lên CRM</div>';
   if (_pl.loadingFolder && !_pl.items.length) h += '<div class="ml-empty">Đang tải…</div>';
   else if (!_pl.items.length) h += '<div class="ml-empty">Thư mục trống — bấm “⬆ Tải ảnh lên” (chọn được nhiều ảnh).</div>';
   else h += '<div class="ml-grid">' + _pl.items.map(function(it, i){
@@ -246,6 +387,7 @@ function _plRenderFolder(){
       '<div class="ml-m">' + esc(it.name) + ' · ' + esc(it.by) + '</div><div class="ml-act"><button class="btn sm" onclick="_plCopyLink(' + i + ')">🔗 Chép link</button>' +
       (mine ? '<button class="btn sm" onclick="_plDel(' + i + ')">🗑</button>' : '') + '</div></div>';
   }).join('') + '</div>';
+  h += '<div id="pl-src">' + _plSrcHtml() + '</div>';
   return h;
 }
 function _plRender(){
@@ -258,6 +400,7 @@ function _plRender(){
     '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Mỗi sản phẩm trong bảng giá và mỗi combo có 1 thư mục ảnh (tối đa ' + _pl.max + ' ảnh). Gõ tên sản phẩm hoặc combo (không cần dấu) rồi bấm để mở thư mục. Trong thư mục có ảnh và phần Thông tin sản phẩm (ý nghĩa, điểm bán hàng…); ô tìm cũng tìm cả trong thông tin.</div>' +
     '<div class="ml-bar"><input id="pl-q" class="ml-q" type="search" style="max-width:420px" placeholder="🔍 Tìm sản phẩm / combo…" value="' + esc(_pl.q) + '" oninput="_plSetQ(this.value)" onkeydown="_plKeydown(event)">' +
     '<button class="btn sm" onclick="_plEnsureData(true)">↻ Làm mới</button></div>' +
+    _plSrcStatHtml(all) +
     (_pl.loading ? '<div class="ml-empty">Đang tải…</div>' : '') +
     (_pl.err ? '<div class="ml-empty" style="color:#b91c1c">' + esc(_pl.err) + '</div>' : '') +
     (!_pl.loading ? '<div class="ml-m" style="margin-bottom:8px">' + list.length + ' thư mục' + (list.length > shown.length ? ' · hiện ' + shown.length + ' đầu, gõ thêm để lọc' : '') + '</div>' : '') +
