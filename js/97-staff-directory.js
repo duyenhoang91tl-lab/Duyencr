@@ -29,7 +29,10 @@
         else S.failAt = Date.now();   // chưa đủ quyền / lỗi mạng: thử lại sau 1 phút, Team vẫn hiện như cũ
       });
   }
-  function rerender(){ try { if (document.getElementById('team-wrap') && typeof renderTeamTab === 'function') renderTeamTab(); } catch (e) {} }
+  function rerender(){
+    try { if (document.getElementById('team-wrap') && typeof renderTeamTab === 'function') renderTeamTab(); } catch (e) {}
+    try { var dp = document.getElementById('dp-page'); if (dp && dp.classList.contains('open') && typeof _dpRender === 'function') _dpRender(); } catch (e) {}   // trang Phòng ban đang mở: vẽ lại để hiện tên Pancake gốc
+  }
   // Hồ sơ khớp với 1 nhóm tên (mảng tên của cùng 1 người) — chỉ trả khi hồ sơ có họ tên chuẩn (nếu không thì giữ cách hiện cũ).
   function entryOf(names){
     for (var i = 0; i < (names || []).length; i++){ var e = S.idx[fold(names[i])]; if (e && e.fullName) return e; }
@@ -70,6 +73,12 @@
       return out;
     };
   })();
+  // TÊN PANCAKE (tên gốc theo Duyên 26/11) của người có 1 trong các tên này, theo HỒ SƠ CHUẨN; '' nếu hồ sơ chưa nhập tên Pancake.
+  window._staffPancakeOf = function(names){
+    load();
+    for (var i = 0; i < (names || []).length; i++){ var e = S.idx[fold(names[i])]; if (e && e.names && e.names.pancake && e.names.pancake.length) return e.names.pancake[0]; }
+    return '';
+  };
   window._staffNamesReload = function(){ S.loaded = false; S.failAt = 0; load(true); };
   window._staffDirState = function(){ return { n: S.list.length, loaded: S.loaded }; };   // dùng cho test
   window._staffDirBuild = build;                                                              // dùng cho test

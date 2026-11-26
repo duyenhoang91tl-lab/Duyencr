@@ -60,6 +60,8 @@ async function openDeptSettings(){
     var base = (Array.isArray(dl) && dl.length) ? dl : ((typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.deptList && _ov.data.deptList.length) ? _ov.data.deptList : DEPT_DEFAULT);
     _dp.list = base.map(function(g){ return { key: g.key, label: g.label }; });
     _dp.map = (sd && typeof sd === 'object' && !Array.isArray(sd)) ? Object.assign({}, sd) : {};
+    // Tải Khớp tên Pancake (nếu chưa) để hiện tên gốc theo Pancake — không chặn mở trang, xong thì vẽ lại nếu trang còn mở
+    try { if (typeof _pkState !== 'undefined' && !_pkState.nameMapLoaded && typeof _pkLoadNameMap === 'function') Promise.resolve(_pkLoadNameMap()).then(function(){ var o = document.getElementById('dp-page'); if (o && o.classList.contains('open') && !_dp.busy) _dpRender(); }); } catch (e) {}
     _dpRender();
   } catch (e) { _dpLoadFail(e && e.message || String(e)); }
 }
@@ -99,9 +101,31 @@ function _dpIsAssigned_(n){
 // NGUYÊN NHÂN GỐC: _dpNames() chỉ gộp trùng khi 2 tên GIỐNG HỆT (khác hoa/thường), không dùng nhóm "cùng 1 người" mà hệ thống đã có sẵn
 // (tài khoản nhiều tên + "Khớp sale" salePersonTags — _groupNamesByPerson, js/08+js/50). Nay gom theo nhóm đó; tên chính (tên gốc) = tên chính của nhóm.
 function _dpGroups_(){
-  var names = _dpNames();
-  try { if (typeof _groupNamesByPerson === 'function') return _groupNamesByPerson(names); } catch (e) {}
-  return names.map(function(n){ return { names: [n], primary: n }; });
+  var names = _dpNames(), gs;
+  try { if (typeof _groupNamesByPerson === 'function') gs = _groupNamesByPerson(names); } catch (e) {}
+  if (!gs) gs = names.map(function(n){ return { names: [n], primary: n }; });
+  // TÊN GỐC = TÊN TRÊN PANCAKE (Duyên 26/11): hồ sơ chuẩn (js/97) → không có thì Khớp tên Pancake (js/15 _pkOrigNameOf_). Tên Pancake được thêm vào nhóm
+  // (không thêm dòng mới) nên gán phòng cũng ghi cho tên Pancake — báo cáo Pancake tra theo tên đó. Không có tên Pancake → giữ tên chính cũ.
+  var fixed = gs.map(function(g){
+    var pk = '';
+    try { pk = (typeof _staffPancakeOf === 'function' && _staffPancakeOf(g.names)) || (typeof _pkOrigNameOf_ === 'function' && _pkOrigNameOf_(g.names)) || ''; } catch (e) { pk = ''; }
+    if (!pk) return g;
+    var f = pk.toLowerCase();
+    return { names: [pk].concat(g.names.filter(function(n){ return String(n).trim().toLowerCase() !== f; })), primary: pk };
+  });
+  // Tên Pancake có thể đã nằm sẵn trong danh sách như 1 dòng riêng (đã từng được gán phòng) → gộp vào đúng người, không để 1 người thành 2 dòng
+  var out = [], at = {};
+  fixed.forEach(function(g){
+    var hit = -1;
+    g.names.some(function(n){ var k = String(n).trim().toLowerCase(); if (at[k] !== undefined){ hit = at[k]; return true; } return false; });
+    if (hit < 0){ out.push({ names: g.names.slice(), primary: g.primary }); hit = out.length - 1; }
+    else {
+      var cur = out[hit], have = {}; cur.names.forEach(function(n){ have[String(n).trim().toLowerCase()] = 1; });
+      g.names.forEach(function(n){ if (!have[String(n).trim().toLowerCase()]) cur.names.push(n); });
+    }
+    out[hit].names.forEach(function(n){ at[String(n).trim().toLowerCase()] = hit; });
+  });
+  return out;
 }
 function _dpGroupOf_(n){
   var f = String(n || '').trim().toLowerCase(), gs = _dpGroups_();
@@ -114,11 +138,8 @@ function _dpRoomOfGroup_(g){
   return '';
 }
 function _dpSetFilter(v){ _dp.f = v || ''; _dpPeopleList(); }
-function _dpCount(key){   // số NGƯỜI (không phải số tên) đang ở phòng này — chỉ xét tên đã có trong bản gán, nên KHÔNG quét đơn (trang Danh sách phòng mở nhanh)
-  var names = Object.keys(_dp.map), gs;
-  try { gs = (typeof _groupNamesByPerson === 'function') ? _groupNamesByPerson(names) : null; } catch (e) { gs = null; }
-  if (!gs) gs = names.map(function(n){ return { names: [n], primary: n }; });
-  var c = 0; gs.forEach(function(g){ if (_dpRoomOfGroup_(g) === key) c++; });
+function _dpCount(key){   // số NGƯỜI (không phải số tên) đang ở phòng này — cùng nhóm người với danh sách/thẻ số (tên Pancake gốc cũng gộp vào đúng người)
+  var c = 0; _dpGroups_().forEach(function(g){ if (_dpRoomOfGroup_(g) === key) c++; });
   return c;
 }
 function _dpTeams(){
