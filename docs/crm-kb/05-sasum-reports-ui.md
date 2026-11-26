@@ -171,3 +171,10 @@ Báo cáo A có 3 cách đếm khác nhau, KHÔNG phải lỗi: (1) **Số lư�
 - **An toàn:** chỉ cột M; nguồn trống không xoá ô cũ; không ghi đè ô công thức; giá trị cũ lưu "Nhật ký cập nhật nhập file"; có dòng trong "Nhật ký lần nhập" nên **↩️ Hoàn tác** ở Lịch sử nhập dùng được (chỉ khôi phục ô chưa bị sửa tay sau đó). Backend chưa deploy (không trả `dryRun`) → client báo đợi workflow, không ghi.
 - **Bẫy:** (1) mã bị Excel đổi sang `3.46E+14` không khớp được → client đếm riêng + cảnh báo, hãy xuất lại cột mã dạng văn bản. (2) Tên cột là SUY ĐOÁN (chưa có file mẫu khi làm) — không dò được cột thì toast liệt kê tiêu đề đọc được; thêm tên mới vào `_impIsSrcKeyHeader_` / `_IMP_SRC_KENH` (js/11). (3) `tools/test-import-undo-ui.js` đếm đúng 2 chỗ gọi `action:'importSheetRows'` trong js/11 — KHÔNG thêm chuỗi đó lần nữa.
 - **Test:** `node tools/test-import-base-source.js` (GAS, sheet giả) + `node tools/test-import-base-source-ui.js` (jsdom + xlsx, đọc file .xlsx thật).
+
+
+## Phạm vi "phòng kinh doanh" ở mục 1-2 Báo cáo A/B (21/11/2026)
+- Mục 1 (doanh thu theo Sale) + mục 2 (Tỷ lệ chốt theo Sale + thẻ "Tỷ lệ chốt TB") CHỈ tính phòng kinh doanh; từ mục 3 ("Tỷ lệ chốt theo Sale — từng Page") trở đi tính TẤT CẢ.
+- **Server** (`gas_v13.js` khối "PHAM VI PHONG KINH DOANH"): `_srKdMark_` gắn `kd:true/false` vào `bySale` + `saleCloseRate` của `buildSalesReportA_/B_`. Thành viên = `_posKMembers_(month, true)` = Online + Văn phòng + **Thử việc** (mốc ngày cuối tháng của ngày "đến") + phòng ban Sale; khớp theo NGƯỜI bằng `_salePersonKeyFn_` (tên Pancake ↔ tên Sale). Báo cáo K gọi `_posKMembers_(month)` 1 tham số → vẫn KHÔNG tính Thử việc.
+- **Client** (`js/11`): `_srKdScopeRows_` giữ dòng `kd===true`; dòng không có cờ → dự phòng theo `SALE_CHANNELS`. `_srKdNoteHtml_` liệt kê tài khoản đang bị ẩn.
+- Bài học: lọc theo TÊN ở trình duyệt hụt người mới/tên Pancake khác tên Sale; luôn lọc theo khoá NGƯỜI ở server. Test: `tools/test-kd-mark.js`, `tools/test-kd-scope.js`.

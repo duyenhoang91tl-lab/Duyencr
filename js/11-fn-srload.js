@@ -917,24 +917,40 @@ function _srDrillAttr_(kind, key){
 // Phạm vi PHÒNG KINH DOANH = đội Online + Văn phòng (Báo cáo E → Phân loại Sale; theo mốc ngày _saleChannelOn_ tại ngày cuối kỳ xem). Duyên chốt 2026-11-20:
 // mục 1 (tổng doanh thu theo Sale) + mục 2 (Tỷ lệ chốt theo Sale + thẻ Tỷ lệ chốt TB) của Báo cáo A/B CHỈ tính người trong phạm vi này;
 // từ mục 3 ("Tỷ lệ chốt theo Sale — từng Page") trở đi vẫn tính TẤT CẢ. Chưa phân loại ai (SALE_CHANNELS rỗng) → không lọc để không ra trống.
-function _srKdInScope_(name){
+function _srKdInScope_(name){   // CÁCH DỰ PHÒNG (dòng chưa có cờ kd từ server): tra theo tên trong SALE_CHANNELS
   if (typeof _saleChannelOn_ !== 'function') return true;
   var to = String(_srState.dateTo || ''), m = to.match(/(\d{4})-(\d{2})-(\d{2})/) || to.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   var ymd = ''; if (m) ymd = (m[1].length === 4) ? m[0].slice(0,10) : (m[3] + '-' + m[2] + '-' + m[1]);
   var ch = _saleChannelOn_(name, ymd);
-  return ch === 'online' || ch === 'offline';
+  return ch === 'online' || ch === 'offline' || ch === 'probation';
 }
+// 2026-11-21: server (GAS _srKdMark_) gắn kd:true/false theo NGƯỜI (Online + Văn phòng + Thử việc + phòng ban Sale, khớp tên Pancake↔Sale) — ưu tiên cờ này.
+// Dòng không có cờ (vd dòng đơn quầy mới thêm ở B) → cách dự phòng theo tên; chưa phân loại ai cả → không lọc để không ra trống.
 function _srKdScopeRows_(rows){
   rows = rows || [];
-  var any = typeof SALE_CHANNELS !== 'undefined' && SALE_CHANNELS && Object.keys(SALE_CHANNELS).some(function(n){ return SALE_CHANNELS[n] === 'online' || SALE_CHANNELS[n] === 'offline'; });
-  if (!any) return rows;
-  return rows.filter(function(r){ return _srKdInScope_(r && r.name); });
+  var anyKd = rows.some(function(r){ return r && typeof r.kd === 'boolean'; });
+  var anyCh = typeof SALE_CHANNELS !== 'undefined' && SALE_CHANNELS && Object.keys(SALE_CHANNELS).some(function(n){ var v = SALE_CHANNELS[n]; return v === 'online' || v === 'offline' || v === 'probation'; });
+  if (!anyKd && !anyCh) return rows;
+  return rows.filter(function(r){
+    if (r && typeof r.kd === 'boolean') return r.kd;
+    return anyCh ? _srKdInScope_(r && r.name) : true;
+  });
 }
 function _srKdScopeData_(d){
   if (!d) return d;
   var c = {}; Object.keys(d).forEach(function(k){ c[k] = d[k]; });
-  c.saleCloseRate = _srKdScopeRows_(d.saleCloseRate);
+  var all = d.saleCloseRate || [];
+  c.saleCloseRate = _srKdScopeRows_(all);
+  var keep = {}; c.saleCloseRate.forEach(function(r){ keep[r.name] = 1; });
+  c.kdHidden = all.filter(function(r){ return !keep[r.name] && (Number(r.held) > 0 || Number(r.closed) > 0); }).map(function(r){ return r.name; });
   return c;
+}
+// Ghi chú dưới biểu đồ: ai đang BỊ ẨN (ngoài phòng kinh doanh) để Duyên đối chiếu — thiếu bạn mới nghĩa là chưa khớp tên/chưa phân loại.
+function _srKdNoteHtml_(dKd){
+  var h = (dKd && dKd.kdHidden) || [];
+  if (!h.length) return '';
+  return '<div style="font-size:11px;color:var(--muted);margin:4px 0 8px">Đang ẩn <b>' + h.length + '</b> tài khoản ngoài phòng kinh doanh (vẫn tính ở mục từng Page trở đi): ' + esc(h.slice(0, 14).join(', ')) + (h.length > 14 ? '…' : '') +
+    '. Thiếu bạn nào → vào Báo cáo E › Phân loại Sale (Online/Văn phòng/Thử việc) hoặc khớp tên Sale↔Pancake.</div>';
 }
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
@@ -984,7 +1000,7 @@ function _srRenderA(d){
   // trở đi (xem saleCloseRateFrom, bo qua nếu chưa từng nạp báo cáo Pancake ngày nào).
   var saleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span class="sr-sub">(Số đơn Base ÷ Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) + _srKdNoteHtml_(dKd_) :
       '<div class="sr-empty sr-empty-lg">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div class="sr-split">'+
     '<div class="sr-col-lg">'+saleHtml+_srSaleNoFbHtml_(d)+'</div>'+
@@ -1436,7 +1452,7 @@ function _srRenderB(d){
   // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
   var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span class="sr-sub">(Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.bSaleSearch, 'tương tác', d.saleCloseRateExcluded) :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(dKd_.saleCloseRate, _srState.bSaleSearch, 'tương tác', d.saleCloseRateExcluded) + _srKdNoteHtml_(dKd_) :
       '<div class="sr-empty sr-empty-lg">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div class="sr-split">'+
     '<div class="sr-col-lg">'+saleHtmlB_+'</div>'+
