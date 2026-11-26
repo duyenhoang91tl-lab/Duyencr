@@ -39,7 +39,7 @@
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','topsp','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
-    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
+    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist','act:leadassign','act:leadreport'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:pancakemap','act:ordersale','act:splitextra','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
     { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:sakura','act:mascot','act:garden','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
@@ -67,6 +67,8 @@
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },
     assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },
+    leadassign: { t:'👥 Data của team (chia lại)', f:'openLeadModal', lead:true, open:true },
+    leadreport: { t:'📊 Báo cáo nhân viên', f:'openLeadModal', arg:'report', lead:true, open:true },
     upload:     { t:'📂 Tải file Excel', click:'fi' },
     sync:       { t:'↓ Sync GS', f:'syncFromGS', arg:{pullOrders:true,manual:true} },
     fullsync:   { t:'🔁 Đồng bộ 2 chiều (tải + đẩy)', f:'fullSyncOrdersToGS', admin:true },
@@ -131,7 +133,7 @@
       var r = gOf('act:'+k), g = GROUPS[r.g];
       el.setAttribute('data-sn-g', g.k);
       el.style.order = String(r.g*100 + 1 + r.j);
-      var ok = !demo && (!ACTS[k].admin || isAdm()) && (isAdm() || ACTS[k].admin || ACTS[k].open || typeof _featAllowed !== 'function' || _featAllowed('act:' + k));   // phân quyền theo vai trò/bộ phận (js/40)
+      var ok = !demo && (!ACTS[k].lead || (typeof currentUser!=='undefined' && currentUser && currentUser.role==='leader' && !isAdm())) && (!ACTS[k].admin || isAdm()) && (isAdm() || ACTS[k].admin || ACTS[k].open || typeof _featAllowed !== 'function' || _featAllowed('act:' + k));   // phân quyền theo vai trò/bộ phận (js/40)
       if (ok) cnt[g.k] = (cnt[g.k]||0) + 1;
       el.classList.toggle('sn-hide', !ok || (!!closed[g.k]));
     });

@@ -3,9 +3,9 @@
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
-- ✅ **ĐÃ XONG:** Bước 1–6 + js/96 tự vẽ lại menu sau đăng nhập
-- 🔧 **ĐANG LÀM:** Bước 7: menu + nạp file
-- ➡️ **BƯỚC KẾ TIẾP:** js/29 (menu) → js/40 → index.html
+- ✅ **ĐÃ XONG:** Bước 1–6, js/96, menu js/29 (2 mục chỉ Trưởng nhóm thấy)
+- 🔧 **ĐANG LÀM:** Bước 7: nạp file
+- ➡️ **BƯỚC KẾ TIẾP:** js/40 → index.html
 
 ## 2026-11-26 (phiên Claude — CHIA DATA: CHỌN NGƯỜI NHẬN THEO DANH SÁCH SALE / TÀI KHOẢN ĐĂNG NHẬP CRM) — XONG BƯỚC 1/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: ở modal "Chia data nâng cao" muốn chia data theo Team có sẵn HOẶC theo danh sách Sale, tài khoản đăng nhập CRM.
