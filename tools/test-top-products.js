@@ -48,4 +48,17 @@ ok(!r.rows.some(x => x.code === 'QT99'), 'loai tru theo TEN (khong dau/hoa thuon
 r = A(rows, { dateFrom: '2026-11-21', dateTo: '2026-11-21', teamOf, limit: 2 });
 ok(r.rows.length === 2 && r.totalProducts >= 3, 'limit 2 nhung totalProducts van day du');
 ok(K('nv01', 'x') === 'c:NV01' && K('', 'Nhẫn Vàng') === K('', 'nhan vang') && K('(không rõ mã #1)', 'Abc').indexOf('n:') === 0, 'khoa: uu tien ma, khong ma thi theo ten bo dau');
+
+// --- onlyConfig: tra team + loai tru, KHONG doc don ---
+{
+  const g = n => grab(n);
+  let read = 0;
+  const c2 = vm.createContext({ Logger: { log() {} }, SH_TEAM: 'Team', getCrmSS_: () => ({ getSheetByName: () => ({}) }), readTeams_: () => [{ name: 'Team A' }, { name: 'Team B' }],
+    _makeTeamResolver_: () => () => 'Team A', getSetting_: () => JSON.stringify([{ key: 'c:QT99', name: 'Quà tặng' }]), readDonChiTiet_: () => { read++; return []; }, _mergeTachDon_: r => r,
+    _vnYmd_: () => '2026-11-21', _normTxt_: x => x });
+  vm.runInContext('var TOPSP_UNASSIGNED_TEAM_ = "(chưa có Team)";\n' + g('readTopSpExclude_') + '\n' + g('_topSpAggregate_').replace(/^/, '') + '\n' + g('buildTopProducts_'), c2);
+  const cfg = vm.runInContext('buildTopProducts_({onlyConfig:"1"})', c2);
+  ok(cfg.ok && cfg.onlyConfig && cfg.teams.join() === 'Team A,Team B,(chưa có Team)' && cfg.exclude.length === 1 && cfg.exclude[0].key === 'c:QT99', 'onlyConfig tra teams + exclude');
+  ok(read === 0, 'onlyConfig KHONG doc sheet don (nhanh)');
+}
 console.log(bad ? bad + ' LOI' : 'DAT'); process.exit(bad ? 1 : 0);
