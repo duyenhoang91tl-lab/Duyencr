@@ -3,9 +3,9 @@
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
-- ✅ **ĐÃ XONG:** Bước 1-3/7: backend, màn js/96, lọc tháng trên web (js/08 _inUserScope; test-lead-scope).
-- 🔧 **ĐANG LÀM:** Bước 4/7.
-- ➡️ **BƯỚC KẾ TIẾP:** js/14 → js/15 ô chọn tháng → js/07 → js/29 + index.html → tài liệu.
+- ✅ **ĐÃ XONG:** Bước 1-4/7: backend, js/96, js/08 lọc tháng, js/14 nạp viewMonths khi đăng nhập.
+- 🔧 **ĐANG LÀM:** Bước 5/7.
+- ➡️ **BƯỚC KẾ TIẾP:** js/15 ô chọn tháng ở form tài khoản → js/07 → js/29 + index.html → tài liệu.
 
 ## 2026-11-21 (phiên Claude — TẠO TÀI KHOẢN ĐỘI CSKH KHÔNG CẦN CHỌN SALE, CHIA DATA SAU) — XONG 1/1 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: tạo tài khoản cho đội CSKH rồi mới chia data nên chưa có "nhân viên/Sale" sẵn để tích ở "Quản lý tài khoản đăng nhập" — vẫn phải tạo được. Ảnh: modal có "Sale mà tài khoản này được nhìn thấy (Đang chọn 0/78)".
