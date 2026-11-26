@@ -804,7 +804,9 @@ function _csFilterHas(name){
 // Khớp theo chế độ lọc CS đang chọn (phụ trách / chăm sóc / cả hai) — DÙNG CHUNG cho danh sách, thống kê, xuất CSV
 function _csModeMatch(inSeller, inCare, inAssign){
   if (_csFilterMode === 'seller') return !!inSeller;          // chỉ CS phụ trách (người lên đơn)
-  if (_csFilterMode === 'care')   return !!inCare;            // chỉ CS chăm sóc (người đang chăm)
+  // CS được chia data cũng LÀ người chăm khách đó (data chia = giao khách để chăm) -> tính inAssign ở chế độ 'care',
+  // nếu không khách chỉ có trong đợt chia (chưa có CS chăm sóc ghi tên mình) biến mất khỏi Danh sách KH khi bấm "Chăm sóc".
+  if (_csFilterMode === 'care')   return !!(inCare || inAssign);   // chỉ CS chăm sóc (người đang chăm / được chia chăm)
   return !!(inSeller || inCare || inAssign);                  // 'both': phụ trách HOẶC chăm sóc HOẶC được chia
 }
 function _inCSScope(c, _preList){

@@ -78,17 +78,44 @@ async function flushAuditSync(){
   } catch(e){ /* GAS cũ chưa hỗ trợ saveAudit → bỏ qua, audit vẫn có ở localStorage */ }
 }
 
+// Gấp tên để so khớp: bỏ dấu, hoa/thường, gộp khoảng trắng (Ngocnm = ngocnm = "Ngọc nm").
+function _assignFoldName_(n){
+  return String(n == null ? '' : n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+// Các cách viết tên mà tài khoản/CS đang dùng ở nơi khác (tài khoản đăng nhập, tên CS đang đăng nhập, danh sách CS có sẵn):
+// gấp tên -> [cách viết]. Dùng để đợt chia ghi "Ngocnm" vẫn tính là của tài khoản "ngocnm".
+function _assignKnownNames_(){
+  var m = {};
+  function add(n){ n = String(n == null ? '' : n).trim(); if (!n) return; var k = _assignFoldName_(n); if (!m[k]) m[k] = []; if (m[k].indexOf(n) === -1) m[k].push(n); }
+  try {
+    if (typeof currentUser !== 'undefined' && currentUser){
+      (currentUser.names || []).forEach(add); add(currentUser.name); add(currentUser.username); (currentUser.viewNames || []).forEach(add);
+    }
+    if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; (a.names || []).forEach(add); add(a.name); add(a.username); });
+    var sel = (typeof document !== 'undefined') ? document.getElementById('cs-staff-filter') : null;
+    if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') add(o.value); });
+  } catch (e) {}
+  return m;
+}
 function _rebuildAssignIndex(){
   _assignIndex = {};
   _assignAllIndex = {};
+  var known = _assignKnownNames_(), extraBy = {};
   // duyệt từ CŨ → MỚI để bản ghi mới nhất ghi đè
   var hist = (typeof assignHistory !== 'undefined' && assignHistory) ? assignHistory.slice() : [];
   hist.sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
   hist.forEach(function(e){
+    // NGUYÊN NHÂN GỐC "CS được chia data nhưng Danh sách KH không hiện khách": _inUserScope / bộ lọc CS tra _assignAllIndex bằng
+    // so khớp CHÍNH XÁC từng ký tự tên, trong khi tab "Data của tôi" chọn đúng tên ghi trong đợt chia -> đợt chia ghi tên khác
+    // hoa/thường/dấu với tên tài khoản (vd Ngocnm vs ngocnm) thì Data của tôi có khách mà Danh sách KH trống. Thêm MỌI cách viết
+    // đã biết của cùng tên vào chỉ mục (giữ nguyên tên gốc của đợt chia).
+    var fk = _assignFoldName_(e.csName), ex = extraBy[fk];
+    if (!ex){ ex = (known[fk] || []).filter(function(n){ return n !== e.csName; }); extraBy[fk] = ex; }
     (e.phones||[]).forEach(function(p){
       _assignIndex[p] = e.csName; // CS mới nhất (dùng cho _heldBy)
-      if (!_assignAllIndex[p]) _assignAllIndex[p] = new Set();
-      _assignAllIndex[p].add(e.csName); // tất cả CS (dùng cho _inUserScope + CS filter)
+      var st = _assignAllIndex[p]; if (!st) st = _assignAllIndex[p] = new Set();
+      st.add(e.csName); // tất cả CS (dùng cho _inUserScope + CS filter)
+      for (var i = 0; i < ex.length; i++) st.add(ex[i]);
     });
   });
 }
