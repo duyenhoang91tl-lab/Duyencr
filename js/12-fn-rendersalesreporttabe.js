@@ -995,7 +995,12 @@ function renderSalesReportTabG_(wrap, subTabs){
     return;
   }
   // nhiều mục có tiêu đề riêng → ô bodyHtml của khuôn (js/76): thanh lọc G → nội dung G
-  wrap.innerHTML = uiReportFrame_({ id: 'G', barHtml: filters, loading: !!_srState.loading, bodyHtml: _srState.loading ? '' : _srRenderG_(_srState.dataG) });
+  var bodyG = '';
+  if (!_srState.loading){
+    try { bodyG = _srRenderG_(_srState.dataG); }
+    catch (eRg) { bodyG = '<div style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;font-size:13px">⚠️ Báo cáo G lỗi khi vẽ: ' + esc(String(eRg && eRg.message || eRg)) + ' — chụp màn hình gửi người hỗ trợ.</div>'; }   // trước đây ném lỗi → trang ở nguyên "Đang tải" mãi
+  }
+  wrap.innerHTML = uiReportFrame_({ id: 'G', barHtml: filters, loading: !!_srState.loading, bodyHtml: bodyG });
 }
 
 function openSaleKpiConfigModal_(){
