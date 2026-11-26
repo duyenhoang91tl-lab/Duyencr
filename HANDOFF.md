@@ -7,6 +7,12 @@
 - 🔧 **ĐANG LÀM:** Bước 4/7.
 - ➡️ **BƯỚC KẾ TIẾP:** js/14 → js/15 ô chọn tháng → js/07 → js/29 + index.html → tài liệu.
 
+## 2026-11-26 (phiên Claude — CHIA DATA: CHỌN NGƯỜI NHẬN THEO DANH SÁCH SALE / TÀI KHOẢN ĐĂNG NHẬP CRM) — XONG BƯỚC 1/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
+- ĐỀ BÀI Duyên: ở modal "Chia data nâng cao" muốn chia data theo Team có sẵn HOẶC theo danh sách Sale, tài khoản đăng nhập CRM.
+- HIỆN TRẠNG TRƯỚC KHI SỬA: chế độ "Theo Team" ĐÃ CÓ (lấy `teams` = "Quản lý Team", chia % cho thành viên). Chế độ "CS riêng lẻ" chỉ có 1 danh sách trộn (`_assignAllCSNames`: tên từ khách + tk CS), không tách được Sale / tài khoản.
+- ĐÃ LÀM (bước 1, file `js/07-openassignmodal.js`): trong "CS riêng lẻ" thêm hàng "Lấy người nhận từ": Tất cả CS (như cũ) | Danh sách Sale (`_assignSaleNames` = cùng `_allCSNames()` mà "Quản lý tài khoản" dùng) | Tài khoản đăng nhập CRM (`_assignAcctEntries`). Tài khoản → nhận data bằng TÊN CS CHÍNH của tài khoản (names[0] → name → username) để khách hiện đúng ở tài khoản đó; bỏ tk bị khoá + vai trò viewer + trùng tên CS + tên toàn số. Thêm nút "Chọn / Bỏ các dòng đang hiện" (theo ô tìm) và "Xoá hết lựa chọn", đếm "Đang chọn N người". Đổi nguồn KHÔNG mất người đã chọn. State mới `_advAssign.recvSrc` (reset khi mở modal). Logic chia/ghi lịch sử (`doAssignDataAdvanced`) KHÔNG đổi. Backend KHÔNG đổi. Test `node tools/test-assign-recv.js` (7 kiểm tra).
+- [ ] **VIỆC KẾ TIẾP (bước 2):** chế độ "Theo Team": hỏi/xác nhận Duyên "Team có sẵn" là gì — (a) Team trong "Quản lý Team" (đã chọn được, nhưng nếu Duyên chưa tạo Team nào thì danh sách trống), hay (b) Phòng ban Sale (`saleDepts`/`deptList` js/35) cần hiện như Team để chia. Nếu (b): thêm chip phòng ban vào `teams`-picker, thành viên lấy từ `saleDepts`. Duyên thử: mở Chia data → CS riêng lẻ → bấm 3 nguồn, chọn vài người, Xác nhận chia.
+
 ## 2026-11-21 (phiên Claude — TẠO TÀI KHOẢN ĐỘI CSKH KHÔNG CẦN CHỌN SALE, CHIA DATA SAU) — XONG 1/1 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: tạo tài khoản cho đội CSKH rồi mới chia data nên chưa có "nhân viên/Sale" sẵn để tích ở "Quản lý tài khoản đăng nhập" — vẫn phải tạo được. Ảnh: modal có "Sale mà tài khoản này được nhìn thấy (Đang chọn 0/78)".
 - NGUYÊN NHÂN GỐC: `addAccount` (js/15) chặn "Chọn hoặc nhập ít nhất 1 Tên CS" với mọi vai trò trừ admin/manager/viewer. Không thể chỉ bỏ chặn: `names` rỗng ở vài chỗ nghĩa là "thấy tất cả" → lộ dữ liệu. Ngoài ra danh sách CS của **Chia data** (`_assignAllCSNames`, js/07) chỉ lấy tên từ khách đã có → tài khoản mới chưa có khách sẽ KHÔNG hiện để chia.
