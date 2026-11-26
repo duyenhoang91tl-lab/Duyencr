@@ -56,6 +56,9 @@ jobs:
       - name: So sánh bản nén với bản gốc (cùng biến/hàm toàn cục, cùng lỗi chạy)
         run: node tools/test-dist-equivalence.js
 
+      - name: Kiểm thử hộp thoại thống nhất (js/96)
+        run: node tools/test-ui-dialogs.js
+
       - name: Deploy lên Cloudflare
         if: env.HAS_CF == 'true'
         id: deploy
