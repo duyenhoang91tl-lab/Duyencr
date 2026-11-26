@@ -226,6 +226,20 @@ function _allHoldersOf(c){
   if (idx) idx.forEach(function(n){ s.add(n); });
   return s;
 }
+// Truong nhom bi gioi han thang (2026-11-26, Users.viewMonths): khach co it nhat 1 don (Base hoac POS) trong cac thang duoc cap.
+function _leadMonthOk_(c){
+  var ms = currentUser.viewMonths;
+  if (currentUser._monthSrc !== ms){ var set = {}; ms.forEach(function(m){ set[m] = 1; }); currentUser._monthSet = set; currentUser._monthSrc = ms; }   // tinh 1 lan (duong nong)
+  var want = currentUser._monthSet, yl = c.ymList || [], i, o;
+  for (i = 0; i < yl.length; i++){
+    o = yl[i]; if (!o) continue;
+    if (o.ds){ if (want[o.ds.slice(0,7)]) return true; }
+    else if (o.yr && o.mo && want[o.yr + '-' + (o.mo < 10 ? '0' : '') + o.mo]) return true;
+  }
+  var pos = (typeof window !== 'undefined' && window.posOrdersByPhone) ? window.posOrdersByPhone[c.phone] : null;
+  if (pos) for (i = 0; i < pos.length; i++){ if (pos[i].ds && want[pos[i].ds.slice(0,7)]) return true; }
+  return false;
+}
 function _inUserScope(c){
   if (!currentUser || currentUser.role === 'admin') return true;
   // Tài khoản có thể gắn NHIỀU tên (vd đơn "chia" cho nhiều sale, hoặc 1 tài khoản gộp nhiều bí
@@ -255,6 +269,10 @@ function _inUserScope(c){
     return false;
   }
   if (currentUser.role === 'leader'){
+    // Data admin chia thang cho Truong nhom: luon xem duoc (ke ca chua cai team, hoac ngoai thang duoc cap).
+    var _own = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+    if (_own) { for (var _q = 0; _q < myNames.length; _q++) { if (_own.has(myNames[_q])) return true; } }
+    if (currentUser.viewMonths && currentUser.viewMonths.length && !_leadMonthOk_(c)) return false;   // data khac cua team: chi cac thang duoc cap
     var team = null;
     for (var i=0;i<teams.length;i++){
       if (myNames.indexOf(teams[i].leader) !== -1 || teams[i].name === currentUser.team){ team = teams[i]; break; }

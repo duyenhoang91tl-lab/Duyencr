@@ -1,0 +1,22 @@
+// Pham vi xem cua Truong nhom tren web: data duoc chia + gioi han thang. Chay: node tools/test-lead-scope.js
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const src = fs.readFileSync(path.join(__dirname, '..', 'js', '08-fn-invalidatefiltercache.js'), 'utf8');
+const grab = n => { const m = src.match(new RegExp('^function ' + n + '\\([\\s\\S]*?\\n}\\n', 'm')); if (!m) throw new Error(n); return m[0]; };
+let ok = 0, fail = 0; const t = (n, v) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + n); v ? ok++ : fail++; };
+const ctx = { window: { posOrdersByPhone: { p4: [{ ds: '2026-05-02' }] } }, _assignAllIndex: { p3: new Set(['Mai']) }, _assignIndex: {}, teams: [{ name: 'A', leader: 'Mai', members: ['Lan'] }] };
+vm.createContext(ctx); ['_teamMemberSet', '_heldBy', '_leadMonthOk_', '_inUserScope'].forEach(n => vm.runInContext(grab(n), ctx));
+const c = (phone, ds, cs) => ({ phone, careCS: cs || 'Lan', ymList: ds ? [{ ds }] : [] });
+const lead = m => ({ role: 'leader', name: 'Mai', names: ['Mai'], team: 'A', viewMonths: m });
+ctx.currentUser = lead([]);
+t('khong cai thang: thay data team moi thang (nhu cu)', ctx._inUserScope(c('p1', '2026-09-01')) && ctx._inUserScope(c('p2', '')));
+ctx.currentUser = lead(['2026-04', '2026-05', '2026-06']);
+t('co don thang 4 -> thay', ctx._inUserScope(c('p1', '2026-04-30')));
+t('don thang 9 / khong co don -> an', !ctx._inUserScope(c('p1', '2026-09-01')) && !ctx._inUserScope(c('p2', '')));
+t('thang 4 nam khac -> an', !ctx._inUserScope(c('p1', '2025-04-01')));
+t('don Base chi co nam/thang (khong ds)', ctx._inUserScope({ phone: 'p9', careCS: 'Lan', ymList: [{ yr: 2026, mo: 6, ds: '' }] }));
+t('don chi co o POS thang 5 -> thay', ctx._inUserScope(c('p4', '')));
+t('duoc chia thang cho Lead -> thay du ngoai thang', ctx._inUserScope(c('p3', '2026-09-01')));
+t('dung thang nhung ngoai team -> an', !ctx._inUserScope(c('p1', '2026-04-01', 'Tu')));
+ctx.teams = []; t('Lead chua cai team van thay data duoc chia (du CS cham soc la nguoi khac)', ctx._inUserScope(c('p3', '2026-09-01', 'Lan')));
+ctx.currentUser = { role: 'cs', name: 'Lan', names: ['Lan'] }; t('CS khong bi anh huong', ctx._inUserScope(c('p1', '2026-09-01')));
+console.log(ok + ' OK, ' + fail + ' FAIL'); process.exit(fail ? 1 : 0);
