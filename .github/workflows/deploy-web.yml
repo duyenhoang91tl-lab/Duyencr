@@ -44,6 +44,9 @@ jobs:
       - name: Cài công cụ nén và kiểm thử
         run: npm i --no-save terser@5 clean-css@5 jsdom@24
 
+      - name: Kiểm tra sức khoẻ web (file thiếu, nạp trùng, thiếu ?v=, hàm trùng, cú pháp)
+        run: node tools/check-health.js
+
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
 

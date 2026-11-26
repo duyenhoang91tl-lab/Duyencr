@@ -29,7 +29,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/00-tokens.css?v=20261114b"><!-- R1: mã thiết kế --ui-* (chỉ thêm biến, chưa đổi giao diện); PHẢI nạp trước 01-base -->
 <link rel="stylesheet" href="css/01-base.css?v=20261115g">
-<link rel="stylesheet" href="css/02-style.css">
+<link rel="stylesheet" href="css/02-style.css?v=20261126a">
 </head>
 <body>
 <div id="boot-splash"><i></i><span>Đang mở CRM…</span><small>Lần đầu có thể mất vài giây</small></div>
@@ -1106,9 +1106,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/17-opencarestatusmodal.js"></script>
+<script src="js/17-opencarestatusmodal.js?v=20261126a"></script>
 
-<link rel="stylesheet" href="css/03-style.css">
+<link rel="stylesheet" href="css/03-style.css?v=20261126a">
 
 
 <!-- ── TRẠNG THÁI KH MANAGER MODAL ── -->
@@ -1267,7 +1267,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<link rel="stylesheet" href="css/04-style.css">
+<link rel="stylesheet" href="css/04-style.css?v=20261126a">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261115g">
 <link rel="stylesheet" href="css/06-pro.css?v=20261119a">
 <link rel="stylesheet" href="css/07-teamchat.css?v=20261115g">
@@ -1279,8 +1279,8 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/11-roles.css?v=20261115g">
 <link rel="stylesheet" href="css/12-salematch.css?v=20261115g">
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
-<link rel="stylesheet" href="css/14-qrpills.css">
-<link rel="stylesheet" href="css/15-mobile.css">
+<link rel="stylesheet" href="css/14-qrpills.css?v=20261126a">
+<link rel="stylesheet" href="css/15-mobile.css?v=20261126a">
 <link rel="stylesheet" href="css/16-mobile-list.css?v=20261126b">
 <link rel="stylesheet" href="css/17-reports-pro.css?v=20261103b">
 <link rel="stylesheet" href="css/18-list-pro.css?v=20261103a">
@@ -1298,7 +1298,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/30-cust-dup.css?v=20261117a"><!-- R5d bước 1: bảng xem khách trùng SĐT (js/87; chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/99-dark-auto.css?v=20261116a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
-<script src="js/18-openkhstatusmodal.js"></script>
+<script src="js/18-openkhstatusmodal.js?v=20261126a"></script>
 
 
 <!-- ── HANG TOOLTIP (Phân hạng KH theo doanh thu) ── -->
@@ -1399,7 +1399,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 
-<script src="js/19-opentiertooltip.js"></script>
+<script src="js/19-opentiertooltip.js?v=20261126a"></script>
 
 <script src="js/20-loadaiexamples.js?v=20261115f"></script>
 
@@ -1452,7 +1452,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 
-<script src="js/21-openbroadcastcompose.js"></script>
+<script src="js/21-openbroadcastcompose.js?v=20261126a"></script>
 
 <!-- ═══ MẪU TIN HỎI THĂM TỰ ĐỘNG (FollowUpTemplates) ═══ -->
 <div class="modal-overlay" id="futpl-modal" style="z-index:2600">
@@ -1492,7 +1492,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/22-fumycs.js"></script>
+<script src="js/22-fumycs.js?v=20261126a"></script>
 
 <!-- ═══ XÓA ĐƠN TRÙNG (DuplicateOrders) ═══ -->
 <div class="modal-overlay" id="dup-orders-modal" style="z-index:2600">
@@ -1569,7 +1569,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/24-openbctmodal.js"></script>
+<script src="js/24-openbctmodal.js?v=20261126a"></script>
 
 <!-- ═══ THỐNG KÊ CHIẾN DỊCH GỬI HÀNG LOẠT ═══ -->
 <div class="modal-overlay" id="bcstat-modal" style="z-index:2600">
@@ -1604,7 +1604,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/25-openbcstatmodal.js"></script>
+<script src="js/25-openbcstatmodal.js?v=20261126a"></script>
 
 <!-- ═══ LOG GỬI TN CHIẾN DỊCH CỦA 1 KHÁCH ═══ -->
 <div class="modal-overlay" id="bclog-modal" style="z-index:2700">
@@ -1782,28 +1782,28 @@ function openBcLogModal(phone){
   </div>
 </div>
 
-<script src="js/26-loadtasks.js"></script>
+<script src="js/26-loadtasks.js?v=20261126a"></script>
 <script src="js/44-fn-taskflow.js?v=20261115g"></script>
 <script src="js/45-fn-taskflow-admin.js?v=20261115g"></script>
-<script src="js/27-fn-bonuscore.js"></script>
+<script src="js/27-fn-bonuscore.js?v=20261126a"></script>
 <script src="js/28-fn-bonusdetail.js?v=20261115g"></script>
-<script src="js/34-fn-todaytasks.js"></script>
+<script src="js/34-fn-todaytasks.js?v=20261126a"></script>
 <script src="js/35-fn-deptsettings.js?v=20261126c"></script>
 <script src="js/36-fn-homechips.js?v=20261115f"></script>
 <script src="js/37-fn-configpage.js?v=20261116a"></script>
-<script src="js/39-fn-buyfilter.js"></script>
+<script src="js/39-fn-buyfilter.js?v=20261126a"></script>
 <script src="js/40-fn-carepage.js?v=20261115g"></script>
 <script src="js/41-fn-stageboard.js?v=20261115g"></script>
-<script src="js/42-fn-homesummary.js"></script>
+<script src="js/42-fn-homesummary.js?v=20261126a"></script>
 <script src="js/43-fn-uxtools.js?v=20261115g"></script>
 <script src="js/30-fn-teamanalysis.js?v=20261116a"></script>
 <script src="js/29-sidenav.js?v=20261126a"></script>
 <script src="js/31-fn-orgoverview.js?v=20261116a"></script>
 <script src="js/32-fn-furesult.js?v=20261115g"></script>
-<script src="js/33-fn-tierconfig.js"></script>
+<script src="js/33-fn-tierconfig.js?v=20261126a"></script>
 <script src="js/33-pro-profile.js?v=20261126a"></script>
-<script src="js/34-pro-charts.js"></script>
-<script src="js/36-pro-home.js"></script>
+<script src="js/34-pro-charts.js?v=20261126a"></script>
+<script src="js/36-pro-home.js?v=20261126a"></script>
 <script src="js/38-pro-dock.js?v=20261118b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js?v=20261126a"></script>
@@ -1812,24 +1812,24 @@ function openBcLogModal(phone){
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/48-fn-medialib.js?v=20261113e"></script>
 <script src="js/43-teamchat.js?v=20261101a"></script>
-<script src="js/40-main-restorenav.js"></script>
-<script src="js/43-fn-viewstate.js"></script>
-<script src="js/46-fn-kho.js"></script>
+<script src="js/40-main-restorenav.js?v=20261126a"></script>
+<script src="js/43-fn-viewstate.js?v=20261126a"></script>
+<script src="js/46-fn-kho.js?v=20261126a"></script>
 <script src="js/47-staff-profile.js?v=20261126p"></script>
 <script src="js/48-filter-presets.js?v=20261110a"></script>
 <script src="js/48-pro-chatinfo.js?v=20261115h"></script>
-<script src="js/49-pro-discuss.js"></script>
+<script src="js/49-pro-discuss.js?v=20261126a"></script>
 <script src="js/50-split-orders.js?v=20261116a"></script>
 <script src="js/50-person-tags.js?v=20261115g"></script>
-<script src="js/51-demo-guard.js"></script>
-<script src="js/52-fn-salematch.js"></script>
-<script src="js/53-fn-promo-engine.js"></script>
+<script src="js/51-demo-guard.js?v=20261126a"></script>
+<script src="js/52-fn-salematch.js?v=20261126a"></script>
+<script src="js/53-fn-promo-engine.js?v=20261126a"></script>
 <script src="js/54-fn-promo-admin.js?v=20261115g"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
-<script src="js/56-fn-qrpills.js"></script>
+<script src="js/56-fn-qrpills.js?v=20261126a"></script>
 <script src="js/59-fn-mobilefit.js?v=20261115g"></script>
 <script src="js/57-viettat.js?v=20261116a"></script>
-<script src="js/58-auto-cust-link.js"></script>
+<script src="js/58-auto-cust-link.js?v=20261126a"></script>
 <script src="js/59-conn-diag.js?v=20261115g"></script>
 <script src="js/59-report-drill.js?v=20261115g"></script>
 <script src="js/60-team-bonus.js?v=20261117a"></script>
