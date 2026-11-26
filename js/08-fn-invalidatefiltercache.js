@@ -103,6 +103,10 @@ function _assignKnownNames_(){
       (currentUser.viewNames || []).forEach(function(n){ addGroup([n]); });   // Quầy/CSKH: tên riêng, KHÔNG gộp thành cùng người với tài khoản
     }
     if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; addGroup((a.names || []).concat([a.name, a.username])); });
+    // NGUYÊN NHÂN GỐC "đã chia data cho sale nhưng Danh sách KH không hiện" (2026-11-26, tiếp): chia data chọn người nhận từ "Danh sách Sale" (tên Base/Pancake/Pos)
+    // và 2 tên đó được admin nối với tài khoản qua Quản lý Team › 🔗 Khớp sale (SALE_PERSON_TAGS = {tên chính: [thẻ...]}) — nhưng chỉ mục này chỉ biết nhóm tên của TÀI KHOẢN
+    // (names/name/username) nên đợt chia ghi tên thẻ (vd 'thuydinh95') không khớp tên tài khoản ('thuydinh1995') → _inUserScope/bộ lọc CS loại hết khách. Nay mỗi nhóm thẻ cũng là 1 người.
+    try { if (typeof SALE_PERSON_TAGS !== 'undefined' && SALE_PERSON_TAGS) Object.keys(SALE_PERSON_TAGS).forEach(function(k){ addGroup([k].concat(Array.isArray(SALE_PERSON_TAGS[k]) ? SALE_PERSON_TAGS[k] : [])); }); } catch (eT) {}
     var sel = (typeof document !== 'undefined') ? document.getElementById('cs-staff-filter') : null;
     if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') addGroup([o.value]); });
   } catch (e) {}

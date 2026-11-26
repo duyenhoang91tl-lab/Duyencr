@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+
+## 2026-11-26 (phiên Claude — ĐÃ CHIA DATA CHO SALE NHƯNG KHÔNG HIỆN Ở DANH SÁCH KH, LẦN 3: TÊN THẺ "KHỚP SALE") — BƯỚC 1/2 XONG (web, Ctrl+F5); BƯỚC 2/2 (GAS) ĐANG LÀM
+- ĐỀ BÀI Duyên: đã chia data cho sale nhưng Danh sách KH không hiện khách.
+- NGUYÊN NHÂN GỐC (tìm được thêm, sau 2 lần sửa hoa/thường + dấu/khoảng trắng): chia data chọn người nhận từ "Danh sách Sale" (tên Base/Pancake/Pos); 2 tên đó được admin nối với tài khoản bằng Quản lý Team › 🔗 Khớp sale (`SALE_PERSON_TAGS` = {tên chính: [thẻ...]}). Nhưng `_assignKnownNames_` (js/08) chỉ biết nhóm tên của TÀI KHOẢN (names/name/username) → đợt chia ghi tên thẻ (vd `thuydinh95`) không khớp tài khoản `thuydinh1995` → `_inUserScope`/bộ lọc CS loại hết khách (client), và server (`_scopePhoneSet_`/`_scopeVerdict_`) cũng chỉ so tên tài khoản.
+- ✅ **BƯỚC 1/2 (web, XONG):** js/08 `_assignKnownNames_` thêm mỗi nhóm thẻ `SALE_PERSON_TAGS` = 1 người (?v=20261126c). Test mới `node tools/test-assign-person-tags.js` (5 ca, có ca tái hiện lỗi + ca tài khoản khác KHÔNG thấy) xanh; test-cs-assigned-visible + test-assign-recv vẫn xanh.
+- 🔧 **ĐANG LÀM — BƯỚC 2/2 (GAS gas_v13.js + gas/*.gs):** `_scopePhoneSet_` + `_scopeVerdict_` cũng phải coi tên cùng nhóm thẻ (`_userAliasGroups_`) là cùng người khi so tên đợt chia. Chỉ ảnh hưởng khi Script Property `scopeMode`='enforce' (hoặc tài khoản bị giới hạn tháng). SAU KHI XONG: nhớ deploy lại GAS thủ công (hoặc workflow tự deploy xanh).
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên Ctrl+F5 → đăng nhập tài khoản sale được chia → Danh sách KH phải hiện khách. Nếu vẫn trống: vào Quản lý Team › Khớp sale xem tên ghi trong đợt chia (tab Lịch sử chia) đã nằm cùng nhóm thẻ với tài khoản chưa; chưa thì nối vào, hoặc gửi: tên tài khoản + tên ghi trong đợt chia + 1 SĐT.
+
 ## 2026-11-26 (phiên Claude — TÊN GỐC = TÊN TRÊN PANCAKE) — XONG 2/2 (A: tạo/sửa tài khoản, B: trang Phòng ban; chỉ web, Ctrl+F5; không đụng GAS)
 - ĐỀ BÀI Duyên: khớp sale phải lấy tên gốc ngay từ phần tạo tài khoản; chốt "lấy gốc theo tên trên Pancake cho dễ".
 - NGUYÊN NHÂN GỐC: tên chính của tài khoản = ô đầu tiên được tick/gõ (`names[0]`), không liên quan tới tên Pancake → cùng 1 người mang tên chính khác nhau ở từng nơi, các mục chọn theo tên rồi tách đôi (yennth / yenNTH2004).
