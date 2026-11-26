@@ -32,7 +32,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(D.querySelector('.sn-act[data-act="profile"]'), 'menu co muc Ho so nhan vien');
     w.openProfileModal(); await wait(300);
     const ov = D.getElementById('sp-overlay'); ok(ov && ov.classList.contains('open'), 'hop thoai mo');
-    ok(D.querySelector('#sp-overlay > .sp-box.sp-box') && D.querySelector('.sp-layout > .sp-colL #sp-fullName') && D.querySelector('.sp-layout > .sp-colR .sp-card'), 'bo cuc man day du: ho so o cot trai, ket qua o cot phai');
+    ok(D.querySelector('#sp-overlay > .sp-box.sp-box') && D.querySelector('.sp-layout > .sp-colL #sp-fullName') && D.querySelector('.sp-layout > .sp-colR #sp-load-ov'), 'bo cuc man day du: ho so o cot trai, ket qua o cot phai');
     ok(/Quay lại/.test(D.getElementById('sp-close').textContent), 'nut ← Quay lai');
     ok(D.documentElement.classList.contains('sp-lock'), 'khoa cuon trang nen khi man day du mo');
     ok(!D.querySelector('.sp-overlay .sp-box').style.maxWidth && /position:fixed;inset:0/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')) && !/width:min\(620px/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')), 'CSS: phu kin cua so, khong con hop 620px');
@@ -40,6 +40,12 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(w.__xss !== 1 && !D.querySelector('#sp-body img'), 'ho ten co HTML bi escape (khong XSS)');
     ok(D.getElementById('sp-fullName').value.indexOf('<img') === 0, 'o ho ten giu nguyen chuoi text');
     ok(!D.getElementById('sp-phone').disabled, 'nhan vien sua duoc ho so minh');
+    // Duyen 26/11: KET QUA LAM VIEC CHI TAI KHI BAM NUT (do lag) — mo ho so khong duoc goi staffOverview
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === 0, 'mo ho so KHONG tu goi staffOverview');
+    ok(!D.querySelector('.sp-card'), 'chua bam tai thi chua co the so lieu');
+    D.getElementById('sp-load-ov').click(); await wait(300);
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === 1, 'bam nut tai -> goi staffOverview dung 1 lan');
+    ok(!D.getElementById('sp-load-ov'), 'tai xong thi nut tai bien mat');
     const cards = [...D.querySelectorAll('.sp-card')].map(c => c.textContent);
     ok(cards.length === 13, 'du 13 the so lieu, co ' + cards.length);
     const has = (lbl, val) => ok(cards.some(t => t.indexOf(lbl) >= 0 && t.indexOf(val) >= 0), 'the "' + lbl + '" phai chua "' + val + '" — ' + JSON.stringify(cards.filter(t => t.indexOf(lbl) >= 0)));
@@ -66,7 +72,10 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     pick2.value = 'saleA'; pick2.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
     const n0 = calls.filter(c => /staffOverview/.test(c.url)).length;
     const q = D.getElementById('sp-quick'); q.value = 'lastMonth'; q.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
-    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'doi ky -> goi lai staffOverview');
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0, 'doi ky -> KHONG tu goi lai staffOverview');
+    ok(D.getElementById('sp-load-ov'), 'doi ky -> hien lai nut Tai ket qua');
+    D.getElementById('sp-load-ov').click(); await wait(300);
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'bam tai sau khi doi ky -> goi staffOverview');
     const soCalls = calls.filter(c => /staffOverview/.test(c.url));   // lay request staffOverview CUOI (khong phai request bat ky cuoi cung: co the co goi khac xen vao -> test chap chon)
     ok(soCalls.length && /from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/.test(soCalls[soCalls.length - 1].url), 'tham so ngay dung dinh dang: ' + (soCalls.length ? soCalls[soCalls.length - 1].url.slice(-80) : '(khong co)'));
     D.getElementById('sp-close').click();

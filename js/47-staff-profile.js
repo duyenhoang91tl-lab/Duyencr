@@ -75,10 +75,14 @@
     ov.addEventListener('change', function(ev){
       var t = ev.target;
       if (t.id === 'sp-pick') load(t.value);
-      else if (t.id === 'sp-quick'){ S.quick = t.value; if (t.value !== 'custom'){ var r = rangeOf(t.value); S.from = r.from; S.to = r.to; } loadOverview(); render(); }
-      else if (t.id === 'sp-from' || t.id === 'sp-to'){ S[t.id === 'sp-from' ? 'from' : 'to'] = t.value; if (S.from && S.to && S.from <= S.to) loadOverview(); }
+      else if (t.id === 'sp-quick'){ S.quick = t.value; if (t.value !== 'custom'){ var r = rangeOf(t.value); S.from = r.from; S.to = r.to; } resetOverview(); render(); }
+      else if (t.id === 'sp-from' || t.id === 'sp-to'){ S[t.id === 'sp-from' ? 'from' : 'to'] = t.value; resetOverview(); }
     });
-    ov.addEventListener('click', function(ev){ var b = ev.target.closest && ev.target.closest('#sp-save'); if (b) save(); });
+    ov.addEventListener('click', function(ev){
+      var t = ev.target.closest ? ev.target : null; if (!t) return;
+      if (t.closest('#sp-save')) save();
+      else if (t.closest('#sp-load-ov')) loadOverview();   // CHỈ tải kết quả làm việc khi bấm nút (Duyên 26/11: đỡ lag)
+    });
     return ov;
   }
   function close(){ var ov = document.getElementById('sp-overlay'); if (ov) ov.classList.remove('open'); document.documentElement.classList.remove('sp-lock'); }
@@ -124,7 +128,11 @@
       (S.quick === 'custom' ? '<input type="date" id="sp-from" class="sp-in sp-dt" value="' + e(S.from) + '"><input type="date" id="sp-to" class="sp-in sp-dt" value="' + e(S.to) + '">' : '<span class="sp-mu">' + e(S.from) + ' → ' + e(S.to) + '</span>') + '</div>';
     var o = S.ov;
     if (S.loading && !o) h += '<div class="sp-load"><i class="sp-spin"></i><span>Đang tính số liệu…</span></div>';
-    else if (!o) h += '<div class="sp-err">' + e(S.ovErr || 'Chưa có số liệu.') + '</div>';
+    else if (!o) {
+      if (S.ovErr) h += '<div class="sp-err">' + e(S.ovErr) + '</div>';
+      else h += '<div class="sp-mu sp-wn">Số liệu chỉ được tính khi bạn bấm nút bên dưới (để trang đỡ lag).</div>';
+      h += '<div class="sp-act"><button type="button" class="btn" id="sp-load-ov">' + (S.ovErr ? '🔄 Thử tải lại' : '📊 Tải kết quả làm việc') + '</button></div>';
+    }
     else {
       var cs = custStats(o.names && o.names.length ? o.names : d.names);
       var closeHeld = cs.held ? (o.totalOrders || 0) / cs.held * 100 : null;
@@ -148,6 +156,8 @@
     h += '</div>';
     body.innerHTML = top + '<div class="sp-layout"><div class="sp-colL">' + left + '</div><div class="sp-colR">' + h + '</div></div>';
   }
+  // Đổi nhân viên / khoảng ngày: bỏ kết quả cũ (huỷ yêu cầu đang chạy) và chờ người dùng bấm "Tải kết quả làm việc".
+  function resetOverview(){ S.seq++; S.loading = false; S.ov = null; S.ovErr = ''; }
   function loadOverview(){
     if (!S.username || !S.from || !S.to || S.from > S.to) return;
     var seq = ++S.seq; S.loading = true; S.ov = null; S.ovErr = ''; render();
@@ -165,7 +175,7 @@
     getJson({ action:'profileGet', username:S.username }).then(function(p){
       if (seq !== S.seq) return;
       if (!p || !p.ok){ S.loading = false; S.err = (p && p.error) || 'Không tải được hồ sơ.'; render(); return; }
-      S.data = p; render(); loadOverview();
+      S.data = p; S.loading = false; render();   // KHÔNG tự tải kết quả làm việc — chờ bấm nút
     });
   }
   function save(){

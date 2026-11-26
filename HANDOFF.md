@@ -1,5 +1,18 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — HỒ SƠ NHÂN VIÊN: (1) KẾT QUẢ LÀM VIỆC CHỈ TẢI KHI BẤM NÚT; (2) SALE TỰ CHỌN/GÕ "TÊN THEO TỪNG HỆ THỐNG") — BƯỚC 1/2 XONG (chỉ web, Ctrl+F5)
+- ĐỀ BÀI Duyên: vào Hồ sơ nhân viên bị lag; chỉ tải "Kết quả làm việc" khi bấm nút. Mục "Tên theo từng hệ thống" (Pancake/CRM/Base/POS) cho Sale được tick chọn từ danh sách hoặc tự gõ tên (hiện chỉ admin sửa được).
+- NGUYÊN NHÂN GỐC lag: `js/47-staff-profile.js` `load()` luôn gọi `loadOverview()` (action `staffOverview` của GAS — tính doanh thu/hoa hồng/thưởng/Pancake/xếp hạng, nặng) ngay khi mở hồ sơ, đổi nhân viên hay đổi kỳ.
+- ✅ BƯỚC 1 (xong): mở hồ sơ / đổi nhân viên / đổi kỳ KHÔNG tự gọi `staffOverview` nữa; cột phải hiện nút "📊 Tải kết quả làm việc" (lỗi thì "🔄 Thử tải lại"). Thêm `resetOverview()` (huỷ yêu cầu đang chạy + xoá số cũ khi đổi kỳ). `?v=20261126o`. `tools/test-staff-profile-ui.js` cập nhật (mở hồ sơ 0 lần gọi staffOverview; bấm nút = 1 lần; đổi kỳ không tự gọi, bấm lại thì gọi) — xanh; test-staff-profile, test-staff-names-ui, test-staff-directory-team xanh. KHÔNG đụng GAS/extension.
+- [ ] BƯỚC 2 (chưa làm): cho Sale tự sửa tên theo hệ thống của CHÍNH MÌNH.
+  - GAS `gas/28_StaffProfile.gs` (+ `gas_v13.js`, rồi `split-gas`): `profileGet_` trả `canEditNames` = admin HOẶC chính chủ; `profileSave_` bỏ chặn "chỉ admin" cho chính chủ (vẫn giữ kiểm xung đột `_profNameConflicts_` — tên đang thuộc tài khoản/nhóm thẻ khác bị từ chối); thêm action GET `profileNameOptions` (mọi người đã đăng nhập) trả gợi ý theo 4 hệ thống (Danh sách Sale: Pancake/Base; tài khoản CRM; tên đã có trong hồ sơ khác cho POS) và bỏ tên đã thuộc người khác.
+  - Web `js/47`: ô tên theo hệ thống = ô gõ + danh sách gợi ý tick chọn (datalist/chip), dùng cho cả sale.
+  - ⚠ RỦI RO cần Duyên biết: sale tự khai tên chưa có chủ (vd tên Pancake của đồng nghiệp chưa có hồ sơ) thì doanh thu/đơn của tên đó gộp về sale này. Cột `updatedBy` của sheet hồ sơ ghi ai sửa; admin nên rà định kỳ.
+  - Sau bước 2: CẦN DEPLOY GAS (workflow deploy-gas.yml hoặc dán lại gas_v13.js → New version).
+- 🧪 Duyên thử bước 1: Ctrl+F5 → Hồ sơ nhân viên: mở ra nhanh, chưa có số; bấm "📊 Tải kết quả làm việc" mới tính; đổi kỳ → phải bấm tải lại.
+- Việc tay: revoke token GitHub đã dán (token dán nhiều lần trong các phiên).
+
+
 ## 2026-11-26 (phiên Claude — Ô "CS CHĂM SÓC" Ở HỒ SƠ KHÁCH BÁO "KHÔNG TÌM THẤY CS", CS MỚI CÓ TÀI KHOẢN KHÔNG CHỌN ĐƯỢC TÊN MÌNH) — XONG, ĐÃ PUSH (chỉ web, Ctrl+F5; không đụng GAS/extension)
 - NGUYÊN NHÂN GỐC (đọc code `renderCareTab` + `_csPickList_`, js/03): danh sách chọn chỉ lấy CS có trong ĐƠN (+ thành viên Team nếu là admin). CS vừa được tạo tài khoản CRM, chưa có đơn nào → tên không có trong danh sách dù Chia data (js/07 `_assignAcctEntries`, lấy tên từ tài khoản) đã chia đúng tên đó → ô báo "Không tìm thấy CS".
 - ✅ `js/03-fn-refreshopendptab.js` (`?v=20261126b`): thêm `_csAccountNames_()` (tên tài khoản CRM đang hoạt động, bỏ khoá/chỉ xem/tên toàn số, cùng quy tắc tên names[0]→name→username với Chia data; thêm người đang đăng nhập nếu không phải admin/viewer); `_csPickList_` nhận tham số thứ 4 `extraNames` (tương thích ngược). `renderCareTab` truyền thêm tên tài khoản + CS đang gán của khách (không bị mất khi không còn trong đơn). `tools/test-aa-ui.js` +3 ca, 28 ca xanh (cần jsdom).
