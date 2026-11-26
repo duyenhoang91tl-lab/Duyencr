@@ -3359,6 +3359,7 @@ function doGetCore_(e) {
     if (action === 'importBatches') return jsonOut_(_impWho_(e && e.parameter && e.parameter.token) ? importBatchesList_() : { error: 'Cần đăng nhập.', code: 'AUTH' });   // OWNER_ONLY_ACTIONS_ da chan nguoi khong phai chu so huu o doGet
     if (action === 'chatViolations') return jsonOut_(cvList_((e && e.parameter) || {}));   // giam sat chat: CHI admin (cvList_ tu kiem)
     if (action === 'profileGet')    return jsonOut_(profileGet_((e && e.parameter) || {}));
+    if (action === 'staffNamesList') return jsonOut_(staffNamesList_((e && e.parameter) || {}));
     if (action === 'staffOverview') return jsonOut_(staffOverview_((e && e.parameter) || {}));
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
@@ -20861,7 +20862,9 @@ function removePkLichSuTrigger_() { ScriptApp.getProjectTriggers().forEach(funct
 //  phong kinh doanh = nhom KPI Sale (deptKey); team = sheet Teams. So khach dang giu / da ket ban do CLIENT dem (cung pham vi voi "Data cua toi").
 // ═══════════════════════════════════════════════════════════════
 var SH_PROFILE = 'StaffProfiles';
-var PROFILE_HEADERS = ['username', 'fullName', 'phone', 'email', 'facebook', 'updatedAt', 'updatedBy'];
+var PROFILE_HEADERS = ['username', 'fullName', 'phone', 'email', 'facebook', 'updatedAt', 'updatedBy', 'namesJson'];
+// namesJson = JSON {pancake:[],crm:[],base:[],pos:[]}: ten CUA CHINH NHAN VIEN NAY o tung he thong (yeu cau Duyen 26/11/2026: 1 ho so chuan -> Team chi chon ho so).
+var PROFILE_NAME_SYS_ = ['pancake', 'crm', 'base', 'pos'];
 
 // Lam sach + kiem tra 1 ho so. Tra { ok, error, profile }. Chan ky tu mo dau cong thuc Sheets (= + - @) o ho ten.
 function _profClean_(p) {
@@ -20892,15 +20895,94 @@ function _profNames_(u) {
   (u && u.names || []).concat([u && u.name, u && u.username]).forEach(function(x) { if (x && out.indexOf(x) === -1) out.push(x); });
   return out;
 }
+// ── TEN THEO TUNG HE THONG (Pancake / CRM / Base / POS) cua 1 nhan vien ──
+// Parse cot namesJson (loi/rong -> 4 mang rong).
+function _profNamesParse_(raw) {
+  var out = {}; PROFILE_NAME_SYS_.forEach(function(k) { out[k] = []; });
+  try {
+    var o = JSON.parse(String(raw || '{}')) || {};
+    PROFILE_NAME_SYS_.forEach(function(k) { if (Array.isArray(o[k])) out[k] = o[k].map(function(x) { return String(x || '').trim(); }).filter(Boolean); });
+  } catch (e) {}
+  return out;
+}
+// Lam sach names do client gui: moi he thong = mang ten (chap nhan ca chuoi ngan cach , ; xuong dong). Bo trung (khong phan biet hoa/thuong/dau),
+// toi da 20 ten/he thong, 60 ky tu/ten, chan ky tu mo dau cong thuc Sheets (= + - @).
+function _profNamesClean_(n) {
+  n = n || {};
+  var out = {}, err = [];
+  PROFILE_NAME_SYS_.forEach(function(k) {
+    var raw = n[k];
+    if (typeof raw === 'string') raw = raw.split(/[,;\n]+/);
+    var list = [], seen = {};
+    (Array.isArray(raw) ? raw : []).forEach(function(x) {
+      x = String(x == null ? '' : x).replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!x) return;
+      if (x.length > 60) { err.push('Tên "' + x.slice(0, 20) + '…" quá dài (tối đa 60 ký tự).'); return; }
+      if (/^[=+\-@]/.test(x)) { err.push('Tên "' + x + '" không được bắt đầu bằng = + - @.'); return; }
+      var kk = _normTxt_(x); if (seen[kk]) return; seen[kk] = 1; list.push(x);
+    });
+    if (list.length > 20) err.push('Mỗi hệ thống tối đa 20 tên.');
+    out[k] = list;
+  });
+  return err.length ? { ok: false, error: err.join(' ') } : { ok: true, names: out };
+}
+// Gop moi ten cua ca 4 he thong thanh 1 danh sach duy nhat (khong trung).
+function _profNamesAll_(names) {
+  var out = [], seen = {};
+  PROFILE_NAME_SYS_.forEach(function(k) { ((names || {})[k] || []).forEach(function(x) { var kk = _normTxt_(x); if (kk && !seen[kk]) { seen[kk] = 1; out.push(x); } }); });
+  return out;
+}
+// Ten dang bi nguoi KHAC giu (de khong vo tinh gop 2 nguoi thanh 1): ten nam trong nhom 'salePersonTags' cua khoa khac, hoac la ten/username tai khoan khac.
+// Tra mang [{name, owner}] (rong = khong xung dot).
+function _profNameConflicts_(username, allNames, users, tags) {
+  var me = _normTxt_(username), out = [];
+  allNames.forEach(function(nm) {
+    var k = _normTxt_(nm); if (!k || k === me) return;
+    var hit = '';
+    Object.keys(tags || {}).forEach(function(key) {
+      if (hit || _normTxt_(key) === me) return;
+      if (_normTxt_(key) === k || (tags[key] || []).some(function(t) { return _normTxt_(t) === k; })) hit = 'nhóm thẻ "' + key + '"';
+    });
+    if (!hit) (users || []).forEach(function(u) {
+      if (hit || _normTxt_(u.username) === me) return;
+      var uk = [u.username, u.name].concat(u.names || []).map(_normTxt_);
+      if (uk.indexOf(k) > -1) hit = 'tài khoản "' + u.username + '"';
+    });
+    if (hit) out.push({ name: nm, owner: hit });
+  });
+  // chinh ten chinh (username) cung khong duoc la the cua nguoi khac
+  Object.keys(tags || {}).forEach(function(key) {
+    if (_normTxt_(key) !== me && (tags[key] || []).some(function(t) { return _normTxt_(t) === me; })) out.push({ name: username, owner: 'nhóm thẻ "' + key + '"' });
+  });
+  return out;
+}
+// Dong bo ten ho so -> Settings 'salePersonTags' { "<ten chinh>": [the...] } (nguon DUY NHAT ma backend _userAliasGroups_ va client _personAliases dang dung de gop doanh thu/don theo NGUOI).
+// oldAll = cac ten ho so da dong bo lan truoc (de xoa dung nhung ten ho so tu bo, KHONG dung toi the admin gan tay o Quan ly Team).
+function _profSyncTags_(primary, oldAll, newAll) {
+  var tags = {}; try { var raw = getSetting_('salePersonTags'); if (raw) tags = JSON.parse(raw) || {}; } catch (e) { tags = {}; }
+  var me = _normTxt_(primary), key = primary;
+  Object.keys(tags).forEach(function(k) { if (_normTxt_(k) === me) key = k; });
+  var drop = {}; (oldAll || []).forEach(function(x) { drop[_normTxt_(x)] = 1; });
+  var list = [], seen = {};
+  (tags[key] || []).concat(newAll || []).forEach(function(x) {
+    var kk = _normTxt_(x); if (!kk || kk === me || seen[kk]) return;
+    var isNew = (newAll || []).some(function(y) { return _normTxt_(y) === kk; });
+    if (drop[kk] && !isNew) return;
+    seen[kk] = 1; list.push(x);
+  });
+  if (list.length) tags[key] = list; else delete tags[key];
+  setSetting_('salePersonTags', JSON.stringify(tags));
+  return tags;
+}
 function _profRead_(username) {
   var sh = getCrmSS_().getSheetByName(SH_PROFILE), un = String(username || '').trim().toLowerCase();
-  var empty = { fullName: '', phone: '', email: '', facebook: '', updatedAt: '', updatedBy: '' };
+  var empty = { fullName: '', phone: '', email: '', facebook: '', updatedAt: '', updatedBy: '', names: _profNamesParse_('') };
   if (!sh || sh.getLastRow() < 2) return empty;
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, PROFILE_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     if (String(v[i][0]).trim().toLowerCase() !== un) continue;
     var up = v[i][5] instanceof Date ? v[i][5].toISOString() : String(v[i][5] || '');
-    return { fullName: String(v[i][1] || ''), phone: String(v[i][2] || ''), email: String(v[i][3] || ''), facebook: String(v[i][4] || ''), updatedAt: up, updatedBy: String(v[i][6] || '') };
+    return { fullName: String(v[i][1] || ''), phone: String(v[i][2] || ''), email: String(v[i][3] || ''), facebook: String(v[i][4] || ''), updatedAt: up, updatedBy: String(v[i][6] || ''), names: _profNamesParse_(v[i][7]) };
   }
   return empty;
 }
@@ -21009,7 +21091,7 @@ function profileGet_(p) {
     if (!_profScope_(viewer, target, _roleBase_(viewer.role) === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
   }
   return { ok: true, username: target.username, accountName: target.name || '', role: target.role || '', team: target.team || '', names: _profNames_(target),
-           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin' };
+           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin', canEditNames: viewer.role === 'admin' };
 }
 // POST action=profileSave {token, username?, profile:{fullName,phone,email,facebook}} — chi sua ho so cua chinh minh (admin sua duoc cua nguoi khac)
 function profileSave_(d) {
@@ -21021,6 +21103,14 @@ function profileSave_(d) {
   if (String(viewer.username).toLowerCase() !== String(target.username).toLowerCase() && viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Bạn chỉ sửa được hồ sơ của chính mình.', code: 'FORBIDDEN' });
   var c = _profClean_(d.profile);
   if (!c.ok) return jsonOut_({ ok: false, error: c.error });
+  // Ten theo he thong: CHI admin sua (nhan vien tu them ten = co the ke khai nham doanh thu cua nguoi khac). Khong gui names = giu nguyen ten cu.
+  var wantNames = d.names !== undefined && d.names !== null;
+  var nc = null;
+  if (wantNames) {
+    if (viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Chỉ admin được sửa tên theo hệ thống (Pancake/CRM/Base/POS).', code: 'FORBIDDEN' });
+    nc = _profNamesClean_(d.names);
+    if (!nc.ok) return jsonOut_({ ok: false, error: nc.error });
+  }
   var lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (eL) { return jsonOut_({ ok: false, error: 'Hệ thống bận, thử lại sau vài giây.' }); }
   try {
@@ -21030,11 +21120,42 @@ function profileSave_(d) {
       for (var i = 0; i < ids.length; i++) if (String(ids[i][0]).trim().toLowerCase() === un) { row = i + 2; break; }
     }
     if (!row) row = Math.max(sh.getLastRow(), 1) + 1;
+    var oldNames = _profRead_(target.username).names, namesToStore = oldNames, conflicts = [];
+    if (wantNames) {
+      var tagsNow = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tagsNow = JSON.parse(rawT) || {}; } catch (eT) {}
+      conflicts = _profNameConflicts_(target.username, _profNamesAll_(nc.names), users, tagsNow);
+      if (conflicts.length) return jsonOut_({ ok: false, error: 'Tên đang thuộc người khác: ' + conflicts.map(function(x) { return '"' + x.name + '" (' + x.owner + ')'; }).join(', ') + '. Gỡ khỏi hồ sơ/nhóm thẻ kia trước.', conflicts: conflicts });
+      namesToStore = nc.names;
+    }
     var rng = sh.getRange(row, 1, 1, PROFILE_HEADERS.length);
     rng.setNumberFormat('@');   // giu so 0 dau cua SDT, khong cho Sheets tu doi kieu
-    rng.setValues([[target.username, c.profile.fullName, c.profile.phone, c.profile.email, c.profile.facebook, new Date().toISOString(), viewer.username]]);
+    rng.setValues([[target.username, c.profile.fullName, c.profile.phone, c.profile.email, c.profile.facebook, new Date().toISOString(), viewer.username, JSON.stringify(namesToStore)]]);
+    // Gop ten ho so vao 'salePersonTags' -> bao cao doanh thu/don/ty le chot gop theo NGUOI (dung nguon co san, khong them logic gop moi).
+    if (wantNames) _profSyncTags_(target.username, _profNamesAll_(oldNames), _profNamesAll_(namesToStore));
   } finally { try { lock.releaseLock(); } catch (eR) {} }
   return jsonOut_({ ok: true, profile: _profRead_(target.username) });
+}
+// GET action=staffNamesList&token=.. — danh sach HO SO CHUAN cua moi tai khoan (de man Cai dat Team chon theo ho so): ten chuan + ten o 4 he thong.
+// Chi admin / quan ly / leader xem (cung nhom duoc phep chon nhan vien vao Team).
+function staffNamesList_(p) {
+  var viewer = _sessUser_(p.token);
+  if (!viewer) return { ok: false, error: 'Cần đăng nhập.', code: 'AUTH' };
+  var base = _roleBase_(viewer.role);
+  if (viewer.role !== 'admin' && base !== 'manager' && base !== 'leader') return { ok: false, error: 'Bạn không có quyền xem danh sách hồ sơ.', code: 'FORBIDDEN' };
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)), prof = {};
+  var sh = getCrmSS_().getSheetByName(SH_PROFILE);
+  if (sh && sh.getLastRow() >= 2) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, PROFILE_HEADERS.length).getValues().forEach(function(r) {
+      var un = String(r[0] || '').trim().toLowerCase(); if (un) prof[un] = { fullName: String(r[1] || ''), names: _profNamesParse_(r[7]) };
+    });
+  }
+  var list = [];
+  users.forEach(function(u) {
+    if (!u || u.active === false || u.role === 'demo') return;
+    var pr = prof[String(u.username || '').trim().toLowerCase()] || { fullName: '', names: _profNamesParse_('') };
+    list.push({ username: u.username, accountName: u.name || '', role: u.role || '', team: u.team || '', fullName: pr.fullName, display: pr.fullName || u.name || u.username, names: pr.names, all: _profNamesAll_(pr.names) });
+  });
+  return { ok: true, list: list };
 }
 // GET action=staffOverview&token=..&username=..&from=YYYY-MM-DD&to=YYYY-MM-DD
 function staffOverview_(p) {
