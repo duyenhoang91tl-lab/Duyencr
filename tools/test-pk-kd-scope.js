@@ -16,16 +16,19 @@ const rows = [
 ];
 const s = ctx._pkKdSplit_(rows, '2026-11-20');
 t(s.scoped === true, 'có lọc');
-t(s.kd.map(x => x.name).join() === 'ninh,trinh', 'KD = online + offline: ' + s.kd.map(x => x.name));
-t(s.out.map(x => x.name).join() === 'tuoi,Public API,Duyen Hoang', 'ngoài KD vẫn giữ để hiển thị: ' + s.out.map(x => x.name));
+t(s.kd.map(x => x.name).join() === 'ninh,trinh,tuoi', 'KD = online + offline + thu viec: ' + s.kd.map(x => x.name));
+t(s.out.map(x => x.name).join() === 'Public API,Duyen Hoang', 'ngoài KD vẫn giữ để hiển thị: ' + s.out.map(x => x.name));
 const kd = ctx._pkRateOf_(s.kd), all = ctx._pkRateOf_(rows);
-t(kd.rate === 15 && kd.don === 30 && kd.tongTT === 200, 'KD 30/200 = 15%: ' + JSON.stringify(kd));
+t(kd.rate === 14 && kd.don === 35 && kd.tongTT === 250, 'KD 35/250 = 14%: ' + JSON.stringify(kd));
 t(all.rate === Math.round(38 / 1350 * 1000) / 10, 'gộp mọi người thấp hơn nhiều (2.8%): ' + all.rate);
 t(kd.rate > all.rate, 'bỏ người ngoài KD thì tỷ lệ chung không còn bị kéo xuống');
 // dự phòng: chưa có phân loại Sale -> dùng nhóm SaleDirectory
 ctx.CH = {};
 const s2 = ctx._pkKdSplit_(rows, '2026-11-20');
-t(s2.kd.map(x => x.name).join() === 'ninh,trinh', 'dự phòng theo nhóm S/O: ' + s2.kd.map(x => x.name));
+t(s2.kd.map(x => x.name).join() === 'ninh,trinh,tuoi', 'dự phòng theo nhóm S/O/Thử việc: ' + s2.kd.map(x => x.name));
+// 2026-11-26: cờ kd của server thắng — ngocNM thuộc Phòng ban Sale (không có kênh/nhóm S-O) vẫn được tính; người kd:false thì ra ngoài
+const s4 = ctx._pkKdSplit_([{ name: 'ngocNM', tongTT: 10, donHangForRate: 1, nhom: '', kd: true }, { name: 'Public API', tongTT: 90, donHangForRate: 0, nhom: '', kd: false }], '2026-11-20');
+t(s4.scoped && s4.kd.map(x => x.name).join() === 'ngocNM' && s4.out.map(x => x.name).join() === 'Public API', 'co kd cua server: ngocNM trong KD');
 // không ai được phân loại ở cả 2 nguồn -> không lọc (tránh ra trống)
 const s3 = ctx._pkKdSplit_(rows.map(r => ({ name: r.name, tongTT: r.tongTT, donHangForRate: r.donHangForRate, nhom: '' })), '2026-11-20');
 t(s3.scoped === false && s3.kd.length === 5 && s3.out.length === 0, 'chưa phân loại -> không lọc');

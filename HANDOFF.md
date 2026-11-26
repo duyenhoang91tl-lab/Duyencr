@@ -1,11 +1,23 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-26 (phiên Claude — FIX: TAB KPI PANCAKE LỌC "PHÒNG KINH DOANH" LÀM MẤT BẠN MỚI (ngocNM) KHỎI DOANH THU) — XONG 1/1 (GAS tự deploy + Ctrl+F5; chờ Duyên thử thật)
+- ĐỀ BÀI Duyên: đã lọc phòng kinh doanh đội sale mà các bạn mới (vd ngocnm) vẫn không hiện doanh thu.
+- NGUYÊN NHÂN GỐC: bộ lọc KD mình thêm ở tab 📈 Báo cáo KPI Pancake (11-21, `_pkKdInScope_` ở js/10) chỉ nhận kênh `online`/`offline` hoặc nhóm SaleDirectory Văn phòng/Online → KHÔNG nhận **Thử việc** và **Phòng ban Sale** (ngocNM thuộc phòng ban Sale theo file nhân sự) nên bị đẩy xuống khối "Ngoài phòng KD" và không cộng vào "Tỷ lệ chốt chung — phòng KD". Báo cáo A/B không bị vì đã dùng cờ `kd` của server (fix 11-21).
+- ĐÃ SỬA: (1) GAS `buildKpiReport_` (gas_v13.js + gas/14_KpiReport_Users_Assign.gs): gắn `kd:true/false` vào `bySale` bằng `_srKdMark_(bySale,{dateTo:to})` — CÙNG nguồn A/B: Online + Văn phòng + Thử việc + Phòng ban Sale, khớp theo NGƯỜI. (2) `js/10-fn-pkkpipct.js` (?v=20261126a): `_pkKdInScope_` ưu tiên cờ `kd` của server; dự phòng cũng nhận Thử việc. Test `node tools/test-pk-kd-scope.js` (thêm ca ngocNM kd:true) + test-kd-mark + test-kd-scope + test-page-pkd-header OK; `split-gas --check` OK.
+- [ ] **VIỆC KẾ TIẾP:** chờ GAS deploy xanh (tab Actions) + Ctrl+F5 → KPI Pancake: ngocNM phải nằm trong nhóm KD. Nếu vẫn thiếu: xem dòng "Ngoài phòng KD" có ngocNM không → tên Pancake chưa khớp 1 người Sale có phân loại/phòng ban Sale (Báo cáo E › Phân loại Sale, bảng khớp tên Sale↔Pancake). Nếu Duyên đang nói tab/báo cáo khác (A, B, K...) → báo đúng tên tab + khoảng ngày để dò tiếp. Báo cáo K cố ý chưa tính Thử việc.
+
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
 - ✅ **ĐÃ XONG:** Bước 1–7: tính năng đã nạp vào web (index.html)
 - 🔧 **ĐANG LÀM:** Kiểm tra cuối + tài liệu
 - ➡️ **BƯỚC KẾ TIẾP:** docs/crm-kb/15 → Duyên thử thật với 1 tài khoản Trưởng nhóm
+
+## 2026-11-26 (phiên Claude — CHIA DATA THEO TEAM: TẠO NHANH TEAM + PHÒNG BAN SALE NHƯ TEAM) — XONG BƯỚC 2/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
+- ĐỀ BÀI Duyên: "làm cả a b" — (a) Team trong Quản lý Team (tạo nhanh nếu chưa có), (b) Phòng ban Sale hiện như Team để chia.
+- ĐÃ LÀM (file `js/07-openassignmodal.js`, chế độ "Theo Team"): (a) nút "➕ Tạo nhanh Team [từ N người đang chọn]" (chỉ Admin): tạo Team cùng cấu trúc `addTeam` (js/08) — thành viên = người đang chọn ở "CS riêng lẻ", lưu `ome_teams` + `pushTeamsToGS`, tự chọn Team vừa tạo, chặn trùng tên. (b) Mục "Phòng ban Sale": đọc `deptList` + `saleDepts` từ Settings qua `_dpGet` (js/35), mỗi phòng có ≥1 thành viên thành "Team ảo" id `dept:<key>` (KHÔNG ghi vào ome_teams); chia % / số lượng cho thành viên y như Team thường. Mọi chỗ tra Team trong js/07 đổi sang `_assignTeamById` (gồm cả phòng ban). Logic ghi lịch sử chia (`doAssignDataAdvanced`) giữ nguyên. Backend KHÔNG đổi (dùng getSetting có sẵn). Test `node tools/test-assign-team.js` (8 kiểm tra) + `tools/test-assign-recv.js`.
+- LƯU Ý: thành viên phòng ban là TÊN SALE trong `saleDepts` — chỉ nhận được data nếu tên đó trùng tên CS đang dùng trong dữ liệu/tài khoản. Nếu Chia xong mà tài khoản không thấy khách → kiểm tra tên Sale↔tên CS tài khoản.
+- [ ] **VIỆC KẾ TIẾP:** Duyên thử: Chia data → "Theo Team": (1) thấy mục "Phòng ban Sale" (cần kết nối GAS; nếu lỗi bấm ↻ Tải lại), chọn 1 phòng → chia % cho thành viên → Xác nhận; (2) ở "CS riêng lẻ" chọn vài người → sang "Theo Team" → "Tạo nhanh Team". Chưa làm: Team ảo theo phòng cho tài khoản Quản lý (hiện chia bằng tài khoản Admin).
 
 ## 2026-11-26 (phiên Claude — CHIA DATA: CHỌN NGƯỜI NHẬN THEO DANH SÁCH SALE / TÀI KHOẢN ĐĂNG NHẬP CRM) — XONG BƯỚC 1/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: ở modal "Chia data nâng cao" muốn chia data theo Team có sẵn HOẶC theo danh sách Sale, tài khoản đăng nhập CRM.

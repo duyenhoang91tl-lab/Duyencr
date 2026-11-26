@@ -42,6 +42,7 @@ function openAssignModal() {
   _advAssign.selectedTeams = new Set();
   _advAssign.selectMode = 'cs';
   _advAssign.recvSrc = 'all';
+  _asgDept.loaded = false; _asgDept.err = '';   // mở modal mới → lần chọn Theo Team kế tiếp tải lại Phòng ban Sale
   _advAssign.sourceMode = 'filter';
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
@@ -251,6 +252,61 @@ function _advAssignClearCS(){
   renderAssignCreate();
 }
 
+// ── 2026-11-26 (bước 2): chia THEO TEAM — thêm (a) tạo nhanh Team ngay trong modal, (b) Phòng ban Sale như 1 Team ──
+// Phòng ban Sale = deptList + saleDepts ({tênSale: keyPhòng}) lưu ở Settings (js/35). Mỗi phòng có ≥1 thành viên thành 1 "Team ảo" id 'dept:<key>' (không ghi vào ome_teams).
+var _asgDept = { loaded: false, loading: false, err: '', list: [] };
+function _assignBuildDeptTeams(base, sd){
+  var out = [];
+  if (!Array.isArray(base) || !sd || typeof sd !== 'object' || Array.isArray(sd)) return out;
+  base.forEach(function(g){
+    if (!g || !g.key) return;
+    var mem = Object.keys(sd).filter(function(nm){ return String(sd[nm]) === String(g.key) && String(nm).trim() && !/^\d+$/.test(String(nm).trim()); })
+                .sort(function(x, y){ return x.localeCompare(y, 'vi'); });
+    if (mem.length) out.push({ id: 'dept:' + g.key, name: String(g.label || g.key), members: mem, isDept: true });
+  });
+  return out;
+}
+async function _assignLoadDeptTeams(force){
+  if (_asgDept.loading || (_asgDept.loaded && !force)) return;
+  if (typeof gsUrl === 'undefined' || !gsUrl || typeof _dpGet !== 'function'){ _asgDept.loaded = true; _asgDept.err = 'chưa kết nối Google Apps Script'; return; }
+  _asgDept.loading = true; _asgDept.err = '';
+  try {
+    var dl = _dpParse(await _dpGet('deptList')), sd = _dpParse(await _dpGet('saleDepts'));
+    var base = (Array.isArray(dl) && dl.length) ? dl : ((typeof DEPT_DEFAULT !== 'undefined') ? DEPT_DEFAULT : []);
+    _asgDept.list = _assignBuildDeptTeams(base, sd);
+  } catch (e) { _asgDept.err = (e && e.message) ? e.message : String(e); }
+  _asgDept.loaded = true; _asgDept.loading = false;
+  if (document.getElementById('assign-body') && _advAssign.selectMode === 'team') renderAssignCreate();
+}
+// Team theo id — gồm Team trong Quản lý Team VÀ phòng ban (id 'dept:...')
+function _assignTeamById(id){
+  var t = (teams || []).find(function(x){ return x.id === id; });
+  if (t) return t;
+  return (_asgDept.list || []).find(function(x){ return x.id === id; });
+}
+function _advAssignSetMode(mode){
+  _advAssign.selectMode = (mode === 'team') ? 'team' : 'cs';
+  if (_advAssign.selectMode === 'team') _assignLoadDeptTeams(false);
+  renderAssignCreate();
+}
+// Tạo nhanh Team: thành viên = người đang chọn ở "CS riêng lẻ" (mỗi người 1 tên chính). Cùng cấu trúc với addTeam (js/08) để tab Quản lý Team thấy ngay.
+function _advAssignQuickTeam(){
+  if (!currentUser || currentUser.role !== 'admin'){ toast('Chỉ Admin mới tạo được team'); return; }
+  var name = prompt('Tên team mới:', 'Team ' + (teams.length + 1));
+  if (name === null) return;
+  name = name.trim(); if (!name) return;
+  if (teams.some(function(t){ return String(t.name).trim().toLowerCase() === name.toLowerCase(); })){ toast('Đã có Team tên "' + name + '" — chọn tên khác.'); return; }
+  var members = _dedupePeopleNames([..._advAssign.selectedCS]);
+  var t = { id: _genTeamId(), name: name, leader: '', members: members, color: V9_TEAM_COLORS[teams.length % V9_TEAM_COLORS.length], channels: [], ratePct: { above15: 0, below15: 0 } };
+  teams.push(t);
+  saveLS('ome_teams', teams);
+  if (typeof logAudit === 'function') logAudit('team', '', '', 'Tạo team: ' + name + ' (' + members.length + ' thành viên, tạo nhanh từ Chia data)');
+  if (typeof pushTeamsToGS === 'function') pushTeamsToGS();
+  _advAssign.selectedTeams.add(t.id);
+  toast('✓ Đã tạo Team "' + name + '" (' + members.length + ' thành viên)' + (members.length ? '' : ' — chưa có thành viên, vào Quản lý Team để thêm'));
+  renderAssignCreate();
+}
+
 // ── Helper: get sorted pool based on advAssign settings ──
 function _getAssignPool() {
   let pool = [..._advAssignDateFilteredList()];
@@ -450,10 +506,10 @@ function renderAssignCreate() {
   <div class="assign-section" id="as-s2" style="scroll-margin-top:46px">
     <div class="assign-section-title">② Chọn nơi nhận data</div>
     <div class="assign-mode-row" style="margin-bottom:10px">
-      <div class="assign-mode-btn ${!isTeamMode?'active':''}" onclick="_advAssign.selectMode='cs';renderAssignCreate()">
+      <div class="assign-mode-btn ${!isTeamMode?'active':''}" onclick="_advAssignSetMode('cs')">
         👤 CS riêng lẻ <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chọn từng người</span>
       </div>
-      <div class="assign-mode-btn ${isTeamMode?'active':''}" onclick="_advAssign.selectMode='team';renderAssignCreate()">
+      <div class="assign-mode-btn ${isTeamMode?'active':''}" onclick="_advAssignSetMode('team')">
         👥 Theo Team <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chia tỷ lệ % cho từng người trong Team</span>
       </div>
     </div>
@@ -484,10 +540,18 @@ function renderAssignCreate() {
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
     ` : `
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team / Phòng ban — chọn được nhiều, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="as-lbl">Team trong "Quản lý Team" <span class="as-sub">(${teams.length})</span>:</div>
     <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
       ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
-      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — vào tab "Quản lý Team" để tạo Team trước.</span>':''}
+      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — bấm "➕ Tạo nhanh Team" bên dưới (lấy luôn những người đang chọn ở chế độ CS riêng lẻ) hoặc vào tab "Quản lý Team".</span>':''}
+    </div>
+    <div style="margin-bottom:10px"><button type="button" class="btn sm" onclick="_advAssignQuickTeam()" title="Tạo Team mới ngay tại đây; thành viên = những người đang chọn ở 'CS riêng lẻ' (chọn trước rồi bấm). Chỉ Admin.">➕ Tạo nhanh Team${_advAssign.selectedCS.size>0?` từ ${_advAssign.selectedCS.size} người đang chọn`:''}</button></div>
+    <div class="as-lbl">Phòng ban Sale <span class="as-sub">(theo "Phòng ban" ở cài đặt — thành viên lấy từ file nhân sự)</span>:</div>
+    <div class="assign-cs-list" id="assign-dept-chips" style="margin-bottom:8px">
+      ${_asgDept.loading?'<span style="color:var(--hint);font-size:12px">Đang tải phòng ban…</span>':''}
+      ${_asgDept.list.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">🏢 ${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
+      ${(!_asgDept.loading && _asgDept.list.length===0)?`<span style="color:var(--hint);font-size:12px">${_asgDept.err?('Không tải được phòng ban: '+esc(_asgDept.err)):'Chưa có phòng ban nào có thành viên (cài ở "Phòng ban").'} <a href="#" onclick="_assignLoadDeptTeams(true);renderAssignCreate();return false">↻ Tải lại</a></span>`:''}
     </div>
     ${_advAssign.selectedTeams.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 Team</div>':''}
     `}
@@ -659,7 +723,7 @@ function _advAssignSetMemberCount(el) {
 // viên CHƯA được gán hoặc gán 0 — chia đều phần dư, giống _autoFillRemaining nhưng khoanh vùng
 // trong phạm vi 1 Team thay vì toàn bộ danh sách CS/Team.
 function _advAssignAutoFillTeamMembers(teamId) {
-  const team = teams.find(t => t.id === teamId);
+  const team = _assignTeamById(teamId);
   const members = _dedupePeopleNames((team && team.members) || []);   // 1 người nhiều tên chỉ nhận 1 phần
   if (!members.length) return;
   const pool = _getAssignPool();
@@ -722,7 +786,7 @@ function _renderTeamDistTable(pool, teamIds) {
       <thead><tr><th>Team</th><th style="text-align:center">Số KH</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
       <tbody>
         ${teamIds.map(tid=>{
-          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const team = _assignTeamById(tid) || {name:tid};
           const n = teamDist[tid]||0;
           const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
           return `<tr>
@@ -746,7 +810,7 @@ function _renderTeamDistTable(pool, teamIds) {
       <thead><tr><th>Team</th><th style="text-align:right">Số KH nhận</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
       <tbody>
         ${teamIds.map(tid=>{
-          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const team = _assignTeamById(tid) || {name:tid};
           const n = teamDist[tid]||0;
           const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
           return `<tr>
@@ -772,7 +836,7 @@ function _renderTeamDistTable(pool, teamIds) {
     </div>
   </div>`;
   teamIds.forEach(tid => {
-    const team = teams.find(t=>t.id===tid) || {name:tid, members:[]};
+    const team = _assignTeamById(tid) || {name:tid, members:[]};
     const members = _dedupePeopleNames(team.members || []);   // 1 người nhiều tên chỉ nhận 1 phần
     const teamCount = teamDist[tid] || 0;
     html += `<div style="margin-bottom:10px">`;
@@ -852,7 +916,7 @@ function doAssignDataAdvanced() {
     const isCountMode = _advAssign.memberDistMode === 'count';
     const orderedSet = new Set();
     for (const teamId of teamIds) {
-      const team = teams.find(t => t.id === teamId);
+      const team = _assignTeamById(teamId);
       const members = _dedupePeopleNames((team && team.members) || []);   // 1 người nhiều tên chỉ nhận 1 phần
       const teamCount = teamDist[teamId] || 0;
       if (!members.length || teamCount <= 0) continue;

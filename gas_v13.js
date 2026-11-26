@@ -10804,6 +10804,9 @@ function buildKpiReport_(from, to, saleFilter) {
     r.maSale = rec ? rec.code : '';
     r.inDirectory = !!rec;
   });
+  // 2026-11-26: gan co kd:true/false (CUNG nguon voi Bao cao A/B: Online + Van phong + Thu viec + phong ban Sale, khop NGUOI) de tab KPI Pancake loc "phong kinh doanh"
+  // dung nhu A/B. NGUYEN NHAN GOC: client chi tra SALE_CHANNELS/nhom S-O nen ban moi (ngocNM thuoc phong ban Sale, hoac Thu viec) bi xep vao "ngoai phong KD".
+  _srKdMark_(bySale, { dateTo: to });
   bySale.sort(function(a, b) {
     // Thu tu nhom: Van phong (S) -> Online (O) -> ngoai danh sach, dung theo yeu cau; trong
     // tung nhom sap theo Ty le chot (tyLeChot) giam dan — Sale chot tot nhat len dau.
