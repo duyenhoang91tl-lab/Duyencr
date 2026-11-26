@@ -120,7 +120,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `PK_HIST_SECTION_`
 
 ## 28_StaffProfile.gs
-- Hàm: `_profClean_`, `_profFindUser_`, `_profNames_`, `_profNamesParse_`, `_profNamesClean_`, `_profNamesAll_`, `_profNameConflicts_`, `_profSyncTags_`, `_profRead_`, `_profMetrics_`, `_profCreatorOrders_`, `_profFold_`, `_profScope_`, `_profRank_`, `_profMonthRange_`, `profileGet_`, `profileSave_`, `staffNamesList_`, `staffOverview_`
+- Hàm: `_profClean_`, `_profFindUser_`, `_profNames_`, `_profNamesParse_`, `_profNamesClean_`, `_profNamesAll_`, `_profNameConflicts_`, `_profSyncTags_`, `_profRead_`, `_profMetrics_`, `_profCreatorOrders_`, `_profFold_`, `_profScope_`, `_profRank_`, `_profMonthRange_`, `profileGet_`, `profileSave_`, `profileNameOptions_`, `staffNamesList_`, `staffOverview_`
 - Hằng/biến: `SH_PROFILE`, `PROFILE_HEADERS`, `PROFILE_NAME_SYS_`
 
 ## 29_MediaLib.gs

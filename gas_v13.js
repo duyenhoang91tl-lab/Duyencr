@@ -3489,6 +3489,7 @@ function doGetCore_(e) {
     if (action === 'chatViolations') return jsonOut_(cvList_((e && e.parameter) || {}));   // giam sat chat: CHI admin (cvList_ tu kiem)
     if (action === 'profileGet')    return jsonOut_(profileGet_((e && e.parameter) || {}));
     if (action === 'staffNamesList') return jsonOut_(staffNamesList_((e && e.parameter) || {}));
+    if (action === 'profileNameOptions') return jsonOut_(profileNameOptions_((e && e.parameter) || {}));
     if (action === 'staffOverview') return jsonOut_(staffOverview_((e && e.parameter) || {}));
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
@@ -21232,7 +21233,7 @@ function profileGet_(p) {
     if (!_profScope_(viewer, target, _roleBase_(viewer.role) === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
   }
   return { ok: true, username: target.username, accountName: target.name || '', role: target.role || '', team: target.team || '', names: _profNames_(target),
-           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin', canEditNames: viewer.role === 'admin' };
+           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin', canEditNames: self || viewer.role === 'admin' };   // 26/11 Duyen: sale tu chon/go ten he thong cua CHINH MINH (xung dot voi nguoi khac van bi chan)
 }
 // POST action=profileSave {token, username?, profile:{fullName,phone,email,facebook}} — chi sua ho so cua chinh minh (admin sua duoc cua nguoi khac)
 function profileSave_(d) {
@@ -21255,7 +21256,7 @@ function profileSave_(d) {
   var wantNames = d.names !== undefined && d.names !== null;
   var nc = null;
   if (wantNames) {
-    if (viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Chỉ admin được sửa tên theo hệ thống (Pancake/CRM/Base/POS).', code: 'FORBIDDEN' });
+    // Chinh chu hoac admin (kiem o tren: nguoi khac khong phai admin da bi tu choi). Sale tu khai ten van bi _profNameConflicts_ chan neu ten da thuoc nguoi khac.
     nc = _profNamesClean_(d.names);
     if (!nc.ok) return jsonOut_({ ok: false, error: nc.error });
   }
@@ -21271,7 +21272,7 @@ function profileSave_(d) {
     var oldNames = _profRead_(target.username).names, namesToStore = oldNames, conflicts = [];
     if (wantNames) {
       var tagsNow = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tagsNow = JSON.parse(rawT) || {}; } catch (eT) {}
-      var adoptKeys = Array.isArray(d.adoptTags) ? d.adoptTags.map(function(x) { return String(x || '').trim(); }).filter(Boolean) : [], adoptSet = {};
+      var adoptKeys = (viewer.role === 'admin' && Array.isArray(d.adoptTags)) ? d.adoptTags.map(function(x) { return String(x || '').trim(); }).filter(Boolean) : [], adoptSet = {};
       adoptKeys.forEach(function(k) { adoptSet[_normTxt_(k)] = 1; });
       // Nhom the cu duoc nhan phai con DU ten trong ho so, neu khong nguoi do mat lien ket (bao loi thay vi am tham lam mat).
       var newAllNow = _profNamesAll_(nc.names).map(_normTxt_).concat([_normTxt_(target.username)]), lost = [];
@@ -21293,6 +21294,39 @@ function profileSave_(d) {
     if (wantNames) _profSyncTags_(target.username, _profNamesAll_(oldNames), _profNamesAll_(namesToStore), adoptKeys);
   } finally { try { lock.releaseLock(); } catch (eR) {} }
   return jsonOut_({ ok: true, profile: _profRead_(target.username) });
+}
+// GET action=profileNameOptions&token=..&username=.. — GOI Y ten cho o "Ten theo tung he thong" (sale tick chon hoac tu go). Chinh chu / admin.
+// Nguon: Danh sach Sale (Pancake = ten Facebook, Base = user Base), tai khoan CRM, ten da co trong ho so khac (POS...). Da LOAI ten dang thuoc nguoi khac.
+function profileNameOptions_(p) {
+  var viewer = _sessUser_(p.token);
+  if (!viewer) return { ok: false, error: 'Cần đăng nhập.', code: 'AUTH' };
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var target = _profFindUser_(users, p.username || viewer.username);
+  if (!target) return { ok: false, error: 'Không tìm thấy tài khoản.' };
+  if (String(viewer.username).toLowerCase() !== String(target.username).toLowerCase() && viewer.role !== 'admin') return { ok: false, error: 'Bạn không có quyền xem gợi ý của hồ sơ này.', code: 'FORBIDDEN' };
+  var opts = {}, seen = {};
+  PROFILE_NAME_SYS_.forEach(function(k) { opts[k] = []; seen[k] = {}; });
+  function add(k, x) {
+    x = String(x == null ? '' : x).replace(/\s+/g, ' ').trim();
+    if (!x || x.length > 60 || /^[=+\-@]/.test(x) || _isNumericTag_(x)) return;
+    var kk = _normTxt_(x); if (!kk || seen[k][kk]) return; seen[k][kk] = 1; opts[k].push(x);
+  }
+  try { readSaleDirectory_().list.forEach(function(r) { add('pancake', r.tenFacebook); add('base', r.userBase); }); } catch (eD) {}
+  users.forEach(function(u) {
+    if (!u || u.active === false || u.role === 'demo') return;
+    add('crm', u.username); add('crm', u.name); (u.names || []).forEach(function(n) { add('crm', n); });
+  });
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_PROFILE);
+    if (sh && sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, PROFILE_HEADERS.length).getValues().forEach(function(r) {
+      var nm = _profNamesParse_(r[7]); PROFILE_NAME_SYS_.forEach(function(k) { (nm[k] || []).forEach(function(x) { add(k, x); }); });
+    });
+  } catch (eP) {}
+  var tags = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tags = JSON.parse(rawT) || {}; } catch (eT) {}
+  var all = []; PROFILE_NAME_SYS_.forEach(function(k) { all = all.concat(opts[k]); });
+  var bad = {}; _profNameConflicts_(target.username, all, users, tags, {}).forEach(function(c) { bad[_normTxt_(c.name)] = 1; });
+  PROFILE_NAME_SYS_.forEach(function(k) { opts[k] = opts[k].filter(function(x) { return !bad[_normTxt_(x)]; }); });
+  return { ok: true, username: target.username, options: opts };
 }
 // GET action=staffNamesList&token=.. — danh sach HO SO CHUAN cua moi tai khoan (de man Cai dat Team chon theo ho so): ten chuan + ten o 4 he thong.
 // Chi admin / quan ly / leader xem (cung nhom duoc phep chon nhan vien vao Team).
