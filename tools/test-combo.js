@@ -64,11 +64,11 @@ ok(J(ctx.comboDelete_({ token: 't', code: 'NOPE' })).error, 'delete missing');
 const g = J(ctx.doGet({ parameter: { action: 'comboList', q: 'vong' } }));
 ok(g.ok && g.rows.length === 1, 'doGet comboList');
 // ── 2026-11-18: ANH COMBO (cot 10 'Anh') ──
-ok(sheet.maxCols === 10 && String(sheet.rows[0][9]) === 'Ảnh', 'sheet cu 9 cot: tu them cot Anh (cot 10) + tieu de');
+ok(sheet.maxCols === 13 && String(sheet.rows[0][9]) === 'Ảnh' && String(sheet.rows[0][10]) === 'Ship (đ)' && String(sheet.rows[0][12]) === 'CTKM combo', 'sheet cu 9 cot: tu them cot Anh + Ship/Freeship/CTKM (cot 10-13) + tieu de');
 const FID = '1AbCdEfGhIjKlMnOpQrStUv';
 ok(JSON.stringify(ctx._comboImageUrls_('https://drive.google.com/file/d/' + FID + '/view?usp=sharing\nhttps://drive.google.com/uc?export=view&id=' + FID + '2\nhttps://cdn.example.com/a.jpg\nhttps://drive.google.com/drive/folders/' + FID + '\nrac roi')) ===
   JSON.stringify(['https://drive.google.com/thumbnail?id=' + FID + '&sz=w600', 'https://drive.google.com/thumbnail?id=' + FID + '2&sz=w600', 'https://cdn.example.com/a.jpg']), 'doi link Drive -> thumbnail, giu link http, BO link thu muc va chu rac');
-ok(ctx._comboImageUrls_('a\nb\nhttps://x.com/1.png\nhttps://x.com/2.png\nhttps://x.com/3.png\nhttps://x.com/4.png\nhttps://x.com/5.png').length === 4, 'toi da 4 anh');
+ok(ctx._comboImageUrls_('a\nb\nhttps://x.com/1.png\nhttps://x.com/2.png\nhttps://x.com/3.png\nhttps://x.com/4.png\nhttps://x.com/5.png\nhttps://x.com/6.png\nhttps://x.com/7.png').length === 6 && ctx._comboImageUrls_('https://x.com/1.png\nhttps://x.com/2.png\nhttps://x.com/3.png', 2).length === 2, 'anh combo toi da 6, anh qua toi da 2');
 r = J(ctx.comboSave_({ token: 't', combo: { name: 'Combo co anh', items: [{ name: 'Vòng' }], price: 500000, images: ['https://drive.google.com/uc?export=view&id=' + FID, 'rac', 'https://cdn.example.com/b.jpg'] } }));
 const saved = sheet.rows[sheet.rows.length - 1];
 ok(r.ok && saved[9] === 'https://drive.google.com/uc?export=view&id=' + FID + '\nhttps://cdn.example.com/b.jpg', 'luu anh: moi link 1 dong, link rac bi bo');

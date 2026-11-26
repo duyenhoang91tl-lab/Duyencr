@@ -193,6 +193,7 @@ function doGetCore_(e) {
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
     if (action === 'posPrice') return jsonOut_(posPrice_(e && e.parameter ? e.parameter.q : ''));   // don gia niem yet cua don POS GAN NHAT theo tung SP (form tao combo, js/93)
+    if (action === 'ctkmComboList') return jsonOut_({ ok: true, rows: readCtkmComboList_() });   // CTKM combo tao san (sheet CTKM_COMBO)
     if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
