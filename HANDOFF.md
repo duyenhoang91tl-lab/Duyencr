@@ -7,6 +7,12 @@
 - 🔧 **ĐANG LÀM:** Bước 7/7.
 - ➡️ **BƯỚC KẾ TIẾP:** js/29 menu + index.html nạp js/96 → tài liệu → Duyên thử thật.
 
+## 2026-11-26 (phiên Claude — CHIA DATA THEO TEAM: TẠO NHANH TEAM + PHÒNG BAN SALE NHƯ TEAM) — XONG BƯỚC 2/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
+- ĐỀ BÀI Duyên: "làm cả a b" — (a) Team trong Quản lý Team (tạo nhanh nếu chưa có), (b) Phòng ban Sale hiện như Team để chia.
+- ĐÃ LÀM (file `js/07-openassignmodal.js`, chế độ "Theo Team"): (a) nút "➕ Tạo nhanh Team [từ N người đang chọn]" (chỉ Admin): tạo Team cùng cấu trúc `addTeam` (js/08) — thành viên = người đang chọn ở "CS riêng lẻ", lưu `ome_teams` + `pushTeamsToGS`, tự chọn Team vừa tạo, chặn trùng tên. (b) Mục "Phòng ban Sale": đọc `deptList` + `saleDepts` từ Settings qua `_dpGet` (js/35), mỗi phòng có ≥1 thành viên thành "Team ảo" id `dept:<key>` (KHÔNG ghi vào ome_teams); chia % / số lượng cho thành viên y như Team thường. Mọi chỗ tra Team trong js/07 đổi sang `_assignTeamById` (gồm cả phòng ban). Logic ghi lịch sử chia (`doAssignDataAdvanced`) giữ nguyên. Backend KHÔNG đổi (dùng getSetting có sẵn). Test `node tools/test-assign-team.js` (8 kiểm tra) + `tools/test-assign-recv.js`.
+- LƯU Ý: thành viên phòng ban là TÊN SALE trong `saleDepts` — chỉ nhận được data nếu tên đó trùng tên CS đang dùng trong dữ liệu/tài khoản. Nếu Chia xong mà tài khoản không thấy khách → kiểm tra tên Sale↔tên CS tài khoản.
+- [ ] **VIỆC KẾ TIẾP:** Duyên thử: Chia data → "Theo Team": (1) thấy mục "Phòng ban Sale" (cần kết nối GAS; nếu lỗi bấm ↻ Tải lại), chọn 1 phòng → chia % cho thành viên → Xác nhận; (2) ở "CS riêng lẻ" chọn vài người → sang "Theo Team" → "Tạo nhanh Team". Chưa làm: Team ảo theo phòng cho tài khoản Quản lý (hiện chia bằng tài khoản Admin).
+
 ## 2026-11-26 (phiên Claude — CHIA DATA: CHỌN NGƯỜI NHẬN THEO DANH SÁCH SALE / TÀI KHOẢN ĐĂNG NHẬP CRM) — XONG BƯỚC 1/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: ở modal "Chia data nâng cao" muốn chia data theo Team có sẵn HOẶC theo danh sách Sale, tài khoản đăng nhập CRM.
 - HIỆN TRẠNG TRƯỚC KHI SỬA: chế độ "Theo Team" ĐÃ CÓ (lấy `teams` = "Quản lý Team", chia % cho thành viên). Chế độ "CS riêng lẻ" chỉ có 1 danh sách trộn (`_assignAllCSNames`: tên từ khách + tk CS), không tách được Sale / tài khoản.
