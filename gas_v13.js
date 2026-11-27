@@ -11212,8 +11212,14 @@ function saveUsers_(users) {
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
   var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
-  var oldMonths = {};
-  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; oldMonths[String(x.username || '').trim().toLowerCase()] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  var oldMonths = {}, oldRec = {};
+  _oldUsers.forEach(function(x) { var k = String(x.username || '').trim().toLowerCase(); oldRec[k] = x; oldHash[k] = x.passHash || ''; oldMonths[k] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  // 2026-11-27: truong client KHONG gui (undefined) -> giu gia tri dang luu. NGUYEN NHAN GOC: ghi lai ca sheet voi '' cho truong thieu, nen web ban cu (sua tai khoan lam roi
+  // 4 truong nay) hoac danh sach rut gon xoa mat quyen tab rieng / loai sale / ngay nhan tin / ngay vao. Muon XOA thi gui gia tri rong (perms: null, ngay: '') — web dang lam vay.
+  users.forEach(function(x) {
+    var old = x && oldRec[String(x.username || '').trim().toLowerCase()];
+    if (old) ['perms', 'saleType', 'startDate', 'joinDate'].forEach(function(f) { if (x[f] === undefined) x[f] = old[f]; });
+  });
   // Web ban cu (chua Ctrl+F5) khong gui viewMonths -> giu gia tri dang luu, tranh xoa mat gioi han thang admin da cai.
   users.forEach(function(x) { if (x) x.viewMonths = _viewMonthsNorm_(x.viewMonths === undefined ? oldMonths[String(x.username || '').trim().toLowerCase()] : x.viewMonths); });
   users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });

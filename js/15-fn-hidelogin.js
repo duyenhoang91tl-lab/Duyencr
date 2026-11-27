@@ -651,7 +651,9 @@ async function addAccount(){
   var existing = _findAccount(u);
   if (!p && !existing){ toast('Đặt mật khẩu cho tài khoản mới.'); return; }
   // Mat khau (neu co) di theo truong tam _setPw -> pushUsers gui cho may chu tu bam; client KHONG con giu passHash.
-  var rec = { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
+  // Chep ban cu roi moi ghi de truong cua form. NGUYEN NHAN GOC (2026-11-27): dung lai rec tu dau lam mat perms (quyen tab rieng), saleType, startDate (ngay nhan tin), joinDate
+  // — 4 truong nay sua o phan chi tiet tai khoan, form Sua khong co -> bam "Luu thay doi" la bi xoa tren may chu.
+  var rec = Object.assign({}, existing || {}, { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true });
   if (p) rec._setPw = p;
   rec.viewMonths = (_roleBaseOf(role) === 'leader') ? _acctCollectMonths_() : [];
   if (existing){ for (var i=0;i<accounts.length;i++){ if (String(accounts[i].username).toLowerCase()===String(existing.username).toLowerCase()){ accounts[i]=rec; break; } } }
