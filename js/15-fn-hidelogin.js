@@ -527,6 +527,7 @@ function renderAcctModal(){
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tài khoản &amp; mật khẩu do admin cấp. Mật khẩu được mã hoá trước khi lưu. '+
       'Bấm vào 1 tài khoản để xem tài khoản đó đang phụ trách những sale nào, rồi <b>thêm</b> hoặc <b>cắt</b> sale ngay tại đó. '+
       'Để cấp cho cả team, hãy bật kết nối Google Sheets.</div>'+
+    ((typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin' && typeof openAcctPkNormalize === 'function') ? '<div style="margin-bottom:8px"><button class="btn sm" onclick="openAcctPkNormalize()" title="Đưa tên Pancake của từng người lên làm tên chính của tài khoản đã có (xem trước rồi mới lưu)">🥞 Chuẩn hóa tên gốc theo Pancake</button></div>' : '')+
     '<div style="max-height:300px;overflow:auto;margin-bottom:12px">'+list+'</div>'+
     '<div id="acct-form-box" style="border-top:1px solid var(--border);padding-top:12px">'+
       formHead+
