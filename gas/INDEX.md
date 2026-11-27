@@ -64,7 +64,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
-- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `_viewMonthsNorm_`, `_leadMonths_`, `_leadOwnNames_`, `_leadTeam_`, `_ymOfOrderDate_`, `_phoneHasOrderInMonths_`, `_leadMonthFilterSet_`, `_leadUser_`, `leadAssignInfo_`, `leadAssign_`, `saveAssignHistoryGuarded_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
+- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `_viewMonthsNorm_`, `_leadMonths_`, `_leadOwnNames_`, `_leadTeam_`, `_ymOfOrderDate_`, `_phoneHasOrderInMonths_`, `_leadMonthFilterSet_`, `_leadUser_`, `_leadNameResolver_`, `_leadOwnKeys_`, `leadAssignInfo_`, `leadAssign_`, `saveAssignHistoryGuarded_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
 - Hằng/biến: `LEAD_ASSIGN_MAX_`, `_PW_SALT_`, `_PW_SALT_OLD_`
 
 ## 15_ProductSheets_Drive.gs

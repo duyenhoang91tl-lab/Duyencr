@@ -188,9 +188,9 @@
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
-- ✅ **ĐÃ XONG:** Bước 1–7: tính năng đã nạp vào web (index.html)
+- ✅ **ĐÃ XONG:** Bước 1–7 (đã nạp vào web) + khớp tên đợt chia như phạm vi xem (GAS)
 - 🔧 **ĐANG LÀM:** Kiểm tra cuối + tài liệu
-- ➡️ **BƯỚC KẾ TIẾP:** docs/crm-kb/15 → Duyên thử thật với 1 tài khoản Trưởng nhóm
+- ➡️ **BƯỚC KẾ TIẾP:** tools/test-assign-done.js → docs/crm-kb/15
 
 ## 2026-11-26 (phiên Claude — CHIA DATA THEO TEAM: TẠO NHANH TEAM + PHÒNG BAN SALE NHƯ TEAM) — XONG BƯỚC 2/2 (chờ Duyên thử thật; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: "làm cả a b" — (a) Team trong Quản lý Team (tạo nhanh nếu chưa có), (b) Phòng ban Sale hiện như Team để chia.
