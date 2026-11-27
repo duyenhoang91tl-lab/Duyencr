@@ -4,9 +4,9 @@
 
 ## 2026-11-27 (phiên Claude — SỬA 3 LỖI PHÁT HIỆN THÊM: TÀI KHOẢN MẤT DỮ LIỆU / ADMIN GHI ĐÈ LỊCH SỬ CHIA / TEST ĐỎ)
 - ĐỀ BÀI Duyên: "làm phần bạn phát hiện thêm" (sau tính năng tài khoản Trưởng nhóm).
-- ✅ **ĐÃ XONG:** Mục 1 + 2 XONG. Mục 3: vh, chế độ tối, test 12/13 (mới nhất: test-auto-cust-link)
-- 🔧 **ĐANG LÀM:** Mục 3: sửa test đỏ
-- ➡️ **BƯỚC KẾ TIẾP:** các test còn lại → kiểm tra cuối
+- ✅ **ĐÃ XONG:** CẢ 3 MỤC XONG. (1) Sửa tài khoản giữ perms/saleType/startDate/joinDate. (2) Xoá đợt chia = GAS deleteAssign đúng đợt; chia theo Team ghi từng đợt; web không còn ghi đè sheet AssignData. (3) 15 test đỏ → xanh (sửa --vh js/96 + css/09, sinh lại css/99, còn lại test cũ theo code mới); toàn bộ 442 file test + bước CI deploy web chạy cục bộ đạt (27/11)
+- 🔧 **ĐANG LÀM:** Không còn việc code; chờ Duyên thử thật
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên: chờ deploy-gas + deploy-web xanh (tab Actions) → Ctrl+F5 mọi máy admin (tab bản cũ vẫn ghi đè) → thử xoá 1 đợt chia, sửa 1 tài khoản. Chưa sửa (đã báo): đợt đã xoá còn ở máy người khác và bấm 'xong' sẽ ghi lại; bấm 'xong' web có thể đè dấu tích từ Pancake AI
 
 ## 2026-11-27 (phiên Claude) — PANCAKE AI NÚT TÌM GIÁ: GOM CÁC SIZE CÙNG SẢN PHẨM THÀNH 1 THẺ (bước 2/2 của yêu cầu "size liệt kê liên tiếp") — XONG (đã push; reload extension Pancake AI, manifest 2026.11.27.1; KHÔNG cần deploy GAS)
 - **Yêu cầu Duyên (kèm ảnh 21/11):** cùng 1 sản phẩm khác size thì liệt kê liên tiếp "size 1 giá …, size 2 giá …", không hiện lại cả khối nội dung cho từng size. Bước 1 (khung AI/dự phòng GAS) đã xong ở mục trước; đây là bước 2: các THẺ bên dưới khi bấm **Tìm** (`renderPriceRows_`).
