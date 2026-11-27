@@ -63,3 +63,101 @@ function _loyaltyTierHistory_(orders, tierCfg) {
   });
   return { tier: cfg[best].key, cumulative: cum, history: hist };
 }
+
+// ── Bước 2b: SỔ ĐIỂM (sheet LoyaltyPoints) + LỊCH SỬ HẠNG (sheet LoyaltyTier) + action loyaltyGet / loyaltyRedeem ──
+// Sổ điểm TỰ ĐỒNG BỘ từ đơn POS của SĐT mỗi lần xem/dùng điểm (idempotent theo cột key → gọi bao nhiêu lần cũng không nhân đôi):
+//   đơn hợp lệ → dòng earn; đơn hủy/hoàn mà đã từng earn → dòng refund (trừ đúng điểm đơn gốc); dùng điểm → dòng redeem.
+// POS không có mã đơn ổn định → orderId = SĐT|ngày|giá trị|số thứ tự trong nhóm cùng ngày+giá trị (không đổi khi dòng bị dịch do archive).
+var SH_LOYALTY_ = 'LoyaltyPoints';
+var LOYALTY_HEADERS_ = ['key', 'phone', 'type', 'orderId', 'date', 'points', 'amount', 'note', 'by', 'at'];
+var SH_LOYALTY_TIER_ = 'LoyaltyTier';
+var LOYALTY_TIER_HEADERS_ = ['key', 'phone', 'date', 'orderId', 'from', 'to', 'cumulative', 'at'];
+var LOYALTY_GET_ACTIONS_ = { loyaltyGet: 1 };
+var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1 };
+function _loyaltyCfg_() { var c = null; try { c = getSetting_('loyaltyConfig'); } catch (e) {} return _loyaltyCfgNormalize_(c); }
+function _loyaltyYmdCell_(v) { if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : _vnYmd_(v); return String(v || '').slice(0, 10); }
+function _loyaltyOrdersOfPhone_(phone, rows) {
+  var ph = normPhone_(String(phone || '')), seen = {}, out = [];
+  (rows || []).forEach(function (o) {
+    if (normPhone_(String(o.soDienThoai || '')) !== ph) return;
+    var v = Number(o.giaTriSauGiam) || 0, d = parseVNDate_(o.ngayTaoDon), ymd = d ? _vnYmd_(d) : '';
+    if (!ymd || v <= 0) return;
+    var base = ph + '|' + ymd + '|' + v, n = (seen[base] = (seen[base] || 0) + 1);
+    out.push({ orderId: base + '|' + n, date: ymd, value: v, refunded: _donHasExcludedStatus_(o.trangThai) });
+  });
+  return out;
+}
+function _loyaltyRead_(name, headers, phone) {
+  var sh = getSheet_(name, headers), last = sh.getLastRow(), out = [];
+  if (last < 2) return out;
+  var pi = headers.indexOf('phone');
+  sh.getRange(2, 1, last - 1, headers.length).getValues().forEach(function (r) {
+    if (normPhone_(String(r[pi] || '')) !== phone) return;
+    var o = {}; headers.forEach(function (h, i) { o[h] = r[i]; }); out.push(o);
+  });
+  return out;
+}
+function _loyaltyAppend_(name, headers, rows) {
+  if (!rows.length) return;
+  var sh = getSheet_(name, headers), rng = sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length);
+  if (rng.setNumberFormat) rng.setNumberFormat('@');   // SĐT/ngày giữ nguyên dạng chữ (khỏi mất số 0 đầu, khỏi thành Date)
+  rng.setValues(rows);
+}
+// Đồng bộ sổ điểm + lịch sử hạng của 1 SĐT từ đơn POS. Trả số dòng mới thêm.
+function loyaltySync_(phone, posRows) {
+  var ph = normPhone_(String(phone || '')); if (!ph) return { error: 'Thieu so dien thoai.' };
+  var cfg = _loyaltyCfg_(), orders = _loyaltyOrdersOfPhone_(ph, posRows || readDonChiTiet_());
+  var have = {}, earnPts = {}, now = new Date(), today = _vnYmd_(now), add = [], nE = 0, nR = 0;
+  _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph).forEach(function (r) { have[r.key] = 1; if (r.type === 'earn') earnPts[r.orderId] = Number(r.points) || 0; });
+  orders.forEach(function (o) {
+    var ek = 'earn|' + o.orderId, rk = 'refund|' + o.orderId;
+    if (!o.refunded && !have[ek]) {
+      var p = _loyaltyEarnPoints_(o.value, cfg);
+      if (p > 0) { add.push([ek, ph, 'earn', o.orderId, o.date, p, o.value, '', 'auto', now]); have[ek] = 1; earnPts[o.orderId] = p; nE++; }
+    }
+    if (o.refunded && have[ek] && !have[rk]) { add.push([rk, ph, 'refund', o.orderId, today, earnPts[o.orderId] || 0, o.value, 'don hoan/huy', 'auto', now]); have[rk] = 1; nR++; }
+  });
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, add);
+  var th = _loyaltyTierHistory_(orders, _tierCfg_()), haveT = {}, addT = [];
+  _loyaltyRead_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, ph).forEach(function (r) { haveT[r.key] = 1; });
+  th.history.forEach(function (h) { var k = ph + '|' + h.to; if (!haveT[k]) { addT.push([k, ph, h.date, h.orderId, h.from, h.to, h.cumulative, now]); haveT[k] = 1; } });
+  _loyaltyAppend_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, addT);
+  return { earn: nE, refund: nR, tier: addT.length };
+}
+function loyaltyState_(phone) {
+  var ph = normPhone_(String(phone || '')), cfg = _loyaltyCfg_(), tcfg = _tierCfg_(), today = _vnYmd_(new Date());
+  var ledger = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph).map(function (r) {
+    return { key: String(r.key), type: String(r.type), orderId: String(r.orderId), date: _loyaltyYmdCell_(r.date), points: Number(r.points) || 0, amount: Number(r.amount) || 0, note: String(r.note || ''), by: String(r.by || '') };
+  });
+  var tierRows = _loyaltyRead_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, ph).map(function (r) { return { date: _loyaltyYmdCell_(r.date), orderId: String(r.orderId), from: String(r.from), to: String(r.to), cumulative: Number(r.cumulative) || 0 }; });
+  tierRows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var curKey = tierRows.length ? tierRows[tierRows.length - 1].to : tcfg[0].key, lab = {}; tcfg.forEach(function (t) { lab[t.key] = t.label; });
+  tierRows.forEach(function (h) { h.fromLabel = lab[h.from] || h.from; h.toLabel = lab[h.to] || h.to; });
+  return { ok: true, phone: ph, tier: curKey, tierLabel: lab[curKey] || curKey, tierHistory: tierRows,
+    points: _loyaltyBalance_(ledger, today), config: cfg,
+    ledger: ledger.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }).slice(0, 50) };
+}
+function loyaltyDoGet_(action, p) {
+  try {
+    var a = _khoAuth_(p); if (a.err) return a.err;
+    return _khoWithLock_(function () { var s = loyaltySync_(p && p.phone); if (s.error) return jsonOut_({ ok: false, error: s.error }); var out = loyaltyState_(p.phone); out.synced = s; return jsonOut_(out); });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi diem tich luy: ' + (err && err.message || err) }); }
+}
+// Dùng điểm cho 1 đơn: d = {token, phone, orderValue, points, refKey?}. refKey (tuỳ chọn) chống bấm 2 lần: cùng refKey → không trừ lần 2.
+function loyaltyDoPost_(action, d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    return _khoWithLock_(function () {
+      var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
+      var s = loyaltySync_(ph); if (s.error) return jsonOut_({ ok: false, error: s.error });
+      var key = d.refKey ? 'redeem|' + ph + '|' + String(d.refKey).slice(0, 60) : 'redeem|' + ph + '|' + new Date().getTime() + '|' + Math.floor(Math.random() * 1e6);
+      var st = loyaltyState_(ph);
+      if (st.ledger.filter(function (r) { return r.key === key; }).length) return jsonOut_({ ok: false, error: 'Don nay da tru diem roi.', code: 'DUPLICATE', points: st.points });
+      var r = _loyaltyRedeem_(d.orderValue, st.points.balance, d.points, st.config);
+      if (r.points <= 0) return jsonOut_({ ok: false, error: 'Khong co diem de dung (het diem hoac don 0d).', points: st.points });
+      var now = new Date(), who = String(a.user.username || a.user.name || '');
+      _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[key, ph, 'redeem', String(d.orderRef || ''), _vnYmd_(now), r.points, Number(d.orderValue) || 0, String(d.note || '').slice(0, 200), who, now]]);
+      return jsonOut_({ ok: true, redeemed: r, points: loyaltyState_(ph).points });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi dung diem: ' + (err && err.message || err) }); }
+}

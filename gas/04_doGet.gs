@@ -12,6 +12,7 @@ function doGet(e) {
   if (PLIB_GET_ACTIONS_[action] === 1) return plibDoGet_(action, p);   // thu vien san pham (thu muc anh theo SP/combo): tu kiem token
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
+  if (LOYALTY_GET_ACTIONS_[action] === 1) return loyaltyDoGet_(action, p);   // diem tich luy + lich su hang khach (token, moi tai khoan dang nhap)
   if (TEAMBONUS_GET_ACTIONS_[action] === 1) return teamBonusDoGet_(action, p);   // thuong phat doi Sale Online/Van phong (Bao cao B): token -> phan quyen
   if (SPLIT_GET_ACTIONS_[action] === 1) return splitDoGet_(action, p);   // don chia (bao cao M + danh sach don chia): token -> phan quyen theo vai tro
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_

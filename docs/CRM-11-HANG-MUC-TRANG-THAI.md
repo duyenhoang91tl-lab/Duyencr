@@ -13,7 +13,7 @@ Ký hiệu: ✅ có và chạy · 🟡 có một phần · ❌ chưa có · ⏳ 
 | 6 | AI + Google Sheets | 🟡 có khung AI (`callAI_`, trợ lý) và xuất Sheet (`gas/11`) | Khoá nhà cung cấp AI + hạn mức; tài khoản dịch vụ Google | ⏳ chờ khoá |
 | 7 | Hoa hồng + thưởng | ✅ cơ chế: ngưỡng 15tr (`CS_COMMISSION_THRESHOLD_`), % cá nhân/team/kênh, luật vàng kênh Nguồn, loại Hủy/Hoàn (`gas/09`, `gas/10`) | Chính sách đang TẮT; chốt: 1,5% (≥15tr) / 1% (<15tr), **trừ hoa hồng kỳ sau nếu đơn hoàn sau khi đã trả**, chu kỳ chốt/trả | 🟡 bật bảng % + logic trừ đơn hoàn kỳ sau |
 | 8 | KPI | ✅ KPI doanh thu 9 bậc, 500tr chính thức / 100tr thử việc, KPI riêng từng người (`readSaleKpiConfig_`, `buildSaleKpiReport_`); tỷ lệ chốt = đơn Base ÷ tương tác Pancake | ❌ điểm KPI nhiều chỉ tiêu Σ(trọng số × min(đạt÷định mức, trần)); ❌ KPI tự cam kết + duyệt + nhật ký; ❌ chốt danh sách chỉ tiêu/trọng số; "Màu mặc định" trong docx đang để trống | 🟡 phần cam kết/duyệt làm được; điểm KPI cần danh sách chỉ tiêu |
-| 9 | Hạng + điểm | ✅ 4 hạng theo doanh thu cộng dồn, cấu hình được (`_tierCfg_`, `_aaHangKey_`, màn "Cấu hình hạng KH") | ❌ **điểm tích luỹ 1%/năm** (trừ khi hoàn, hết hạn theo năm, dùng trừ đơn/đổi quà); ❌ lịch sử đổi hạng; ❌ quyền lợi theo hạng (giảm 5%/10%, miễn ship ≥1tr, danh sách mã KHÔNG GIẢM / TỐI ĐA 5%) | 🟡 BƯỚC 2 XONG: hàm thuần điểm + lịch sử hạng (`gas/34_Loyalty.gs`, test `tools/test-loyalty.js`); chưa nối sheet/UI |
+| 9 | Hạng + điểm | ✅ 4 hạng theo doanh thu cộng dồn, cấu hình được (`_tierCfg_`, `_aaHangKey_`, màn "Cấu hình hạng KH") | ❌ **điểm tích luỹ 1%/năm** (trừ khi hoàn, hết hạn theo năm, dùng trừ đơn/đổi quà); ❌ lịch sử đổi hạng; ❌ quyền lợi theo hạng (giảm 5%/10%, miễn ship ≥1tr, danh sách mã KHÔNG GIẢM / TỐI ĐA 5%) | 🟡 BƯỚC 2 + 2b XONG ở backend: hàm điểm/hạng + sổ điểm sheet `LoyaltyPoints`/`LoyaltyTier` + action `loyaltyGet`/`loyaltyRedeem` (`gas/34_Loyalty.gs`, test `tools/test-loyalty*.js`); CHƯA có giao diện (hồ sơ khách, ô nhập điểm khi tạo đơn) |
 | 10 | Chia doanh thu, ghi nhận đơn | ✅ chia đều nhiều sale; quầy 30/70 (`quayKeywords`, `quayRatio`); đơn ghép/tách dò Base | Ngày ghi nhận = ngày lên đơn (kiểm lại mọi báo cáo dùng đúng); đơn đổi trả/bảo hành/thay dây không tính thưởng ngày | 🟡 kiểm tra + test |
 | 11 | Ticket, giờ làm việc | ❌ chưa có ticket; chưa có hàm giờ làm việc/hạn trả lời | Hạn ticket (24h/72h/7 ngày), giờ làm việc, hạn trả lời tin 30 phút/2 giờ, báo trưởng phòng khi trễ, người được giao theo loại | ⏳ cần chốt mâu thuẫn giờ (xem dưới) |
 | — | Quy tắc chung | ✅ có `AuditLog` (sheet) | Nhật ký đổi cấu hình (hạng, mốc, ngưỡng, % hoa hồng): giờ, người đổi, giá trị cũ/mới — chưa kiểm từng chỗ đã ghi chưa; "chưa có dữ liệu" thay vì 0 — chưa kiểm | 🟡 kiểm từng chỗ |
@@ -28,7 +28,7 @@ Ký hiệu: ✅ có và chạy · 🟡 có một phần · ❌ chưa có · ⏳ 
 
 ## Thứ tự làm đề xuất (mỗi bước 1 file, push + cập nhật HANDOFF)
 1. ✅ Bảng này.
-2. ✅ Điểm tích luỹ + lịch sử đổi hạng (mục 9) — hàm thuần + test (1 điểm = 1.000đ, trừ thẳng vào đơn, hết hạn 31/12 theo năm). Bước 2b: nối sheet `LoyaltyPoints` + action GAS + hiện trong hồ sơ khách.
+2. ✅ Điểm tích luỹ + lịch sử đổi hạng (mục 9) — hàm thuần + test (1 điểm = 1.000đ, trừ thẳng vào đơn, hết hạn 31/12 theo năm). 2b ✅ sổ điểm + action GAS (cần deploy GAS). 2c: giao diện hồ sơ khách + dùng điểm.
 3. Nhật ký đổi cấu hình (quy tắc chung) — kiểm các chỗ đổi hạng/ngưỡng/% hoa hồng đã ghi `AuditLog` chưa, bù chỗ thiếu.
 4. Trừ hoa hồng kỳ sau khi đơn hoàn (mục 7).
 5. KPI tự cam kết + duyệt (mục 8).
