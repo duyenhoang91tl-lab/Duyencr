@@ -174,17 +174,21 @@ function loyaltyDoPost_(action, d) {
 function _loyaltyAudit_(who, action, phone, oldV, newV) {
   try { var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS); sh.getRange(sh.getLastRow() + 1, 1, 1, AUDIT_HEADERS.length).setValues([[new Date().toISOString(), who, action, phone, _auditClip_(oldV), _auditClip_(newV)]]); } catch (e) {}
 }
-function _loyaltyUndo_(d, a) {
-  if (a.user.role !== 'admin') return jsonOut_({ ok: false, error: 'Chi admin moi duoc hoan tac dung diem.', code: 'FORBIDDEN' });
+// Lõi hoàn tác (KHÔNG kiểm quyền — nơi gọi tự kiểm): trả object {ok,...} / {ok:false,error,code}. Dùng cho nút admin (_loyaltyUndo_) và khi Hủy/Hoàn đơn CRM (bước 4b).
+function _loyaltyUndoApply_(d, who) {
   var ph = normPhone_(String(d && d.phone || '')), key = String(d && d.key || '').trim();
-  if (!ph || !key) return jsonOut_({ ok: false, error: 'Thieu so dien thoai hoac ma lan dung diem.' });
+  if (!ph || !key) return { ok: false, error: 'Thieu so dien thoai hoac ma lan dung diem.' };
   var rows = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph), uk = 'undo|' + key;
   var orig = rows.filter(function (r) { return String(r.key) === key && r.type === 'redeem'; })[0];
-  if (!orig) return jsonOut_({ ok: false, error: 'Khong tim thay lan dung diem nay.' });
-  if (rows.some(function (r) { return String(r.key) === uk; })) return jsonOut_({ ok: false, error: 'Lan dung diem nay da duoc hoan tac roi.', code: 'DUPLICATE' });
-  var now = new Date(), who = String(a.user.username || a.user.name || ''), pts = Number(orig.points) || 0;
+  if (!orig) return { ok: false, error: 'Khong tim thay lan dung diem nay.', code: 'NOTFOUND' };
+  if (rows.some(function (r) { return String(r.key) === uk; })) return { ok: false, error: 'Lan dung diem nay da duoc hoan tac roi.', code: 'DUPLICATE' };
+  var now = new Date(), pts = Number(orig.points) || 0;
   _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[uk, ph, 'undo', key, _vnYmd_(now), pts, Number(orig.amount) || 0, String(d.note || 'hoan tac dung diem').slice(0, 200), who, now]]);
   _loyaltyAudit_(who, 'loyalty:undo', ph, 'dung ' + pts + ' diem (don ' + (Number(orig.amount) || 0) + 'd) ngay ' + _loyaltyYmdCell_(orig.date), 'hoan tac');
-  return jsonOut_({ ok: true, undone: { key: key, points: pts }, points: loyaltyState_(ph).points });
+  return { ok: true, undone: { key: key, points: pts }, points: loyaltyState_(ph).points };
+}
+function _loyaltyUndo_(d, a) {
+  if (a.user.role !== 'admin') return jsonOut_({ ok: false, error: 'Chi admin moi duoc hoan tac dung diem.', code: 'FORBIDDEN' });
+  return jsonOut_(_loyaltyUndoApply_(d, String(a.user.username || a.user.name || '')));
 }
 
