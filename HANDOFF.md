@@ -2,6 +2,12 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
+## 2026-11-27 (phiên Claude — SỬA 3 LỖI PHÁT HIỆN THÊM: TÀI KHOẢN MẤT DỮ LIỆU / ADMIN GHI ĐÈ LỊCH SỬ CHIA / TEST ĐỎ)
+- ĐỀ BÀI Duyên: "làm phần bạn phát hiện thêm" (sau tính năng tài khoản Trưởng nhóm).
+- ✅ **ĐÃ XONG:** Mục 1 phần web (js/15): sửa tài khoản giữ perms/saleType/startDate/joinDate
+- 🔧 **ĐANG LÀM:** Mục 1 phần máy chủ (GAS saveUsers_)
+- ➡️ **BƯỚC KẾ TIẾP:** GAS giữ trường client không gửi → mục 2 (xoá đợt chia / chia theo Team)
+
 ## 2026-11-27 (phiên Claude) — PANCAKE AI NÚT TÌM GIÁ: GOM CÁC SIZE CÙNG SẢN PHẨM THÀNH 1 THẺ (bước 2/2 của yêu cầu "size liệt kê liên tiếp") — XONG (đã push; reload extension Pancake AI, manifest 2026.11.27.1; KHÔNG cần deploy GAS)
 - **Yêu cầu Duyên (kèm ảnh 21/11):** cùng 1 sản phẩm khác size thì liệt kê liên tiếp "size 1 giá …, size 2 giá …", không hiện lại cả khối nội dung cho từng size. Bước 1 (khung AI/dự phòng GAS) đã xong ở mục trước; đây là bước 2: các THẺ bên dưới khi bấm **Tìm** (`renderPriceRows_`).
 - **Kiểm `origin/main` trước khi làm (bài học 18/11 + 21/11):** không phiên nào đụng `extension-pancake` kể từ lần push trước → không trùng.
