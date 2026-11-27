@@ -161,3 +161,4 @@ function loyaltyDoPost_(action, d) {
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi dung diem: ' + (err && err.message || err) }); }
 }
+
