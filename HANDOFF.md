@@ -2,8 +2,8 @@
 
 ## 2026-11-27 (tối — TÀI KHOẢN TEST BƯỚC 2/2 WEB: LỌC THEO SALE ĐÃ CHỌN + XEM ĐỦ TAB) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành". Rà: 461 test (chỉ test-dist-equivalence đỏ khi dist/ cũ, build lại thì xanh), check-health, mở các tab trên Chromium (dữ liệu trống, chặn mạng): không thấy lỗi sập. Việc dở tìm được: bước 2/2 (web) của "Tài khoản test" bên dưới.
-- ✅ Đã xong: js/08 (lọc khách theo sale), js/14 (xem đủ tab), js/09, js/67, js/11 (không còn nút ✎ sửa mốc tỷ lệ chốt).
-- 🔧 Đang làm: js/12. ➡️ Kế tiếp: test + tài liệu.
+- ✅ Đã xong: js/08 (lọc khách theo sale), js/14 (xem đủ tab), js/09, js/67, js/11, js/12 (Báo cáo F chỉ hiện sale được chọn).
+- 🔧 Đang làm: test tự động. ➡️ Kế tiếp: tài liệu + chốt.
 
 ## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
 - ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).

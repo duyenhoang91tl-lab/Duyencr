@@ -563,7 +563,7 @@ function _srRenderF_(d){
   // khoan deu xem duoc tab "Bao cao doanh so" tru khi Admin chu dong gioi han (xem
   // _tabAllowedForUser), nen neu khong thu hep o day thi tung Sale se thay het doanh thu/bac
   // cua ca cong ty. Admin van thay day du nhu cu, khong doi gi.
-  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && (currentUser.role==='admin'||currentUser.role==='demo'));
+  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && currentUser.role==='admin');   // tai khoan test: Bao cao F chi hien dong cua sale duoc chon
   var _fSelfView = !_fIsAdmin;
   if (_fSelfView) {
     var _fMyNames = (typeof currentUser!=='undefined' && currentUser && currentUser.names && currentUser.names.length)
