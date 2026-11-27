@@ -545,6 +545,7 @@ function testScript() {
   getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   getSheet_(SH_USER, USER_HEADERS);
   getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
   getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var oss = getOrderSS_();
   for (var i = 0; i < ORDER_SHEETS.length; i++) {
