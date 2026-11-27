@@ -84,36 +84,63 @@ function switchAssignTab(tab, el) {
 // như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
 // trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
 function _advAssignValidBase() { return (_assignFilteredList || []).filter(isValidVnPhone); }   // chỉ SĐT di động VN hợp lệ
+// NGUYEN NHAN GOC (Duyen 27/11: loc khach thang 5 de chia data ra 0-5 KH trong khi Danh sach KH co nhieu khach thang 5): bo loc ngay cua BANG (js/90) tinh ngay
+// = ngay don Base (c.ymList) + ngay don POS (posOrdersByPhone), con Chia data chi doc c.ymList -> khach chi co don POS trong thang 5 hien o bang nhung bi loai o Chia data.
+// Ngoai ra cua so don POS mac dinh chi 90 ngay: khoang ngay xa hon thi phai tai them (posOrdersEnsureDays_) nhu bang vẫn lam, neu khong don POS thang 5 chua ve may.
+var _asgPosEnsuring = {};
+function _advAssignEnsurePos_(from) {
+  try {
+    var P = window.posOrders, t = new Date(from + 'T00:00:00').getTime();
+    if (!P || !P.loadedAt || !P.from || !(from < P.from) || !isFinite(t) || typeof window.posOrdersEnsureDays_ !== 'function') return;
+    var need = Math.ceil((Date.now() - t) / 86400000) + 1;
+    if (need <= (P.days || 0) || _asgPosEnsuring[need]) return;
+    _asgPosEnsuring[need] = 1;
+    window.posOrdersEnsureDays_(need).then(function (ch) { if (ch && typeof renderAssignCreate === 'function') { try { renderAssignCreate(); } catch (e) {} } }, function () {});
+  } catch (e) {}
+}
+// Ngay don cua 1 khach cho loc ngay Chia data = ymList (Base) + ngay don POS (cung ham thuan voi bang: posFilterView_ js/90).
+function _advAssignOrderDays_(c, phone) {
+  var yl = c.ymList || [];
+  try {
+    var by = window.posOrdersByPhone, rows = by && by[phone];
+    if (rows && rows.length && typeof window.posFilterView_ === 'function') { var v = window.posFilterView_(c, rows, '', ''); if (v && v.ymList) yl = v.ymList; }
+  } catch (e) {}
+  return yl;
+}
 function _advAssignDateFilteredList() {
   var _base = _advAssignValidBase();
   var hasSrc = _advAssign.srcSet && _advAssign.srcSet.size > 0;
   var hasDate = !!(_advAssign.dateFrom || _advAssign.dateTo);
+  _advAssign._diag = { noCust: 0, srcOut: 0, dateOut: 0 };
   if (!hasSrc && !hasDate) return _base;
+  if (hasDate && _advAssign.dateFrom) _advAssignEnsurePos_(_advAssign.dateFrom);
   // NGUYÊN NHÂN GỐC (đã sửa 2026-10-07): trước đây tra customerMap[p] — object THÔ (chỉ có orders), KHÔNG có
   // ymList (ymList chỉ tính sẵn trên các phần tử allCustomers trong buildCustomers) → luôn undefined → mọi KH bị
   // loại → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT → phần tử allCustomers).
   var _cm = _assignCustMap();
   return _base.filter(function (p) {
     var c = _cm.get(p);
-    if (!c) return false;
+    if (!c) { _advAssign._diag.noCust++; return false; }
     if (hasSrc) {
       var d = c.dataSrc || {}, ok = false;
       _advAssign.srcSet.forEach(function (k) { if (d[k]) ok = true; });
-      if (!ok) return false;
+      if (!ok) { _advAssign._diag.srcOut++; return false; }
     }
     if (!hasDate) return true;
-    var yl = c.ymList || [];
+    var yl = _advAssignOrderDays_(c, p);
     // Khách KHÔNG có ngày đơn nào (vd nguồn CSKH-Duyên): khoảng ngày không áp dụng được → khi đã chọn nguồn
     // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
     // NGUYEN NHAN GOC (da sua 2026-10-10): truoc day KH POS (dt/don/cs) KHONG co ngay don van lot qua khi da chon nguon -> chia "khach thang 9" bi lan khach khong ro ngay.
     // Nay chi KH thuoc nguon CSKH-Duyen (khong co ngay don) moi duoc miễn loc ngay, va chi khi CSKH nam trong nguon da chon.
-    if (!yl.some(function (o) { return o.ds; })) return hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh);
-    return yl.some(function (o) {
+    if (!yl.some(function (o) { return o.ds; })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
+    var inR = yl.some(function (o) {
       if (!o.ds) return false;
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
       if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
       return true;
     });
+    if (!inR) _advAssign._diag.dateOut++;
+    return inR;
   });
 }
 
@@ -441,7 +468,7 @@ function renderAssignCreate() {
       <button class="btn sm secondary" onclick="_advAssignOpenAdvFilter()" title="Mở Lọc nâng cao (CS, sản phẩm, nguồn, trạng thái CS/Zalo, trường tự tạo...) để chọn đúng data muốn chia">⚙ Lọc nâng cao${countAdvFilters()>0?` <span class="adv-filter-active-badge">${countAdvFilters()}</span>`:''}</button>
     </div>
     <div class="assign-preview" style="margin-bottom:10px">
-      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''} &nbsp;|&nbsp;
+      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''}${(function(){ var g = _advAssign._diag; return g && (g.dateOut || g.srcOut) ? ` <span style="color:#92400e;font-size:11px" title="Khách có trong bảng nhưng bị loại ở bước lọc thêm của Chia data. Ngày tính theo đơn Base + đơn POS.">(loại thêm: ${g.srcOut ? g.srcOut + ' ngoài nguồn đã chọn' : ''}${g.srcOut && g.dateOut ? ', ' : ''}${g.dateOut ? g.dateOut + ' không có đơn trong khoảng ngày' : ''})</span>` : ''; })()} &nbsp;|&nbsp;
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
       ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}

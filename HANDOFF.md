@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-27 (phiên Claude — CHIA DATA NÂNG CAO: LỌC KHÁCH THÁNG 5 RA 0–5 KH TRONG KHI DANH SÁCH KH CÓ NHIỀU) — XONG BƯỚC 1/1 (web `js/07`, chưa xác nhận bằng dữ liệu thật của Duyên)
+- TRIỆU CHỨNG (ảnh Duyên): Chia data nâng cao, nguồn "Dữ liệu đơn", khoảng ngày 01/05–31/05/2026 → "Bộ lọc hiện tại: 5 KH (đã loại 547 SĐT không hợp lệ) | Chưa chia 0 | Đã chia 5", trong khi Danh sách KH lọc tháng 5 có nhiều khách.
+- NGUYÊN NHÂN GỐC TÌM RA: bộ lọc ngày của BẢNG (js/90) tính ngày = ngày đơn Base (`c.ymList`) + ngày đơn POS (`posOrdersByPhone`), còn `_advAssignDateFilteredList` (js/07) chỉ đọc `c.ymList` → khách chỉ có đơn POS trong tháng 5 hiện ở bảng nhưng bị loại ở Chia data. Thêm: cửa sổ đơn POS mặc định 90 ngày, tháng 5 xa hơn; bảng tự tải thêm (`posOrdersEnsureDays_`), Chia data thì không.
+- ĐÃ SỬA (js/07): `_advAssignOrderDays_` (ymList + ngày POS qua `posFilterView_` js/90), `_advAssignEnsurePos_` (khoảng ngày xa cửa sổ POS → tự tải thêm 1 lần/số ngày rồi vẽ lại), `_advAssign._diag` + dòng "(loại thêm: N ngoài nguồn đã chọn, M không có đơn trong khoảng ngày)" cạnh "Bộ lọc hiện tại" để thấy ngay vì sao khách bị loại. Test `node tools/test-assign-date-pos.js` (6 ca) + test-assign-* xanh.
+- ⚠ CHƯA CHẮC 100%: nếu sau khi sửa vẫn ra ít, nhìn dòng "(loại thêm: …)": "ngoài nguồn" nhiều → bỏ chọn bớt nguồn (đang chỉ chọn "Dữ liệu đơn"); "không có đơn trong khoảng ngày" nhiều → khách chỉ có ngày đơn ngoài tháng 5. Ngoài ra "Đã chia: 5" nghĩa là 5 khách đó đã từng được chia (chọn ưu tiên "Chưa chia lần nào" sẽ ra 0).
+- ➡️ VIỆC KẾ TIẾP: Duyên Ctrl+F5, mở lại Chia data, chọn tháng 5, gửi ảnh dòng "Bộ lọc hiện tại" (kèm "loại thêm") nếu vẫn lệch.
+
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
 ## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM) — XONG 4/4 (chỉ web, Ctrl+F5)
