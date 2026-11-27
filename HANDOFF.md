@@ -2,6 +2,12 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
+## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM)
+- ĐỀ BÀI Duyên (ảnh ô "Chọn sale để thêm" phải kéo tìm): chỗ nào dropdown trong CRM cũng tìm nhanh được.
+- NGUYÊN NHÂN: các ô chọn là `<select>` gốc của trình duyệt (index.html + ~40 file js), không có ô gõ tìm.
+- ✅ Bước 1/4: file mới `js/99-e-select-search.js` (một file dùng chung, không sửa từng màn hình).
+- ⏳ Đang làm: nạp file vào web. ➡️ KẾ TIẾP: (2) thẻ script trong index.html, (3) test, (4) js/INDEX.md + chốt.
+
 ## 2026-11-27 (phiên Claude — LÊN ĐƠN TRÊN CRM: TAB "🧾 ĐƠN CRM" LIỆT KÊ + XEM CHI TIẾT) — BƯỚC 3/4 XONG (chỉ web, Ctrl+F5; cần GAS bước 1 đã deploy)
 - ĐỀ BÀI Duyên: "làm tiếp bước 3/4 lên đơn CRM". LƯU Ý THỨ TỰ: bước 2/4 (màn ➕ Tạo đơn) CHƯA làm — bước 3 chỉ cần backend `crmOrders` nên làm trước được; chưa có màn tạo đơn thì tab sẽ trống cho tới khi có đơn (hoặc đơn thử gọi thẳng `crmOrderSave`).
 - ✅ `js/99-d-crm-orders.js` mới (+ 1 thẻ script sau js/99-c, `?v=20261127a`; id `crmorders` thêm vào nhóm "👤 Hồ sơ" trong `js/29-sidenav.js`): tab **🧾 Đơn CRM** (`registerExtraTab`). Dòng "Bạn đang xem: …" theo `scope` server trả (all/dept/team/own, bước 1b). Lọc Từ/đến + nút Hôm nay/7 ngày/Tháng này/Tất cả (mặc định từ đầu tháng), ô tìm (mã đơn, tên/SĐT khách, người nhận, sale, thẻ, người tạo, tên/mã SP — không dấu), dải tổng (số đơn, tổng cần thu, đã chuyển khoản, còn thiếu — tính trên danh sách đang hiện), thẻ từng đơn; bấm thẻ mở chi tiết: bảng dòng SP (SL, giá, giảm kèm %, thành tiền, ghi chú dòng) + khối tiền (tạm tính, giảm dòng/đơn, THUẾ (bước 1b: cộng vào cần thu; thuế % + tiền thuế từng dòng),  ship, phụ thu, cần thu, đã CK, còn thiếu) + khách/nhận hàng/xử lý đơn + ghi chú nội bộ/để in. TẤT CẢ số tiền lấy nguyên từ server (client KHÔNG tính lại tiền). Mọi chữ qua `esc`; id đơn đi qua `data-id` (không nhét vào onclick).
