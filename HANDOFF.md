@@ -2,6 +2,25 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
+## 2026-11-27 — ⭐ TỔNG HỢP LÊN ĐƠN CRM (GỘP 4 PHIÊN: bước 1/1b, 2, 3, 4a) — ĐỌC MỤC NÀY TRƯỚC; chi tiết từng bước ở các mục ngay bên dưới
+- **Bối cảnh:** nhiều phiên Claude cùng làm song song (mỗi phiên 1 bước) rồi gộp trên `main` (đã kiểm: không còn xung đột, mọi test liên quan xanh trên bản gộp). CRM tự lên đơn → ghi sheet RIÊNG "Đơn CRM" (đang TEST; KHÔNG đụng DT Tổng/OrderData/Pos; `saveOrders` vẫn TẮT).
+- **BẢNG TRẠNG THÁI (đối chiếu `main` 27/11):**
+  | Bước | Nội dung | File | Trạng thái |
+  |---|---|---|---|
+  | 1 | Sheet "Đơn CRM" + `crmOrderSave`/`crmOrders`, server tự tính tiền | `gas/35_CrmOrder.gs` (⇄ `gas_v13.js`) | ✅ cần deploy GAS |
+  | 1b | Thuế dòng nhập tay (cộng vào cần thu, cột `tax`) + quyền xem theo cấp bậc (`scope` all/dept/team/own) | cùng file GAS | ✅ cần deploy GAS |
+  | 2 | Tab ➕ Tạo đơn (tiền tố hàm `_co*`) | `js/99-d-crm-order.js` | ✅ Ctrl+F5 |
+  | 3 / 3b | Tab 🧾 Đơn CRM: liệt kê + chi tiết + nút đổi trạng thái/huỷ/hoàn (tiền tố `_cro*`) | `js/99-d-crm-orders.js` | ✅ Ctrl+F5 |
+  | 4a | `crmOrderStatus` (Mới→Đã xác nhận→Đang giao→Đã giao; Hủy/Hoàn cần lý do, là trạng thái cuối) + 3 cột `statusAt/statusBy/statusNote` | cùng file GAS | ✅ cần deploy GAS |
+  | 4b | Dùng điểm tích luỹ ở màn Tạo đơn (`loyaltyRedeem`); Hủy/Hoàn đơn có dùng điểm → `loyaltyUndo` (đã có từ 2d) | — | ⬜ CHƯA |
+  | 4c | Trừ kho khi "Đã xác nhận", cộng trả khi Hủy/Hoàn (`docs/KHO-TRU-TON.md`; cần nguồn đơn mới + sổ cái chống trừ 2 lần) | — | ⬜ CHƯA |
+  | 4d | In đơn (dùng `printNote`) | — | ⬜ CHƯA |
+- **QUY ƯỚC CHUNG (để các phiên không đè nhau):** (a) mỗi file js dùng 1 tiền tố hàm/biến/id RIÊNG: Tạo đơn = `_co*`/`co-*`, Đơn CRM = `_cro*`/`cro-*`, thẻ điểm = `_loy*` — file mới phải kiểm không trùng (grep hàm toàn cục ở các file js khác) — đã từng trùng `_co*` 27/11; (b) mọi sửa GAS làm ở `gas_v13.js` rồi `node tools/split-gas.js` (check: `--check`, hiện 35 file khớp); (c) sau khi thêm màu inline mới chạy `node tools/gen-dark-theme.js` (nếu quên, `test-dark-theme` đỏ); (d) trước khi push luôn `git fetch` + `git rebase origin/main` (HANDOFF.md hay xung đột: giữ CẢ HAI mục), không force-push; (e) tiền do SERVER tính, client chỉ xem trước (đã có test khớp 400 ca).
+- **DUYÊN CẦN LÀM (1 lần cho cả cụm):** chờ tab Actions `deploy-gas` xanh (hoặc dán `gas_v13.js` → New version, nhớ có file `35_CrmOrder.gs` nếu dán từng file) → Ctrl+F5 → thử: ➕ Tạo đơn (nhập SĐT, 1 sản phẩm, giảm/ship/CK như clip → Cần thu 931.000, Còn thiếu 631.000) → Lưu → 🧾 Đơn CRM thấy đơn → đổi trạng thái → kiểm sheet "Đơn CRM". Chưa kiểm trên trình duyệt thật (không có tài khoản/GAS thật ở môi trường làm việc).
+- **ĐANG LÀM:** phiên làm 4b/4c/4d (nếu có) ghi tiến độ vào mục RIÊNG phía trên mục này, đừng sửa bảng trên cho tới khi push xong bước đó rồi mới đổi ⬜ → ✅.
+- **VIỆC NHỎ CHƯA AI LÀM:** (1) lưu đơn ở tab Tạo đơn xong tự mở tab Đơn CRM + làm mới (đang phải bấm ↻); (2) nút "Xem đơn" trong hồ sơ khách (`crmOrders?phone=`); (3) địa chỉ theo danh mục tỉnh/quận/phường Pancake (đang gõ tay), thẻ dạng chip, giá combo/CTKM tự động.
+- **CÂU HỎI CHỜ DUYÊN CHỐT:** Trưởng team/phòng có được đổi trạng thái đơn của team không (hiện chỉ admin + người tạo; CEO chỉ xem)? Tên/đường đi trạng thái đã đúng ý Pancake POS chưa (chưa đối chiếu clip)? Có áp giới hạn tháng `viewMonths` của Trưởng nhóm lên đơn CRM không?
+
 ## 2026-11-27 (phiên Claude — LÊN ĐƠN TRÊN CRM: TAB "🧾 ĐƠN CRM" LIỆT KÊ + XEM CHI TIẾT) — BƯỚC 3/4 XONG (chỉ web, Ctrl+F5; cần GAS bước 1 đã deploy)
 - ĐỀ BÀI Duyên: "làm tiếp bước 3/4 lên đơn CRM". LƯU Ý THỨ TỰ: bước 2/4 (màn ➕ Tạo đơn) CHƯA làm — bước 3 chỉ cần backend `crmOrders` nên làm trước được; chưa có màn tạo đơn thì tab sẽ trống cho tới khi có đơn (hoặc đơn thử gọi thẳng `crmOrderSave`).
 - ✅ `js/99-d-crm-orders.js` mới (+ 1 thẻ script sau js/99-c, `?v=20261127a`; id `crmorders` thêm vào nhóm "👤 Hồ sơ" trong `js/29-sidenav.js`): tab **🧾 Đơn CRM** (`registerExtraTab`). Dòng "Bạn đang xem: …" theo `scope` server trả (all/dept/team/own, bước 1b). Lọc Từ/đến + nút Hôm nay/7 ngày/Tháng này/Tất cả (mặc định từ đầu tháng), ô tìm (mã đơn, tên/SĐT khách, người nhận, sale, thẻ, người tạo, tên/mã SP — không dấu), dải tổng (số đơn, tổng cần thu, đã chuyển khoản, còn thiếu — tính trên danh sách đang hiện), thẻ từng đơn; bấm thẻ mở chi tiết: bảng dòng SP (SL, giá, giảm kèm %, thành tiền, ghi chú dòng) + khối tiền (tạm tính, giảm dòng/đơn, THUẾ (bước 1b: cộng vào cần thu; thuế % + tiền thuế từng dòng),  ship, phụ thu, cần thu, đã CK, còn thiếu) + khách/nhận hàng/xử lý đơn + ghi chú nội bộ/để in. TẤT CẢ số tiền lấy nguyên từ server (client KHÔNG tính lại tiền). Mọi chữ qua `esc`; id đơn đi qua `data-id` (không nhét vào onclick).
