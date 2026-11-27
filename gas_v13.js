@@ -2453,7 +2453,7 @@ var NTL_ACTIONS_ = {
   customers:1, lookup:1, donOrdersByPhone:1, cskhDetail:1, reminders:1, tasks:1, taskComments:1,
   save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
   saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, importBaseSource:1, archiveOrders:1,
-  setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
+  setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1, deleteAssign:1,
   saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, taskReassign:1, notifications:1, notifRead:1, notifMention:1, roleConfig:1, saveRoleConfig:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
   broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
 };
@@ -8652,6 +8652,7 @@ function doPostCore_(e) {
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
     if (action === 'saveAssignHistory')   return saveAssignHistoryGuarded_(data);
     if (action === 'leadAssign')          return leadAssign_(data);
+    if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
     if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
@@ -11524,9 +11525,35 @@ function leadAssign_(data) {
 }
 // Ghi de ca sheet AssignData chi danh cho admin. Tai khoan khac (web ban cu gui ca lich su khi bam "xong"): chi cap nhat
 // donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
+// 2026-11-27: xoa DUNG cac dot chia theo id. NGUYEN NHAN GOC: web xoa 1 dot bang cach ghi de CA sheet AssignData bang ban tren may admin (saveAssignHistory),
+// ban nay khong co dot Truong nhom vua chia lai / dot chia tu dong moi va giu tien do "da xong" cu -> mat du lieu cua nguoi khac. Quyen giong saveAssignHistory.
+function deleteAssign_(data) {
+  var u = (data && data.token) ? _sessUser_(data.token) : null;
+  if (u && _roleBase_(u.role) !== 'admin') return jsonOut_({ error: 'Chi admin duoc xoa dot chia.', code: 'FORBIDDEN' });
+  var ids = {}, n = 0;
+  ((data && Array.isArray(data.ids)) ? data.ids : []).forEach(function (id) { id = String(id || '').trim(); if (id) { ids[id] = 1; n++; } });
+  if (!n) return jsonOut_({ error: 'Thieu id dot chia can xoa.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), last = sh.getLastRow(), rows = [];
+    if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { if (ids[String(r[0])]) rows.push(i + 2); });
+    if (rows.length && sh.getMaxRows() - rows.length < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);   // Sheets khong cho xoa het cac dong duoi tieu de
+    // Xoa tu duoi len, gom cac dong lien nhau thanh 1 lan goi (dot chia lon nam tren nhieu dong).
+    for (var e = rows.length - 1; e >= 0; ) {
+      var s = e;
+      while (s > 0 && rows[s - 1] === rows[s] - 1) s--;
+      sh.deleteRows(rows[s], e - s + 1);
+      e = s - 1;
+    }
+    return jsonOut_({ ok: true, deleted: rows.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
 function saveAssignHistoryGuarded_(data) {
   var u = (data && data.token) ? _sessUser_(data.token) : null;
-  if (!u || u.role === 'admin') return saveAssignHistory_(data && data.history);
+  if (!u || _roleBase_(u.role) === 'admin') return saveAssignHistory_(data && data.history);
   var own = _leadOwnNames_(u), incoming = {};
   ((data && data.history) || []).forEach(function (h) { if (h && h.id && own[_normTxt_(h.csName)]) incoming[String(h.id)] = h; });
   var lock = LockService.getScriptLock();
