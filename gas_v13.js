@@ -23747,17 +23747,21 @@ function _loyaltyEarnPoints_(amountPaid, cfg) {
 }
 function _loyaltyYearOf_(ymd) { var m = /^(\d{4})-\d{2}-\d{2}/.exec(String(ymd || '')); return m ? Number(m[1]) : 0; }
 // Số dư điểm còn dùng được tại ngày asOfYmd. Mỗi năm 1 "quỹ" riêng; quỹ năm trước đã hết hạn (không cộng dồn sang).
-// events: {type:'earn'|'refund'|'redeem', orderId, date:'YYYY-MM-DD', points}. refund trừ vào quỹ của NĂM ĐƠN GỐC (tra theo orderId).
+// events: {type:'earn'|'refund'|'redeem'|'undo', key, orderId, date:'YYYY-MM-DD', points}. undo: orderId = key của dòng redeem bị hoàn tác. refund trừ vào quỹ của NĂM ĐƠN GỐC (tra theo orderId).
 function _loyaltyBalance_(events, asOfYmd) {
-  var asYear = _loyaltyYearOf_(asOfYmd), pools = {}, earnYear = {};
+  var asYear = _loyaltyYearOf_(asOfYmd), pools = {}, earnYear = {}, redeemYear = {};
   function pool(y) { return pools[y] || (pools[y] = { earned: 0, refunded: 0, redeemed: 0 }); }
   var list = (events || []).filter(function (e) { return e && String(e.date || '').slice(0, 10) <= String(asOfYmd).slice(0, 10); });
-  list.forEach(function (e) { if (e.type === 'earn' && e.orderId != null) earnYear[e.orderId] = _loyaltyYearOf_(e.date); });
+  list.forEach(function (e) {
+    if (e.type === 'earn' && e.orderId != null) earnYear[e.orderId] = _loyaltyYearOf_(e.date);
+    if (e.type === 'redeem' && e.key != null) redeemYear[e.key] = _loyaltyYearOf_(e.date);   // để 'undo' trả điểm về đúng quỹ năm của lần dùng gốc
+  });
   list.forEach(function (e) {
     var p = Math.max(0, Math.floor(Number(e.points) || 0)), y = _loyaltyYearOf_(e.date); if (!y) return;
     if (e.type === 'earn') pool(y).earned += p;
     else if (e.type === 'refund') pool(earnYear[e.orderId] || y).refunded += p;
     else if (e.type === 'redeem') pool(y).redeemed += p;
+    else if (e.type === 'undo') pool(redeemYear[e.orderId] || y).redeemed -= p;   // hoàn tác dùng điểm (orderId = key dòng redeem gốc)
   });
   var cur = pool(asYear), net = cur.earned - cur.refunded - cur.redeemed, expired = 0;
   Object.keys(pools).forEach(function (y) { if (Number(y) < asYear) expired += Math.max(0, pools[y].earned - pools[y].refunded - pools[y].redeemed); });
@@ -23797,7 +23801,7 @@ var LOYALTY_HEADERS_ = ['key', 'phone', 'type', 'orderId', 'date', 'points', 'am
 var SH_LOYALTY_TIER_ = 'LoyaltyTier';
 var LOYALTY_TIER_HEADERS_ = ['key', 'phone', 'date', 'orderId', 'from', 'to', 'cumulative', 'at'];
 var LOYALTY_GET_ACTIONS_ = { loyaltyGet: 1 };
-var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1 };
+var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1 };
 function _loyaltyCfg_() { var c = null; try { c = getSetting_('loyaltyConfig'); } catch (e) {} return _loyaltyCfgNormalize_(c); }
 function _loyaltyYmdCell_(v) { if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : _vnYmd_(v); return String(v || '').slice(0, 10); }
 function _loyaltyOrdersOfPhone_(phone, rows) {
@@ -23853,6 +23857,8 @@ function loyaltyState_(phone) {
   var ledger = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph).map(function (r) {
     return { key: String(r.key), type: String(r.type), orderId: String(r.orderId), date: _loyaltyYmdCell_(r.date), points: Number(r.points) || 0, amount: Number(r.amount) || 0, note: String(r.note || ''), by: String(r.by || '') };
   });
+  var undoneKeys = {}; ledger.forEach(function (r) { if (r.type === 'undo') undoneKeys[r.orderId] = true; });
+  ledger.forEach(function (r) { if (r.type === 'redeem' && undoneKeys[r.key]) r.undone = true; });
   var tierRows = _loyaltyRead_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, ph).map(function (r) { return { date: _loyaltyYmdCell_(r.date), orderId: String(r.orderId), from: String(r.from), to: String(r.to), cumulative: Number(r.cumulative) || 0 }; });
   tierRows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   var curKey = tierRows.length ? tierRows[tierRows.length - 1].to : tcfg[0].key, lab = {}; tcfg.forEach(function (t) { lab[t.key] = t.label; });
@@ -23871,6 +23877,7 @@ function loyaltyDoGet_(action, p) {
 function loyaltyDoPost_(action, d) {
   try {
     var a = _khoAuth_(d); if (a.err) return a.err;
+    if (action === 'loyaltyUndo') return _khoWithLock_(function () { return _loyaltyUndo_(d, a); });
     return _khoWithLock_(function () {
       var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
       var s = loyaltySync_(ph); if (s.error) return jsonOut_({ ok: false, error: s.error });
@@ -23884,6 +23891,25 @@ function loyaltyDoPost_(action, d) {
       return jsonOut_({ ok: true, redeemed: r, points: loyaltyState_(ph).points });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi dung diem: ' + (err && err.message || err) }); }
+}
+
+// Hoàn tác 1 lần dùng điểm (CHỈ ADMIN). KHÔNG xoá dòng cũ: thêm dòng 'undo' (key 'undo|<key redeem>', orderId = key redeem gốc) để còn dấu vết,
+// và ghi AuditLog. Điểm quay về quỹ NĂM CỦA LẦN DÙNG GỐC (nếu năm đó đã qua thì điểm đó đã hết hạn — đúng luật 31/12).
+function _loyaltyAudit_(who, action, phone, oldV, newV) {
+  try { var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS); sh.getRange(sh.getLastRow() + 1, 1, 1, AUDIT_HEADERS.length).setValues([[new Date().toISOString(), who, action, phone, _auditClip_(oldV), _auditClip_(newV)]]); } catch (e) {}
+}
+function _loyaltyUndo_(d, a) {
+  if (a.user.role !== 'admin') return jsonOut_({ ok: false, error: 'Chi admin moi duoc hoan tac dung diem.', code: 'FORBIDDEN' });
+  var ph = normPhone_(String(d && d.phone || '')), key = String(d && d.key || '').trim();
+  if (!ph || !key) return jsonOut_({ ok: false, error: 'Thieu so dien thoai hoac ma lan dung diem.' });
+  var rows = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph), uk = 'undo|' + key;
+  var orig = rows.filter(function (r) { return String(r.key) === key && r.type === 'redeem'; })[0];
+  if (!orig) return jsonOut_({ ok: false, error: 'Khong tim thay lan dung diem nay.' });
+  if (rows.some(function (r) { return String(r.key) === uk; })) return jsonOut_({ ok: false, error: 'Lan dung diem nay da duoc hoan tac roi.', code: 'DUPLICATE' });
+  var now = new Date(), who = String(a.user.username || a.user.name || ''), pts = Number(orig.points) || 0;
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[uk, ph, 'undo', key, _vnYmd_(now), pts, Number(orig.amount) || 0, String(d.note || 'hoan tac dung diem').slice(0, 200), who, now]]);
+  _loyaltyAudit_(who, 'loyalty:undo', ph, 'dung ' + pts + ' diem (don ' + (Number(orig.amount) || 0) + 'd) ngay ' + _loyaltyYmdCell_(orig.date), 'hoan tac');
+  return jsonOut_({ ok: true, undone: { key: key, points: pts }, points: loyaltyState_(ph).points });
 }
 
 // ═══════════════════════════════════════════════════════════════

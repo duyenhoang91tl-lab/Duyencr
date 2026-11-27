@@ -52,4 +52,9 @@ ok(h.tier === 'tt' && h.cumulative === 25000000 && h.history.length === 1, 'đơ
 h = run('_loyaltyTierHistory_(' + J([{ orderId: 'a', date: '2026-02-01', value: 31000000 }, { orderId: 'b', date: '2026-01-01', value: 1000000 }]) + ')');
 ok(h.history[0].orderId === 'a' && h.history[0].cumulative === 32000000 && h.history.length === 1 && h.history[0].to === 'vip', 'sắp theo ngày đơn, không theo thứ tự nhập: ' + J(h));
 ok(run('_loyaltyTierHistory_([])').tier === 'thuong', 'chưa có đơn → Khách thường');
+// hoàn tác dùng điểm: 'undo' đảo dòng redeem, trả về đúng quỹ năm của lần dùng gốc
+const evU = [{ type: 'earn', orderId: 'A', date: '2026-03-10', points: 100 }, { type: 'redeem', key: 'R1', date: '2026-07-01', points: 40 }, { type: 'undo', orderId: 'R1', date: '2026-08-01', points: 40 }];
+ok(run('_loyaltyBalance_(' + J(evU) + ', "2026-09-01")').balance === 100 && run('_loyaltyBalance_(' + J(evU) + ', "2026-09-01")').redeemed === 0, 'undo trả lại 40 điểm');
+ok(run('_loyaltyBalance_(' + J(evU) + ', "2026-07-15")').balance === 60, 'chưa tới ngày undo thì vẫn đang trừ');
+ok(run('_loyaltyBalance_(' + J([{ type: 'earn', orderId: 'A', date: '2026-03-10', points: 100 }, { type: 'redeem', key: 'R1', date: '2026-07-01', points: 40 }, { type: 'undo', orderId: 'R1', date: '2027-01-05', points: 40 }]) + ', "2027-02-01")').balance === 0, 'undo sang năm sau: điểm 2026 đã hết hạn, không cộng vào quỹ 2027');
 console.log('ALL LOYALTY TESTS PASSED');

@@ -57,6 +57,23 @@ pos.push(o('11/03/2026', 4000000, 'Hủy đơn')); const n0 = rowsOf('LoyaltyPoi
 tokenUser = null; ok(J(ctx.loyaltyDoGet_('loyaltyGet', { token: 'x', phone: PH })).code === 'AUTH', 'chưa đăng nhập GET');
 ok(J(ctx.loyaltyDoPost_('loyaltyRedeem', { token: 'x', phone: PH, orderValue: 1000000, points: 5 })).code === 'AUTH', 'chưa đăng nhập POST');
 tokenUser = { role: 'sale', username: 'hoa' }; ok(!J(ctx.loyaltyDoGet_('loyaltyGet', { token: 't', phone: '' })).ok, 'GET thiếu SĐT');
+// 8) hoàn tác dùng điểm (chỉ admin, thêm dòng — không xoá; ghi AuditLog)
+tokenUser = { role: 'sale', username: 'hoa' };
+pos = [o('10/01/2026', 16000000), o('10/02/2026', 12000000)];
+sheets.LoyaltyPoints.rows = [sheets.LoyaltyPoints.rows[0]]; sheets.LoyaltyTier.rows = [sheets.LoyaltyTier.rows[0]];
+g = get(); ok(g.points.balance === 280, 'làm lại từ đầu 160+120: ' + g.points.balance);
+r = J(ctx.loyaltyDoPost_('loyaltyRedeem', { token: 't', phone: PH, orderValue: 3000000, points: 50, refKey: 'U1' })); ok(r.ok && r.points.balance === 230, 'dùng 50');
+const redeemKey = get().ledger.find(x => x.type === 'redeem').key;
+ok(J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: redeemKey })).code === 'FORBIDDEN', 'sale KHÔNG được hoàn tác');
+tokenUser = { role: 'admin', username: 'duyen' };
+ok(!J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: 'khong|co' })).ok, 'key không tồn tại');
+ok(!J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: 'earn|' + rowsOf('LoyaltyPoints')[0][3] })).ok, 'không hoàn tác được dòng earn');
+r = J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: redeemKey }));
+ok(r.ok && r.undone.points === 50 && r.points.balance === 280 && r.points.redeemed === 0, 'admin hoàn tác: ' + JSON.stringify(r));
+ok(rowsOf('LoyaltyPoints').some(x => x[2] === 'redeem') && rowsOf('LoyaltyPoints').some(x => x[2] === 'undo'), 'dòng redeem cũ GIỮ NGUYÊN, thêm dòng undo');
+g = get(); ok(g.ledger.find(x => x.type === 'redeem').undone === true && g.points.balance === 280, 'sổ đánh dấu đã hoàn tác');
+ok(J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: redeemKey })).code === 'DUPLICATE', 'hoàn tác lần 2 bị chặn');
+ok(sheets.AuditLog && sheets.AuditLog.rows.some(x => x[2] === 'loyalty:undo' && x[1] === 'duyen' && String(x[4]).includes('50 diem')), 'ghi AuditLog loyalty:undo');
 // 7) dispatch qua doGet/doPost
 const viaGet = J(ctx.doGet({ parameter: { action: 'loyaltyGet', token: 't', phone: PH } })); ok(viaGet.ok && viaGet.phone, 'doGet có route loyaltyGet');
 const viaPost = J(ctx.doPost({ postData: { contents: JSON.stringify({ action: 'loyaltyRedeem', token: 't', phone: PH, orderValue: 1000000, points: 5 }) } }));
