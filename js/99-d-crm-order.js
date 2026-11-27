@@ -6,6 +6,7 @@
 //  đơn = Σdòng + Σthuế − giảm đơn (%|đ) + phí ship (0 nếu miễn) + phụ thu; còn thiếu = max(0, cần thu − đã chuyển khoản).
 //  Sản phẩm: GAS priceCatalogFlat (bảng giá DANH_MUC, giá NGHÌN đồng → ×1000 nếu <100000). Khách: tự điền theo SĐT (dữ liệu đã có trên máy, nếu chưa thì GAS lookup).
 //  Chống bấm Lưu 2 lần: refKey sinh 1 lần/đơn, GIỮ NGUYÊN khi lỗi/thử lại, chỉ đổi sau khi lưu thành công (server trả duplicate:true nếu trùng).
+//  Dùng điểm tích luỹ (bước 4b-2): ô "🎖️ Dùng điểm" (số dư từ GAS loyaltyGet theo SĐT khách; 1 điểm = pointValue đ, TRỪ THẲNG vào cần thu). Gửi `pointsUse` Ở CẤP NGOÀI order (server tự tính + từ chối nếu quá mức, code POINTS). Quá mức → báo lỗi, KHÔNG âm thầm cắt.
 //  F2 = Lưu (khi đang ở tab này). Danh sách đơn đã tạo = bước 3/4. Gỡ: xoá file này + thẻ <script> trong index.html + (không còn gì khác).
 // ════════════════════════════════════════════════════════════════════
 function _coBlank(){
@@ -13,9 +14,10 @@ function _coBlank(){
   try { who = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? String(currentUser.name) : ''; } catch(e){}
   return { phone:'', custName:'', gender:'', birthday:'', recvName:'', recvPhone:'', province:'', district:'', ward:'', address:'', expectedDate:'', carrier:'',
     source:'', saleName:who, careName:'', marketer:'', tags:'', note:'', printNote:'', items:[], discType:'amt', discValue:0, freeShip:false, shipFee:0, surcharge:0, paid:0,
-    refKey:'', busy:false, msg:'', msgOk:false, saved:null };
+    pointsUse:0, refKey:'', busy:false, msg:'', msgOk:false, saved:null };
 }
 var _co = _coBlank();
+var _coLoy = { phone:'', loading:false, data:null, err:'', seq:0 };   // điểm tích luỹ của khách đang nhập SĐT (loyaltyGet)
 var _coCat = { items:[], loaded:false, loading:false, err:'' };
 var _coPick = { q:'', list:[] };
 function _coNum(v){ var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
@@ -41,8 +43,18 @@ function _coCalc(o){
   var after = gross - itemDiscount, orderDiscount = _coDisc(after, o.discType === 'pct' ? 'pct' : 'amt', o.discValue);
   var shipFee = o.freeShip ? 0 : Math.max(0, Math.round(_coNum(o.shipFee))), surcharge = Math.max(0, Math.round(_coNum(o.surcharge)));
   var total = after + tax - orderDiscount + shipFee + surcharge, paid = Math.max(0, Math.round(_coNum(o.paid)));
-  return { lines: lines, gross: gross, itemDiscount: itemDiscount, tax: tax, orderDiscount: orderDiscount, shipFee: shipFee, surcharge: surcharge, total: total, paid: paid, due: Math.max(0, total - paid), qty: qty };
+  // Điểm tích luỹ (cùng luật server _loyaltyRedeem_): ≤ điểm muốn dùng, ≤ số dư, ≤ tổng đơn (trước khi trừ điểm) ÷ giá trị 1 điểm. Số dư/giá trị điểm do nơi gọi đưa vào (o.pointsBalance, o.pointValue).
+  var pv = _coNum(o.pointValue) > 0 ? _coNum(o.pointValue) : 1000, want = Math.max(0, Math.floor(_coNum(o.pointsUse)));
+  var pMax = Math.max(0, Math.min(Math.max(0, Math.floor(_coNum(o.pointsBalance))), Math.floor(Math.max(0, total) / pv))), pUsed = Math.min(want, pMax), pDisc = pUsed * pv;
+  var totalBefore = total; total -= pDisc;
+  return { lines: lines, gross: gross, itemDiscount: itemDiscount, tax: tax, orderDiscount: orderDiscount, shipFee: shipFee, surcharge: surcharge, totalBeforePoints: totalBefore, pointsWant: want, pointsMax: pMax, pointsUsed: pUsed, pointsDiscount: pDisc, total: total, paid: paid, due: Math.max(0, total - paid), qty: qty };
 }
+// State đang soạn + số dư điểm của khách (đúng SĐT đang nhập; chưa tải được thì số dư 0).
+function _coNow(){
+  var d = _coLoy.data && _coLoy.phone === _coPhoneKey(_co.phone) ? _coLoy.data : null;
+  return Object.assign({}, _co, { pointsBalance: d ? ((d.points || {}).balance || 0) : 0, pointValue: d ? ((d.config || {}).pointValue || 1000) : 1000, pointsLoaded: !!d });
+}
+function _coPhoneKey(v){ var p = String(v || '').replace(/\D/g, ''); return p.length >= 9 ? p : ''; }
 // Kiểm tra nhanh trước khi gửi (server vẫn kiểm lại). Trả chuỗi lỗi hoặc ''.
 function _coValidate(o){
   var ph = String(o.phone || '').replace(/\D/g, '');
@@ -53,6 +65,12 @@ function _coValidate(o){
     if (!String(it.name || '').trim()) return 'Dòng sản phẩm ' + (i + 1) + ' thiếu tên.';
     if (!(Math.floor(_coNum(it.qty)) >= 1)) return 'Dòng sản phẩm ' + (i + 1) + ': số lượng phải từ 1.';
     if (_coNum(it.price) < 0) return 'Dòng sản phẩm ' + (i + 1) + ': đơn giá không được âm.';
+  }
+  var want = Math.max(0, Math.floor(_coNum(o.pointsUse)));
+  if (want > 0){
+    if (o.pointsLoaded === false) return 'Chưa tải được điểm của khách — bấm "Thử lại" ở ô Dùng điểm, hoặc xoá số điểm đang nhập.';
+    var c = _coCalc(o);
+    if (want > c.pointsMax) return 'Chỉ dùng được tối đa ' + c.pointsMax + ' điểm cho đơn này (số dư ' + Math.max(0, Math.floor(_coNum(o.pointsBalance))) + ' điểm, đơn ' + _coVnd(c.totalBeforePoints) + ').';
   }
   return '';
 }
@@ -69,6 +87,7 @@ function _coPayload(o){
   });
   return P;
 }
+function _coPointsUse(o){ return Math.max(0, Math.floor(_coNum(o.pointsUse))); }   // gửi Ở CẤP NGOÀI order (server bỏ qua pointsUsed/pointsDiscount trong order)
 function _coNewRef(){ return 'co' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 async function _coPost(action, body){
   if (typeof gsUrl === 'undefined' || !gsUrl) return { ok:false, error:'Chưa kết nối Google Sheets.' };
@@ -160,22 +179,61 @@ async function _coFillCustomer(){
   if (!_co.recvPhone){ _co.recvPhone = _co.phone; changed = true; }
   if (changed) _coRender(true);
 }
+// ── Điểm tích luỹ của khách (loyaltyGet) ──
+function _coLoySync(){ var k = _coPhoneKey(_co.phone); if (_coLoy.phone !== k){ _coLoy.phone = k; _coLoy.data = null; _coLoy.err = ''; _coLoy.loading = false; _coLoy.seq++; if (_co.pointsUse) _co.pointsUse = 0; } return k; }
+async function _coLoyLoad(){
+  var ph = _coLoySync(); _coLoyRender(); _coSummary();
+  if (!ph || typeof gsUrl === 'undefined' || !gsUrl) return;
+  var my = ++_coLoy.seq; _coLoy.loading = true; _coLoy.err = ''; _coLoyRender();
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=loyaltyGet&phone=' + encodeURIComponent(ph), { redirect:'follow' }), d = await r.json();
+    if (my !== _coLoy.seq) return;   // đã đổi SĐT / có lần tải mới hơn
+    if (d && d.ok) _coLoy.data = d; else _coLoy.err = (d && d.error) || 'GAS chưa có action loyaltyGet — cần deploy lại GAS.';
+  } catch(e){ if (my !== _coLoy.seq) return; _coLoy.err = 'Không tải được điểm: ' + (e && e.message || e); }
+  _coLoy.loading = false; _coLoyRender(); _coSummary();
+}
+function _coLoyHtml(){
+  var k = _coLoySync(), E = _coEsc;
+  var box = function(t){ return '<div style="font-size:12px;color:var(--muted)">' + t + '</div>'; };
+  if (!k) return box('🎖️ Nhập số điện thoại khách để xem điểm tích luỹ.');
+  if (_coLoy.loading) return box('🎖️ Đang tải điểm của khách…');
+  if (_coLoy.err) return '<div style="font-size:12px;color:#c0392b">🎖️ ' + E(_coLoy.err) + ' <button class="btn sm" onclick="_coLoyLoad()">Thử lại</button></div>';
+  if (!_coLoy.data) return box('🎖️ Chưa tải điểm.');
+  var d = _coLoy.data, bal = (d.points || {}).balance || 0, pv = (d.config || {}).pointValue || 1000, c = _coCalc(_coNow());
+  if (bal <= 0) return box('🎖️ ' + E(d.tierLabel || '') + ' · khách chưa có điểm để dùng.');
+  return '<div style="font-size:12px;margin-bottom:4px">🎖️ <b>' + E(d.tierLabel || '') + '</b> · điểm dùng được: <b style="color:#c0392b">' + bal + '</b> <span style="color:var(--muted)">(1 điểm = ' + _coVnd(pv) + ')</span></div>' +
+    '<div style="display:flex;gap:6px;align-items:center"><input id="co-pts" type="number" min="0" max="' + c.pointsMax + '" value="' + (_co.pointsUse ? E(_co.pointsUse) : '') + '" placeholder="Số điểm dùng" oninput="_coPtsSet(this.value)" style="' + _coInp + '">' +
+    '<button class="btn sm" style="white-space:nowrap" onclick="_coPtsMax()">Dùng tối đa</button></div><div id="co-pts-hint" style="font-size:11px;margin-top:3px"></div>';
+}
+function _coLoyHint(){
+  var h = document.getElementById('co-pts-hint'); if (!h) return;
+  var c = _coCalc(_coNow()), want = c.pointsWant;
+  if (!want){ h.style.color = 'var(--muted)'; h.textContent = 'Tối đa ' + c.pointsMax + ' điểm cho đơn này.'; }
+  else if (want > c.pointsMax){ h.style.color = '#c0392b'; h.textContent = '⚠ Vượt mức: tối đa ' + c.pointsMax + ' điểm (số dư hoặc giá trị đơn). Sửa lại trước khi lưu.'; }
+  else { h.style.color = '#1e8449'; h.textContent = 'Trừ ' + c.pointsUsed + ' điểm = giảm ' + _coVnd(c.pointsDiscount) + '.'; }
+}
+function _coLoyRender(){ var b = document.getElementById('co-loy'); if (b){ b.innerHTML = _coLoyHtml(); _coLoyHint(); } }
+function _coPtsSet(v){ _co.pointsUse = Math.max(0, Math.floor(_coNum(v))); _coSummary(); _coLoyHint(); }
+function _coPtsMax(){ var c = _coCalc(Object.assign(_coNow(), { pointsUse: 1e9 })); _co.pointsUse = c.pointsMax; _coLoyRender(); _coSummary(); }
 // ── Lưu ──
 async function _coSave(){
   if (_co.busy) return;
-  var err = _coValidate(_co);
+  var err = _coValidate(_coNow());
   if (err){ _co.msg = err; _co.msgOk = false; _coMsgRender(); return; }
   if (!_co.refKey) _co.refKey = _coNewRef();   // giữ nguyên khi lỗi/thử lại → server không tạo đơn thứ 2
   _co.busy = true; _co.msg = 'Đang lưu đơn…'; _co.msgOk = true; _coMsgRender();
-  var d = await _coPost('crmOrderSave', { refKey: _co.refKey, order: _coPayload(_co) });
+  var d = await _coPost('crmOrderSave', { refKey: _co.refKey, pointsUse: _coPointsUse(_co), order: _coPayload(_co) });
   _co.busy = false;
   if (d && d.ok && d.order){
     _co.saved = d.order; _co.refKey = ''; _co.msg = ''; _co.msgOk = true;
     if (typeof toast === 'function') toast((d.duplicate ? 'Đơn đã lưu trước đó: ' : '✓ Đã lưu đơn ') + d.order.orderId);
     _coRender();
-  } else { _co.msg = (d && d.error) || 'Lưu đơn thất bại.'; _co.msgOk = false; _coMsgRender(); }
+  } else {
+    _co.msg = (d && d.error) || 'Lưu đơn thất bại.'; _co.msgOk = false; _coMsgRender();
+    if (d && d.code === 'POINTS') _coLoyLoad();   // số dư đã đổi (máy khác vừa dùng điểm) → tải lại để hiện mức tối đa đúng
+  }
 }
-function _coNew(){ var keep = { saleName:_co.saleName, careName:_co.careName, marketer:_co.marketer, source:_co.source, carrier:_co.carrier }; _co = Object.assign(_coBlank(), keep); _coPick.q = ''; _coRender(); }
+function _coNew(){ _coLoy.phone = ''; _coLoy.data = null; _coLoy.err = ''; _coLoy.seq++; var keep = { saleName:_co.saleName, careName:_co.careName, marketer:_co.marketer, source:_co.source, carrier:_co.carrier }; _co = Object.assign(_coBlank(), keep); _coPick.q = ''; _coRender(); }
 // ── Giao diện ──
 var _coInp = 'width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;background:var(--card,#fff);color:inherit';
 function _coField(label, key, opt){
@@ -204,12 +262,12 @@ function _coItemRow(it, i){
 }
 function _coSummaryHtml(c){
   var row = function(l, v, b){ return '<div style="display:flex;justify-content:space-between;font-size:13px;' + (b ? 'font-weight:800;font-size:15px;' : '') + '"><span>' + l + '</span><span>' + v + '</span></div>'; };
-  return row('Tạm tính (' + c.qty + ' sp)', _coVnd(c.gross)) + (c.itemDiscount ? row('Giảm giá dòng', '-' + _coVnd(c.itemDiscount)) : '') + (c.tax ? row('Thuế', _coVnd(c.tax)) : '') + (c.orderDiscount ? row('Giảm giá đơn', '-' + _coVnd(c.orderDiscount)) : '') +
+  return row('Tạm tính (' + c.qty + ' sp)', _coVnd(c.gross)) + (c.itemDiscount ? row('Giảm giá dòng', '-' + _coVnd(c.itemDiscount)) : '') + (c.tax ? row('Thuế', _coVnd(c.tax)) : '') + (c.orderDiscount ? row('Giảm giá đơn', '-' + _coVnd(c.orderDiscount)) : '') + (c.pointsUsed ? row('Dùng ' + c.pointsUsed + ' điểm', '-' + _coVnd(c.pointsDiscount)) : '') +
     (c.shipFee ? row('Phí vận chuyển', _coVnd(c.shipFee)) : '') + (c.surcharge ? row('Phụ thu', _coVnd(c.surcharge)) : '') +
     '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true);
 }
 function _coSummary(){   // cập nhật số tiền KHÔNG dựng lại form (giữ nguyên ô đang gõ)
-  var c = _coCalc(_co), box = document.getElementById('co-sum'); if (box) box.innerHTML = _coSummaryHtml(c);
+  var c = _coCalc(_coNow()), box = document.getElementById('co-sum'); if (box) box.innerHTML = _coSummaryHtml(c);
   c.lines.forEach(function(l, i){ var el = document.getElementById('co-line-' + i); if (el) el.textContent = _coVnd(l.amount); });
 }
 function _coMsgRender(){
@@ -225,6 +283,7 @@ function _coRender(keepFocus){
       '<div style="font-size:34px">✅</div><div style="font-size:18px;font-weight:800;margin:6px 0">Đã lưu đơn ' + _coEsc(s.orderId) + '</div>' +
       '<div style="font-size:13px;color:var(--muted);margin-bottom:10px">' + _coEsc(s.custName || '') + ' · ' + _coEsc(s.phone) + ' · ' + (s.itemCount || 0) + ' dòng / ' + (s.qty || 0) + ' sp</div>' +
       '<div style="font-size:13px">Cần thu <b>' + _coVnd(s.total) + '</b> · Còn thiếu <b style="color:' + (s.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(s.due) + '</b></div>' +
+      (s.pointsUsed > 0 ? '<div style="font-size:12px;margin-top:4px">🎖️ Đã dùng <b>' + s.pointsUsed + '</b> điểm (−' + _coVnd(s.pointsDiscount) + ')</div>' : '') +
       '<div style="font-size:11px;color:var(--muted);margin:10px 0">Đơn nằm ở sheet "Đơn CRM" (đang chạy thử — chưa đẩy sang Pancake POS / DT Tổng / trừ kho).</div>' +
       '<button class="btn primary" onclick="_coNew()">➕ Tạo đơn mới</button></div>';
     return;
@@ -235,7 +294,7 @@ function _coRender(keepFocus){
     '<div style="font-size:18px;font-weight:700">➕ Tạo đơn trên CRM</div>' +
     '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Đơn được ghi vào sheet riêng "Đơn CRM" (đang chạy thử). Tiền (kể cả thuế % mỗi dòng, tự nhập) do máy chủ tính lại khi lưu.</div>' +
     '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start"><div style="flex:2;min-width:300px">' +
-    sec('👤 Khách hàng') + '<div style="' + grid + '">' + _coField('Số điện thoại *', 'phone', { type:'tel', ph:'09…', onchange:'_coFillCustomer()' }) + _coField('Tên khách', 'custName') + _coField('Giới tính', 'gender') + _coField('Sinh nhật', 'birthday', { ph:'dd/mm/yyyy' }) + '</div>' +
+    sec('👤 Khách hàng') + '<div style="' + grid + '">' + _coField('Số điện thoại *', 'phone', { type:'tel', ph:'09…', onchange:'_coFillCustomer();_coLoyLoad()' }) + _coField('Tên khách', 'custName') + _coField('Giới tính', 'gender') + _coField('Sinh nhật', 'birthday', { ph:'dd/mm/yyyy' }) + '</div>' +
     sec('🛍 Sản phẩm') +
     '<input id="co-pick-q" type="text" placeholder="🔍 Tìm sản phẩm trong bảng giá (không cần dấu)…" value="' + _coEsc(_coPick.q) + '" oninput="_coPickQ(this.value)" onfocus="_coCatLoad()" style="' + _coInp + ';margin-bottom:6px">' +
     '<div id="co-pick-res"></div>' +
@@ -250,13 +309,14 @@ function _coRender(keepFocus){
     '<select onchange="_coSet(\'discType\',this.value)" style="padding:6px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (_co.discType === 'pct' ? '' : ' selected') + '>đ</option><option value="pct"' + (_co.discType === 'pct' ? ' selected' : '') + '>%</option></select></div>' +
     '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Phí vận chuyển', 'shipFee') + '</div>' +
     '<label style="font-size:12px;white-space:nowrap;padding-bottom:7px"><input type="checkbox"' + (_co.freeShip ? ' checked' : '') + ' onchange="_coSetBool(\'freeShip\',this.checked)"> Miễn phí giao</label></div>' +
-    '<div style="margin-bottom:8px">' + _coMoneyField('Phụ thu', 'surcharge') + '</div><div style="margin-bottom:10px">' + _coMoneyField('Đã chuyển khoản', 'paid') + '</div>' +
+    '<div style="margin-bottom:8px">' + _coMoneyField('Phụ thu', 'surcharge') + '</div>' +
+    '<div id="co-loy" style="margin-bottom:8px;padding:8px;border:1px dashed var(--border);border-radius:8px"></div><div style="margin-bottom:10px">' + _coMoneyField('Đã chuyển khoản', 'paid') + '</div>' +
     '<div id="co-sum"></div></div>' +
     '<div id="co-msg" style="display:none;font-size:12px;font-weight:600;border-radius:6px;padding:8px;margin-top:8px"></div>' +
     '<button id="co-save" class="btn primary" onclick="_coSave()" style="width:100%;margin-top:8px;padding:10px;font-size:14px">💾 Lưu đơn (F2)</button>' +
     '<button class="btn sm" onclick="if(confirm(\'Xoá hết nội dung đơn đang soạn?\'))_coNew()" style="width:100%;margin-top:6px">Làm lại từ đầu</button>' +
     '</div></div></div>';
-  _coSummary(); _coMsgRender(); _coPickRender();
+  _coSummary(); _coMsgRender(); _coPickRender(); _coLoyRender();
 }
 document.addEventListener('keydown', function(e){
   if (e.key !== 'F2') return;

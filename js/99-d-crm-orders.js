@@ -51,6 +51,7 @@ function _croMoneyHtml(o){
   if (Number(o.itemDiscount)) h += row('Giảm giá dòng', '-' + _croVnd(o.itemDiscount));
   if (Number(o.orderDiscount)) h += row('Giảm giá đơn', '-' + _croVnd(o.orderDiscount));
   if (Number(o.tax)) h += row('Thuế', _croVnd(o.tax));
+  if (Number(o.pointsUsed)) h += row('Dùng ' + Number(o.pointsUsed) + ' điểm' + (String(o.status) === 'Hủy' || String(o.status) === 'Hoàn' ? ' (đã hoàn lại cho khách)' : ''), '-' + _croVnd(o.pointsDiscount));
   h += row('Phí vận chuyển', _croVnd(o.shipFee));
   if (Number(o.surcharge)) h += row('Phụ thu', _croVnd(o.surcharge));
   h += row('Tiền cần thu', _croVnd(o.total), true);
@@ -146,7 +147,7 @@ async function _croSetStatus(id, to, note){
     if (d && d.ok && d.order){
       var l = (_cro.data && _cro.data.orders) || [];
       for (var k = 0; k < l.length; k++) if (l[k].orderId === id){ var keep = l[k]; l[k] = Object.assign({}, keep, d.order, { items: (d.order.items && d.order.items.length) ? d.order.items : keep.items }); break; }
-      _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".';
+      _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".' + (Number(d.pointsRefunded) > 0 ? ' Đã hoàn ' + Number(d.pointsRefunded) + ' điểm cho khách.' : '');
     } else _cro.msg = '❌ ' + ((d && (d.error || d.message)) || 'Không đổi được trạng thái (GAS chưa deploy crmOrderStatus?).');
   } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
   _cro.busy = false; _croRenderList();
