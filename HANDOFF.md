@@ -5,8 +5,8 @@
 ## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM)
 - ĐỀ BÀI Duyên (ảnh ô "Chọn sale để thêm" phải kéo tìm): chỗ nào dropdown trong CRM cũng tìm nhanh được.
 - NGUYÊN NHÂN: các ô chọn là `<select>` gốc của trình duyệt (index.html + ~40 file js), không có ô gõ tìm.
-- ✅ Bước 1/4: file mới `js/99-e-select-search.js` (một file dùng chung, không sửa từng màn hình).
-- ⏳ Đang làm: nạp file vào web. ➡️ KẾ TIẾP: (2) thẻ script trong index.html, (3) test, (4) js/INDEX.md + chốt.
+- ✅ Bước 1/4: file mới `js/99-e-select-search.js`. ✅ Bước 2/4: thêm thẻ script trong index.html (tính năng BẬT).
+- ⏳ Đang làm: test tự động. ➡️ KẾ TIẾP: (3) tools/test-select-search.js, (4) js/INDEX.md + chốt.
 
 ## 2026-11-27 (phiên Claude — LÊN ĐƠN TRÊN CRM: TAB "🧾 ĐƠN CRM" LIỆT KÊ + XEM CHI TIẾT) — BƯỚC 3/4 XONG (chỉ web, Ctrl+F5; cần GAS bước 1 đã deploy)
 - ĐỀ BÀI Duyên: "làm tiếp bước 3/4 lên đơn CRM". LƯU Ý THỨ TỰ: bước 2/4 (màn ➕ Tạo đơn) CHƯA làm — bước 3 chỉ cần backend `crmOrders` nên làm trước được; chưa có màn tạo đơn thì tab sẽ trống cho tới khi có đơn (hoặc đơn thử gọi thẳng `crmOrderSave`).
