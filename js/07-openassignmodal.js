@@ -1021,7 +1021,7 @@ function _applyCareCSToAssigned(entries){
     // Chia THEO LO 2000 SDT/request (truoc day 1 request chua toan bo — hang tram nghin SDT — de bi timeout/nghen)
     (async function(){
       for (let i = 0; i < updates.length; i += 2000) {
-        try { await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates.slice(i, i + 2000) }) }); } catch(e) {}
+        try { var rb_ = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates.slice(i, i + 2000) }) }); _writeCheck_('CS chăm sóc của đơn khi chia data (lô ' + (i / 2000 + 1) + ')')(rb_); } catch(e) { _writeFail_('CS chăm sóc của đơn khi chia data (lô ' + (i / 2000 + 1) + ')', e && e.message); }
       }
     })();
     // đồng bộ careData.cs lên CareData (theo lô)

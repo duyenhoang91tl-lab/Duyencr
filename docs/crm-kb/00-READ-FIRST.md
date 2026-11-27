@@ -29,6 +29,8 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Thư viện sản phẩm (menu Social: thư mục ảnh theo SP bảng giá + combo, tối đa 50 ảnh, action plibList/Upload/Delete/InfoSave/DriveScan/FolderImages/LinkSave; ảnh có sẵn trên Drive tự khớp tên) | `13-thu-vien-san-pham.md` | `gas_v13.js`, `js/94-plib-tab.js` |
 | Nhập báo cáo nguồn từ Base → cập nhật Kênh bán (cột M) DT TỔNG theo mã đơn / mã bộ đếm (thẻ "Nguồn đơn từ Base" ở Up dữ liệu, action importBaseSource) | `05-sasum-reports-ui.md` mục "Up dữ liệu › Nguồn đơn từ Base" (+ `07-reference-tables.md`) | `gas_v13.js` (`doImportBaseSource_`), `js/11-fn-srload.js` (`_impUploadBaseSrc`, `_impSrcCard_`) |
 | Top sản phẩm bán (menu Báo cáo: xếp hạng SP theo SỐ LƯỢNG, lọc ngày + nhiều team, danh sách SP loại trừ; action topProducts / saveTopSpExclude) | `14-top-san-pham-ban.md` | `gas_v13.js`, `js/95-top-sp-tab.js` |
+| Tốc độ tải & ổn định (số đo dung lượng, ngân sách CI, những thứ ĐÃ cân nhắc và không làm: bundle/defer/lazy-load/immutable) | `15-toc-do-va-on-dinh.md` | `tools/measure-load.js`, `.github/workflows/deploy-web.yml` |
+| Tìm lại lịch sử làm việc cũ (HANDOFF trước 26/11/2026 đã chuyển nguyên văn vào kho, chia 5 file, có mục lục + cách grep) | `docs/handoff-archive/README.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |

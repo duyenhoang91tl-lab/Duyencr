@@ -47,8 +47,14 @@ jobs:
       - name: Kiểm tra sức khoẻ web (file thiếu, nạp trùng, thiếu ?v=, hàm trùng, cú pháp)
         run: node tools/check-health.js
 
+      - name: Kiểm tra ngân sách nguồn (tổng js/css, số thẻ script, !important)
+        run: node tools/test-budget.js
+
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
+
+      - name: Kiểm tra ngân sách dung lượng (JS/CSS sau gzip)
+        run: node tools/measure-load.js --check
 
       - name: Kiểm tra cú pháp từng file đã nén
         run: for f in dist/js/*.js; do node --check "$f" || exit 1; done
@@ -58,6 +64,9 @@ jobs:
 
       - name: Kiểm thử hộp thoại thống nhất (js/96)
         run: node tools/test-ui-dialogs.js
+
+      - name: Kiểm thử báo lỗi ghi dữ liệu (js/97)
+        run: node tools/test-write-guard.js
 
       - name: Deploy lên Cloudflare
         if: env.HAS_CF == 'true'

@@ -1113,7 +1113,7 @@ function pushMktTeamsToGS(){
   saveLS('ome_mkt_teams', mktTeams);
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).then(_writeCheck_('danh sách đội Marketing')).catch(_writeCatch_('danh sách đội Marketing'));
 }
 async function _mktLoadPages_(){
   if (_mktPagesCache || _mktPagesLoading || !gsUrl) return;
@@ -1201,7 +1201,7 @@ function _mktSetShare(id,pageId,val){
 function pushTeamsToGS(){
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).then(_writeCheck_('danh sách Team')).catch(_writeCatch_('danh sách Team'));
 }
 function renderTeamTab(){
   var wrap = document.getElementById('team-wrap');
@@ -1213,6 +1213,7 @@ function renderTeamTab(){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
     (isAdmin ? '<div style="display:flex;gap:8px">'+
+        '<button class="btn sm" onclick="openStaffNamesMigrate()" title="Gom tên đang nối thủ công thành hồ sơ chuẩn">🧩 Gom tên → Hồ sơ</button>'+
         '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>'+
         '<button class="btn primary" onclick="addTeam()">+ Thêm Team</button></div>'
              : '<span style="color:var(--muted);font-size:12px">Chỉ Admin mới chỉnh sửa được</span>')+
