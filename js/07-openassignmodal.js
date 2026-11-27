@@ -980,7 +980,7 @@ function doAssignDataAdvanced() {
   if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
   try { _applyCareCSToAssigned(entries); } catch(e){ console.warn('applyCareCSToAssigned lỗi:', e); }   // chia data → cập nhật "CS chăm sóc" + ghi OrderData cột N
   entries.forEach(e => logAudit('assign', '', '', `Chia ${e.phones.length} KH → ${e.csName}`));
-  // Chi day CAC DOT MOI (saveAssign tung dot) — truoc day pushAssignHistToGS() ghi de TOAN BO lich su (kem mang SDT cua moi dot)
+  // Chi day CAC DOT MOI (saveAssign tung dot) — truoc day ghi de TOAN BO lich su (kem mang SDT cua moi dot)
   // len sheet moi lan chia: body hang MB va backend clearContents() truoc khi ghi nen loi giua chung la mat lich su tren Sheet.
   try { if (gsUrl) (async function(){ for (const _e of entries) { await pushAssignToGS(_e); } })(); } catch(e){ console.warn('pushAssignToGS lỗi:', e); }
 
@@ -1073,11 +1073,15 @@ function renderAssignHistory() {
   document.getElementById('assign-body').innerHTML = html;
 }
 
-function deleteAssignEntry(id) {
+// Xoa tren may chu TRUOC (dung dot theo id), thanh cong moi bo o may — neu bo truoc ma may chu loi thi lan keo sau dot lai hien ra.
+async function deleteAssignEntry(id) {
   if (!confirm('Xóa lịch sử chia này?')) return;
+  if (gsUrl) {
+    const res = await deleteAssignOnGS_([id]);
+    if (!res.ok) { toast('⚠ Chưa xoá được: ' + res.error); return; }
+  }
   assignHistory = assignHistory.filter(h => h.id !== id);
   saveLS('ome_assign_hist', assignHistory);
-  if (gsUrl) pushAssignHistToGS();  // đồng bộ xóa lên GS
   renderAssignHistory();
   updateMyDataBadge();
   if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
@@ -1829,17 +1833,17 @@ async function pushAssignToGS(entry) {
   } catch(e) { console.warn('GS assign push failed', e); }
 }
 
-// Ghi TOÀN BỘ lịch sử chia lên sheet AssignData (overwrite) → là "vết" bền vững trên trang tính.
-// Gọi mỗi khi tạo/xoá chiến dịch để sheet luôn khớp với máy, không mất khi xoá localStorage.
-async function pushAssignHistToGS() {
-  if (!gsUrl) return;
+// Xoa DUNG cac dot chia tren sheet AssignData. KHONG con duong "ghi de ca lich su tu ban tren may" (NGUYEN NHAN GOC 2026-11-27: lam mat dot Truong nhom
+// vua chia lai / he thong chia tu dong va tien do "da xong" cua nguoi khac). Dot moi / tien do: dung pushAssignToGS tung dot.
+async function deleteAssignOnGS_(ids) {
+  let tk = ''; try { tk = localStorage.getItem('ome_sess_token') || ''; } catch (e) {}
   try {
-    const r = await fetch(gsUrl, {
-      method: 'POST', redirect: 'follow',
-      body: JSON.stringify({ action: 'saveAssignHistory', history: assignHistory })
-    });
-    _checkAssignResp(await r.text());
-  } catch(e) { console.warn('GS assign hist push failed', e); }
+    const r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteAssign', token: tk, ids }) });
+    const j = await r.json();
+    if (j && j.ok) return { ok: true };
+    const err = String((j && j.error) || 'máy chủ từ chối');
+    return { ok: false, error: /Unknown action/i.test(err) ? 'máy chủ chưa cập nhật, chờ vài phút rồi thử lại' : err };
+  } catch (e) { return { ok: false, error: 'lỗi mạng, thử lại' }; }
 }
 
 function _checkAssignResp(txt) {
