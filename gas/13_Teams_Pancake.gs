@@ -257,12 +257,86 @@ function savePancakeNameMap_(pancakeName, saleName) {
 // ca 3 noi tren (memo ngan han 5s, du dung trong 1 request, tu lam moi o request sau de khong
 // giu du lieu cu qua lau) — giam tu toi da 4 lan doc sheet xuong CON 1 LAN, khong doi logic/ket
 // qua tra ve cua tung noi.
+// ── RAI DONG GOP NHIEU NGAY RA TUNG NGAY (Pancake gop thang, buoc 3/4) ──
+// NGUYEN NHAN GOC TLC sai khi tai file Thong ke tuong tac GOP CA THANG: dong luu voi date = ngay DAU nen moi so lieu dan vao 1 ngay (xem buoc 1/2).
+// Nay dong co dateTo > date duoc RAI ra tung ngay trong khoang TRUOC khi cac bao cao doc (buildPancakeReport_, _pkTrackedDatesByPageAndSale_, saleCloseByPage):
+//  - Trong so tung truong = so lieu THAT theo ngay cua Page (PancakeStatsDaily); khong co thi lay theo tongTT (cac truong tuong tac) / tongDH (cac truong don);
+//    van khong co thi chia DEU theo lich. Chia so nguyen theo phan du lon nhat -> TONG khong doi so voi dong goc.
+//  - Ngay da co dong THAT (khong gop) cua dung (Page, nhan vien) thi bo phan rai cua ngay do (so that thay the, khong cong doi).
+//  - 2 dong gop chong nhau cung (Page, nhan vien): dong NAP SAU (nam duoi trong sheet) thang tren cac ngay chong.
+// Dong tra ve giu nguyen 13 cot dau; cot 14 = dateTo (rong sau khi rai); cot 15 = co uoc tinh: 0 = so that, 1 = rai theo so lieu ngay that cua Page, 2 = chia deu theo lich.
+function _pkDaysBetween_(a, b) {
+  var out = [], p = String(a).split('-'), q = String(b).split('-');
+  var t = Date.UTC(+p[0], +p[1] - 1, +p[2]), e = Date.UTC(+q[0], +q[1] - 1, +q[2]);
+  for (var n = 0; t <= e && n < 400; n++, t += 86400000) {
+    var d = new Date(t), m = d.getUTCMonth() + 1, dd = d.getUTCDate();
+    out.push(d.getUTCFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd);
+  }
+  return out;
+}
+// Chia total theo weights (>=0, tong > 0). total nguyen -> ket qua nguyen, tong dung bang total (phan du lon nhat); khong nguyen -> chia ty le.
+function _pkApportion_(total, weights) {
+  var sum = 0, i; for (i = 0; i < weights.length; i++) sum += weights[i];
+  var out = [];
+  if (!(sum > 0)) { for (i = 0; i < weights.length; i++) out.push(total / weights.length); return out; }
+  if (total !== Math.floor(total)) { for (i = 0; i < weights.length; i++) out.push(total * weights[i] / sum); return out; }
+  var fr = [], used = 0;
+  for (i = 0; i < weights.length; i++) { var x = total * weights[i] / sum, f = Math.floor(x); out.push(f); used += f; fr.push({ i: i, r: x - f }); }
+  fr.sort(function(a, b) { return b.r - a.r || a.i - b.i; });
+  for (var k = 0; k < total - used; k++) out[fr[k % fr.length].i]++;
+  return out;
+}
+function _pkExpandMergedRows_(rows, dailyRows) {
+  var dm = {};   // pageId -> ngay -> dong PancakeStatsDaily
+  (dailyRows || []).forEach(function(r) { var d = normOrderDate_(r[0]); if (!d) return; var pid = String(r[1]); (dm[pid] = dm[pid] || {})[d] = r; });
+  var out = [], merged = [], realKeys = {};
+  (rows || []).forEach(function(r) {
+    var d = normOrderDate_(r[0]), dt = r[13] ? normOrderDate_(r[13]) : '';
+    if (dt && d && dt > d) { merged.push({ r: r, d: d, dt: dt }); return; }
+    var c = r.slice(0, 13); c[0] = d; c[13] = ''; c[14] = 0; out.push(c);
+    realKeys[String(r[1]) + '|' + String(r[3]) + '|' + d] = true;
+  });
+  var claimed = {};   // pageId|nhanVien|ngay da co dong gop NAP SAU nhan
+  for (var mi = merged.length - 1; mi >= 0; mi--) {   // tu dong nap sau ve truoc
+    var m = merged[mi], r2 = m.r, pid = String(r2[1]), nv = String(r2[3]);
+    var days = _pkDaysBetween_(m.d, m.dt), dmp = dm[pid] || {};
+    var flag = 2, vals = [];   // vals[idx] = [giaTri tung ngay]
+    var dayW = function(di) { return days.map(function(d) { var x = dmp[d]; return x ? (+x[di] || 0) : 0; }); };   // PancakeStatsDaily lech 1 cot so voi PancakeStats (khong co nhanVien)
+    var wTT = dayW(5), wDH = dayW(11), sTT = 0, sDH = 0;
+    wTT.forEach(function(x) { sTT += x; }); wDH.forEach(function(x) { sDH += x; });
+    if (sTT > 0 || sDH > 0) flag = 1;
+    for (var fi = 4; fi <= 12; fi++) {
+      var total = +r2[fi] || 0, w = dayW(fi - 1), sw = 0;
+      w.forEach(function(x) { sw += x; });
+      if (!(sw > 0)) { var fb = (fi >= 10) ? wDH : wTT, sf = (fi >= 10) ? sDH : sTT; if (sf > 0) { w = fb; sw = sf; } }
+      if (!(sw > 0)) w = days.map(function() { return 1; });
+      vals[fi] = total ? _pkApportion_(total, w) : days.map(function() { return 0; });
+    }
+    for (var di = 0; di < days.length; di++) {
+      var dd = days[di], key = pid + '|' + nv + '|' + dd;
+      if (realKeys[key] || claimed[key]) continue;
+      claimed[key] = true;
+      var nr = [dd, r2[1], r2[2], r2[3]];
+      for (var f2 = 4; f2 <= 12; f2++) nr.push(vals[f2][di]);
+      nr.push('', flag);
+      out.push(nr);
+    }
+  }
+  return out;
+}
+function _pkDailyRows_() {
+  var sh = getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
+  return sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, PK_DAILY_HEADERS.length).getValues() : [];
+}
 var _pkStatsRowsMemoCache_ = null; // { time, rows }
 function _pkStatsRowsMemo_() {
   var now = Date.now();
   if (_pkStatsRowsMemoCache_ && (now - _pkStatsRowsMemoCache_.time) < 5000) return _pkStatsRowsMemoCache_.rows;
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
   var rows = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues() : [];
+  var hasMergedPk = false;
+  for (var mgi = 0; mgi < rows.length; mgi++) { if (rows[mgi][13]) { hasMergedPk = true; break; } }
+  if (hasMergedPk) { try { rows = _pkExpandMergedRows_(rows, _pkDailyRows_()); } catch (eMg) { /* loi rai -> giu nguyen dong goc nhu truoc (khong lam hong bao cao) */ } }
   _pkStatsRowsMemoCache_ = { time: now, rows: rows };
   return rows;
 }
