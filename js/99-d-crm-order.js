@@ -2,8 +2,8 @@
 //  LÊN ĐƠN TRÊN CRM — bước 2/4 (web): tab "➕ Tạo đơn" theo clip màn Tạo đơn Pancake POS.
 //  Backend (bước 1/4, gas/35_CrmOrder.gs): POST crmOrderSave {refKey, order} ghi vào sheet RIÊNG "Đơn CRM" (đang TEST — KHÔNG đụng DT Tổng/OrderData/Pos).
 //  SERVER TỰ TÍNH TIỀN (không tin số client); module này tính LẠI cùng công thức chỉ để hiện trực tiếp "Cần thu / Còn thiếu" khi gõ.
-//  Công thức (khớp server _crmOrderNormalize_): dòng = SL×giá − giảm dòng (%|đ, ≤ thành tiền); đơn = Σdòng − giảm đơn (%|đ) + phí ship (0 nếu miễn) + phụ thu;
-//  còn thiếu = max(0, cần thu − đã chuyển khoản). Thuế % của dòng chỉ LƯU, chưa cộng (chờ Duyên xác nhận).
+//  Công thức (khớp server _crmOrderNormalize_): dòng = SL×giá − giảm dòng (%|đ, ≤ thành tiền); thuế dòng = làm tròn(dòng × thuế% do người lên đơn TỰ NHẬP, 0–100) CỘNG vào cần thu;
+//  đơn = Σdòng + Σthuế − giảm đơn (%|đ) + phí ship (0 nếu miễn) + phụ thu; còn thiếu = max(0, cần thu − đã chuyển khoản).
 //  Sản phẩm: GAS priceCatalogFlat (bảng giá DANH_MUC, giá NGHÌN đồng → ×1000 nếu <100000). Khách: tự điền theo SĐT (dữ liệu đã có trên máy, nếu chưa thì GAS lookup).
 //  Chống bấm Lưu 2 lần: refKey sinh 1 lần/đơn, GIỮ NGUYÊN khi lỗi/thử lại, chỉ đổi sau khi lưu thành công (server trả duplicate:true nếu trùng).
 //  F2 = Lưu (khi đang ở tab này). Danh sách đơn đã tạo = bước 3/4. Gỡ: xoá file này + thẻ <script> trong index.html + (không còn gì khác).
@@ -29,18 +29,19 @@ function _coDisc(base, type, value){
   var d = type === 'pct' ? Math.round(base * Math.min(v, 100) / 100) : Math.round(v);
   return Math.min(d, base);
 }
-// Hàm thuần: tính tiền từ state (cùng công thức server). Trả { lines:[{gross,discount,amount}], gross, itemDiscount, orderDiscount, shipFee, surcharge, total, paid, due, qty }.
+// Hàm thuần: tính tiền từ state (cùng công thức server). Trả { lines:[{gross,discount,tax,amount}], gross, itemDiscount, tax, orderDiscount, shipFee, surcharge, total, paid, due, qty }.
 function _coCalc(o){
-  var lines = [], gross = 0, itemDiscount = 0, qty = 0;
+  var lines = [], gross = 0, itemDiscount = 0, qty = 0, tax = 0;
   (o.items || []).forEach(function(it){
     var q = Math.max(0, Math.floor(_coNum(it.qty))), price = Math.max(0, Math.round(_coNum(it.price))), line = q * price;
     var dis = _coDisc(line, it.discType === 'pct' ? 'pct' : 'amt', it.discValue);
-    lines.push({ gross: line, discount: dis, amount: line - dis }); gross += line; itemDiscount += dis; qty += q;
+    var tx = Math.round((line - dis) * Math.min(100, Math.max(0, _coNum(it.taxPct))) / 100);
+    lines.push({ gross: line, discount: dis, tax: tx, amount: line - dis }); gross += line; itemDiscount += dis; qty += q; tax += tx;
   });
   var after = gross - itemDiscount, orderDiscount = _coDisc(after, o.discType === 'pct' ? 'pct' : 'amt', o.discValue);
   var shipFee = o.freeShip ? 0 : Math.max(0, Math.round(_coNum(o.shipFee))), surcharge = Math.max(0, Math.round(_coNum(o.surcharge)));
-  var total = after - orderDiscount + shipFee + surcharge, paid = Math.max(0, Math.round(_coNum(o.paid)));
-  return { lines: lines, gross: gross, itemDiscount: itemDiscount, orderDiscount: orderDiscount, shipFee: shipFee, surcharge: surcharge, total: total, paid: paid, due: Math.max(0, total - paid), qty: qty };
+  var total = after + tax - orderDiscount + shipFee + surcharge, paid = Math.max(0, Math.round(_coNum(o.paid)));
+  return { lines: lines, gross: gross, itemDiscount: itemDiscount, tax: tax, orderDiscount: orderDiscount, shipFee: shipFee, surcharge: surcharge, total: total, paid: paid, due: Math.max(0, total - paid), qty: qty };
 }
 // Kiểm tra nhanh trước khi gửi (server vẫn kiểm lại). Trả chuỗi lỗi hoặc ''.
 function _coValidate(o){
@@ -197,12 +198,13 @@ function _coItemRow(it, i){
       '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="number" min="0" value="' + _coEsc(it.price) + '" oninput="_coItemSet(' + i + ',\'price\',this.value)" style="' + _coInp + '"></label>' +
       '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px"><input type="number" min="0" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' +
         '<select onchange="_coItemDiscType(' + i + ',this.value)" style="padding:4px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (pct ? '' : ' selected') + '>đ</option><option value="pct"' + (pct ? ' selected' : '') + '>%</option></select></span></label>' +
+      '<label style="font-size:11px;color:var(--muted)">Thuế (%)<input type="number" min="0" max="100" value="' + (it.taxPct ? _coEsc(it.taxPct) : '') + '" placeholder="0" oninput="_coItemSet(' + i + ',\'taxPct\',this.value)" style="' + _coInp + '"></label>' +
       '<div style="font-size:11px;color:var(--muted)">Thành tiền<div id="co-line-' + i + '" style="font-size:14px;font-weight:700;color:var(--text,inherit)"></div></div>' +
     '</div></div>';
 }
 function _coSummaryHtml(c){
   var row = function(l, v, b){ return '<div style="display:flex;justify-content:space-between;font-size:13px;' + (b ? 'font-weight:800;font-size:15px;' : '') + '"><span>' + l + '</span><span>' + v + '</span></div>'; };
-  return row('Tạm tính (' + c.qty + ' sp)', _coVnd(c.gross)) + (c.itemDiscount ? row('Giảm giá dòng', '-' + _coVnd(c.itemDiscount)) : '') + (c.orderDiscount ? row('Giảm giá đơn', '-' + _coVnd(c.orderDiscount)) : '') +
+  return row('Tạm tính (' + c.qty + ' sp)', _coVnd(c.gross)) + (c.itemDiscount ? row('Giảm giá dòng', '-' + _coVnd(c.itemDiscount)) : '') + (c.tax ? row('Thuế', _coVnd(c.tax)) : '') + (c.orderDiscount ? row('Giảm giá đơn', '-' + _coVnd(c.orderDiscount)) : '') +
     (c.shipFee ? row('Phí vận chuyển', _coVnd(c.shipFee)) : '') + (c.surcharge ? row('Phụ thu', _coVnd(c.surcharge)) : '') +
     '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true);
 }
@@ -231,7 +233,7 @@ function _coRender(keepFocus){
   var grid = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px';
   w.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:4px 2px 80px;width:100%">' +
     '<div style="font-size:18px;font-weight:700">➕ Tạo đơn trên CRM</div>' +
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Đơn được ghi vào sheet riêng "Đơn CRM" (đang chạy thử). Tiền do máy chủ tính lại khi lưu.</div>' +
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Đơn được ghi vào sheet riêng "Đơn CRM" (đang chạy thử). Tiền (kể cả thuế % mỗi dòng, tự nhập) do máy chủ tính lại khi lưu.</div>' +
     '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start"><div style="flex:2;min-width:300px">' +
     sec('👤 Khách hàng') + '<div style="' + grid + '">' + _coField('Số điện thoại *', 'phone', { type:'tel', ph:'09…', onchange:'_coFillCustomer()' }) + _coField('Tên khách', 'custName') + _coField('Giới tính', 'gender') + _coField('Sinh nhật', 'birthday', { ph:'dd/mm/yyyy' }) + '</div>' +
     sec('🛍 Sản phẩm') +

@@ -17,9 +17,10 @@ function _loyPreview(orderValue, wantPoints, balance, pointValue){
   return { points: pts, discount: pts * pv, payable: v - pts * pv };
 }
 function _loyLedgerLabel(r){
-  var t = r.type === 'earn' ? '＋ Tích' : r.type === 'refund' ? '－ Hoàn đơn' : '－ Dùng';
+  var t = r.type === 'earn' ? '＋ Tích' : r.type === 'refund' ? '－ Hoàn đơn' : r.type === 'undo' ? '＋ Hoàn tác dùng điểm' : '－ Dùng';
   return _loyDmy(r.date) + ' · ' + t + ' ' + r.points + ' điểm' + (r.amount ? ' (đơn ' + _loyVnd(r.amount) + ')' : '') + (r.note ? ' · ' + r.note : '');
 }
+function _loyIsAdmin(){ return typeof currentUser !== 'undefined' && !!currentUser && currentUser.role === 'admin'; }
 function _loyBodyHtml(L){
   var p = L.points || {}, cfg = L.config || {}, pv = cfg.pointValue || 1000, E = (typeof esc === 'function') ? esc : function(s){ return String(s); };
   var h = '<div style="font-size:13px;margin-bottom:6px"><b>' + E(L.tierLabel || '') + '</b>' + (L.tierHistory && L.tierHistory.length ? '' : ' <span style="color:var(--muted)">(chưa có đơn đủ điều kiện lên hạng)</span>') + '</div>';
@@ -38,8 +39,12 @@ function _loyBodyHtml(L){
        '<div id="loy-prev" style="font-size:12px;margin-top:4px;color:var(--muted)">' + (p.balance ? '1 điểm = ' + _loyVnd(pv) + '. Nhập giá trị đơn và số điểm để xem giảm bao nhiêu.' : 'Khách chưa có điểm để dùng.') + '</div>' +
        (_loy.msg ? '<div style="font-size:12px;margin-top:4px;font-weight:600">' + E(_loy.msg) + '</div>' : '') + '</div>';
   if (L.ledger && L.ledger.length){
-    h += '<details style="margin-top:8px"><summary style="font-size:12px;cursor:pointer;color:var(--muted)">Sổ điểm gần đây (' + L.ledger.length + ')</summary><ul style="margin:4px 0 0 16px;padding:0;font-size:12px">' +
-      L.ledger.slice(0, 10).map(function(r){ return '<li>' + E(_loyLedgerLabel(r)) + '</li>'; }).join('') + '</ul></details>';
+    h += '<details style="margin-top:8px"><summary style="font-size:12px;cursor:pointer;color:var(--muted)">Sổ điểm gần đây (' + Math.min(L.ledger.length, 20) + ')</summary><ul style="margin:4px 0 0 16px;padding:0;font-size:12px">' +
+      L.ledger.slice(0, 20).map(function(r, i){
+        var t = E(_loyLedgerLabel(r));
+        if (r.type === 'redeem' && r.undone) return '<li><s style="color:var(--muted)">' + t + '</s> <i style="color:var(--muted)">(đã hoàn tác)</i></li>';
+        return '<li>' + t + (r.type === 'redeem' && _loyIsAdmin() ? ' <button class="btn sm" title="Hoàn tác lần dùng điểm này (admin)" onclick="_loyUndo(' + i + ')">↩ Hoàn tác</button>' : '') + '</li>';
+      }).join('') + '</ul></details>';
   }
   return h;
 }
@@ -105,8 +110,20 @@ async function _loyRedeem(){
   } catch(e){ _loy.msg = '❌ Không trừ được: ' + (e && e.message || e); }
   _loy.busy = false; _loyLoad(true);
 }
+async function _loyUndo(i){
+  var r = _loy.data && _loy.data.ledger && _loy.data.ledger[i]; if (_loy.busy || !r || r.type !== 'redeem' || r.undone || !_loyIsAdmin()) return;
+  if (!confirm('Hoàn tác lần dùng ' + r.points + ' điểm (' + _loyDmy(r.date) + ')?\n' + r.points + ' điểm sẽ quay lại số dư của năm đó (nếu năm đó đã qua thì điểm đã hết hạn). Có ghi nhật ký.')) return;
+  _loy.busy = true; var ph = _loy.phone;
+  try {
+    var res = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'loyaltyUndo', phone: ph, key: r.key }) }), d = await res.json();
+    if (d && d.ok){ _loy.msg = '✅ Đã hoàn tác ' + d.undone.points + ' điểm.'; if (typeof toast === 'function') toast('Đã hoàn tác ' + d.undone.points + ' điểm'); }
+    else if (d && d.code === 'DUPLICATE') _loy.msg = 'Lần dùng này đã được hoàn tác trước đó.';
+    else _loy.msg = '❌ ' + ((d && d.error) || 'Không hoàn tác được (GAS chưa deploy loyaltyUndo?).');
+  } catch(e){ _loy.msg = '❌ Không hoàn tác được: ' + (e && e.message || e); }
+  _loy.busy = false; _loyLoad(true);
+}
 (function(){
   if (typeof openDp === 'function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try { _loy.msg = ''; _loyRender(); if (_loy.open) _loyLoad(false); } catch(e){ console.warn('[loyalty]', e); } return r; }; }
   if (typeof renderDpTab === 'function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try { _loyRender(); } catch(e){ console.warn('[loyalty]', e); } return r; }; }
 })();
-if (typeof module !== 'undefined') module.exports = { _loyVnd, _loyDmy, _loyPreview, _loyLedgerLabel, _loyBodyHtml };
+if (typeof module !== 'undefined') module.exports = { _loyUndo, _loyVnd, _loyDmy, _loyPreview, _loyLedgerLabel, _loyBodyHtml };

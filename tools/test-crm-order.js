@@ -39,6 +39,12 @@ n = ctx._crmOrderNormalize_({ phone: '0912345678', items: [{ name: 'A', qty: 1, 
 // SĐT chuẩn hoá (+84), người nhận mặc định = SĐT khách
 n = ctx._crmOrderNormalize_({ phone: '+84 912 345 678', items: [{ name: 'A', qty: 1, price: 1 }] }).order; ok(n.phone === '0912345678' && n.recvPhone === '0912345678', 'chuẩn hoá SĐT: ' + n.phone);
 
+// 2b) thuế % do người lên đơn TỰ ĐIỀN: thuế dòng = làm tròn((SL×giá − giảm giá dòng) × thuế%) và CỘNG vào tiền cần thu; mặc định 0; chặn 0–100
+n = ctx._crmOrderNormalize_({ phone: '0912345678', items: [{ name: 'A', qty: 2, price: 500000, discType: 'pct', discValue: 10, taxPct: 8 }, { name: 'B', qty: 1, price: 100000 }], shipFee: 30000 }).order;
+ok(n.items[0].tax === 72000 && n.items[1].tax === 0 && n.tax === 72000 && n.total === 1000000 - 100000 + 100000 + 72000 + 30000 && n.due === n.total, 'thuế 8% trên 900.000 = 72.000 cộng vào tổng: ' + JSON.stringify([n.tax, n.total]));
+n = ctx._crmOrderNormalize_({ phone: '0912345678', items: [{ name: 'A', qty: 1, price: 1000, taxPct: 999 }, { name: 'B', qty: 1, price: 1000, taxPct: -5 }] }).order;
+ok(n.items[0].taxPct === 100 && n.items[0].tax === 1000 && n.items[1].taxPct === 0 && n.total === 3000, 'thuế bị chặn 0–100: ' + JSON.stringify([n.items[0].taxPct, n.items[1].taxPct, n.total]));
+
 // 3) từ chối dữ liệu sai
 const bad = o => ctx._crmOrderNormalize_(o).error;
 ok(/so dien thoai/.test(bad({ items: [{ name: 'A', qty: 1, price: 1 }] })), 'thiếu SĐT');
@@ -76,4 +82,32 @@ const viaPost = J(ctx.doPost({ postData: { contents: JSON.stringify({ action: 'c
 ok(viaPost.ok && viaPost.order.orderId, 'doPost điều hướng crmOrderSave: ' + JSON.stringify(viaPost).slice(0, 120));
 const viaGet = J(ctx.doGet({ parameter: { action: 'crmOrders', token: 't' } }));
 ok(viaGet.ok && viaGet.total >= 1, 'doGet điều hướng crmOrders');
+
+// 9) QUYỀN XEM theo cấp bậc: admin/CEO = tất cả | Trưởng phòng = các phòng được giao | Trưởng team = team mình | nhân viên = của mình
+const U = (username, name, role, team) => ({ username, name, names: [name], role, team: team || '', active: true });
+const users = [U('boss', 'Boss', 'admin'), U('ceo1', 'Giám Đốc', 'ceo'), U('tp1', 'Trưởng Phòng 1', 'tp', 'phong1'), U('truonga', 'Trưởng A', 'leader', 'Team A'),
+  U('mai', 'Mai', 'cs'), U('nam', 'Nam', 'cs'), U('truongb', 'Trưởng B', 'leader', 'Team B'), U('binh', 'Bình', 'cs')];
+ctx.readUsers_ = () => users;
+ctx.readTeams_ = () => [{ id: 'a', name: 'Team A', leader: 'Trưởng A', members: ['Mai', 'Nam'] }, { id: 'b', name: 'Team B', leader: 'Trưởng B', members: ['Bình'] }];
+ctx.readSaleDepts_ = () => ({ raw: { 'Trưởng A': 'phong1', 'Mai': 'phong1', 'Nam': 'phong1', 'Trưởng B': 'phong2', 'Bình': 'phong2' }, byNorm: {} });
+const mk = (code) => ({ phone: '0977000' + code, items: [{ name: 'SP' + code, qty: 1, price: 1000 }] });
+const as = (u) => { tokenUser = users.find(x => x.username === u); };
+['mai', 'nam', 'binh', 'truonga', 'truongb'].forEach((u, i) => { as(u); ok(save(mk('10' + i), 'S' + u).ok, 'tạo đơn bởi ' + u); });
+as('boss'); ok(save(Object.assign(mk('200'), { saleName: 'Mai' }), 'Sboss').order.saleName === 'Mai', 'admin lên đơn hộ Sale Mai');
+as('mai'); ok(save(mk('201'), 'Smai2').order.saleName === 'Mai', 'saleName mặc định = tên người tạo');
+const mine = (u) => { as(u); const g = list({ limit: 500 }); return { scope: g.scope, phones: g.orders.map(o => o.phone).filter(p => p.indexOf('0977000') === 0).sort().join(',') }; };
+const ph = (c) => '0977000' + c;
+let m = mine('mai'); ok(m.scope === 'own' && m.phones === [ph('100'), ph('200'), ph('201')].sort().join(','), 'nhân viên Mai thấy đơn mình tạo + đơn Sale=Mai: ' + JSON.stringify(m));
+m = mine('nam'); ok(m.scope === 'own' && m.phones === ph('101'), 'nhân viên Nam chỉ thấy đơn mình: ' + JSON.stringify(m));
+m = mine('truonga'); ok(m.scope === 'team' && m.phones === [ph('100'), ph('101'), ph('103'), ph('200'), ph('201')].sort().join(','), 'Trưởng team A thấy Mai + Nam + mình + đơn Sale=Mai, KHÔNG thấy team B: ' + JSON.stringify(m));
+m = mine('truongb'); ok(m.scope === 'team' && m.phones === [ph('102'), ph('104')].sort().join(','), 'Trưởng team B chỉ thấy team B: ' + JSON.stringify(m));
+m = mine('tp1'); ok(m.scope === 'dept' && m.phones === [ph('100'), ph('101'), ph('103'), ph('200'), ph('201')].sort().join(','), 'Trưởng phòng 1 thấy cả phòng 1 (team A), không thấy phòng 2: ' + JSON.stringify(m));
+m = mine('ceo1'); ok(m.scope === 'all' && m.phones.split(',').length === 7, 'CEO (viewer) thấy tất cả: ' + JSON.stringify(m));
+m = mine('boss'); ok(m.scope === 'all' && m.phones.split(',').length === 7, 'admin thấy tất cả');
+// vai trò lạ / chưa gán phòng → mặc định CHỈ đơn của mình (không lộ dữ liệu)
+tokenUser = U('stranger', 'Người Lạ', 'vaitrolalam'); ok(list().total === 0, 'vai trò lạ chỉ thấy của mình (hiện chưa có đơn)');
+tokenUser = Object.assign(U('tp2', 'Trưởng Phòng 2', 'tp', ''), {}); ok(list().total === 0, 'Trưởng phòng chưa được giao phòng nào → chỉ đơn của mình');
+tokenUser = U('tp3', 'TP3', 'tp', 'phong2'); const rsv = ctx.readUsers_; ctx.readUsers_ = () => users.concat([tokenUser]);
+m = list({ limit: 500 }); ok(m.scope === 'dept' && m.orders.map(o => o.phone).sort().join(',') === [ph('102'), ph('104')].sort().join(','), 'Trưởng phòng 2 chỉ thấy phòng 2: ' + JSON.stringify(m.orders.map(o => o.phone)));
+ctx.readUsers_ = rsv;
 console.log('ALL CRM ORDER TESTS PASSED');

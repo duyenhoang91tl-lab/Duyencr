@@ -144,10 +144,10 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`, `TB_MSG_SCAN_MAX_ROWS_`, `TOPSP_UNASSIGNED_TEAM_`
 
 ## 34_Loyalty.gs
-- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`
+- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndo_`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
 
 ## 35_CrmOrder.gs
-- Hàm: `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `crmOrderDoPost_`, `crmOrderDoGet_`
+- Hàm: `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `crmOrderDoGet_`
 - Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_MAX_ITEMS_`
 

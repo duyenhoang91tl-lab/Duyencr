@@ -23,14 +23,16 @@ c = w._coCalc(S([itm(1, 1250000)], { shipFee: 40000 }));
 ok(c.total === 1290000 && c.due === 1290000, 'clip 2: 1.250.000 + 40.000 = 1.290.000');
 c = w._coCalc(S([itm(2, 500000)], { shipFee: 40000, freeShip: true, surcharge: 15000, discType: 'pct', discValue: 150, paid: 5000000 }));
 ok(c.orderDiscount === 1000000 && c.shipFee === 0 && c.total === 15000 && c.due === 0, 'giam >100% bi chan, mien ship, phu thu, thua CK -> thieu 0');
+c = w._coCalc(S([{ name: 'A', qty: 1, price: 1000000, discType: 'pct', discValue: 10, taxPct: 8 }]));
+ok(c.tax === 72000 && c.total === 972000, 'thue 8% tren 900.000 = 72.000 (cong vao can thu) — khop server');
 // 2) khop server (fuzz 400 ca)
 let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
 let bad = 0;
 for (let n = 0; n < 400; n++) {
-  const items = Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => ({ name: 'A', qty: 1 + Math.floor(rnd() * 5), price: Math.floor(rnd() * 3000) * 1000 + Math.floor(rnd() * 3) * 333, discType: rnd() < .5 ? 'pct' : 'amt', discValue: rnd() < .5 ? Math.floor(rnd() * 130) : Math.floor(rnd() * 900000) }));
+  const items = Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => ({ name: 'A', qty: 1 + Math.floor(rnd() * 5), price: Math.floor(rnd() * 3000) * 1000 + Math.floor(rnd() * 3) * 333, discType: rnd() < .5 ? 'pct' : 'amt', discValue: rnd() < .5 ? Math.floor(rnd() * 130) : Math.floor(rnd() * 900000), taxPct: rnd() < .5 ? 0 : Math.floor(rnd() * 120) }));
   const o = S(items, { discType: rnd() < .5 ? 'pct' : 'amt', discValue: Math.floor(rnd() * 120) * (rnd() < .5 ? 1 : 5000), freeShip: rnd() < .3, shipFee: Math.floor(rnd() * 80) * 1000, surcharge: Math.floor(rnd() * 30) * 1000, paid: Math.floor(rnd() * 5000) * 1000 });
   const a = w._coCalc(o), s = g._crmOrderNormalize_(w._coPayload(o));
-  if (s.error || a.total !== s.order.total || a.due !== s.order.due || a.gross !== s.order.gross || a.itemDiscount !== s.order.itemDiscount || a.orderDiscount !== s.order.orderDiscount) { bad++; if (bad < 3) console.error(JSON.stringify([o, a, s])); }
+  if (s.error || a.total !== s.order.total || a.due !== s.order.due || a.gross !== s.order.gross || a.itemDiscount !== s.order.itemDiscount || a.tax !== s.order.tax || a.orderDiscount !== s.order.orderDiscount) { bad++; if (bad < 3) console.error(JSON.stringify([o, a, s])); }
 }
 ok(bad === 0, 'cong thuc client KHOP server trong 400 ca ngau nhien (' + bad + ' lech)');
 // 3) validate + payload

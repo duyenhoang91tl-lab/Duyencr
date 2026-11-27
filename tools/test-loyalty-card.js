@@ -67,5 +67,16 @@ run('_loyRender()'); ok(calls.length === 0 && host.innerHTML.includes('Hạng &a
   reply = u => /loyaltyGet/.test(u) ? DATA : { ok: false, code: 'DUPLICATE' };
   pr = run('_loyRedeem()'); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
   ok(ctx._loy.msg.includes('đã được ghi trước đó'), 'DUPLICATE báo không trừ lại');
+  // ── hoàn tác (admin)
+  const L2 = Object.assign({}, DATA, { ledger: [{ key: 'redeem|p|1', type: 'redeem', date: '2026-04-01', points: 40, amount: 2000000, note: '' }, { key: 'redeem|p|0', type: 'redeem', date: '2026-03-01', points: 10, amount: 500000, note: '', undone: true }, { type: 'undo', date: '2026-03-02', points: 10, amount: 500000, note: 'hoan tac' }] });
+  ctx.currentUser = { role: 'sale' }; let hh = run('_loyBodyHtml(' + JSON.stringify(L2) + ')');
+  ok(!hh.includes('_loyUndo') && hh.includes('<s ') && hh.includes('đã hoàn tác') && hh.includes('＋ Hoàn tác dùng điểm'), 'sale không thấy nút ↩; dòng đã hoàn tác bị gạch');
+  ctx.currentUser = { role: 'admin' }; hh = run('_loyBodyHtml(' + JSON.stringify(L2) + ')');
+  ok(hh.includes('_loyUndo(0)') && !hh.includes('_loyUndo(1)') && !hh.includes('_loyUndo(2)'), 'admin chỉ thấy ↩ ở lần dùng CHƯA hoàn tác');
+  ctx._loy.data = L2; ctx._loy.phone = '0912345678'; bodies.length = 0; confirmAns = false; await run('_loyUndo(0)'); ok(!bodies.length, 'hủy xác nhận → không POST');
+  confirmAns = true; reply = u => /loyaltyGet/.test(u) ? DATA : { ok: true, undone: { points: 40 } };
+  pr = run('_loyUndo(0)'); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
+  ok(bodies[0].action === 'loyaltyUndo' && bodies[0].key === 'redeem|p|1' && bodies[0].phone === '0912345678' && ctx._loy.msg.includes('Đã hoàn tác 40 điểm'), 'POST loyaltyUndo đúng key: ' + JSON.stringify(bodies[0]));
+  ctx.currentUser = { role: 'sale' }; ctx._loy.data = L2; bodies.length = 0; await run('_loyUndo(0)'); ok(!bodies.length, 'non-admin gọi thẳng cũng không POST');
   console.log('ALL LOYALTY CARD TESTS PASSED');
 })().catch(e => { console.error(e); process.exit(1); });
