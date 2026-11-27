@@ -4,7 +4,7 @@
 
 ## 2026-11-27 (phiên Claude — SỬA 3 LỖI PHÁT HIỆN THÊM: TÀI KHOẢN MẤT DỮ LIỆU / ADMIN GHI ĐÈ LỊCH SỬ CHIA / TEST ĐỎ)
 - ĐỀ BÀI Duyên: "làm phần bạn phát hiện thêm" (sau tính năng tài khoản Trưởng nhóm).
-- ✅ **ĐÃ XONG:** Mục 1 + 2 XONG. Mục 3: vh, chế độ tối, test 10/13 (mới nhất: test-import-base-source-ui)
+- ✅ **ĐÃ XONG:** Mục 1 + 2 XONG. Mục 3: vh, chế độ tối, test 11/13 (mới nhất: test-ng-info-panel)
 - 🔧 **ĐANG LÀM:** Mục 3: sửa test đỏ
 - ➡️ **BƯỚC KẾ TIẾP:** các test còn lại → kiểm tra cuối
 
