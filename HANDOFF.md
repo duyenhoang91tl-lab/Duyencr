@@ -5,9 +5,9 @@
 ## 2026-11-26 (phiên Claude — TÀI KHOẢN LEAD: NHẬN DATA, CHIA LẠI CHO TEAM, BÁO CÁO NHÂN VIÊN, GIỚI HẠN THÁNG)
 - ĐỀ BÀI Duyên: tạo tk Lead → Lead thấy data Duyên chia, chia lại cho nhân viên trong team, xem báo cáo nhân viên; Duyên cho Lead quyền xem data theo tháng (vd 4, 5, 6).
 - CÁCH HIỂU (chờ Duyên xác nhận): tháng = tháng ĐƠN HÀNG; Lead xem = data chia cho chính Lead (mọi tháng) + data team có đơn trong tháng được tick; không tick = không giới hạn. Báo cáo doanh số KHÔNG giới hạn theo tháng.
-- ✅ **ĐÃ XONG:** Bước 1–7 + khớp tên đợt chia với phạm vi xem (GAS) + sửa test
-- 🔧 **ĐANG LÀM:** Tài liệu
-- ➡️ **BƯỚC KẾ TIẾP:** docs/crm-kb → Duyên thử thật với 1 tài khoản Trưởng nhóm
+- ✅ **ĐÃ XONG:** Bước 1–7, khớp tên đợt chia (GAS), tài liệu docs/crm-kb/16-tai-khoan-lead.md
+- 🔧 **ĐANG LÀM:** Kiểm tra cuối trên main
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên thử thật với 1 tài khoản Trưởng nhóm + xác nhận cách hiểu 'tháng'
 
 ## 2026-11-27 (phiên Claude — PANCAKE: FILE THỐNG KÊ GỘP CẢ THÁNG → TỶ LỆ CHỐT THEO NGÀY HOẶC GỘP) — BƯỚC 1/4 XONG (client đọc file; chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên: tải "Thống kê tương tác" Pancake tháng 8 GỘP CẢ THÁNG (không từng ngày) nhưng vẫn muốn đo tỷ lệ chốt (TLC): có từng ngày thì xem từng ngày, không thì tính gộp cả tháng.
