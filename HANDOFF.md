@@ -4,7 +4,7 @@
 
 ## 2026-11-27 (phiên Claude — SỬA 3 LỖI PHÁT HIỆN THÊM: TÀI KHOẢN MẤT DỮ LIỆU / ADMIN GHI ĐÈ LỊCH SỬ CHIA / TEST ĐỎ)
 - ĐỀ BÀI Duyên: "làm phần bạn phát hiện thêm" (sau tính năng tài khoản Trưởng nhóm).
-- ✅ **ĐÃ XONG:** Mục 1 + mục 2 XONG (GAS deleteAssign, js/13 chia theo Team, js/07 xoá đợt). Web không còn đường ghi đè cả lịch sử chia
+- ✅ **ĐÃ XONG:** Mục 1 + mục 2 XONG, KB 16 cập nhật
 - 🔧 **ĐANG LÀM:** Mục 3: test đỏ
 - ➡️ **BƯỚC KẾ TIẾP:** Phân định từng test đỏ (ưu tiên test-view-extra) → kiểm tra cuối
 
