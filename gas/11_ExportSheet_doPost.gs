@@ -313,7 +313,7 @@ function doPostCore_(e) {
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows, data.daily);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
-    if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
+    if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows, data.daily);
     if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
     if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
