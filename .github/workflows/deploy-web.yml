@@ -50,6 +50,9 @@ jobs:
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
 
+      - name: Kiểm tra ngân sách dung lượng (JS/CSS sau gzip)
+        run: node tools/measure-load.js --check
+
       - name: Kiểm tra cú pháp từng file đã nén
         run: for f in dist/js/*.js; do node --check "$f" || exit 1; done
 
