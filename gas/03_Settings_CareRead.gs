@@ -1422,9 +1422,8 @@ function _scopeVerdict_(user, phone, namesFn) {
   var months = (user.viewMonths && user.viewMonths.length) ? _leadMonths_(user) : [];
   if (months.length) {
     // Data admin chia thang cho Truong nhom: luon xem duoc. Data khac cua team: chi khi co don trong thang duoc cap.
-    var own = _leadOwnNames_(user), asg = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
-    var ownK = {}; Object.keys(own).forEach(function (k) { ownK[_scopeNameKey_(k)] = 1; });
-    for (var a = 0; a < asg.length; a++) { if (own[_normTxt_(asg[a])] || ownK[_scopeNameKey_(asg[a])]) return true; }
+    var ownK = _leadOwnKeys_(user), asg = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
+    for (var a = 0; a < asg.length; a++) { if (ownK[_normTxt_(asg[a])] || ownK[_scopeNameKey_(asg[a])]) return true; }
     if (!_phoneHasOrderInMonths_(phone, months)) return false;
   }
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }

@@ -522,10 +522,10 @@ function _phoneHasOrderInMonths_(phone, months) {
 }
 // Thu hep tap SDT cua team: giu SDT duoc chia cho chinh Truong nhom + SDT co don (DT tong hoac du lieu don) trong cac thang duoc cap.
 function _leadMonthFilterSet_(user, set, months) {
-  var want = {}, out = {}, own = _leadOwnNames_(user);
+  var want = {}, out = {}, ownK = _leadOwnKeys_(user);
   months.forEach(function (m) { want[m] = 1; });
   var ai = _scopeAssignIndex_();
-  Object.keys(ai).forEach(function (ph) { if (ai[ph].some(function (n) { return own[_normTxt_(n)]; })) out[ph] = 1; });
+  Object.keys(ai).forEach(function (ph) { if (ai[ph].some(function (n) { return ownK[_normTxt_(n)] || ownK[_scopeNameKey_(n)]; })) out[ph] = 1; });
   function add(ph, date) { var k = normPhone_(String(ph || '')); if (k && set[k] && !out[k] && want[_ymOfOrderDate_(date)]) out[k] = 1; }
   try {
     var oc = _cacheGetBig_('orders_v1'), ords = null;
@@ -541,14 +541,33 @@ function _leadUser_(token) {
   if (_roleBase_(u.role) !== 'leader') return { error: 'Chi tai khoan Truong nhom moi dung duoc muc nay.', code: 'FORBIDDEN' };
   return { user: u };
 }
+// Dot chia ghi ten khac cach viet (hoa/thuong, dau, khoang trang) hoac ten cung nguoi (the Khop sale / names tai khoan Sale) -> tra ve ten tuong ung trong `names`; khong khop -> ''.
+// Cung tieu chi voi pham vi xem (_scopeSameNameKeys_), neu khong thi Truong nhom thay khach o Danh sach KH ma man "Data cua team" lai trong. Khop dung ten duoc xet truoc.
+function _leadNameResolver_(names) {
+  var map = {}, groups = {};
+  function put(k, n) { if (k && !map[k]) map[k] = n; }
+  names.forEach(function (n) { put(_normTxt_(n), n); });
+  names.forEach(function (n) { put(_scopeNameKey_(n), n); });
+  try { groups = _userAliasGroups_(); } catch (e) { Logger.log('_leadNameResolver_: ' + e); }
+  names.forEach(function (n) { (groups[_normTxt_(n)] || []).forEach(function (x) { put(_normTxt_(x), n); put(_scopeNameKey_(x), n); }); });
+  return function (cs) { return map[_normTxt_(cs)] || map[_scopeNameKey_(cs)] || ''; };
+}
+// Ten cua chinh Truong nhom, moi cach viet -> tra theo _normTxt_ / _scopeNameKey_.
+function _leadOwnKeys_(user) {
+  var own = _leadOwnNames_(user), o = {};
+  Object.keys(own).forEach(function (k) { o[own[k]] = 1; });
+  return _scopeSameNameKeys_(o);
+}
 function leadAssignInfo_(e) {
   var a = _leadUser_(e && e.parameter && e.parameter.token);
   if (a.error) return jsonOut_(a);
-  var t = _leadTeam_(a.user), keys = {};
-  Object.keys(t.own).forEach(function (k) { keys[k] = 1; });
-  t.members.forEach(function (m) { keys[_normTxt_(m)] = 1; });
-  var hist = readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).filter(function (h) { return keys[_normTxt_(h.csName)]; });
+  var t = _leadTeam_(a.user);
   var own = Object.keys(t.own).map(function (k) { return t.own[k]; });
+  var resolve = _leadNameResolver_(own.concat(t.members)), hist = [];
+  readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) {
+    var n = resolve(h.csName);
+    if (n) { h.csName = n; hist.push(h); }   // web so ten dot chia voi own/members -> tra ten da quy ve team
+  });
   return jsonOut_({ ok: true, own: own, teams: t.teamNames, members: t.members, viewMonths: _leadMonths_(a.user), assignHistory: hist });
 }
 function leadAssign_(data) {
@@ -562,8 +581,9 @@ function leadAssign_(data) {
     var t = _leadTeam_(a.user), memberByKey = {};
     t.members.forEach(function (m) { memberByKey[_normTxt_(m)] = m; });
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), pool = {};
+    var resolve = _leadNameResolver_(Object.keys(t.own).map(function (k) { return t.own[k]; }).concat(t.members));
     readAssign_(sh).forEach(function (h) {
-      if (!t.own[_normTxt_(h.csName)]) return;
+      if (!t.own[_normTxt_(resolve(h.csName))]) return;
       (h.phones || []).forEach(function (p) { var k = normPhone_(String(p)); if (k) pool[k] = String(p); });
     });
     var used = {}, entries = [], total = 0;
