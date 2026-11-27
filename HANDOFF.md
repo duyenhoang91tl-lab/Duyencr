@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-27 (phiên Claude — 11 HẠNG MỤC CRM: BƯỚC 3 KIỂM NHẬT KÝ ĐỔI CẤU HÌNH + CHỐT 2e) — XONG (chỉ test + tài liệu; không đổi GAS/web)
+- ✅ **2e không làm lại:** phiên "Lên đơn CRM 4b" đã nối điểm THẲNG vào đơn (trừ thẳng, `pointsUse`, Hủy/Hoàn tự hoàn điểm) — xem mục 4b bên dưới. Tránh làm trùng (đã gặp 2 lần: combo, ô dùng điểm).
+- ✅ **Bước 3 (quy tắc chung "nhật ký đổi cấu hình"):** KẾT LUẬN từ code: chỉ có 1 đường ghi cài đặt là `setSetting_` (gas_v13.js ~1697) và nó luôn ghi `AuditLog` (`config:setting:<khoá>`, giờ, người theo token, cũ → mới; khoá nhạy cảm chỉ "đã đổi"; khoá máy tự cập nhật bị bỏ qua). Hạng/KPI/điểm/hoa hồng/thưởng đều đi đường này → ĐÃ có dấu vết, không cần sửa code. Có màn xem ở Cấu hình (`js/37`).
+- 🧪 Thêm `tools/test-audit-config-keys.js` (9 khoá: tierConfig, saleKpiConfig, loyaltyConfig, individualRates, channelCommissionRates, bonusPrograms, closeRateThresholds, saleChannels, goldUnitAmount: mỗi khoá đổi 2 lần ⇒ 2 dòng đúng cũ→mới, không ghi khi không đổi, khoá nhạy cảm không lộ giá trị, token hết hạn vẫn ghi). Thử tắt dòng ghi nhật ký ⇒ test đỏ đúng chỗ. `test-audit-cfg` vẫn xanh.
+- 📋 `docs/CRM-11-HANG-MUC-TRANG-THAI.md` cập nhật: quy tắc chung ✅, mục 9 (dùng điểm trong đơn đã xong ở 4b).
+- [ ] **VIỆC KẾ TIẾP trong 11 hạng mục:** (4) mục 7: trừ hoa hồng kỳ sau khi đơn hoàn — làm được ngay nhưng CẦN Duyên chốt chu kỳ chốt/trả hoa hồng; (5) mục 8: KPI tự cam kết + duyệt (lưu ý phiên khác vừa đổi bậc Sale còn 2 bậc TV 100tr/CT 500tr — đọc mục "BẬC SALE CHỈ CÒN 2 BẬC" trước khi đụng KPI); (6) mục 9: quyền lợi theo hạng (chờ chốt); (7) mục 11: ticket/giờ làm việc (chờ chốt 17h hay 21h). Mục 1,2,5,6 chờ khoá/API bên ngoài; mục 4 chờ Duyên bật webhook.
+- ⏳ **Chờ Duyên chốt (đang chặn việc):** giờ làm việc 08:00–17:00 hay –21:00; chu kỳ trả hoa hồng; quyền lợi từng hạng (Vip "từ lần mua thứ 2" vs 30tr); giữ/bỏ hệ hạng theo số đơn; hết hạn điểm 31/12 đúng không.
+
 ## 2026-11-27 (tối — TÀI KHOẢN TEST BƯỚC 2/2 WEB: LỌC THEO SALE ĐÃ CHỌN + XEM ĐỦ TAB) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành". Rà: 461 test (chỉ test-dist-equivalence đỏ khi dist/ cũ, build lại thì xanh), check-health, mở các tab trên Chromium (dữ liệu trống, chặn mạng): không thấy lỗi sập. Việc dở tìm được: bước 2/2 (web) của "Tài khoản test" bên dưới.
 - ✅ Đã xong: js/08 (lọc khách theo sale), js/14 (xem đủ tab), js/09, js/67, js/11, js/12 (Báo cáo F chỉ hiện sale được chọn).
