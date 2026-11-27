@@ -800,7 +800,7 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
       '<div style="font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+')</div>'+_srCrExtraCells_(team, true)+'</div>';
     bars = '<div style="overflow-x:auto"><div style="min-width:560px">'+head+teamRow+bars+'</div></div>';
   }
-  var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
+  var isAdmin = currentUser.role === 'admin';   // tai khoan test chi xem: khong co nut sua moc ty le chot
   var legend = _srCrLegendHtml_(lv);
   var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
   return '<div style="padding:4px 0 10px">'+
