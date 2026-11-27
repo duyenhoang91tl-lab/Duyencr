@@ -2,6 +2,12 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
+## 2026-11-27 (phiên Claude — ĐỐI CHIẾU 11 HẠNG MỤC CRM VỚI CODE) — BƯỚC 1 XONG (chỉ tài liệu)
+- ĐỀ BÀI Duyên: gửi bản chốt `docs/Chot-noi-dung-CRM-11-hang-muc.docx` (đã thêm quyết định), yêu cầu làm từng bước nhỏ, mỗi file push + cập nhật HANDOFF, và kiểm mục nào CRM chưa làm.
+- ✅ XONG: `docs/CRM-11-HANG-MUC-TRANG-THAI.md` — bảng từng mục: đã có code gì / còn thiếu / làm được ngay hay chờ bên ngoài + 6 chỗ docx còn mâu thuẫn. Kết quả: #1,2,5 chờ khoá/API; #3 bỏ (CRM thay POS); #4 chờ Duyên bật webhook; #6 chờ khoá AI; #7,8,10 đã có cơ chế (thiếu trừ hoa hồng kỳ sau/KPI nhiều chỉ tiêu); #9 có hạng, CHƯA có điểm + lịch sử hạng + quyền lợi; #11 chưa có gì.
+- ⚠ Cần Duyên chốt (chi tiết trong file trên): giờ làm việc 08:00–17:00 hay –21:00; 1 điểm = bao nhiêu đồng + hạn dùng; quyền lợi từng hạng (Vip "từ lần mua thứ 2" vs 30tr); giữ hay bỏ hệ hạng theo số đơn; chu kỳ trả hoa hồng.
+- [ ] **VIỆC KẾ TIẾP:** bước 2 = điểm tích luỹ 1%/năm + lịch sử đổi hạng (hàm thuần + test, chưa nối UI). Không đụng gas/extension ở bước 1 nên không cần deploy/reload.
+
 ## 2026-11-27 (phiên Claude — PANCAKE: FILE "THỐNG KÊ NHÂN VIÊN" (SĐT MANG VỀ / ĐƠN CHỐT) GỘP CẢ THÁNG → RẢI THEO NGÀY) — BƯỚC 1–2/3 XONG (1: web; 2: GAS lưu dateTo + PancakeSdtDaily — CẦN deploy GAS)
 - ĐỀ BÀI Duyên: gửi 2 file tháng 8 (tương tác + nhân viên) hỏi CRM có nhận diện và tính tỷ lệ chốt được không.
 - KẾT QUẢ KIỂM TRA FILE THẬT: (a) file TƯƠNG TÁC ghi khoảng 01/08/**2025**–31/08/2025 (sai năm → Duyên phải tải lại đúng 2026; chỉ Page 595… có số, 29.335 TT; CRM đọc được 15 dòng + 31 ngày); (b) file NHÂN VIÊN đúng 2026 nhưng `_pkParseSdtFile` chỉ lấy NGÀY ĐẦU làm date cho cả file và bỏ sheet By time → 56 dòng (712 SĐT, 472 đơn chốt) dồn hết vào 01/08/2026.
