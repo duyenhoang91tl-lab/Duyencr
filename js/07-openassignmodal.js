@@ -1752,6 +1752,19 @@ function careBadgeText(st) {
   return careStatusFullLabel(st) || st;
 }
 
+let _doneQueue_ = Promise.resolve();
+// Gui lan luot: bam tich roi bo tich nhanh phai toi may chu dung thu tu.
+function _pushDoneToGS_(csName, phone, done, ids) {
+  _doneQueue_ = _doneQueue_.then(async function () {
+    try {
+      const r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'toggleAssignDone', csName, phone, done, ids }) });
+      const j = await r.json();
+      if (!j || !j.ok) throw new Error((j && j.error) || 'máy chủ từ chối');
+    } catch (e) { if (typeof _writeFail_ === 'function') _writeFail_('đánh dấu "đã xong"', e && e.message); else console.warn('GS done push failed', e); }
+  });
+  return _doneQueue_;
+}
+
 function toggleMyDataDone(phone, csName, isDone) {
   // Update in all batches for this CS
   const touched = [];
@@ -1767,8 +1780,9 @@ function toggleMyDataDone(phone, csName, isDone) {
     touched.push(h);
   }
   saveLS('ome_assign_hist', assignHistory);
-  // Chi ghi cac dot bi doi (saveAssign): ghi ca lich su tu ban tren may co the xoa dot moi chia (vd Truong nhom vua chia lai) va de mat tien do cua nguoi khac.
-  if (gsUrl) (async function(){ for (const _e of touched) { await pushAssignToGS(_e); } })();
+  // Chi gui DUNG thay doi (1 SDT) cua cac dot bi doi, KHONG gui ca dot. NGUYEN NHAN GOC: ban dot tren may co the thieu dau tich Pancake AI vua ghi
+  // (gui ca dot la de mat) va co the la dot admin da xoa (gui ca dot la tao lai).
+  if (gsUrl && touched.length) _pushDoneToGS_(csName || touched[0].csName, phone, !!isDone, touched.map(h => h.id));
   updateMyDataBadge();
   renderMyDataTab();
 }
@@ -1849,7 +1863,7 @@ function showDeployGuideBanner() {
 }
 
 async function pushAssignToGS(entry) {
-  // Giữ tương thích: ghi 1 entry (dùng khi cập nhật tiến độ donePhones)
+  // Ghi 1 dot MOI. Tien do "da xong" KHONG di duong nay (xem _pushDoneToGS_).
   if (!gsUrl || !entry) return;
   try {
     const r = await fetch(gsUrl, {
@@ -1861,7 +1875,7 @@ async function pushAssignToGS(entry) {
 }
 
 // Xoa DUNG cac dot chia tren sheet AssignData. KHONG con duong "ghi de ca lich su tu ban tren may" (NGUYEN NHAN GOC 2026-11-27: lam mat dot Truong nhom
-// vua chia lai / he thong chia tu dong va tien do "da xong" cua nguoi khac). Dot moi / tien do: dung pushAssignToGS tung dot.
+// vua chia lai / he thong chia tu dong va tien do "da xong" cua nguoi khac). Dot moi: pushAssignToGS tung dot; "da xong": _pushDoneToGS_.
 async function deleteAssignOnGS_(ids) {
   let tk = ''; try { tk = localStorage.getItem('ome_sess_token') || ''; } catch (e) {}
   try {
@@ -1880,7 +1894,7 @@ function _checkAssignResp(txt) {
   else { _assignBackendOK = false; showAssignBackendWarning(); }
 }
 
-// Kéo chiến dịch từ sheet về (merge — chỉ BỔ SUNG, không bao giờ xoá entry đang có ở máy).
+// Kéo chiến dịch từ sheet về (merge): BỔ SUNG đợt mới; chỉ gỡ đợt máy chủ báo admin ĐÃ XOÁ (deletedIds). Đợt chỉ có ở máy (chưa gửi kịp) vẫn giữ.
 async function pullAssignHistory() {
   if (!gsUrl) return;
   try {
@@ -1893,27 +1907,34 @@ async function pullAssignHistory() {
       _assignBackendOK = false; showAssignBackendWarning(); return;
     }
     _assignBackendOK = true;
-    if (ad.assignHistory.length > 0) {
-      const localIds = new Set(assignHistory.map(h => h.id));
-      let added = 0;
-      for (const h of ad.assignHistory) {
-        if (!localIds.has(h.id)) {
-          // Normalize phones trong chiến dịch từ GS (có thể mất số 0 do Excel lưu kiểu số nguyên)
-          if (h.phones) h.phones = h.phones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
-          if (h.donePhones) h.donePhones = h.donePhones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
-          assignHistory.push(h); localIds.add(h.id); added++;
-        }
+    const gone = new Set((ad.deletedIds || []).map(String));
+    let removed = 0, added = 0;
+    for (let i = assignHistory.length - 1; i >= 0; i--) {
+      if (gone.has(String(assignHistory[i].id))) { assignHistory.splice(i, 1); removed++; }
+    }
+    const localIds = new Set(assignHistory.map(h => h.id));
+    for (const h of ad.assignHistory) {
+      if (!localIds.has(h.id) && !gone.has(String(h.id))) {
+        // Normalize phones trong chiến dịch từ GS (có thể mất số 0 do Excel lưu kiểu số nguyên)
+        if (h.phones) h.phones = h.phones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
+        if (h.donePhones) h.donePhones = h.donePhones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
+        assignHistory.push(h); localIds.add(h.id); added++;
       }
-      if (added > 0) {
-        assignHistory.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-        saveLS('ome_assign_hist', assignHistory);
-        if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
-        if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
-        if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
-        if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
-        // Làm mới danh sách KH ngay sau khi pull chiến dịch về
-        if (typeof applyFilters === 'function') applyFilters();
+    }
+    if (added > 0 || removed > 0) {
+      assignHistory.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      saveLS('ome_assign_hist', assignHistory);
+      if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
+      if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
+      if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
+      if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
+      if (removed > 0) {   // man dang mo phai bo ngay dot vua go
+        try { const bs = document.getElementById('mydata-batch-sel'); if (bs && gone.has(bs.value)) bs.value = ''; if (typeof renderMyDataTab === 'function') renderMyDataTab(); } catch (e) {}
+        // 'assign-body' dung chung cho tab Tao/Lich su/Bao cao/Tu dong -> chi ve lai khi dang xem Lich su (khong de len form dang nhap do)
+        try { if (document.querySelector('#assign-body .assign-hist-item')) renderAssignHistory(); } catch (e) {}
       }
+      // Làm mới danh sách KH ngay sau khi pull chiến dịch về
+      if (typeof applyFilters === 'function') applyFilters();
     }
   } catch(e) { console.warn('Pull assignHistory failed:', e.message); }
 }
