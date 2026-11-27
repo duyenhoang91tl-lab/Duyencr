@@ -10380,7 +10380,7 @@ function buildPancakeReport_(from, to, split) {
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   // Page -> Kenh ban (PancakePageMap): de tinh them MAU SO "chi tuong tac o Page DA khop kenh" cho ty le chot (tongTTMapped). Loi doc map khong duoc lam hong bao cao.
   var kenhOfPage = {}; try { kenhOfPage = readPancakePageMap_() || {}; } catch (eKm) { kenhOfPage = {}; }
-  var byPage = {}, byCS = {};
+  var byPage = {}, byCS = {}, byDayPage = {};   // byDayPage: ngay|pageId -> TT/DH THEO NGAY (sau khi rai dong gop thang, buoc 3) de ve bang TLC theo ngay (buoc 4)
   var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
   var salesCanon = {}; // ci-key -> ten hien thi DAU TIEN gap, danh cho ten Sale DA khop qua PancakeNameMap
                         // (phong truong hop chinh gia tri mapping bi go khac hoa/thuong/dinh khoang
@@ -10396,6 +10396,11 @@ function buildPancakeReport_(from, to, split) {
       var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
           binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
 
+      // Theo NGAY: cot 15 (v[i][14]) = co uoc tinh do _pkExpandMergedRows_ gan (0 = so that, 1 = rai theo ngay that cua Page, 2 = chia deu). Dong chua qua rai -> undefined = 0.
+      var bdKey = d + '|' + pageId;
+      if (!byDayPage[bdKey]) byDayPage[bdKey] = { date: d, pageId: pageId, pageName: pageName, tongTT: 0, tongDH: 0, est: 0 };
+      byDayPage[bdKey].tongTT += tongTT; byDayPage[bdKey].tongDH += tongDH;
+      byDayPage[bdKey].est = Math.max(byDayPage[bdKey].est, +v[i][14] || 0);
       if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, kenh: kenhOfPage[pageId] || '', khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
       var bp = byPage[pageId];
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
@@ -10451,7 +10456,23 @@ function buildPancakeReport_(from, to, split) {
   }
 
   var hiddenSets2 = _hiddenPageSaleSets_();
-  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split,
+  // byDay = tong cac Page (da an Page theo cai dat admin, giong byPage) theo tung ngay; est: 0 so that, 1 rai theo ngay that cua Page, 2 chia deu theo lich (>=1 = ngay nay co phan UOC TINH tu file gop thang).
+  var byDayAgg = {}, byDayPageList = [];
+  Object.keys(byDayPage).forEach(function(k) {
+    var r = byDayPage[k];
+    if (hiddenSets2.channels && hiddenSets2.channels.length && hiddenSets2.channels.indexOf(r.pageName) !== -1) return;
+    r.tongTT = Math.round(r.tongTT * 100) / 100; r.tongDH = Math.round(r.tongDH * 100) / 100;
+    r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
+    byDayPageList.push(r);
+    var a = byDayAgg[r.date] || (byDayAgg[r.date] = { date: r.date, tongTT: 0, tongDH: 0, est: 0 });
+    a.tongTT += r.tongTT; a.tongDH += r.tongDH; a.est = Math.max(a.est, r.est);
+  });
+  var byDayList = Object.keys(byDayAgg).sort().map(function(k) {
+    var a = byDayAgg[k]; a.tongTT = Math.round(a.tongTT * 100) / 100; a.tongDH = Math.round(a.tongDH * 100) / 100;
+    a.tyLeCD = a.tongTT ? Math.round(a.tongDH / a.tongTT * 1000) / 10 : 0; return a;
+  });
+  byDayPageList.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (b.tongTT - a.tongTT); });
+  var _pkReportResult_ = { byDay: byDayList, byDayPage: byDayPageList, byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split,
     pageMapped: Object.keys(kenhOfPage).some(function(pid) { return !!kenhOfPage[pid]; }) };   // co it nhat 1 Page da khop Kenh ban
   _pkReportMemoCache_ = { key: _pkMemoKey_, time: _pkMemoNow_, data: _pkReportResult_ };
   return _pkReportResult_;
