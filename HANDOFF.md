@@ -4,9 +4,9 @@
 
 ## 2026-11-27 (phiên Claude — SỬA 3 LỖI PHÁT HIỆN THÊM: TÀI KHOẢN MẤT DỮ LIỆU / ADMIN GHI ĐÈ LỊCH SỬ CHIA / TEST ĐỎ)
 - ĐỀ BÀI Duyên: "làm phần bạn phát hiện thêm" (sau tính năng tài khoản Trưởng nhóm).
-- ✅ **ĐÃ XONG:** Mục 1 xong. Mục 2 máy chủ: GAS action deleteAssign (xoá đúng đợt theo id), test-delete-assign
-- 🔧 **ĐANG LÀM:** Mục 2 web
-- ➡️ **BƯỚC KẾ TIẾP:** js/13 chia theo Team → js/07 xoá đợt chia → mục 3 (test đỏ)
+- ✅ **ĐÃ XONG:** Mục 1 xong. Mục 2: GAS deleteAssign; js/13 chia theo Team chỉ ghi đợt mới
+- 🔧 **ĐANG LÀM:** Mục 2: js/07 xoá đợt chia
+- ➡️ **BƯỚC KẾ TIẾP:** js/07 → mục 3 (test đỏ)
 
 ## 2026-11-27 (phiên Claude) — PANCAKE AI NÚT TÌM GIÁ: GOM CÁC SIZE CÙNG SẢN PHẨM THÀNH 1 THẺ (bước 2/2 của yêu cầu "size liệt kê liên tiếp") — XONG (đã push; reload extension Pancake AI, manifest 2026.11.27.1; KHÔNG cần deploy GAS)
 - **Yêu cầu Duyên (kèm ảnh 21/11):** cùng 1 sản phẩm khác size thì liệt kê liên tiếp "size 1 giá …, size 2 giá …", không hiện lại cả khối nội dung cho từng size. Bước 1 (khung AI/dự phòng GAS) đã xong ở mục trước; đây là bước 2: các THẺ bên dưới khi bấm **Tìm** (`renderPriceRows_`).
