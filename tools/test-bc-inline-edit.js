@@ -14,7 +14,7 @@ let code = "var _SR_UNASSIGNED_='(chưa gán sale)'; var _SR_BC_LIM_=100; var _i
   "var _srState={}; var store=[]; var loads=0; function _srLoad(){loads++;} var document={getElementById:function(id){return null;}};\n" +
   "async function _splitFixGetExtra_(){ return JSON.parse(JSON.stringify(store)); } async function _splitFixPutExtra_(a){ store=JSON.parse(JSON.stringify(a)); }\n";
 code += src.match(/var _SRBC_SHIP_FEES_ *=[^\n]*/)[0] + '\n';   // 15/11: hang so phi ship cho _srBcIsLech_
-for (const n of ['_srBcIsLech_', '_srOrdNames_', '_srOrderShares_', '_srBcOrders_', '_srBcBuild_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcEditable_', '_srBcRebalance_', '_srBcEditState_', '_srBcSumHtml_', '_srBcEdit_', '_srBcReset_', '_srBcEditCellHtml_', '_srBcSave_', '_srBaseCheckPanelHtml_']) code += grab(src, n);
+for (const n of ['_srBcIsLech_', '_srOrdNames_', '_srOrderShares_', '_srBcOrders_', '_srBcBuild_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcCause_', '_srBcEditable_', '_srBcRebalance_', '_srBcEditState_', '_srBcSumHtml_', '_srBcEdit_', '_srBcReset_', '_srBcEditCellHtml_', '_srBcSave_', '_srBaseCheckPanelHtml_']) code += grab(src, n);
 for (const n of ['splitFixCodeNy_', 'splitFixRemoveCode_', 'splitFixMergeExtra_']) code += grab(s50, n);
 const C = new Function(code + 'return {_srBcRebalance_,_srBcEditable_,_srBcEdit_,_srBcSave_,_srBaseCheckPanelHtml_,_srState,setAdmin:function(v){_isAdmin=v;},store:function(){return store;},toasts:function(){return toasts;},loads:function(){return loads;},confirmMsg:function(){return confirmMsg;}};')();
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
