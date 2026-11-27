@@ -27,3 +27,7 @@ Mặc định **TẮT**. Nguồn: sheet Pos `dữ liệu đơn`, cột I (Sản 
 
 ## Action (cần token admin) — để làm giao diện sau
 `tonKhoTruDonCauHinh` {mode, start, priority}, `tonKhoTruDonXemTruoc`, `tonKhoTruDonChay`, `tonKhoTruDonHoanTay` {key}, `khoComboSave` {combo:{code,name,components,active}}; GET `khoCombo`, `tonKhoTruDonTrangThai`.
+
+## Đơn tạo từ CRM (bước 4c, 27/11/2026)
+- Đơn CRM (sheet `Đơn CRM`) cũng trừ kho: đổi sang **Đã xác nhận** → trừ; **Hủy/Hoàn** → cộng trả đúng số đã trừ. Cùng sổ cái `TonKhoTruDon` nhưng khoá riêng `CRM|<mã đơn>` (không lẫn đơn POS, không bị báo "mồ côi"). Cùng công tắc `mode` (off → không đổi gì; cộng trả vẫn chạy dù đã tắt).
+- Mã SP lấy từ cột `code` của từng dòng đơn. Dòng thiếu mã / combo chưa khai báo / mã 2 kho chưa đặt `priority` → giữ cả đơn (sổ cái `cho_duyet`, KHÔNG chặn đổi trạng thái). Admin sửa cấu hình rồi chạy lại bằng action `crmOrderStockRetry` {orderId}. Code: `_crmStockPlan_/_crmStockApply_/_crmStockReverse_` (gas/35_CrmOrder.gs). Test: `node tools/test-crm-order-stock.js`.
