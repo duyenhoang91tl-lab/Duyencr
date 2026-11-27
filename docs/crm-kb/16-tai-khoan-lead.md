@@ -30,6 +30,10 @@ Làm 2026-11-26/27. Vai trò: base `leader` (nhãn "Trưởng nhóm"; vai trò t
 ## Test
 `node tools/test-lead-assign.js` · `test-lead-ui` · `test-lead-scope` · `test-lead-identity` · `test-lead-account` · `test-lead-menu` · `test-assign-done`
 
+## Đã sửa 2026-11-27 (liên quan)
+- Sửa tài khoản giữ nguyên `perms/saleType/startDate/joinDate` (js/15 `addAccount`; GAS `saveUsers_` giữ trường client không gửi — muốn xoá thì gửi rỗng).
+- Web không còn ghi đè cả sheet AssignData: xoá đợt = POST `deleteAssign {ids}` (chỉ admin); chia theo Team ghi từng đợt `saveAssign`. Action cũ `saveAssignHistory` còn giữ cho tab trình duyệt bản cũ.
+
 ## Hạn chế đã biết (chưa sửa)
-- Sửa tài khoản (`addAccount`, js/15) dựng lại bản ghi không kèm `perms/saleType/startDate/joinDate` → có thể mất các trường này.
-- Admin xoá đợt chia / chia theo Team vẫn ghi đè cả sheet AssignData bằng bản trên máy admin (`pushAssignHistToGS`) → có thể làm mất đợt Lead vừa chia hoặc tiến độ "đã xong". Admin nên tải lại (F5) trước khi xoá/chia theo Team.
+- Máy người khác chỉ kéo THÊM đợt mới: đợt admin đã xoá vẫn còn ở máy họ; nếu họ bấm "đã xong" trong đợt đó thì `saveAssign` ghi lại đợt lên sheet.
+- Bấm "đã xong" ở web ghi cả `donePhones` theo bản trên máy → có thể đè dấu tích vừa làm ở Pancake AI; lịch sử chia trên máy admin không tự cập nhật tiến độ của đợt đã tải.
