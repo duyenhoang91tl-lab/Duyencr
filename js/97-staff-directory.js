@@ -16,18 +16,22 @@
       [e.username, e.accountName, e.fullName].concat(e.all || []).forEach(function(k){ k = fold(k); if (k && !S.idx[k]) S.idx[k] = e; });
     });
   }
+  // Trả Promise<boolean> (true = đã có thư mục). Gọi nhiều lần cùng lúc dùng chung 1 yêu cầu.
   function load(force){
-    if (S.loading) return; if (S.loaded && !force) return;
-    if (!force && S.failAt && Date.now() - S.failAt < 60000) return;
-    if (typeof gsUrl === 'undefined' || !gsUrl || typeof _authAccount === 'undefined' || !_authAccount) return;
+    if (S.loading) return S.p || Promise.resolve(false);
+    if (S.loaded && !force) return Promise.resolve(true);
+    if (!force && S.failAt && Date.now() - S.failAt < 60000) return Promise.resolve(false);
+    if (typeof gsUrl === 'undefined' || !gsUrl || typeof _authAccount === 'undefined' || !_authAccount) return Promise.resolve(false);
     S.loading = true;
-    fetch(gsUrl + (gsUrl.indexOf('?') > -1 ? '&' : '?') + 'action=staffNamesList', { redirect: 'follow' })
+    S.p = fetch(gsUrl + (gsUrl.indexOf('?') > -1 ? '&' : '?') + 'action=staffNamesList', { redirect: 'follow' })
       .then(function(r){ return r.json(); }).catch(function(){ return null; })
       .then(function(r){
         S.loading = false;
-        if (r && r.ok){ build(r.list); S.loaded = true; S.failAt = 0; rerender(); }
-        else S.failAt = Date.now();   // chưa đủ quyền / lỗi mạng: thử lại sau 1 phút, Team vẫn hiện như cũ
+        if (r && r.ok){ build(r.list); S.loaded = true; S.failAt = 0; rerender(); return true; }
+        S.failAt = Date.now();   // chưa đủ quyền / lỗi mạng: thử lại sau 1 phút, Team vẫn hiện như cũ
+        return false;
       });
+    return S.p;
   }
   function rerender(){ try { if (document.getElementById('team-wrap') && typeof renderTeamTab === 'function') renderTeamTab(); } catch (e) {} }
   // Hồ sơ khớp với 1 nhóm tên (mảng tên của cùng 1 người) — chỉ trả khi hồ sơ có họ tên chuẩn (nếu không thì giữ cách hiện cũ).
@@ -70,7 +74,8 @@
       return out;
     };
   })();
-  window._staffNamesReload = function(){ S.loaded = false; S.failAt = 0; load(true); };
+  window._staffNamesReload = function(){ S.loaded = false; S.failAt = 0; return load(true); };
+  window._staffDirList = function(){ return S.list.slice(); };   // cho công cụ gom tên cũ (js/98)
   window._staffDirState = function(){ return { n: S.list.length, loaded: S.loaded }; };   // dùng cho test
   window._staffDirBuild = build;                                                              // dùng cho test
 })();

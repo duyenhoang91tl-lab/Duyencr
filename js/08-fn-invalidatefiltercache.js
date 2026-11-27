@@ -1207,6 +1207,7 @@ function renderTeamTab(){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
     (isAdmin ? '<div style="display:flex;gap:8px">'+
+        '<button class="btn sm" onclick="openStaffNamesMigrate()" title="Gom tên đang nối thủ công thành hồ sơ chuẩn">🧩 Gom tên → Hồ sơ</button>'+
         '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>'+
         '<button class="btn primary" onclick="addTeam()">+ Thêm Team</button></div>'
              : '<span style="color:var(--muted);font-size:12px">Chỉ Admin mới chỉnh sửa được</span>')+
