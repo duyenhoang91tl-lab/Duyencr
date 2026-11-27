@@ -144,6 +144,8 @@ html[data-theme="dark"] .tk-low{color:#ea8b85!important}
 html[data-theme="dark"] .sp-overlay{background:var(--bg,var(--surface2))!important}
 html[data-theme="dark"] .sp-box{background:var(--bg,var(--surface2))!important}
 html[data-theme="dark"] .sp-err{background:var(--surface2)!important;color:#ea8686!important}
+html[data-theme="dark"] .snm-warn,html[data-theme="dark"] .snm-err{color:#ed8a82!important}
+html[data-theme="dark"] .snm-ok{color:#82edb1!important}
 /* ── 10-filter-presets.css ── */
 html[data-theme="dark"] .fp-bar{border-color:var(--border-md)!important;background:var(--surface2,var(--surface2))!important}
 html[data-theme="dark"] .fp-lb{color:#a992dd!important}
