@@ -2,8 +2,8 @@
 
 ## 2026-11-27 (tối — TÀI KHOẢN TEST BƯỚC 2/2 WEB: LỌC THEO SALE ĐÃ CHỌN + XEM ĐỦ TAB) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành". Rà: 461 test (chỉ test-dist-equivalence đỏ khi dist/ cũ, build lại thì xanh), check-health, mở các tab trên Chromium (dữ liệu trống, chặn mạng): không thấy lỗi sập. Việc dở tìm được: bước 2/2 (web) của "Tài khoản test" bên dưới.
-- ✅ Đã xong: `js/08` `_inUserScope` — role demo lọc như CS theo `currentUser.names` (trước: thấy hết).
-- 🔧 Đang làm: `js/14` bỏ ép 5 tab báo cáo. ➡️ Kế tiếp: ẩn nút sửa cấu hình (js/09, js/11, js/67), test + tài liệu.
+- ✅ Đã xong: `js/08` `_inUserScope` — role demo lọc như CS theo `currentUser.names` (trước: thấy hết). `js/14` bỏ ép 5 tab báo cáo + bỏ tự nhảy vào Báo cáo; vẫn giữ dọn cache + `demo-mode`.
+- 🔧 Đang làm: ẩn nút sửa cấu hình cho tài khoản test (js/09, js/11, js/67). ➡️ Kế tiếp: test + tài liệu.
 
 ## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
 - ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).
