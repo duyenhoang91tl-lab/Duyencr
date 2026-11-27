@@ -159,15 +159,22 @@ async function _srLoad(useCache){
       if (rGq){ _srState.gDateFrom = rGq.from; _srState.gDateTo = rGq.to; }
     }
     // THUONG tinh theo DON GOC + NGAY LEN DON TREN BASE (co don Pos): keo Pos den hon (_srGPosTo_) roi loc theo baseNgayTao trong khoang loc (js/12 _srGFilterByBaseDate_)
-    var dPosG = await _srFetch('salesReportB', {
-      dateFrom: _srState.gDateFrom, dateTo: _srGPosTo_(_srState.gDateTo),
-      sale: (_srState.gSale||[]).join(',')
-    }, UC);
-    _srRegisterIdentity_(dPosG);
-    if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
-    if (dPosG && dPosG.orders){
-      var flG = _srGFilterByBaseDate_(dPosG.orders, _srState.gDateFrom, _srState.gDateTo);
-      dPosG.orders = flG.orders; dPosG.baseBasis = flG.info;   // baseBasis: ghi chu cach loc de hien tren bao cao
+    // Duyen 26/11/2026: "bao cao G load mai ko ra". G keo salesReportB them 30 ngay Pos (khoang dai hon B/E nen KHONG dung chung cache) va B ngay cang nang -> hay vuot 55s mac dinh.
+    // Nay: cho toi 150s (GAS cache ket qua 120s nen bam lai la ra ngay) + moi buoc xu ly bao loi RA MAN HINH thay vi nem loi lam trang ket o 'Dang tai'.
+    var dPosG = null;
+    try {
+      dPosG = await _srFetch('salesReportB', {
+        dateFrom: _srState.gDateFrom, dateTo: _srGPosTo_(_srState.gDateTo),
+        sale: (_srState.gSale||[]).join(',')
+      }, UC, 150000);
+      _srRegisterIdentity_(dPosG);
+      if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+      if (dPosG && dPosG.orders){
+        var flG = _srGFilterByBaseDate_(dPosG.orders, _srState.gDateFrom, _srState.gDateTo);
+        dPosG.orders = flG.orders; dPosG.baseBasis = flG.info;   // baseBasis: ghi chu cach loc de hien tren bao cao
+      }
+    } catch (eG) {
+      dPosG = null; _srState.lastFetchError = 'Báo cáo G lỗi khi xử lý dữ liệu: ' + (eG && eG.message || eG);
     }
     _srState.dataG = dPosG;
   }
@@ -1488,7 +1495,8 @@ function _srRenderB(d){
     // Theo Team Sale — cung bang/bieu do nhu Bao cao A, du lieu tu byTeamSale moi tra ve tu backend.
     _SR_COLTH_ROWSFN_['bTeam'] = function(){ return (_srState.dataB && _srState.dataB.byTeamSale) || []; };
     _SR_COLTH_GETTER_['bTeam'] = { name: function(r){ return r.name; } };
-    var bTeamRows = _srApplyColFilters_(d.byTeamSale||[], 'bTeam', _SR_COLTH_GETTER_['bTeam']).filter(function(t){ return !_srState.bTeamSearch || t.name.toLowerCase().indexOf(_srState.bTeamSearch.toLowerCase())!==-1; });
+    var bTeamBase_ = (typeof _srMergeStoreIntoByTeam_ === 'function' && typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_() && _srState.dataBStore) ? _srMergeStoreIntoByTeam_(d.byTeamSale||[], _srState.dataBStore).rows : (d.byTeamSale||[]);   // Pos + phần Sale 30% đơn quầy theo team (cùng nguồn với Theo Sale)
+    var bTeamRows = _srApplyColFilters_(bTeamBase_, 'bTeam', _SR_COLTH_GETTER_['bTeam']).filter(function(t){ return !_srState.bTeamSearch || t.name.toLowerCase().indexOf(_srState.bTeamSearch.toLowerCase())!==-1; });
     html += '<div class="dash-section-title" style="margin-top:18px">Theo Team Sale'+_srViewToggleHtml('bTeamView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên team..." value="'+esc(_srState.bTeamSearch)+'" oninput="_srState.bTeamSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
     if (_srState.bTeamView === 'table'){

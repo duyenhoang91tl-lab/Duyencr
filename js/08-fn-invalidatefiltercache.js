@@ -103,6 +103,10 @@ function _assignKnownNames_(){
       (currentUser.viewNames || []).forEach(function(n){ addGroup([n]); });   // Quầy/CSKH: tên riêng, KHÔNG gộp thành cùng người với tài khoản
     }
     if (typeof accounts !== 'undefined' && accounts) accounts.forEach(function(a){ if (!a) return; addGroup((a.names || []).concat([a.name, a.username])); });
+    // NGUYÊN NHÂN GỐC "đã chia data cho sale nhưng Danh sách KH không hiện" (2026-11-26, tiếp): chia data chọn người nhận từ "Danh sách Sale" (tên Base/Pancake/Pos)
+    // và 2 tên đó được admin nối với tài khoản qua Quản lý Team › 🔗 Khớp sale (SALE_PERSON_TAGS = {tên chính: [thẻ...]}) — nhưng chỉ mục này chỉ biết nhóm tên của TÀI KHOẢN
+    // (names/name/username) nên đợt chia ghi tên thẻ (vd 'thuydinh95') không khớp tên tài khoản ('thuydinh1995') → _inUserScope/bộ lọc CS loại hết khách. Nay mỗi nhóm thẻ cũng là 1 người.
+    try { if (typeof SALE_PERSON_TAGS !== 'undefined' && SALE_PERSON_TAGS) Object.keys(SALE_PERSON_TAGS).forEach(function(k){ addGroup([k].concat(Array.isArray(SALE_PERSON_TAGS[k]) ? SALE_PERSON_TAGS[k] : [])); }); } catch (eT) {}
     var sel = (typeof document !== 'undefined') ? document.getElementById('cs-staff-filter') : null;
     if (sel && sel.options) Array.prototype.forEach.call(sel.options, function(o){ if (o && o.value && o.value !== 'all') addGroup([o.value]); });
   } catch (e) {}
@@ -291,6 +295,8 @@ function _inUserScope(c){
   // Tài khoản có thể gắn NHIỀU tên (vd đơn "chia" cho nhiều sale, hoặc 1 tài khoản gộp nhiều bí
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
+  // 2026-11-26 (lan 5): tai khoan khong co ten nao thi lay TEN DANG NHAP (khop server _scopeAllowedNames_ trong gas_v13.js, vi data duoc chia ghi theo ten dang nhap).
+  if (!myNames.length && currentUser.username) myNames = [currentUser.username];
   if (!myNames.length) return false;
   // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
   var _vn = currentUser.viewNames;
@@ -1107,7 +1113,7 @@ function pushMktTeamsToGS(){
   saveLS('ome_mkt_teams', mktTeams);
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).then(_writeCheck_('danh sách đội Marketing')).catch(_writeCatch_('danh sách đội Marketing'));
 }
 async function _mktLoadPages_(){
   if (_mktPagesCache || _mktPagesLoading || !gsUrl) return;
@@ -1195,7 +1201,7 @@ function _mktSetShare(id,pageId,val){
 function pushTeamsToGS(){
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).then(_writeCheck_('danh sách Team')).catch(_writeCatch_('danh sách Team'));
 }
 function renderTeamTab(){
   var wrap = document.getElementById('team-wrap');

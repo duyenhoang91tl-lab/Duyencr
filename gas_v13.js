@@ -191,7 +191,7 @@ function _stripVN_(s) {
   s = s.replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o');
   s = s.replace(/[ùúụủũưừứựửữ]/g, 'u');
   s = s.replace(/[ỳýỵỷỹ]/g, 'y');
-  s = s.replace(/đ/g, 'd');
+  s = s.replace(/[đð]/g, 'd');   // ð = Eth U+00F0 (Ð) hay lẫn trong tên SP, trông giống đ — gõ "điếu" mới ra "ÐIẾU" (18/11/2026)
   return s;
 }
 
@@ -841,7 +841,7 @@ function readCTKMCatalog_() {
 // Cot "San pham": MOI DONG 1 mon, dang "Ten | Chat lieu | Size | SL" (chi Ten bat buoc; SL mac dinh 1;
 // cung nhan "2 x Ten" o dau dong).
 var COMBO_SHEET_NAME = 'COMBO';
-var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động', 'Ảnh'];
+var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động', 'Ảnh', 'Ship (đ)', 'Freeship', 'CTKM combo'];   // cột 11-13 thêm 18/11/2026: phí ship, freeship (TRUE/FALSE), mã CTKM combo đã tích (cách nhau dấu phẩy)
 var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va', 'tien', 'vnd', 'dong'];
 
 function _comboParseItems_(text) {
@@ -856,7 +856,9 @@ function _comboParseItems_(text) {
     if (!p[0]) return;
     if (p.length >= 4 && /^\d{1,3}$/.test(p[3])) qty = parseInt(p[3], 10);
     if (qty < 1) qty = 1;
-    out.push({ name: p[0], chatLieu: p[1] || '', size: p[2] || '', qty: qty });
+    var vang = String(p[4] || '').match(/^(\d{1,2})\s*k$/i); vang = vang && [10, 14, 18, 24].indexOf(parseInt(vang[1], 10)) >= 0 ? parseInt(vang[1], 10) + 'k' : '';
+    var gia = p[5] ? parseInt(String(p[5]).replace(/[^\d]/g, ''), 10) || 0 : 0;
+    out.push({ name: p[0], chatLieu: p[1] || '', size: p[2] || '', qty: qty, vang: vang, price: gia, gift: /^(1|true|qua|quà)$/i.test(String(p[6] || '').trim()) });
   });
   return out;
 }
@@ -865,7 +867,10 @@ function _comboItemsToText_(items) {
     var n = String(it && it.name || '').trim();
     if (!n) return '';
     var q = parseInt(it.qty, 10); if (!(q >= 1)) q = 1;
-    return n + ' | ' + String(it.chatLieu || '').trim() + ' | ' + String(it.size || '').trim() + ' | ' + q;
+    var base = n + ' | ' + String(it.chatLieu || '').trim() + ' | ' + String(it.size || '').trim() + ' | ' + q;
+    var vg = /^(10|14|18|24)k$/i.test(String(it.vang || '').trim()) ? String(it.vang).trim().toLowerCase() : '', gia = Math.max(0, Math.round(Number(it.price) || 0));
+    // Dong cu (khong vang/gia/qua) giu NGUYEN 4 truong → Pancake/Zalo/tro ly AI cu doc nhu truoc; co them thi ghi 7 truong: ... | SL | Vang | Don gia (dong) | qua
+    return (vg || gia || it.gift) ? base + ' | ' + vg + ' | ' + (gia || '') + ' | ' + (it.gift ? 'qua' : '') : base;
   }).filter(function (s) { return s; }).join('\n');
 }
 function _comboPriceNum_(v) {
@@ -877,11 +882,12 @@ function _comboPriceNum_(v) {
 function _comboVnd_(n) { return n > 0 && n < 100000 ? n * 1000 : n; }
 // ANH COMBO (Duyen 2026-11-18): cot 10 'Anh' = 1-4 link anh, moi link 1 dong (hoac cach nhau dau phay/cham phay). Dang nhan: link Drive (/file/d/ID, ?id=ID, uc?export=view&id=ID) hoac link anh http(s) truc tiep.
 // Link Drive doi sang drive.google.com/thumbnail?id=ID&sz=w600 (cung dang CRM da dung de xem truoc anh; file phai chia se 'bat ky ai co link' — anh tai tu CRM len da tu bat). Link thu muc Drive KHONG dung duoc (khong biet anh nao).
-function _comboImageUrls_(text) {
+function _comboImageUrls_(text, max) {
+  max = max || 6;   // anh combo toi da 6 (truoc 4), anh qua cua CTKM toi da 2 (truyen max=2)
   var out = [];
   String(text == null ? '' : text).split(/[\r\n,;]+/).forEach(function (u) {
     u = String(u).trim();
-    if (!u || out.length >= 4) return;
+    if (!u || out.length >= max) return;
     var m = u.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || u.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
     if (m) { out.push('https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w600'); return; }
     if (/^https?:\/\/\S+$/i.test(u) && !/\/folders\//.test(u)) out.push(u);
@@ -896,7 +902,7 @@ function _comboImageIds_(text) {   // id file Drive trong o Anh (de bat chia se 
   });
   return ids;
 }
-function _comboRow_(r, todayYmd) {
+function _comboRow_(r, todayYmd, ctkmMap) {
   var sd = _ctkmParseDate_(r[5]), ed = _ctkmParseDate_(r[6]);
   var active = !(r[8] === false || String(r[8]).trim().toLowerCase() === 'false' || String(r[8]).trim() === '0' || _stripVN_(r[8]) === 'khong' || _stripVN_(r[8]) === 'tat');
   var expired = ed ? (_vnYmd_(ed) < todayYmd) : false;
@@ -908,7 +914,7 @@ function _comboRow_(r, todayYmd) {
   else if (ed) label = '✅ Còn áp dụng (đến ' + _ctkmFmtDateVN_(ed) + ')';
   else label = '✅ Đang áp dụng';
   var itemsText = String(r[2] == null ? '' : r[2]);
-  return {
+  var o = {
     code: String(r[0] == null ? '' : r[0]).trim(), name: String(r[1] == null ? '' : r[1]).trim(),
     items: _comboParseItems_(itemsText), itemsText: itemsText,
     price: _comboPriceNum_(r[3]), priceVnd: _comboVnd_(_comboPriceNum_(r[3])), priceText: String(r[3] == null ? '' : r[3]).trim(),
@@ -917,6 +923,27 @@ function _comboRow_(r, todayYmd) {
     imagesText: String(r[9] == null ? '' : r[9]), images: _comboImageUrls_(r[9]),
     usable: active && !expired && !upcoming, statusLabel: label
   };
+  return _comboPricing_(o, r, ctkmMap);
+}
+// Ship / freeship / CTKM combo da tich → tinh: giam (tong cac CTKM 'giam'), gia sau giam, tong (+ship), qua tang. Gia combo (priceVnd) = gia truoc giam (thuong = tong gia niem yet cac dong, admin bam 'Dung tong').
+function _comboBool_(v) { return v === true || /^(true|1|x|co|có|yes)$/i.test(String(v == null ? '' : v).trim()); }
+function _comboCodes_(v) {
+  var out = [];
+  (Array.isArray(v) ? v : String(v == null ? '' : v).split(/[,;\s]+/)).forEach(function (x) { x = String(x).trim().toUpperCase(); if (x && out.indexOf(x) < 0 && out.length < 10) out.push(x); });
+  return out;
+}
+function _comboPricing_(o, r, ctkmMap) {
+  o.ship = _comboPriceNum_(r[10]); o.freeship = _comboBool_(r[11]); o.ctkmCodes = _comboCodes_(r[12]);
+  o.ctkms = []; o.gifts = []; o.discount = 0;
+  o.ctkmCodes.forEach(function (code) {
+    var c = ctkmMap && ctkmMap[code]; if (!c || !c.active) return;
+    o.ctkms.push(c);
+    if (c.type === 'giam') o.discount += c.amount; else o.gifts.push({ code: c.code, name: c.name, gift: c.gift, images: c.images });
+  });
+  o.listTotal = 0; o.items.forEach(function (it) { if (!it.gift) o.listTotal += (it.price || 0) * (it.qty || 1); });
+  o.finalPrice = Math.max(0, o.priceVnd - o.discount);
+  o.total = o.finalPrice + (o.freeship ? 0 : o.ship);
+  return o;
 }
 function _comboSheet_(create) {
   var ss = SpreadsheetApp.openById(PRICE_SS_ID), sh = ss.getSheetByName(COMBO_SHEET_NAME);
@@ -930,7 +957,7 @@ function _comboSheet_(create) {
     try {
       var need = COMBO_HEADERS.length;
       if (typeof sh.getMaxColumns === 'function' && sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
-      if (!String(sh.getRange(1, need, 1, 1).getValues()[0][0] || '').trim()) sh.getRange(1, need, 1, 1).setValues([[COMBO_HEADERS[need - 1]]]);
+      for (var hc = 10; hc <= need; hc++) if (!String(sh.getRange(1, hc, 1, 1).getValues()[0][0] || '').trim()) sh.getRange(1, hc, 1, 1).setValues([[COMBO_HEADERS[hc - 1]]]);   // cot 10..13 co the thieu tren sheet cu
     } catch (e) {}
   }
   return sh;
@@ -941,10 +968,10 @@ function readComboCatalog_() {
   var last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, COMBO_HEADERS.length).getValues();
-  var today = _vnYmd_(new Date()), rows = [];
+  var today = _vnYmd_(new Date()), rows = [], cmap = readCtkmComboMap_();
   vals.forEach(function (r, i) {
     if (!String(r[0] || '').trim() && !String(r[1] || '').trim()) return;
-    var o = _comboRow_(r, today); o.row = i + 2;
+    var o = _comboRow_(r, today, cmap); o.row = i + 2;
     rows.push(o);
   });
   rows.sort(function (a, b) { return (a.usable ? 0 : 1) - (b.usable ? 0 : 1); });
@@ -1065,12 +1092,13 @@ function posPrice_(qJson) {
   } catch (err) { return { ok: false, error: 'Khong doc duoc gia POS: ' + (err && err.message || err) }; }
 }
 // Gia tri luu o cot Anh: mang c.images (hoac chuoi c.imagesText) -> moi link 1 dong, bo dong rong, toi da 4. Link khong hop le (khong phai http/Drive) bi bo.
-function _comboImageUrlsRaw_(c) {
+function _comboImageUrlsRaw_(c, max) {
+  max = max || 6;
   var src = Array.isArray(c.images) ? c.images.join('\n') : String(c.imagesText || '');
   var keep = [];
   src.split(/[\r\n,;]+/).forEach(function (u) {
     u = String(u).trim();
-    if (u && keep.length < 4 && _comboImageUrls_(u).length) keep.push(u);
+    if (u && keep.length < max && _comboImageUrls_(u).length) keep.push(u);
   });
   return keep.join('\n');
 }
@@ -1089,7 +1117,7 @@ function _comboNormSave_(c) {
   if (sd && ed && _vnYmd_(ed) < _vnYmd_(sd)) return { error: 'Ngay ket thuc truoc ngay bat dau.' };
   return { rec: [String(c.code || '').trim(), name, text, c.priceText ? String(c.priceText).trim() : price, String(c.note || ''),
     sd ? _vnYmd_(sd) : '', ed ? _vnYmd_(ed) : '', String(c.keywords || ''), c.active === false ? false : true,
-    _comboImageUrlsRaw_(c)] };
+    _comboImageUrlsRaw_(c), Math.max(0, Math.round(_comboPriceNum_(c.ship))) || '', c.freeship === true || _comboBool_(c.freeship), _comboCodes_(c.ctkmCodes != null ? c.ctkmCodes : c.ctkm).join(',')] };
 }
 function comboSave_(data) {
   var a = _khoAuth_(data); if (a.err) return a.err;
@@ -1122,6 +1150,88 @@ function comboDelete_(data) {
     for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code.toUpperCase()) { sh.deleteRow(j + 2); return jsonOut_({ ok: true }); }
     return jsonOut_({ error: 'Khong tim thay combo.' });
   });
+}
+
+// ── CTKM COMBO tao san (Duyen 2026-11-18): admin tao truoc cac CTKM (giam tien / tang qua kem toi da 2 anh qua), khi tao combo chi viec TICH. Sheet 'CTKM_COMBO' (tu tao). Khac sheet 'CTKM' (van ban tu do, chi de doc). ──
+var CTKMCB_SHEET_NAME = 'CTKM_COMBO';
+var CTKMCB_HEADERS = ['Mã', 'Tên CTKM', 'Loại', 'Giảm (đ)', 'Quà tặng', 'Ảnh quà', 'Hoạt động'];   // Loại: giam | qua
+function _ctkmcbSheet_(create) {
+  var ss = SpreadsheetApp.openById(PRICE_SS_ID), sh = ss.getSheetByName(CTKMCB_SHEET_NAME);
+  if (!sh && create) {
+    sh = ss.insertSheet(CTKMCB_SHEET_NAME);
+    sh.getRange(1, 1, 1, CTKMCB_HEADERS.length).setValues([CTKMCB_HEADERS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _ctkmcbAmount_(v) { var n = _comboPriceNum_(v); return n > 0 && n < 1000 ? n * 1000 : n; }   // 200 = 200k; tu 1000 tro len la dong day du
+function _ctkmcbRow_(r) {
+  var type = _stripVN_(r[2]) === 'qua' ? 'qua' : 'giam';
+  var active = !(r[6] === false || String(r[6]).trim().toLowerCase() === 'false' || String(r[6]).trim() === '0' || _stripVN_(r[6]) === 'khong' || _stripVN_(r[6]) === 'tat');
+  return { code: String(r[0] == null ? '' : r[0]).trim().toUpperCase(), name: String(r[1] == null ? '' : r[1]).trim(), type: type,
+    amount: type === 'giam' ? _ctkmcbAmount_(r[3]) : 0, gift: String(r[4] == null ? '' : r[4]).trim(),
+    imagesText: String(r[5] == null ? '' : r[5]), images: _comboImageUrls_(r[5], 2), active: active };
+}
+function readCtkmComboList_() {
+  var sh = _ctkmcbSheet_(false); if (!sh) return [];
+  var last = sh.getLastRow(); if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, CTKMCB_HEADERS.length).getValues().filter(function (r) { return String(r[0] || '').trim(); }).map(_ctkmcbRow_);
+}
+function readCtkmComboMap_() { var m = {}; try { readCtkmComboList_().forEach(function (c) { m[c.code] = c; }); } catch (e) {} return m; }
+function ctkmComboSave_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc them/sua CTKM combo.', code: 'FORBIDDEN' });
+  var c = (data && data.ctkm) || {}, name = String(c.name || '').trim();
+  if (!name) return jsonOut_({ error: 'Thieu ten CTKM.' });
+  var type = _stripVN_(c.type) === 'qua' ? 'qua' : 'giam', amount = type === 'giam' ? _ctkmcbAmount_(c.amount) : 0, gift = String(c.gift || '').trim();
+  var imgs = type === 'qua' ? _comboImageUrlsRaw_(c, 2) : '';
+  if (type === 'giam' && !(amount > 0)) return jsonOut_({ error: 'CTKM giam tien can so tien giam > 0.' });
+  if (type === 'qua' && !gift && !imgs) return jsonOut_({ error: 'CTKM tang qua can ten qua hoac anh qua.' });
+  return _khoWithLock_(function () {
+    var sh = _ctkmcbSheet_(true), last = sh.getLastRow(), row = 0, code = String(c.code || '').trim().toUpperCase();
+    if (!code) code = 'KM' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyMMddHHmmss');
+    if (last >= 2) { var codes = sh.getRange(2, 1, last - 1, 1).getValues(); for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code) { row = j + 2; break; } }
+    var rec = [code, name, type, amount || '', gift, imgs, c.active === false ? false : true];
+    sh.getRange(row || (last + 1), 1, 1, CTKMCB_HEADERS.length).setValues([rec]);
+    _comboImageIds_(imgs).forEach(function (id) { try { DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {} });
+    return jsonOut_({ ok: true, code: code, created: !row });
+  });
+}
+function ctkmComboDelete_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc xoa CTKM combo.', code: 'FORBIDDEN' });
+  var code = String(data && data.code || '').trim().toUpperCase(); if (!code) return jsonOut_({ error: 'Thieu ma CTKM.' });
+  return _khoWithLock_(function () {
+    var sh = _ctkmcbSheet_(false), last = sh ? sh.getLastRow() : 0; if (last < 2) return jsonOut_({ error: 'Khong tim thay CTKM.' });
+    var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code) { sh.deleteRow(j + 2); return jsonOut_({ ok: true }); }
+    return jsonOut_({ error: 'Khong tim thay CTKM.' });
+  });
+}
+// ── CHU HIEN THI COMBO theo mau moi (Duyen 2026-11-18). Dung cho tro ly AI / copy. ──
+function _comboMoney_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+function _comboK_(n) { n = Math.round(Number(n) || 0); return n % 1000 === 0 ? (n / 1000) + 'k' : _comboMoney_(n); }
+function _comboNghin_(n) { n = Math.round(Number(n) || 0); return n % 1000 === 0 ? String(n / 1000).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : _comboMoney_(n); }
+function _comboLineName_(it) {   // vang chen NGAY SAU ten, truoc duoi 'SIZE n' neu ten da co (vd 'CHARM BI MAU SO 10 SIZE 3' → '... 10 10k SIZE 3')
+  var name = String(it.name || '').trim(), vang = it.vang ? String(it.vang) : '';
+  if (vang) { var m = name.match(/^(.*?)(\s+size\s*\S+)$/i); name = m ? m[1] + ' ' + vang + m[2] : name + ' ' + vang; }
+  var cl = String(it.chatLieu || '').trim(), sz = String(it.size || '').trim();
+  if (/mặc định|mac dinh/i.test(cl)) cl = ''; if (/mặc định|mac dinh/i.test(sz)) sz = '';
+  var tail = [cl, sz].filter(function (x) { return x && name.toLowerCase().indexOf(x.toLowerCase()) < 0; }).join(' · ');
+  return tail ? name + ' · ' + tail : name;
+}
+function _comboFormatText_(c) {
+  var L = ['🎁 ' + c.name + (c.code ? ' (' + c.code + ')' : '')];
+  L.push('Giá combo: ' + _comboMoney_(c.priceVnd) + (c.discount > 0 ? ' giảm ' + _comboK_(c.discount) + ' còn ' + _comboMoney_(c.finalPrice) : ''));
+  (c.items || []).forEach(function (it) {
+    var q = it.qty || 1, n = _comboLineName_(it);
+    if (it.gift) { L.push('- 🎁 ' + n + (q > 1 ? ' × ' + q : '') + ' (quà tặng)'); return; }
+    L.push('- ' + n + (it.price > 0 ? ' ' + (q > 1 ? _comboNghin_(it.price) + ' × ' + q + ' = ' + _comboNghin_(it.price * q) : _comboNghin_(it.price)) : (q > 1 ? ' × ' + q : '')));
+  });
+  (c.gifts || []).forEach(function (g) { L.push('- 🎁 Quà tặng: ' + (g.gift || g.name)); });
+  if (c.freeship) L.push('- Freeship tổng: ' + _comboMoney_(c.total));
+  else if (c.ship > 0) L.push('- ' + _comboK_(c.ship) + ' ship tổng: ' + _comboMoney_(c.total));
+  return L.join('\n');
 }
 
 // Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
@@ -2556,6 +2666,20 @@ function _scopeNamesForPhone_(phone) {
 function _scopeNameKey_(s) {
   return _stripVN_(String(s == null ? '' : s).normalize('NFC')).replace(/[^a-z0-9]/g, '');
 }
+// Moi ten CUNG NGUOI voi cac ten trong `allowed` (object ten->1): nhom the 'salePersonTags' (Quan ly Team > Khop sale) + cot 'names' cua tai khoan Sale (_userAliasGroups_).
+// Tra object khoa chuan hoa (_normTxt_ va _scopeNameKey_) -> 1, de so ten DOT CHIA (AssignData).
+// NGUYEN NHAN GOC "da chia data cho sale nhung Danh sach KH khong hien" (2026-11-26, lan 3): chia data chon nguoi nhan tu Danh sach Sale (ten Base/Pancake/Pos) ma admin noi voi tai khoan qua
+// Khop sale; dot chia ghi ten THE (vd 'thuydinh95') con tai khoan la 'thuydinh1995' nen server so ten CHI theo ten tai khoan -> loc mat khach du client (js/08 _assignKnownNames_) da khop.
+function _scopeSameNameKeys_(allowed) {
+  var out = {};
+  function put(n) { var a = _normTxt_(n), b = _scopeNameKey_(n); if (a) out[a] = 1; if (b) out[b] = 1; }
+  Object.keys(allowed || {}).forEach(put);
+  try {
+    var groups = _userAliasGroups_();
+    Object.keys(allowed || {}).forEach(function (n) { (groups[_normTxt_(n)] || []).forEach(put); });
+  } catch (e) { Logger.log('_scopeSameNameKeys_: ' + e); }
+  return out;
+}
 function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
@@ -2578,7 +2702,7 @@ function _scopeVerdict_(user, phone, namesFn) {
   try {
     var asg2 = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
     if (asg2.length) {
-      var mineN = {}; mine.forEach(function (k) { mineN[_normTxt_(k)] = 1; mineN[_scopeNameKey_(k)] = 1; });
+      var mineN = _scopeSameNameKeys_(allowed);   // ten tai khoan + moi ten cung nguoi (the Khop sale / names)
       for (var b = 0; b < asg2.length; b++) { if (mineN[_normTxt_(asg2[b])] || mineN[_scopeNameKey_(asg2[b])]) return true; }
     }
   } catch (eAs) {}
@@ -2721,6 +2845,10 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
+  // NGUYEN NHAN GOC "da chia data (ghi ten dang nhap, vd thaoptp) nhung Danh sach KH khong hien khach" (2026-11-26, lan 5): client (js/08 _assignKnownNames_)
+  // coi names + name + USERNAME cua tai khoan la CUNG 1 nguoi, nen tab "Data cua toi" co khach; nhung server chi lay cot names (hoac name) -> dot chia ghi
+  // theo ten dang nhap bi _scopePhoneSet_/_scopeVerdict_ loc mat khach truoc khi ve toi trinh duyet (khong con gi de client loc). Them name + username de khop client.
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
   if (role === 'leader') {
     try {
       readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) {
@@ -2769,7 +2897,7 @@ function _scopePhoneSet_(user, allowed) {
   try {
     var ai = _scopeAssignIndex_();
     // KHOP TEN DOT CHIA KHONG PHAN BIET HOA/THUONG/KHOANG TRANG (cung tieu chi action=assign&csName=): dot chia ghi 'Ngocnm', tai khoan 'ngocnm' van thuoc pham vi.
-    var allowedN = {}; Object.keys(allowed).forEach(function (k) { allowedN[_normTxt_(k)] = 1; allowedN[_scopeNameKey_(k)] = 1; });
+    var allowedN = _scopeSameNameKeys_(allowed);   // ten tai khoan + moi ten cung nguoi (the Khop sale / names)
     Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]] || allowedN[_normTxt_(ai[ph][i])] || allowedN[_scopeNameKey_(ai[ph][i])]) { set[ph] = 1; break; } } });
   } catch (e8) {}
   if (months.length) set = _leadMonthFilterSet_(user, set, months);
@@ -3091,6 +3219,7 @@ function doGetCore_(e) {
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
     if (action === 'posPrice') return jsonOut_(posPrice_(e && e.parameter ? e.parameter.q : ''));   // don gia niem yet cua don POS GAN NHAT theo tung SP (form tao combo, js/93)
+    if (action === 'ctkmComboList') return jsonOut_({ ok: true, rows: readCtkmComboList_() });   // CTKM combo tao san (sheet CTKM_COMBO)
     if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
@@ -3360,6 +3489,7 @@ function doGetCore_(e) {
     if (action === 'chatViolations') return jsonOut_(cvList_((e && e.parameter) || {}));   // giam sat chat: CHI admin (cvList_ tu kiem)
     if (action === 'profileGet')    return jsonOut_(profileGet_((e && e.parameter) || {}));
     if (action === 'staffNamesList') return jsonOut_(staffNamesList_((e && e.parameter) || {}));
+    if (action === 'profileNameOptions') return jsonOut_(profileNameOptions_((e && e.parameter) || {}));
     if (action === 'staffOverview') return jsonOut_(staffOverview_((e && e.parameter) || {}));
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
@@ -8484,6 +8614,8 @@ function doPostCore_(e) {
     if (action === 'khoComboSave')        return khoComboSave_(data);
     if (action === 'comboSave')           return comboSave_(data);
     if (action === 'comboDelete')         return comboDelete_(data);
+    if (action === 'ctkmComboSave')       return ctkmComboSave_(data);
+    if (action === 'ctkmComboDelete')     return ctkmComboDelete_(data);
     if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
     if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
     if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);
@@ -11129,6 +11261,8 @@ function _leadMonths_(user) {
 function _leadOwnNames_(user) {
   var o = {};
   ((user.names && user.names.length) ? user.names : [user.name]).forEach(function (n) { n = String(n || '').trim(); if (n) o[_normTxt_(n)] = n; });
+  // + ten dang nhap (cung ly do voi _scopeAllowedNames_: client coi username la 1 ten cua tai khoan; data admin chia ghi theo ten dang nhap van phai thay)
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n && !o[_normTxt_(n)]) o[_normTxt_(n)] = n; });
   return o;
 }
 // Team minh lam truong (ten minh = teams.leader, hoac team trung user.team). members KHONG gom chinh minh.
@@ -18808,6 +18942,10 @@ function buildStoreCaseReport_(filters) {
   }
 
   var ctx = _storeCaseBuildCtx_(posNameSet);
+  // TEAM CUA TUNG SALE (Duyen 2026-11-26, Bao cao B "Theo Team Sale" thieu phan 30% don quay): moi phan chia gan kem TEN TEAM
+  // (cung bo giai quyet team voi Bao cao B: _makeTeamResolver_) de client gop dung team, khong phai tu doan team phia web.
+  var teamOfStoreSale_ = null;
+  try { teamOfStoreSale_ = _makeTeamResolver_('(chưa có Team)'); } catch (eTm) { teamOfStoreSale_ = null; }
   var acct = _loadAcctCodeSet_(fresh);   // file ke toan: tap Ma bo dem da ghi (moi tab)
 
   // 3) Ghep tung dong + tinh chia
@@ -18860,7 +18998,7 @@ function buildStoreCaseReport_(filters) {
           sales.forEach(function(s) {
             var dup = theNames.some(function(tn) { return ctx.same(tn, s.name); });
             if (dup) nDup++;
-            o.credits.push({ sale: s.name, raw: s.raw, amount: dup ? 0 : Math.round(per), wouldBe: Math.round(per), dup: dup });
+            o.credits.push({ sale: s.name, raw: s.raw, amount: dup ? 0 : Math.round(per), wouldBe: Math.round(per), dup: dup, team: teamOfStoreSale_ ? teamOfStoreSale_(s.name) : '' });
           });
           o.status = nDup === 0 ? 'tinh' : (nDup === sales.length ? 'trung' : 'mot-phan');
           if (o.status === 'trung') o.note = 'Đã có thẻ Sale trên Pos → đơn trùng, bỏ qua (đã tính ở Báo cáo Pos)';
@@ -21095,7 +21233,7 @@ function profileGet_(p) {
     if (!_profScope_(viewer, target, _roleBase_(viewer.role) === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
   }
   return { ok: true, username: target.username, accountName: target.name || '', role: target.role || '', team: target.team || '', names: _profNames_(target),
-           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin', canEditNames: viewer.role === 'admin' };
+           profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin', canEditNames: self || viewer.role === 'admin' };   // 26/11 Duyen: sale tu chon/go ten he thong cua CHINH MINH (xung dot voi nguoi khac van bi chan)
 }
 // POST action=profileSave {token, username?, profile:{fullName,phone,email,facebook}} — chi sua ho so cua chinh minh (admin sua duoc cua nguoi khac)
 function profileSave_(d) {
@@ -21118,7 +21256,7 @@ function profileSave_(d) {
   var wantNames = d.names !== undefined && d.names !== null;
   var nc = null;
   if (wantNames) {
-    if (viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Chỉ admin được sửa tên theo hệ thống (Pancake/CRM/Base/POS).', code: 'FORBIDDEN' });
+    // Chinh chu hoac admin (kiem o tren: nguoi khac khong phai admin da bi tu choi). Sale tu khai ten van bi _profNameConflicts_ chan neu ten da thuoc nguoi khac.
     nc = _profNamesClean_(d.names);
     if (!nc.ok) return jsonOut_({ ok: false, error: nc.error });
   }
@@ -21134,7 +21272,7 @@ function profileSave_(d) {
     var oldNames = _profRead_(target.username).names, namesToStore = oldNames, conflicts = [];
     if (wantNames) {
       var tagsNow = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tagsNow = JSON.parse(rawT) || {}; } catch (eT) {}
-      var adoptKeys = Array.isArray(d.adoptTags) ? d.adoptTags.map(function(x) { return String(x || '').trim(); }).filter(Boolean) : [], adoptSet = {};
+      var adoptKeys = (viewer.role === 'admin' && Array.isArray(d.adoptTags)) ? d.adoptTags.map(function(x) { return String(x || '').trim(); }).filter(Boolean) : [], adoptSet = {};
       adoptKeys.forEach(function(k) { adoptSet[_normTxt_(k)] = 1; });
       // Nhom the cu duoc nhan phai con DU ten trong ho so, neu khong nguoi do mat lien ket (bao loi thay vi am tham lam mat).
       var newAllNow = _profNamesAll_(nc.names).map(_normTxt_).concat([_normTxt_(target.username)]), lost = [];
@@ -21156,6 +21294,39 @@ function profileSave_(d) {
     if (wantNames) _profSyncTags_(target.username, _profNamesAll_(oldNames), _profNamesAll_(namesToStore), adoptKeys);
   } finally { try { lock.releaseLock(); } catch (eR) {} }
   return jsonOut_({ ok: true, profile: _profRead_(target.username) });
+}
+// GET action=profileNameOptions&token=..&username=.. — GOI Y ten cho o "Ten theo tung he thong" (sale tick chon hoac tu go). Chinh chu / admin.
+// Nguon: Danh sach Sale (Pancake = ten Facebook, Base = user Base), tai khoan CRM, ten da co trong ho so khac (POS...). Da LOAI ten dang thuoc nguoi khac.
+function profileNameOptions_(p) {
+  var viewer = _sessUser_(p.token);
+  if (!viewer) return { ok: false, error: 'Cần đăng nhập.', code: 'AUTH' };
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var target = _profFindUser_(users, p.username || viewer.username);
+  if (!target) return { ok: false, error: 'Không tìm thấy tài khoản.' };
+  if (String(viewer.username).toLowerCase() !== String(target.username).toLowerCase() && viewer.role !== 'admin') return { ok: false, error: 'Bạn không có quyền xem gợi ý của hồ sơ này.', code: 'FORBIDDEN' };
+  var opts = {}, seen = {};
+  PROFILE_NAME_SYS_.forEach(function(k) { opts[k] = []; seen[k] = {}; });
+  function add(k, x) {
+    x = String(x == null ? '' : x).replace(/\s+/g, ' ').trim();
+    if (!x || x.length > 60 || /^[=+\-@]/.test(x) || _isNumericTag_(x)) return;
+    var kk = _normTxt_(x); if (!kk || seen[k][kk]) return; seen[k][kk] = 1; opts[k].push(x);
+  }
+  try { readSaleDirectory_().list.forEach(function(r) { add('pancake', r.tenFacebook); add('base', r.userBase); }); } catch (eD) {}
+  users.forEach(function(u) {
+    if (!u || u.active === false || u.role === 'demo') return;
+    add('crm', u.username); add('crm', u.name); (u.names || []).forEach(function(n) { add('crm', n); });
+  });
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_PROFILE);
+    if (sh && sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, PROFILE_HEADERS.length).getValues().forEach(function(r) {
+      var nm = _profNamesParse_(r[7]); PROFILE_NAME_SYS_.forEach(function(k) { (nm[k] || []).forEach(function(x) { add(k, x); }); });
+    });
+  } catch (eP) {}
+  var tags = {}; try { var rawT = getSetting_('salePersonTags'); if (rawT) tags = JSON.parse(rawT) || {}; } catch (eT) {}
+  var all = []; PROFILE_NAME_SYS_.forEach(function(k) { all = all.concat(opts[k]); });
+  var bad = {}; _profNameConflicts_(target.username, all, users, tags, {}).forEach(function(c) { bad[_normTxt_(c.name)] = 1; });
+  PROFILE_NAME_SYS_.forEach(function(k) { opts[k] = opts[k].filter(function(x) { return !bad[_normTxt_(x)]; }); });
+  return { ok: true, username: target.username, options: opts };
 }
 // GET action=staffNamesList&token=.. — danh sach HO SO CHUAN cua moi tai khoan (de man Cai dat Team chon theo ho so): ten chuan + ten o 4 he thong.
 // Chi admin / quan ly / leader xem (cung nhom duoc phep chon nhan vien vao Team).
@@ -21389,13 +21560,118 @@ var SH_PLIB_ = 'ThuVienSP';
 var PLIB_HEADERS_ = ['id', 'productKey', 'productName', 'group', 'fileId', 'url', 'name', 'mime', 'size', 'createdBy', 'createdAt', 'deleted'];
 var PLIB_MAX_PER_FOLDER_ = 50;
 var PLIB_MAX_BYTES_ = 6 * 1024 * 1024;
-var PLIB_GET_ACTIONS_ = { plibList: 1 };
-var PLIB_POST_ACTIONS_ = { plibUpload: 1, plibDelete: 1, plibInfoSave: 1 };
+var PLIB_GET_ACTIONS_ = { plibList: 1, plibDriveScan: 1, plibFolderImages: 1 };
+var PLIB_POST_ACTIONS_ = { plibUpload: 1, plibDelete: 1, plibInfoSave: 1, plibLinkSave: 1 };
 //  THONG TIN SAN PHAM (van ban tu do: y nghia, diem ban hang...) — sheet "ThuVienSPInfo": productKey, productName, group, info, updatedBy, updatedAt. Moi thu muc 1 dong; CHI ADMIN sua (server kiem), ai cung doc.
 //  plibList khong key tra kem info trong counts (de o tim toan cuc tim ca trong noi dung); co key tra {info:{text,by,at}}. Luu rong = xoa noi dung. Cell ep dinh dang van ban (khong thanh cong thuc).
 var SH_PLIBI_ = 'ThuVienSPInfo';
 var PLIBI_HEADERS_ = ['productKey', 'productName', 'group', 'info', 'updatedBy', 'updatedAt'];
 var PLIBI_MAX_ = 4000;
+//  ANH CO SAN TREN DRIVE (nguon): thu muc goc "Hinh anh theo File Gia" cua Duyen (id mac dinh PLIB_SRC_DEFAULT_, doi bang Script Property PLIB_SRC_FOLDER_ID). CRM CHI DOC, khong tai/di chuyen/doi quyen tep cua Duyen.
+//  plibDriveScan (GET): quet cay thu muc goc toi PLIB_SRC_MAX_DEPTH_ cap -> [{id,name,path}] (cache 10 phut; fresh=1 bo cache) + links (gan tay). KHOP THEO TEN lam o client (co bang gia), server chi liet ke.
+//  plibFolderImages (GET): liet ke anh (image/*) trong 1 thu muc — CHI chap nhan thu muc nam trong cay goc (_plibInRoot_), khong thi ai cung doc duoc thu muc Drive bat ky ma tai khoan chay script thay.
+//  plibLinkSave (POST, CHI ADMIN): gan tay 1 thu muc Drive (link hoac id) cho 1 SP/combo khi ten khong khop; de trong = go gan. Sheet "ThuVienSPLink" (1 dong/thu muc, productKey duy nhat).
+var SH_PLIBL_ = 'ThuVienSPLink';
+var PLIBL_HEADERS_ = ['productKey', 'productName', 'folderId', 'folderName', 'linkedBy', 'linkedAt'];
+var PLIB_SRC_DEFAULT_ = '1Do-SdTTHKORNYBumpJYNUzl_H1u_x8rh';
+var PLIB_SRC_MAX_DEPTH_ = 3;
+var PLIB_SRC_MAX_FOLDERS_ = 3000;
+var PLIB_SRC_MAX_IMAGES_ = 200;
+function _plibSrcId_() { return PropertiesService.getScriptProperties().getProperty('PLIB_SRC_FOLDER_ID') || PLIB_SRC_DEFAULT_; }
+function _plibSrcErr_(e) {
+  var who = ''; try { who = Session.getEffectiveUser().getEmail(); } catch (x) {}
+  return { ok: false, srcError: true, error: 'Khong mo duoc thu muc anh tren Drive' + (who ? ' — hay chia se thu muc do cho ' + who + ' (quyen Nguoi xem)' : '') + '. ' + String(e && e.message || e).slice(0, 120) };
+}
+function _plibIdFromUrl_(s) {
+  s = String(s || '').trim(); if (!s) return '';
+  var m = /\/folders\/([-\w]{10,})/.exec(s) || /[?&]id=([-\w]{10,})/.exec(s) || /^([-\w]{10,})$/.exec(s);
+  return m ? m[1] : '';
+}
+function _plibInRoot_(folder, rootId) {
+  var f = folder, hop = 0;
+  while (f && hop++ < 8) {
+    if (f.getId() === rootId) return true;
+    var ps = f.getParents(); f = ps.hasNext() ? ps.next() : null;
+  }
+  return false;
+}
+function _plibScan_() {
+  var root = DriveApp.getFolderById(_plibSrcId_()), out = [], queue = [{ f: root, path: '', d: 0 }], t0 = Date.now(), cut = false;
+  while (queue.length) {
+    if (Date.now() - t0 > 200000) { cut = true; break; }
+    var cur = queue.shift(), it = cur.f.getFolders();
+    while (it.hasNext()) {
+      if (out.length >= PLIB_SRC_MAX_FOLDERS_) { cut = true; break; }
+      var f = it.next(), name = f.getName(), path = cur.path ? cur.path + ' / ' + name : name;
+      out.push({ id: f.getId(), name: name, path: path });
+      if (cur.d + 1 < PLIB_SRC_MAX_DEPTH_) queue.push({ f: f, path: path, d: cur.d + 1 });
+    }
+    if (cut) break;
+  }
+  return { rootName: root.getName(), rootId: root.getId(), folders: out, truncated: cut };
+}
+function _plibLinkRows_() {
+  var sh = getSheet_(SH_PLIBL_, PLIBL_HEADERS_), n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(2, 1, n - 1, PLIBL_HEADERS_.length).getValues();
+}
+function _plibLinks_() {
+  var m = {};
+  _plibLinkRows_().forEach(function (r) { if (r[0] && r[2]) m[String(r[0])] = { folderId: String(r[2]), name: String(r[3] || '') }; });
+  return m;
+}
+function plibDriveScan_(p) {
+  var a = _mlibUser_(p.token); if (a.err) return a.err;
+  var cache = null, ck = 'plibScan_' + _plibSrcId_(), res = null;
+  try { cache = CacheService.getScriptCache(); } catch (e) {}
+  if (!p.fresh && cache) { try { var c = cache.get(ck); if (c) res = JSON.parse(c); } catch (e) {} }
+  if (!res) {
+    try { res = _plibScan_(); } catch (e) { return _plibSrcErr_(e); }
+    if (cache && !res.truncated) { try { var js = JSON.stringify(res); if (js.length < 95000) cache.put(ck, js, 600); } catch (e) {} }
+  }
+  return { ok: true, rootName: res.rootName, folders: res.folders, truncated: !!res.truncated, links: _plibLinks_(), admin: a.u.admin };
+}
+function plibFolderImages_(p) {
+  var a = _mlibUser_(p.token); if (a.err) return a.err;
+  var id = _plibIdFromUrl_(p.folderId); if (!id) return { ok: false, error: 'Thieu id thu muc.' };
+  var folder;
+  try { folder = DriveApp.getFolderById(id); } catch (e) { return _plibSrcErr_(e); }
+  if (!_plibInRoot_(folder, _plibSrcId_())) return { ok: false, error: 'Thu muc nay nam ngoai thu muc anh da cau hinh.' };
+  var items = [], more = false, it = folder.getFiles();
+  while (it.hasNext()) {
+    var f = it.next(), mime = String(f.getMimeType() || '');
+    if (mime.indexOf('image/') !== 0) continue;
+    if (items.length >= PLIB_SRC_MAX_IMAGES_) { more = true; break; }
+    items.push({ fileId: f.getId(), name: f.getName(), mime: mime, size: f.getSize(), url: 'https://drive.google.com/file/d/' + f.getId() + '/view' });
+  }
+  items.sort(function (x, y) { return x.name < y.name ? -1 : x.name > y.name ? 1 : 0; });
+  return { ok: true, folderId: id, name: folder.getName(), items: items, more: more };
+}
+function plibLinkSave_(d) {
+  var a = _mlibUser_(d.token); if (a.err) return a.err;
+  if (!a.u.admin) return { ok: false, error: 'Chi admin duoc gan thu muc Drive.' };
+  var pname = _mlibClean_(d.productName, 120).replace(/^'/, ''), key = _plibKey_(pname);
+  if (!key) return { ok: false, error: 'Thieu ten san pham.' };
+  var raw = String(d.folder || '').trim(), id = '', fname = '';
+  if (raw) {
+    id = _plibIdFromUrl_(raw); if (!id) return { ok: false, error: 'Link / id thu muc khong hop le.' };
+    var folder;
+    try { folder = DriveApp.getFolderById(id); } catch (e) { return _plibSrcErr_(e); }
+    if (!_plibInRoot_(folder, _plibSrcId_())) return { ok: false, error: 'Thu muc nay nam ngoai thu muc anh da cau hinh nen khong gan duoc.' };
+    fname = _mlibClean_(folder.getName(), 120).replace(/^'/, '');
+  }
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var sh = getSheet_(SH_PLIBL_, PLIBL_HEADERS_), vals = _plibLinkRows_(), at = new Date().toISOString(), row = [key, pname, id, fname, a.u.username, at];
+    for (var i = 0; i < vals.length; i++) {
+      if (String(vals[i][0]) !== key) continue;
+      var rg = sh.getRange(i + 2, 1, 1, PLIBL_HEADERS_.length); rg.setNumberFormat('@'); rg.setValues([row]);
+      return { ok: true, link: id ? { folderId: id, name: fname } : null };
+    }
+    if (id) { var nr = sh.getLastRow() + 1, rg2 = sh.getRange(nr, 1, 1, PLIBL_HEADERS_.length); rg2.setNumberFormat('@'); rg2.setValues([row]); }
+    return { ok: true, link: id ? { folderId: id, name: fname } : null };
+  } finally { lock.releaseLock(); }
+}
 function _plibInfoSheet_() { return getSheet_(SH_PLIBI_, PLIBI_HEADERS_); }
 function _plibInfoRows_() {
   var sh = _plibInfoSheet_(), n = sh.getLastRow();
@@ -21433,7 +21709,7 @@ function plibList_(p) {
     vals.forEach(function (r) { if (String(r[11]) !== '1' && String(r[1]) === key) items.push(_plibRow_(r)); });
     items.reverse();
     out.key = key; out.items = items.slice(0, PLIB_MAX_PER_FOLDER_); out.n = items.length;
-    out.info = { text: '', by: '', at: '' };
+    out.info = { text: '', by: '', at: '' }; out.link = _plibLinks_()[key] || null;
     infos.forEach(function (r) { if (String(r[0]) === key) out.info = { text: String(r[3] || ''), by: String(r[4] || ''), at: String(r[5] || '') }; });
     return out;
   }
@@ -21448,7 +21724,7 @@ function plibList_(p) {
     var c = counts[k] || (counts[k] = { n: 0, cover: '', name: String(r[1]), info: '' });
     c.info = t;
   });
-  out.counts = counts;
+  out.counts = counts; out.links = _plibLinks_();
   return out;
 }
 function plibUpload_(d) {
@@ -21512,10 +21788,10 @@ function plibInfoSave_(d) {
   } finally { lock.releaseLock(); }
 }
 function plibDoGet_(action, p) {
-  try { return jsonOut_(plibList_(p)); } catch (err) { return jsonOut_({ ok: false, error: 'Loi thu vien san pham: ' + (err && err.message || err) }); }
+  try { return jsonOut_(action === 'plibDriveScan' ? plibDriveScan_(p) : action === 'plibFolderImages' ? plibFolderImages_(p) : plibList_(p)); } catch (err) { return jsonOut_({ ok: false, error: 'Loi thu vien san pham: ' + (err && err.message || err) }); }
 }
 function plibDoPost_(action, d) {
-  try { return jsonOut_(action === 'plibUpload' ? plibUpload_(d) : action === 'plibInfoSave' ? plibInfoSave_(d) : plibDelete_(d)); }
+  try { return jsonOut_(action === 'plibUpload' ? plibUpload_(d) : action === 'plibInfoSave' ? plibInfoSave_(d) : action === 'plibLinkSave' ? plibLinkSave_(d) : plibDelete_(d)); }
   catch (err) { return jsonOut_({ ok: false, error: 'Loi thu vien san pham: ' + (err && err.message || err) }); }
 }
 

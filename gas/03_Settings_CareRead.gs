@@ -1396,6 +1396,20 @@ function _scopeNamesForPhone_(phone) {
 function _scopeNameKey_(s) {
   return _stripVN_(String(s == null ? '' : s).normalize('NFC')).replace(/[^a-z0-9]/g, '');
 }
+// Moi ten CUNG NGUOI voi cac ten trong `allowed` (object ten->1): nhom the 'salePersonTags' (Quan ly Team > Khop sale) + cot 'names' cua tai khoan Sale (_userAliasGroups_).
+// Tra object khoa chuan hoa (_normTxt_ va _scopeNameKey_) -> 1, de so ten DOT CHIA (AssignData).
+// NGUYEN NHAN GOC "da chia data cho sale nhung Danh sach KH khong hien" (2026-11-26, lan 3): chia data chon nguoi nhan tu Danh sach Sale (ten Base/Pancake/Pos) ma admin noi voi tai khoan qua
+// Khop sale; dot chia ghi ten THE (vd 'thuydinh95') con tai khoan la 'thuydinh1995' nen server so ten CHI theo ten tai khoan -> loc mat khach du client (js/08 _assignKnownNames_) da khop.
+function _scopeSameNameKeys_(allowed) {
+  var out = {};
+  function put(n) { var a = _normTxt_(n), b = _scopeNameKey_(n); if (a) out[a] = 1; if (b) out[b] = 1; }
+  Object.keys(allowed || {}).forEach(put);
+  try {
+    var groups = _userAliasGroups_();
+    Object.keys(allowed || {}).forEach(function (n) { (groups[_normTxt_(n)] || []).forEach(put); });
+  } catch (e) { Logger.log('_scopeSameNameKeys_: ' + e); }
+  return out;
+}
 function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
@@ -1418,7 +1432,7 @@ function _scopeVerdict_(user, phone, namesFn) {
   try {
     var asg2 = _scopeAssignIndex_()[normPhone_(String(phone || ''))] || [];
     if (asg2.length) {
-      var mineN = {}; mine.forEach(function (k) { mineN[_normTxt_(k)] = 1; mineN[_scopeNameKey_(k)] = 1; });
+      var mineN = _scopeSameNameKeys_(allowed);   // ten tai khoan + moi ten cung nguoi (the Khop sale / names)
       for (var b = 0; b < asg2.length; b++) { if (mineN[_normTxt_(asg2[b])] || mineN[_scopeNameKey_(asg2[b])]) return true; }
     }
   } catch (eAs) {}
@@ -1561,6 +1575,10 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
+  // NGUYEN NHAN GOC "da chia data (ghi ten dang nhap, vd thaoptp) nhung Danh sach KH khong hien khach" (2026-11-26, lan 5): client (js/08 _assignKnownNames_)
+  // coi names + name + USERNAME cua tai khoan la CUNG 1 nguoi, nen tab "Data cua toi" co khach; nhung server chi lay cot names (hoac name) -> dot chia ghi
+  // theo ten dang nhap bi _scopePhoneSet_/_scopeVerdict_ loc mat khach truoc khi ve toi trinh duyet (khong con gi de client loc). Them name + username de khop client.
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
   if (role === 'leader') {
     try {
       readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) {
@@ -1609,7 +1627,7 @@ function _scopePhoneSet_(user, allowed) {
   try {
     var ai = _scopeAssignIndex_();
     // KHOP TEN DOT CHIA KHONG PHAN BIET HOA/THUONG/KHOANG TRANG (cung tieu chi action=assign&csName=): dot chia ghi 'Ngocnm', tai khoan 'ngocnm' van thuoc pham vi.
-    var allowedN = {}; Object.keys(allowed).forEach(function (k) { allowedN[_normTxt_(k)] = 1; allowedN[_scopeNameKey_(k)] = 1; });
+    var allowedN = _scopeSameNameKeys_(allowed);   // ten tai khoan + moi ten cung nguoi (the Khop sale / names)
     Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]] || allowedN[_normTxt_(ai[ph][i])] || allowedN[_scopeNameKey_(ai[ph][i])]) { set[ph] = 1; break; } } });
   } catch (e8) {}
   if (months.length) set = _leadMonthFilterSet_(user, set, months);

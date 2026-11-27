@@ -99,7 +99,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   t('quét toàn bộ khách chỉ 1 lần mỗi lần mở trang (gõ tìm không bị chậm)',calls===1);
   c.w.eval("_dpSetPerson('nguyetTTA1995','sale')"); await c.w.eval('_dpSave()');
   t('gán phòng cho sale mới rồi lưu → saleDepts chứa nguyetTTA1995',JSON.parse(c.S.store.saleDepts).nguyetTTA1995==='sale');
-  t('mở lại trang → quét lại (thấy sale mới thêm sau đó)',(await c.w.openDeptSettings(),c.w.eval('_dp.csNames===null')));
+  t('mở lại trang → quét lại (thấy sale mới thêm sau đó)',(await c.w.openDeptSettings(),c.w.eval('_dp.csNames===null')||calls===2));   // 26/11: số người ở mỗi phòng tính theo NGƯỜI nên quét ngay lúc mở (1 lần/lần mở, thẻ số vốn đã quét sẵn)
   const c2=mk(); delete c2.w._allCSNames; await c2.w.openDeptSettings();
   t('thiếu _allCSNames (js/08 chưa nạp) → không lỗi, vẫn ra danh sách cũ',c2.w.eval('_dpNames()').includes('Binh'));
  // Bộ lọc "Chưa phân phòng" ở mục Từng người (Duyên 26/11: lọc người chưa có phòng để phân lại cho dễ)
@@ -147,6 +147,30 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   t('bỏ phòng → xóa ở mọi tên',c.w.eval("!_dp.map.yennth&&!_dp.map.yenNTH2004"));
   c.w.eval("_dp.map.yenNTH2004='sale'");
   t('chỉ tên phụ có phòng → cả người tính là đã có phòng đó (hiện đúng phòng ở dòng tên chính)',c.w.eval("_dpRoomOfGroup_({names:['yennth','yenNTH2004'],primary:'yennth'})")==='sale');
+ }
+ // TÊN GỐC = TÊN PANCAKE (Duyên 26/11)
+ {
+  const c=mk(); await c.w.openDeptSettings();
+  c.w.eval(`
+    var _ALIAS=[['yennth','yenNTH2004']];
+    function _personAliases(n){var k=String(n).toLowerCase();for(var i=0;i<_ALIAS.length;i++)if(_ALIAS[i].some(function(x){return x.toLowerCase()===k}))return _ALIAS[i];return [n];}
+    function _groupNamesByPerson(names){var low=names.map(function(n){return n.toLowerCase()}),used={},out=[];names.forEach(function(n,i){if(used[i])return;var al=_personAliases(n).map(function(x){return x.toLowerCase()}),g=[];al.forEach(function(a){names.forEach(function(nm,j){if(!used[j]&&low[j]===a){used[j]=1;g.push(nm)}})});if(!used[i]){used[i]=1;g.unshift(n)}out.push({names:g,primary:g[0]})});return out;}
+    _dp.csNames=['yennth','yenNTH2004','Zed']; _dp.sec='people'; _dp.q=''; _dp.f=''; _dpRender();`);
+  const rows=()=>Array.from(c.$('dp-people-list').querySelectorAll('select[data-n]')).map(x=>x.dataset.n);
+  // 1) tên Pancake từ hồ sơ chuẩn
+  c.w.eval("window._staffPancakeOf=function(ns){return ns.some(function(n){return n.toLowerCase()==='yennth'})?'Yến NTH':''}; _dpRender()");
+  t('hồ sơ có tên Pancake → dòng hiện tên Pancake làm tên gốc, tên CRM thành tên phụ',rows().includes('Yến NTH')&&!rows().includes('yennth')&&/yennth/.test(c.$('dp-people-list').textContent)&&/yenNTH2004/.test(c.$('dp-people-list').textContent));
+  c.w.eval("_dpSetPerson('Yến NTH','hr')");
+  t('gán phòng → ghi cho tên Pancake + mọi tên CRM của người đó',c.w.eval("_dp.map['Yến NTH']==='hr'&&_dp.map.yennth==='hr'&&_dp.map.yenNTH2004==='hr'"));
+  t('vẫn đếm 1 người (không tính tên Pancake thành người thứ 2)',c.w.eval("_dpCount('hr')")===1&&c.w.eval("_dpGroups_().filter(function(g){return /yen/i.test(g.names.join())}).length")===1);
+  c.w.eval("_dp.q='yennth'; _dpPeopleList()");
+  t('gõ tên CRM vẫn ra đúng người (hiện tên Pancake)',rows().join()==='Yến NTH');
+  // 2) không có hồ sơ → lấy Khớp tên Pancake (js/15)
+  c.w.eval("window._staffPancakeOf=function(){return ''}; window._pkOrigNameOf_=function(ns){return ns.some(function(n){return n.toLowerCase()==='yenNTH2004'.toLowerCase()})?'Yến Pancake':''}; _dp.q=''; _dpRender()");
+  t('không có hồ sơ → dùng Khớp tên Pancake làm tên gốc',rows().includes('Yến Pancake'));
+  // 3) không có tên Pancake nào → như cũ
+  c.w.eval("window._pkOrigNameOf_=function(){return ''}; _dpRender()");
+  t('không có tên Pancake → giữ tên chính cũ (yennth)',rows().includes('yennth')&&!rows().includes('Yến Pancake'));
  }
  }
 console.log('\n'+ok+' OK, '+bad+' FAIL');process.exit(bad?1:0);
