@@ -15,7 +15,8 @@ var SH_CRM_ORDER_ = 'Đơn CRM';
 var CRM_ORDER_HEADERS_ = ['orderId', 'refKey', 'createdAt', 'createdBy', 'status', 'source', 'warehouse', 'saleName', 'packerName', 'careName', 'marketer', 'tags',
   'custName', 'phone', 'gender', 'email', 'birthday', 'recvName', 'recvPhone', 'province', 'district', 'ward', 'address', 'expectedDate',
   'carrier', 'shipCode', 'items', 'itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'note', 'printNote', 'tax',   // 'tax' ở CUỐI (bước 1b)
-  'statusAt', 'statusBy', 'statusNote'];   // 3 cột cuối thêm ở bước 4a (đổi trạng thái/huỷ); getSheet_ tự bổ sung tiêu đề cho sheet cũ
+  'statusAt', 'statusBy', 'statusNote',
+  'pointsUsed', 'pointsDiscount'];   // 2 cột cuối thêm ở bước 4b (điểm tích luỹ đã dùng + số tiền giảm tương ứng)   // 3 cột cuối thêm ở bước 4a (đổi trạng thái/huỷ); getSheet_ tự bổ sung tiêu đề cho sheet cũ
 var CRM_ORDER_GET_ACTIONS_ = { crmOrders: 1 };
 var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1, crmOrderStatus: 1 };
 // Đổi trạng thái / huỷ đơn (bước 4a). Chỉ cho đi theo đường hợp lệ; 'Hủy' và 'Hoàn' là trạng thái CUỐI (không mở lại — muốn bán tiếp thì lên đơn mới).
@@ -76,6 +77,8 @@ function _crmOrderNormalize_(raw) {
     tax: taxTotal, total: total, paid: paid, due: Math.max(0, total - paid), note: _crmStr_(raw.note, 1000), printNote: _crmStr_(raw.printNote, 1000) } };
 }
 // Mã đơn: CRM + yyMMdd + '-' + số thứ tự trong ngày (4 chữ số). existingIds: mã đã có (để không trùng).
+// Khoá sổ điểm của lần dùng điểm cho 1 đơn CRM (cố định theo mã đơn → Hủy/Hoàn tìm đúng dòng để hoàn tác).
+function _crmRedeemKey_(phone, orderId) { return 'redeem|' + phone + '|crm|' + orderId; }
 function _crmNextOrderId_(ymd, existingIds) {
   var pre = 'CRM' + String(ymd || '').replace(/-/g, '').slice(2), n = 0, re = new RegExp('^' + pre + '-(\\d+)$');
   (existingIds || []).forEach(function (id) { var m = re.exec(String(id)); if (m) n = Math.max(n, parseInt(m[1], 10) || 0); });
@@ -84,7 +87,7 @@ function _crmNextOrderId_(ymd, existingIds) {
 function _crmOrderRowToObj_(r) {
   var o = {}; CRM_ORDER_HEADERS_.forEach(function (h, i) { o[h] = r[i]; });
   var items = []; try { items = JSON.parse(String(o.items || '[]')); } catch (e) {}
-  o.items = items; ['itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'tax'].forEach(function (k) { o[k] = Number(o[k]) || 0; });
+  o.items = items; ['itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'tax', 'pointsUsed', 'pointsDiscount'].forEach(function (k) { o[k] = Number(o[k]) || 0; });
   o.phone = normPhone_(String(o.phone || '')); o.createdAt = Object.prototype.toString.call(o.createdAt) === '[object Date]' ? o.createdAt.getTime() : o.createdAt;
   return o;
 }
@@ -144,10 +147,26 @@ function crmOrderDoPost_(action, d) {
       o.orderId = _crmNextOrderId_(_vnYmd_(now), all.map(function (x) { return String(x.orderId); }));
       o.refKey = refKey; o.createdAt = now.getTime(); o.createdBy = who; o.status = 'Mới';
       if (!o.saleName) o.saleName = String(a.user.name || who);   // Sale mặc định = người tạo (để Trưởng team/phòng lọc đúng theo tên Sale)
+      // Dùng điểm tích luỹ (bước 4b): 1 điểm = pointValue đồng, TRỪ THẲNG vào đơn. Muốn dùng nhiều hơn mức cho phép → TỪ CHỐI (không âm thầm cắt, vì người lên đơn đã thấy tổng tiền).
+      var want = Math.floor(_crmNum_(d.pointsUse)), redeemKey = '';
+      o.pointsUsed = 0; o.pointsDiscount = 0;
+      if (want > 0) {
+        var sync = loyaltySync_(o.phone); if (sync.error) return jsonOut_({ ok: false, error: sync.error });
+        var st = loyaltyState_(o.phone), rd = _loyaltyRedeem_(o.total, st.points.balance, want, st.config);
+        if (rd.points < want) return jsonOut_({ ok: false, code: 'POINTS', error: 'Khong du diem: muon dung ' + want + ' diem, toi da dung duoc ' + rd.points + ' diem (so du ' + st.points.balance + ', don ' + o.total + 'd).', maxPoints: rd.points, points: st.points });
+        o.pointsUsed = rd.points; o.pointsDiscount = rd.discount; o.total = o.total - rd.discount; o.due = Math.max(0, o.total - o.paid);
+        redeemKey = _crmRedeemKey_(o.phone, o.orderId);
+        _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[redeemKey, o.phone, 'redeem', o.orderId, _vnYmd_(now), rd.points, rd.discount + o.total, 'Don CRM ' + o.orderId, who, now]]);
+      }
       var row = CRM_ORDER_HEADERS_.map(function (h) { return h === 'items' ? JSON.stringify(o.items) : (o[h] == null ? '' : o[h]); });
-      var sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_), rng = sh.getRange(sh.getLastRow() + 1, 1, 1, row.length);
-      if (rng.setNumberFormat) rng.setNumberFormat('@');   // SĐT/ngày giữ dạng chữ (khỏi mất số 0 đầu)
-      rng.setValues([row]);
+      try {
+        var sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_), rng = sh.getRange(sh.getLastRow() + 1, 1, 1, row.length);
+        if (rng.setNumberFormat) rng.setNumberFormat('@');   // SĐT/ngày giữ dạng chữ (khỏi mất số 0 đầu)
+        rng.setValues([row]);
+      } catch (eW) {   // ghi đơn lỗi sau khi đã trừ điểm → hoàn lại điểm ngay, không để khách mất điểm mà không có đơn
+        if (redeemKey) { try { _loyaltyUndoApply_({ phone: o.phone, key: redeemKey, note: 'ghi don loi, hoan diem' }, who); } catch (eU) {} }
+        throw eW;
+      }
       return jsonOut_({ ok: true, duplicate: false, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
@@ -166,12 +185,18 @@ function crmOrderStatusDoPost_(d) {
       if (_roleBase_(a.user.role) !== 'admin' && String(o.createdBy).toLowerCase() !== who.toLowerCase()) return jsonOut_({ ok: false, error: 'Ban chi doi duoc trang thai don do minh tao.' });   // CEO/viewer chi xem; Truong team/phong xem duoc nhung CHUA duoc doi don cua team (cho Duyen chot)
       if (String(o.status) === to) return jsonOut_({ ok: true, unchanged: true, order: o });   // bấm 2 lần cùng trạng thái: không lỗi, không ghi
       var err = _crmStatusCheck_(o.status, to, note); if (err) return jsonOut_({ ok: false, error: err });
+      // Hủy/Hoàn đơn có dùng điểm → hoàn lại điểm TRƯỚC khi đổi trạng thái (lỗi thật thì dừng, trạng thái giữ nguyên; đã hoàn tác tay rồi/không thấy dòng = bỏ qua).
+      var refunded = 0;
+      if ((to === 'Hủy' || to === 'Hoàn') && Number(o.pointsUsed) > 0) {
+        var ur = _loyaltyUndoApply_({ phone: o.phone, key: _crmRedeemKey_(o.phone, o.orderId), note: (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId }, who);
+        if (ur.ok) refunded = ur.undone.points; else if (ur.code !== 'DUPLICATE' && ur.code !== 'NOTFOUND') return jsonOut_({ ok: false, error: 'Khong hoan duoc diem, don giu nguyen trang thai: ' + ur.error });
+      }
       var now = Date.now(), sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_);
       var col = function (h) { return CRM_ORDER_HEADERS_.indexOf(h) + 1; };
       var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
       set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
       o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
-      return jsonOut_({ ok: true, unchanged: false, order: o });
+      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
 }
