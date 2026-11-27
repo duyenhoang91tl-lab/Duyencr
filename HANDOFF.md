@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-27 (tối — TÀI KHOẢN TEST BƯỚC 2/2 WEB: LỌC THEO SALE ĐÃ CHỌN + XEM ĐỦ TAB) — ĐANG LÀM
+- ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành". Rà: 461 test (chỉ test-dist-equivalence đỏ khi dist/ cũ, build lại thì xanh), check-health, mở các tab trên Chromium (dữ liệu trống, chặn mạng): không thấy lỗi sập. Việc dở tìm được: bước 2/2 (web) của "Tài khoản test" bên dưới.
+- ✅ Đã xong: `js/08` `_inUserScope` — role demo lọc như CS theo `currentUser.names` (trước: thấy hết).
+- 🔧 Đang làm: `js/14` bỏ ép 5 tab báo cáo. ➡️ Kế tiếp: ẩn nút sửa cấu hình (js/09, js/11, js/67), test + tài liệu.
+
 ## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
 - ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).
 - ✅ **ĐÃ XONG:** CẢ 2 ĐIỂM XONG: (1) đợt admin đã xoá không bị ghi lại và tự gỡ khỏi máy khác; (2) "đã xong" trên web chỉ đổi 1 SĐT, không đè dấu tích Pancake AI. Máy chủ (c25c8d4) + web js/07 ?v=20261127b (4d9bcbd) + KB 16; 461 test + bước CI OK (chỉ thử bằng dữ liệu giả, chưa thử trên app thật).
