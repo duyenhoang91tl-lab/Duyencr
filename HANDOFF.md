@@ -2,11 +2,15 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
-## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM)
+## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM) — XONG 4/4 (chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên (ảnh ô "Chọn sale để thêm" phải kéo tìm): chỗ nào dropdown trong CRM cũng tìm nhanh được.
 - NGUYÊN NHÂN: các ô chọn là `<select>` gốc của trình duyệt (index.html + ~40 file js), không có ô gõ tìm.
-- ✅ Bước 1/4 file js, 2/4 thẻ script (tính năng đã BẬT), 3/4 `tools/test-select-search.js` (15 ca, cần jsdom).
-- ⏳ Đang làm: ghi chú cuối. ➡️ KẾ TIẾP: (4) js/INDEX.md + chốt.
+- ✅ `js/99-e-select-search.js` (một file dùng chung, không sửa từng màn hình) + 1 thẻ script trong index.html (scriptTags còn rất sát trần 126) + `tools/test-select-search.js` (15 ca, cần jsdom) + ghi `js/INDEX.md`.
+- Cách dùng: bấm ô → gõ (không dấu, "lephuong" khớp "Lê Phương") → ↑ ↓ Enter hoặc bấm chọn; Esc chỉ đóng danh sách. Đứng ở ô rồi gõ chữ cũng mở. Không áp cho `<select multiple>`; ô nhập có gợi ý (`datalist`) và các ô combo tự dựng giữ nguyên.
+- 🧪 Test mới xanh; các bước kiểm của deploy-web.yml xanh; thử Chromium (máy tính, giả lập iPhone, nền tối) trên ô "Chọn sale để thêm": chọn được, hộp thoại không bị đóng, không lỗi trang mới. CHƯA thử trên iPhone/Android thật. Chưa chạy lại toàn bộ các test UI khác trong tools/.
+- ⚠ Sự cố trong phiên: commit df7a00e lỡ đưa dấu xung đột merge vào HANDOFF.md → đã gỡ ở 968b411, không mất nội dung. Lưu ý: safe-push báo XUNG ĐỘT thì phải giải quyết xong mới commit tiếp.
+- ⏳ **DUYÊN CẦN LÀM:** Ctrl+F5 rồi thử vài ô chọn (nhất là trên điện thoại). Trục trặc, cần quay về ô cũ ngay: Console gõ `localStorage.setItem('ome_native_select','1')` rồi F5.
+- [ ] **VIỆC KẾ TIẾP:** chờ Duyên thử thật. Nếu cần: thêm tìm nhanh cho 2 extension (Zalo AI + Pancake AI, làm song song theo quy tắc 15).
 
 ## 2026-11-27 — ⭐ TỔNG HỢP LÊN ĐƠN CRM (GỘP 4 PHIÊN: bước 1/1b, 2, 3, 4a) — ĐỌC MỤC NÀY TRƯỚC; chi tiết từng bước ở các mục ngay bên dưới
 - **Bối cảnh:** nhiều phiên Claude cùng làm song song (mỗi phiên 1 bước) rồi gộp trên `main` (đã kiểm: không còn xung đột, mọi test liên quan xanh trên bản gộp). CRM tự lên đơn → ghi sheet RIÊNG "Đơn CRM" (đang TEST; KHÔNG đụng DT Tổng/OrderData/Pos; `saveOrders` vẫn TẮT).
