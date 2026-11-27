@@ -2,6 +2,13 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
+## 2026-11-27 (phiên Claude — ĐIỂM TÍCH LUỸ + LỊCH SỬ ĐỔI HẠNG, mục 9) — BƯỚC 2 XONG (hàm thuần; GAS file mới 34_Loyalty)
+- Duyên chốt: **1 điểm = 1.000đ và trừ thẳng vào đơn**. Còn lại theo docx: tích 1%, theo năm, hoàn đơn trừ lại điểm đơn đó, hạng giữ trọn đời.
+- ✅ `gas_v13.js` thêm khối `LOYALTY_SECTION_` (cuối file) → `gas/34_Loyalty.gs` (thêm PART mới `34_Loyalty` trong `tools/split-gas.js`; `--check` OK 34 file): `_loyaltyCfgNormalize_` (Settings 'loyaltyConfig' {rate, pointValue}), `_loyaltyEarnPoints_` (floor(tiền×1%÷1000)), `_loyaltyBalance_` (quỹ điểm theo năm, hoàn trừ vào quỹ NĂM ĐƠN GỐC, hết hạn 31/12, báo `deficit` nếu hoàn đơn đã dùng điểm), `_loyaltyRedeem_` (≤ số dư, ≤ giá trị đơn ÷ 1.000), `_loyaltyTierHistory_` (lên hạng theo doanh thu cộng dồn, bỏ đơn hoàn, chỉ lên không xuống). Test `tools/test-loyalty.js` xanh (ví dụ docx: 28tr + 3tr = 31tr → Vip; 10tr → 100 điểm).
+- ⚠ GIẢ ĐỊNH chưa Duyên xác nhận: hết hạn 31/12 cuối năm tích; điểm tích trên số tiền khách THỰC TRẢ (sau trừ điểm); làm tròn xuống. Đổi được tại chỗ gọi hàm (chưa nối nên chưa ảnh hưởng ai).
+- Chưa có action/sheet/UI → CHƯA cần deploy GAS hay Ctrl+F5 (hàm chưa được gọi). Lần dán thủ công kế tiếp nhớ có thêm file `34_Loyalty.gs`.
+- [ ] **VIỆC KẾ TIẾP (bước 2b):** sheet `LoyaltyPoints` (sổ cái earn/refund/redeem) + action GAS `loyaltyGet`/`loyaltyRedeem` (kiểm quyền) + ghi lịch sử hạng khi có đơn POS mới/hoàn; sau đó hiện điểm + lịch sử hạng trong hồ sơ khách. Rồi bước 3 nhật ký đổi cấu hình, 4 trừ hoa hồng kỳ sau, 5 KPI tự cam kết (xem `docs/CRM-11-HANG-MUC-TRANG-THAI.md`). Còn chờ Duyên chốt: giờ làm việc (17h hay 21h), quyền lợi từng hạng, chu kỳ trả hoa hồng.
+
 ## 2026-11-27 (phiên Claude — ĐỐI CHIẾU 11 HẠNG MỤC CRM VỚI CODE) — BƯỚC 1 XONG (chỉ tài liệu)
 - ĐỀ BÀI Duyên: gửi bản chốt `docs/Chot-noi-dung-CRM-11-hang-muc.docx` (đã thêm quyết định), yêu cầu làm từng bước nhỏ, mỗi file push + cập nhật HANDOFF, và kiểm mục nào CRM chưa làm.
 - ✅ XONG: `docs/CRM-11-HANG-MUC-TRANG-THAI.md` — bảng từng mục: đã có code gì / còn thiếu / làm được ngay hay chờ bên ngoài + 6 chỗ docx còn mâu thuẫn. Kết quả: #1,2,5 chờ khoá/API; #3 bỏ (CRM thay POS); #4 chờ Duyên bật webhook; #6 chờ khoá AI; #7,8,10 đã có cơ chế (thiếu trừ hoa hồng kỳ sau/KPI nhiều chỉ tiêu); #9 có hạng, CHƯA có điểm + lịch sử hạng + quyền lợi; #11 chưa có gì.
