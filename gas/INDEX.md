@@ -148,6 +148,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
 
 ## 35_CrmOrder.gs
-- Hàm: `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `crmOrderDoPost_`, `crmOrderDoGet_`
+- Hàm: `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `crmOrderDoGet_`
 - Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_MAX_ITEMS_`
 
