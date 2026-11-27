@@ -102,8 +102,14 @@ var USER_HEADERS   = ['username','passHash','role','name','team','active','names
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
+// 'dateTo' (cot cuoi, THEM SAU de khong lech chi so cac cot cu — getSheet_ tu bo sung header o cuoi): file Pancake tai GOP NHIEU NGAY (vd ca thang 8) ghi
+// 'date' = ngay DAU, 'dateTo' = ngay CUOI cua khoang; rong = file 1 ngay (nhu cu). Cac cho doc PancakeStats hien tai bo qua cot nay (xem buoc 3: rai theo ngay).
 var PK_STATS_HEADERS = ['date','pageId','pageName','nhanVien','khCu','khMoi','tongTT',
-  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
+  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH','dateTo'];
+// PancakeStatsDaily: so lieu THEO NGAY THAT cua tung Page (sheet "By time" trong file gop nhieu ngay; khong tach nhan vien). 1 dong = 1 Page x 1 ngay,
+// khoa date+pageId -> nap lai ghi de. Dung de RAI dong gop (co dateTo) ra tung ngay dung trong so thay vi chia deu (buoc 3).
+var SH_PK_DAILY = 'PancakeStatsDaily';
+var PK_DAILY_HEADERS = ['date','pageId','pageName','khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
 // PK_MAP_HEADERS: khop 1-1 ten hien thi Pancake -> ten Sale chuan trong CRM (dung chung moi
 // Page, vi thuong 1 nguoi dung 1 ten Facebook ca nhan cho ca nhieu Page).
 var PK_MAP_HEADERS = ['pancakeName','saleName'];
@@ -8627,7 +8633,7 @@ function doPostCore_(e) {
     if (action === 'importBaseSource')    return doImportBaseSource_(data.items, data.dryRun, _impWho_(data.token));   // 2026-11-21: cap nhat Kenh ban (cot M) cua Base tu bao cao nguon, khop ma don/ma bo dem
     if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
-    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows, data.daily);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
     if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
@@ -10125,9 +10131,12 @@ function _mktKenhWeights_(teams, pageMap) {
 // Ghi cac dong thong ke ngay tu file Excel upload. Idempotent theo date+pageId+nhanVien: xoa
 // het cac dong TRUNG NGAY+PAGE co trong payload roi ghi lai — nap lai file cung 1 ngay (vd
 // sua so lieu, hoac nap lai cho chac) se khong bi nhan doi du lieu.
-function savePancakeStats_(rows) {
+function savePancakeStats_(rows, daily) {
   rows = rows || [];
-  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  // So lieu theo ngay cua Page (file gop nhieu ngay) ghi RIENG vao PancakeStatsDaily; loi o day KHONG duoc lam hong viec luu dong nhan vien.
+  var dailyRes = { written: 0 };
+  try { dailyRes = _savePancakeDaily_(daily); } catch (eD) { dailyRes = { written: 0, error: String(eD && eD.message || eD) }; }
+  if (!rows.length) return jsonOut_({ ok: true, written: 0, dailyWritten: dailyRes.written, dailyError: dailyRes.error || undefined });
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
   var lastRow = sh.getLastRow();
 
@@ -10153,7 +10162,9 @@ function savePancakeStats_(rows) {
   var newRows = rows.map(function(r) {
     return [normOrderDate_(r.date), r.pageId||'', r.pageName||'', r.nhanVien||'',
       +r.khCu||0, +r.khMoi||0, +r.tongTT||0, +r.tinNhan||0, +r.binhLuan||0,
-      +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0];
+      +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0,
+      // dateTo chi co y nghia khi LON HON date (file gop nhieu ngay); con lai de rong = 1 ngay nhu cu
+      (function() { var a = normOrderDate_(r.date), b = r.dateTo ? normOrderDate_(r.dateTo) : ''; return (b && b > a) ? b : ''; })()];
   });
 
   sh.clearContents();
@@ -10162,7 +10173,33 @@ function savePancakeStats_(rows) {
   // chuoi "yyyy-MM-dd" thanh kieu Date nua (chan loi tai phat sinh cho lan luu ke tiep).
   sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
   sh.getRange(1, 1, matrix.length, PK_STATS_HEADERS.length).setValues(matrix);
-  return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
+  return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0), dailyWritten: dailyRes.written, dailyError: dailyRes.error || undefined });
+}
+
+// Ghi so lieu THEO NGAY cua Page (PancakeStatsDaily). Idempotent theo date+pageId: xoa cac dong trung (ngay, Page) co trong payload roi ghi lai.
+function _savePancakeDaily_(daily) {
+  daily = (daily || []).filter(function(d) { return d && d.pageId && normOrderDate_(d.date); });
+  if (!daily.length) return { written: 0 };
+  var sh = getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
+  var touched = {};
+  daily.forEach(function(d) { touched[normOrderDate_(d.date) + '|' + d.pageId] = true; });
+  var keep = [], lastRow = sh.getLastRow();
+  if (lastRow > 1) {
+    var ex = sh.getRange(2, 1, lastRow - 1, PK_DAILY_HEADERS.length).getValues();
+    for (var i = 0; i < ex.length; i++) {
+      ex[i][0] = normOrderDate_(ex[i][0]);   // cot A co the bi Sheets tu doi kieu Date (xem savePancakeStats_)
+      if (!touched[ex[i][0] + '|' + ex[i][1]]) keep.push(ex[i]);
+    }
+  }
+  var add = daily.map(function(d) {
+    return [normOrderDate_(d.date), d.pageId || '', d.pageName || '', +d.khCu || 0, +d.khMoi || 0, +d.tongTT || 0, +d.tinNhan || 0,
+      +d.binhLuan || 0, +d.hoiThoaiMoi || 0, +d.dhKhMoi || 0, +d.dhKhCu || 0, +d.tongDH || 0];
+  });
+  var matrix = [PK_DAILY_HEADERS].concat(keep).concat(add);
+  sh.clearContents();
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
+  sh.getRange(1, 1, matrix.length, PK_DAILY_HEADERS.length).setValues(matrix);
+  return { written: add.length };
 }
 
 // Tra ve {map, mapCI} — mapCI la ban khong phan biet hoa/thuong cua map (dung khi ten Pancake
@@ -13214,6 +13251,7 @@ function testScript() {
   getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   getSheet_(SH_USER, USER_HEADERS);
   getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
   getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var oss = getOrderSS_();
   for (var i = 0; i < ORDER_SHEETS.length; i++) {
