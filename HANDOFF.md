@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
+- ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).
+- ✅ **ĐÃ XONG:** Bước 1/2 MÁY CHỦ (gas_v13.js, split-gas OK, 445 test OK): deleteAssign ghi nhớ id đợt đã xoá (Script Properties assignDeletedIds, ~300 id gần nhất); saveAssign/saveAssignHistory không ghi lại đợt đó; action=assign trả thêm deletedIds; toggleAssignDone nhận ids + khớp SĐT chuẩn hoá.
+- 🔧 **ĐANG LÀM:** Bước 2/2 web (js/07)
+- ➡️ **BƯỚC KẾ TIẾP:** js/07: nút "đã xong" gửi toggleAssignDone từng SĐT; pullAssignHistory gỡ đợt trong deletedIds; bump ?v=
+
 ## 2026-11-27 (phiên Claude — TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN + CHỈ XEM + KHÔNG LẤY ĐƯỢC MÃ GAS) — BƯỚC 1/2 XONG (GAS, đã split + --check OK); BƯỚC 2/2 (web) ĐANG LÀM
 - ĐỀ BÀI Duyên: "tài khoản test vẫn xem được hết danh sách KH trong khi mình chọn có mỗi 1 sale; vẫn muốn tk test xem được thông tin + các tính năng đầy đủ nhưng không có quyền tác động vào CRM hay lấy được Apps Script".
 - NGUYÊN NHÂN GỐC (3 chỗ): (1) role `demo` đi nhánh riêng bằng `demoToken` DÙNG CHUNG nên máy chủ không biết là ai → không lọc được theo sale đã chọn; `_scopeVerdict_`/`_scopeAllowedNames_` coi demo là "không giới hạn"; (2) client `_inUserScope` (js/08) cuối hàm `return true` cho role demo → thấy hết; (3) POST chỉ bị chặn khi body có trường `demo` → bỏ trường đó, chỉ gửi token phiên là GHI được.
