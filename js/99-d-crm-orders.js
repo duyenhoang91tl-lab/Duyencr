@@ -1,12 +1,14 @@
 // ════════════════════════════════════════════════════════════════════
 //  ĐƠN CRM — bước 3/4: tab "🧾 Đơn CRM" liệt kê + xem chi tiết các đơn CRM tự lên (sheet riêng "Đơn CRM").
 //  Backend: GAS crmOrders (gas/35_CrmOrder.gs). Phạm vi xem do SERVER quyết theo cấp bậc (trả `scope`): all (admin/CEO) | dept (trưởng phòng) | team (trưởng team) | own (còn lại).
-//  Tab chỉ ĐỌC. Tạo đơn = bước 2/4 (chưa làm); đổi trạng thái/huỷ/in/trừ kho = bước 4/4.
+//  Xem + ĐỔI TRẠNG THÁI/HUỶ (GAS crmOrderStatus, 4a). Tạo đơn = js/99-d-crm-order.js (bước 2/4); in/trừ kho/dùng điểm = 4b–4d (chưa làm).
+//  Đường đi trạng thái ở client CHỈ để hiện nút đúng; server (CRM_ORDER_FLOW_) mới là chỗ quyết định + kiểm quyền (admin hoặc người tạo).
 //  Mọi số tiền lấy từ server (đã tự tính lại), client KHÔNG tính lại tiền.
 //  Nạp SAU js/40 (registerExtraTab). Gỡ = xoá dòng <script> trong index.html + id 'crmorders' trong js/29.
 // ════════════════════════════════════════════════════════════════════
+var _CRO_FLOW = { 'Mới':['Đã xác nhận','Hủy'], 'Đã xác nhận':['Đang giao','Hủy'], 'Đang giao':['Đã giao','Hoàn','Hủy'], 'Đã giao':['Hoàn'], 'Hủy':[], 'Hoàn':[] };
 var _CRO_SCOPE = { all:'tất cả đơn', dept:'đơn của phòng bạn quản lý', team:'đơn của team bạn làm trưởng', own:'đơn của chính bạn' };
-var _cro = { from:'', to:'', q:'', data:null, loading:false, err:'', sel:'', seq:0 };
+var _cro = { from:'', to:'', q:'', data:null, loading:false, err:'', sel:'', seq:0, pend:null, busy:false, msg:'' };
 function _croTok(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
 function _croPad(n){ return (n < 10 ? '0' : '') + n; }
 function _croYmd(d){ return d.getFullYear() + '-' + _croPad(d.getMonth() + 1) + '-' + _croPad(d.getDate()); }
@@ -56,9 +58,22 @@ function _croMoneyHtml(o){
   h += row('Còn thiếu', _croVnd(o.due), true, Number(o.due) > 0 ? '#c0392b' : '');
   return '<div style="max-width:340px;margin-left:auto">' + h + '</div>';
 }
+function _croStatusHtml(o){
+  var cur = String(o.status || 'Mới'), next = _CRO_FLOW[cur] || [], pend = _cro.pend && _cro.pend.id === o.orderId ? _cro.pend : null;
+  var h = '<div style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px"><div style="font-size:12px"><b>Trạng thái: ' + _croEsc(cur) + '</b>' +
+    (o.statusBy ? ' <span style="color:var(--muted)">· ' + _croEsc(o.statusBy) + (_croDmyHm(o.statusAt) ? ' · ' + _croEsc(_croDmyHm(o.statusAt)) : '') + '</span>' : '') + '</div>' +
+    (o.statusNote ? '<div style="font-size:12px;margin-top:2px">Lý do: ' + _croEsc(o.statusNote) + '</div>' : '');
+  if (!next.length) h += '<div style="font-size:11px;color:var(--muted);margin-top:4px">Trạng thái cuối — không đổi tiếp được (bán tiếp thì lên đơn mới).</div>';
+  else if (pend) h += '<div style="margin-top:6px"><div style="font-size:12px;margin-bottom:4px">Lý do ' + (pend.to === 'Hủy' ? 'huỷ' : 'hoàn') + ' đơn (bắt buộc):</div><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="cro-reason" class="ml-q" maxlength="300" placeholder="Nhập lý do…" style="flex:1 1 220px"' + (_cro.busy ? ' disabled' : '') + '>' +
+    '<button class="btn sm" style="background:#c0392b;color:#fff;border-color:#c0392b" onclick="_croSubmitReason()"' + (_cro.busy ? ' disabled' : '') + '>Xác nhận ' + _croEsc(pend.to) + '</button><button class="btn sm" onclick="_croCancelPend()"' + (_cro.busy ? ' disabled' : '') + '>Bỏ</button></div></div>';
+  else h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + next.map(function(to){ var bad = to === 'Hủy' || to === 'Hoàn';
+    return '<button class="btn sm" data-id="' + _croEsc(o.orderId) + '" data-to="' + _croEsc(to) + '" onclick="_croAskStatus(this.dataset.id,this.dataset.to)" style="' + (bad ? 'color:#c0392b;border-color:#c0392b' : '') + '"' + (_cro.busy ? ' disabled' : '') + '>' + (bad ? '' : '→ ') + _croEsc(to) + '</button>'; }).join('') + '</div>';
+  if (_cro.msg && _cro.sel === o.orderId) h += '<div style="font-size:12px;font-weight:600;margin-top:6px">' + _croEsc(_cro.msg) + '</div>';
+  return h + '</div>';
+}
 function _croDetailHtml(o){
   var addr = [o.address, o.ward, o.district, o.province].filter(function(x){ return x && String(x).trim(); }).join(', ');
-  var h = '<div style="padding:8px 12px 12px;border-top:1px solid var(--border);background:var(--bg2,transparent)">' + _croItemsHtml(o.items) + '<div style="margin-top:8px">' + _croMoneyHtml(o) + '</div>' +
+  var h = '<div style="padding:8px 12px 12px;border-top:1px solid var(--border);background:var(--bg2,transparent)">' + _croStatusHtml(o) + _croItemsHtml(o.items) + '<div style="margin-top:8px">' + _croMoneyHtml(o) + '</div>' +
     '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">' +
     _croBlock('Khách hàng', _croKv('Tên', o.custName) + _croKv('SĐT', o.phone) + _croKv('Giới tính', o.gender) + _croKv('Email', o.email) + _croKv('Sinh nhật', o.birthday)) +
     _croBlock('Nhận hàng', _croKv('Người nhận', o.recvName) + _croKv('SĐT nhận', o.recvPhone) + _croKv('Địa chỉ', addr) + _croKv('Ngày dự kiến', o.expectedDate) + _croKv('ĐVVC', o.carrier) + _croKv('Mã vận đơn', o.shipCode)) +
@@ -110,7 +125,32 @@ function _croRender(){
     '<div class="ml-bar"><input id="cro-q" class="ml-q" placeholder="Tìm mã đơn, tên/SĐT khách, sale, sản phẩm…" value="' + _croEsc(_cro.q) + '" oninput="_croSetQ(this.value)"></div>' +
     '<div id="cro-list">' + _croListHtml() + '</div></div>';
 }
-function _croSel(id){ _cro.sel = (_cro.sel === id) ? '' : id; _croRenderList(); }
+function _croSel(id){ _cro.sel = (_cro.sel === id) ? '' : id; _cro.pend = null; _cro.msg = ''; _croRenderList(); }
+function _croCancelPend(){ _cro.pend = null; _croRenderList(); }
+async function _croAskStatus(id, to){
+  if (_cro.busy) return; _cro.msg = '';
+  if (to === 'Hủy' || to === 'Hoàn'){ _cro.pend = { id: id, to: to }; _croRenderList(); var i = document.getElementById('cro-reason'); if (i && i.focus) i.focus(); return; }
+  var okc = (typeof uiConfirm === 'function') ? await uiConfirm('Chuyển đơn ' + id + ' sang "' + to + '"?') : (typeof confirm === 'function' ? confirm('Chuyển đơn ' + id + ' sang "' + to + '"?') : true);
+  if (okc) _croSetStatus(id, to, '');
+}
+function _croSubmitReason(){
+  var p = _cro.pend; if (!p || _cro.busy) return; var i = document.getElementById('cro-reason'), note = String(i && i.value || '').trim();
+  if (!note){ _cro.msg = '⚠ Phải ghi lý do ' + (p.to === 'Hủy' ? 'huỷ' : 'hoàn') + ' đơn.'; _croRenderList(); return; }
+  _croSetStatus(p.id, p.to, note);
+}
+async function _croSetStatus(id, to, note){
+  _cro.busy = true; _cro.msg = ''; _croRenderList();
+  try {
+    if (typeof gsUrl === 'undefined' || !gsUrl) throw new Error('Chưa cấu hình địa chỉ GAS.');
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'crmOrderStatus', token:_croTok(), orderId:id, status:to, note:note }) }), d = await r.json();
+    if (d && d.ok && d.order){
+      var l = (_cro.data && _cro.data.orders) || [];
+      for (var k = 0; k < l.length; k++) if (l[k].orderId === id){ var keep = l[k]; l[k] = Object.assign({}, keep, d.order, { items: (d.order.items && d.order.items.length) ? d.order.items : keep.items }); break; }
+      _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".';
+    } else _cro.msg = '❌ ' + ((d && (d.error || d.message)) || 'Không đổi được trạng thái (GAS chưa deploy crmOrderStatus?).');
+  } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
+  _cro.busy = false; _croRenderList();
+}
 function _croSetQ(v){ _cro.q = String(v || ''); _croRenderList(); }
 function _croSetDate(k, v){ _cro[k] = String(v || ''); _croLoad(); }
 function _croSetRange(k){
