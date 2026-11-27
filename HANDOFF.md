@@ -2,7 +2,6 @@
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
-<<<<<<< HEAD
 ## 2026-11-27 (phiên Claude — DROPDOWN TÌM NHANH CHO MỌI Ô CHỌN TRONG CRM)
 - ĐỀ BÀI Duyên (ảnh ô "Chọn sale để thêm" phải kéo tìm): chỗ nào dropdown trong CRM cũng tìm nhanh được.
 - NGUYÊN NHÂN: các ô chọn là `<select>` gốc của trình duyệt (index.html + ~40 file js), không có ô gõ tìm.
@@ -27,7 +26,6 @@
 - **ĐANG LÀM:** phiên làm 4b/4c/4d (nếu có) ghi tiến độ vào mục RIÊNG phía trên mục này, đừng sửa bảng trên cho tới khi push xong bước đó rồi mới đổi ⬜ → ✅.
 - **VIỆC NHỎ CHƯA AI LÀM:** (1) lưu đơn ở tab Tạo đơn xong tự mở tab Đơn CRM + làm mới (đang phải bấm ↻); (2) nút "Xem đơn" trong hồ sơ khách (`crmOrders?phone=`); (3) địa chỉ theo danh mục tỉnh/quận/phường Pancake (đang gõ tay), thẻ dạng chip, giá combo/CTKM tự động.
 - **CÂU HỎI CHỜ DUYÊN CHỐT:** Trưởng team/phòng có được đổi trạng thái đơn của team không (hiện chỉ admin + người tạo; CEO chỉ xem)? Tên/đường đi trạng thái đã đúng ý Pancake POS chưa (chưa đối chiếu clip)? Có áp giới hạn tháng `viewMonths` của Trưởng nhóm lên đơn CRM không?
->>>>>>> origin/main
 
 ## 2026-11-27 (phiên Claude — LÊN ĐƠN TRÊN CRM: TAB "🧾 ĐƠN CRM" LIỆT KÊ + XEM CHI TIẾT) — BƯỚC 3/4 XONG (chỉ web, Ctrl+F5; cần GAS bước 1 đã deploy)
 - ĐỀ BÀI Duyên: "làm tiếp bước 3/4 lên đơn CRM". LƯU Ý THỨ TỰ: bước 2/4 (màn ➕ Tạo đơn) CHƯA làm — bước 3 chỉ cần backend `crmOrders` nên làm trước được; chưa có màn tạo đơn thì tab sẽ trống cho tới khi có đơn (hoặc đơn thử gọi thẳng `crmOrderSave`).
