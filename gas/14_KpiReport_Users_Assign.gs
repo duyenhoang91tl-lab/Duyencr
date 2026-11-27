@@ -491,6 +491,8 @@ function _leadMonths_(user) {
 function _leadOwnNames_(user) {
   var o = {};
   ((user.names && user.names.length) ? user.names : [user.name]).forEach(function (n) { n = String(n || '').trim(); if (n) o[_normTxt_(n)] = n; });
+  // + ten dang nhap (cung ly do voi _scopeAllowedNames_: client coi username la 1 ten cua tai khoan; data admin chia ghi theo ten dang nhap van phai thay)
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n && !o[_normTxt_(n)]) o[_normTxt_(n)] = n; });
   return o;
 }
 // Team minh lam truong (ten minh = teams.leader, hoac team trung user.team). members KHONG gom chinh minh.

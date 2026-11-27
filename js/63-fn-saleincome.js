@@ -135,6 +135,34 @@ function _srStoreForBOk_() {
     var v = st[k]; return Array.isArray(v) ? !v.length : !v;
   });   // đang lọc nguồn/marketer/sản phẩm/CS… thì KHÔNG cộng đơn quầy (đơn quầy không có các trường này)
 }
+// ── BÁO CÁO B "Theo Team Sale": gộp phần Sale 30% đơn quầy theo TEAM (Duyên 2026-11-26) ──
+// NGUYÊN NHÂN GỐC: "Theo Sale" đã gộp phần quầy (hàm trên) nhưng "Theo Team Sale" dùng thẳng byTeamSale của GAS (không có phần quầy) → team lệch Theo Sale.
+// GAS gắn sẵn credits[].team (cùng bộ giải quyết team với Báo cáo B). Cùng quy tắc lọc với _srMergeStoreIntoBySale_; số đơn đếm 1 lần cho mỗi (đơn, team).
+// Hàm THUẦN để test bằng Node: tools/test-store-share-b-team.js.
+function _srMergeStoreIntoByTeam_(byTeam, storeData) {
+  var out = (byTeam || []).map(function (r) { return Object.assign({}, r); }), idx = {}, total = 0, seen = {};
+  out.forEach(function (r, i) { idx[String(r.name || '').toLowerCase()] = i; });
+  ((storeData && storeData.rows) || []).forEach(function (row) {
+    if (row.koDen) return;
+    (row.orders || []).forEach(function (o) {
+      if (o.excluded) return;
+      (o.credits || []).forEach(function (cr) {
+        var amt = Number(cr.amount) || 0, tn = String(cr.team || '').trim();
+        if (cr.dup || !(amt > 0) || !cr.sale || !tn) return;   // thiếu team (GAS cũ chưa deploy) → không đoán team
+        var k = tn.toLowerCase(), i = idx[k];
+        if (i === undefined) { out.push({ name: tn, orders: 0, giaTri: 0, cod: 0, trungBinhDon: 0 }); i = idx[k] = out.length - 1; }
+        out[i].giaTri = (out[i].giaTri || 0) + amt;
+        var ok = (o.posRow != null ? o.posRow : (o.ngay + '|' + o.giaTri)) + '|' + k;
+        if (!seen[ok]) { seen[ok] = true; out[i].orders = (out[i].orders || 0) + 1; }
+        out[i].storeAmt = (out[i].storeAmt || 0) + amt;
+        total += amt;
+      });
+    });
+  });
+  out.forEach(function (r) { r.trungBinhDon = r.orders ? Math.round((r.giaTri || 0) / r.orders) : 0; });
+  out.sort(function (a, b) { return (b.giaTri || 0) - (a.giaTri || 0); });
+  return { rows: out, storeTotal: total };
+}
 function _srMergeStoreIntoBySale_(bySale, storeData) {
   var out = (bySale || []).map(function (r) { return Object.assign({}, r); }), idx = {}, total = 0, count = 0;
   out.forEach(function (r, i) { idx[String(r.name || '').toLowerCase()] = i; });

@@ -5,7 +5,7 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIP
 const path = require('path');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
 const calls = [];
-const PROFILE = { ok: true, username: 'saleA', accountName: 'Anh', role: 'cs', team: 'Team 1', names: ['anhNP1999', 'saleA'], canEdit: true,
+const PROFILE = { ok: true, username: 'saleA', accountName: 'Anh', role: 'cs', team: 'Team 1', names: ['anhNP1999', 'saleA'], canEdit: true, canEditNames: true,
   profile: { fullName: '<img src=x onerror=window.__xss=1>', phone: '0911222333', email: 'a@x.vn', facebook: 'https://facebook.com/anh', updatedAt: '2026-10-12T01:00:00.000Z' } };
 const OV = { ok: true, username: 'saleA', names: ['anhNP1999'], totalOrders: 12, revenue: 5000000, commission: 150000, bonus: 40000, closeRatePancake: 1, creatorOrders: 2, closeRateNewDay: 10, ordersNewCustomer: 12, interactionsNew: 120, closeRateOldCustomer: 10, ordersOldCustomer: 8, interactionsOld: 80,
   phoneConnectRate: 30, pancakeConversations: 200, phoneCollected: 60, rankTeam: { name: 'Team 1', rank: 2, of: 3 }, rankDept: null, warnings: [] };
@@ -14,6 +14,7 @@ function fakeFetch(url, o) {
   let out = { ok: false, error: 'khong biet' };
   if (/action=profileGet/.test(url)) out = /username=saleB/.test(url) ? { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' } : PROFILE;
   else if (/action=staffOverview/.test(url)) out = OV;
+  else if (/action=profileNameOptions/.test(url)) out = { ok: true, username: 'saleA', options: { pancake: ['Anh NP', 'Anh Khac'], crm: ['saleA'], base: [], pos: ['anh pos'] } };
   else if (o && o.body && /profileSave/.test(o.body)) { const b = JSON.parse(o.body); out = { ok: true, profile: Object.assign({}, b.profile, { updatedAt: '2026-10-12T02:00:00.000Z' }) }; }
   return Promise.resolve({ json: () => Promise.resolve(out), ok: true });
 }
@@ -32,7 +33,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(D.querySelector('.sn-act[data-act="profile"]'), 'menu co muc Ho so nhan vien');
     w.openProfileModal(); await wait(300);
     const ov = D.getElementById('sp-overlay'); ok(ov && ov.classList.contains('open'), 'hop thoai mo');
-    ok(D.querySelector('#sp-overlay > .sp-box.sp-box') && D.querySelector('.sp-layout > .sp-colL #sp-fullName') && D.querySelector('.sp-layout > .sp-colR .sp-card'), 'bo cuc man day du: ho so o cot trai, ket qua o cot phai');
+    ok(D.querySelector('#sp-overlay > .sp-box.sp-box') && D.querySelector('.sp-layout > .sp-colL #sp-fullName') && D.querySelector('.sp-layout > .sp-colR #sp-load-ov'), 'bo cuc man day du: ho so o cot trai, ket qua o cot phai');
     ok(/Quay lại/.test(D.getElementById('sp-close').textContent), 'nut ← Quay lai');
     ok(D.documentElement.classList.contains('sp-lock'), 'khoa cuon trang nen khi man day du mo');
     ok(!D.querySelector('.sp-overlay .sp-box').style.maxWidth && /position:fixed;inset:0/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')) && !/width:min\(620px/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')), 'CSS: phu kin cua so, khong con hop 620px');
@@ -40,6 +41,12 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(w.__xss !== 1 && !D.querySelector('#sp-body img'), 'ho ten co HTML bi escape (khong XSS)');
     ok(D.getElementById('sp-fullName').value.indexOf('<img') === 0, 'o ho ten giu nguyen chuoi text');
     ok(!D.getElementById('sp-phone').disabled, 'nhan vien sua duoc ho so minh');
+    // Duyen 26/11: KET QUA LAM VIEC CHI TAI KHI BAM NUT (do lag) — mo ho so khong duoc goi staffOverview
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === 0, 'mo ho so KHONG tu goi staffOverview');
+    ok(!D.querySelector('.sp-card'), 'chua bam tai thi chua co the so lieu');
+    D.getElementById('sp-load-ov').click(); await wait(300);
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === 1, 'bam nut tai -> goi staffOverview dung 1 lan');
+    ok(!D.getElementById('sp-load-ov'), 'tai xong thi nut tai bien mat');
     const cards = [...D.querySelectorAll('.sp-card')].map(c => c.textContent);
     ok(cards.length === 13, 'du 13 the so lieu, co ' + cards.length);
     const has = (lbl, val) => ok(cards.some(t => t.indexOf(lbl) >= 0 && t.indexOf(val) >= 0), 'the "' + lbl + '" phai chua "' + val + '" — ' + JSON.stringify(cards.filter(t => t.indexOf(lbl) >= 0)));
@@ -48,11 +55,25 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     has('Đã kết bạn Zalo', '2');                      // khach 1 va 4
     has('Tỷ lệ chốt (Pancake)', '1%'); has('Tỷ lệ chốt (Pancake)', '2 đơn do sale tạo'); has('Chốt trong ngày (khách mới)', '10%'); has('Chốt trong ngày (khách mới)', '12 đơn ÷ 120'); has('Chốt đơn hôm trước (khách cũ)', '10%'); has('Chốt đơn hôm trước (khách cũ)', '8 đơn ÷ 80'); has('Chốt / khách đang giữ', '400%'); has('Kết nối điện thoại', '30%');
     has('Xếp hạng team', '2'); has('Xếp hạng phòng KD', '—');   // chua thuoc phong -> hien — (khong hien 0)
+    // Duyen 26/11: sale tu chon/go ten theo he thong — o go + chip tick chon (goi y tu profileNameOptions)
+    ok(calls.filter(c => /profileNameOptions/.test(c.url)).length === 1, 'mo ho so (duoc sua ten) -> goi profileNameOptions 1 lan');
+    const chips = (sys) => [...D.querySelectorAll('#sp-ch-' + sys + ' .sp-chip')];
+    ok(D.getElementById('sp-nm-pancake') && !D.getElementById('sp-nm-pancake').disabled, 'sale co o go ten Pancake');
+    ok(chips('pancake').map(c => c.dataset.name).join('|') === 'Anh NP|Anh Khac', 'chip goi y Pancake hien dung');
+    ok(!/Chỉ admin sửa/.test(D.querySelector('.sp-names').textContent), 'khong con bao chi admin sua');
+    chips('pancake')[0].click();
+    ok(D.getElementById('sp-nm-pancake').value === 'Anh NP' && chips('pancake')[0].classList.contains('on'), 'bam chip -> chon, ghi vao o');
+    const inp = D.getElementById('sp-nm-pancake'); inp.value = 'Anh NP, Ten Tu Go'; inp.dispatchEvent(new w.Event('input', { bubbles: true }));
+    ok(chips('pancake').map(c => c.dataset.name).join('|') === 'Anh NP|Anh Khac|Ten Tu Go' && chips('pancake')[2].classList.contains('on'), 'go tay -> chip cap nhat, ten tu go hien de bo chon');
+    chips('pancake')[0].click();
+    ok(D.getElementById('sp-nm-pancake').value === 'Ten Tu Go' && !chips('pancake')[0].classList.contains('on'), 'bam chip lan nua -> bo chon');
+    chips('pancake')[1].click();
     // luu
     D.getElementById('sp-fullName').value = 'Nguyễn Anh'; D.getElementById('sp-facebook').value = 'facebook.com/anh';
     D.getElementById('sp-save').click(); await wait(100);
     const sv = calls.filter(c => c.body && /profileSave/.test(c.body)); ok(sv.length === 1, 'goi profileSave 1 lan');
     const sb = JSON.parse(sv[0].body); ok(sb.profile.fullName === 'Nguyễn Anh' && sb.username === 'saleA', 'gui dung noi dung + username');
+    ok(sb.names && sb.names.pancake.join('|') === 'Ten Tu Go|Anh Khac' && Array.isArray(sb.names.crm), 'luu gui kem ten theo he thong sale da chon/go');
     ok(D.getElementById('sp-fullName').value === 'Nguyễn Anh', 'giao dien hien noi dung vua luu');
     // admin chon nhan vien
     w.eval(`_authAccount = { username:'admin1', role:'admin' }; currentUser = { name:'Admin', names:[], role:'admin', team:'' };`);
@@ -66,7 +87,10 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     pick2.value = 'saleA'; pick2.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
     const n0 = calls.filter(c => /staffOverview/.test(c.url)).length;
     const q = D.getElementById('sp-quick'); q.value = 'lastMonth'; q.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
-    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'doi ky -> goi lai staffOverview');
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0, 'doi ky -> KHONG tu goi lai staffOverview');
+    ok(D.getElementById('sp-load-ov'), 'doi ky -> hien lai nut Tai ket qua');
+    D.getElementById('sp-load-ov').click(); await wait(300);
+    ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'bam tai sau khi doi ky -> goi staffOverview');
     const soCalls = calls.filter(c => /staffOverview/.test(c.url));   // lay request staffOverview CUOI (khong phai request bat ky cuoi cung: co the co goi khac xen vao -> test chap chon)
     ok(soCalls.length && /from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/.test(soCalls[soCalls.length - 1].url), 'tham so ngay dung dinh dang: ' + (soCalls.length ? soCalls[soCalls.length - 1].url.slice(-80) : '(khong co)'));
     D.getElementById('sp-close').click();

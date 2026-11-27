@@ -1495,7 +1495,8 @@ function _srRenderB(d){
     // Theo Team Sale — cung bang/bieu do nhu Bao cao A, du lieu tu byTeamSale moi tra ve tu backend.
     _SR_COLTH_ROWSFN_['bTeam'] = function(){ return (_srState.dataB && _srState.dataB.byTeamSale) || []; };
     _SR_COLTH_GETTER_['bTeam'] = { name: function(r){ return r.name; } };
-    var bTeamRows = _srApplyColFilters_(d.byTeamSale||[], 'bTeam', _SR_COLTH_GETTER_['bTeam']).filter(function(t){ return !_srState.bTeamSearch || t.name.toLowerCase().indexOf(_srState.bTeamSearch.toLowerCase())!==-1; });
+    var bTeamBase_ = (typeof _srMergeStoreIntoByTeam_ === 'function' && typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_() && _srState.dataBStore) ? _srMergeStoreIntoByTeam_(d.byTeamSale||[], _srState.dataBStore).rows : (d.byTeamSale||[]);   // Pos + phần Sale 30% đơn quầy theo team (cùng nguồn với Theo Sale)
+    var bTeamRows = _srApplyColFilters_(bTeamBase_, 'bTeam', _SR_COLTH_GETTER_['bTeam']).filter(function(t){ return !_srState.bTeamSearch || t.name.toLowerCase().indexOf(_srState.bTeamSearch.toLowerCase())!==-1; });
     html += '<div class="dash-section-title" style="margin-top:18px">Theo Team Sale'+_srViewToggleHtml('bTeamView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên team..." value="'+esc(_srState.bTeamSearch)+'" oninput="_srState.bTeamSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
     if (_srState.bTeamView === 'table'){
