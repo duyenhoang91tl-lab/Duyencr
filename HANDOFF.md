@@ -2,9 +2,9 @@
 
 ## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
 - ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).
-- ✅ **ĐÃ XONG:** Bước 1/2 MÁY CHỦ (gas_v13.js, split-gas OK, 445 test OK): deleteAssign ghi nhớ id đợt đã xoá (Script Properties assignDeletedIds, ~300 id gần nhất); saveAssign/saveAssignHistory không ghi lại đợt đó; action=assign trả thêm deletedIds; toggleAssignDone nhận ids + khớp SĐT chuẩn hoá.
-- 🔧 **ĐANG LÀM:** Bước 2/2 web (js/07)
-- ➡️ **BƯỚC KẾ TIẾP:** js/07: nút "đã xong" gửi toggleAssignDone từng SĐT; pullAssignHistory gỡ đợt trong deletedIds; bump ?v=
+- ✅ **ĐÃ XONG:** Bước 1/2 máy chủ + bước 2/2 web (js/07 ?v=20261127b): máy chủ nhớ đợt đã xoá (assignDeletedIds) và không ghi lại; web gỡ đợt đó khi tải về (trong ~15 giây khi đang đồng bộ); nút "đã xong" chỉ gửi 1 SĐT (toggleAssignDone + ids) nên không đè dấu tích Pancake AI. 461 test + bước CI OK.
+- 🔧 **ĐANG LÀM:** Kiểm tra sau merge + ghi tài liệu KB 16
+- ➡️ **BƯỚC KẾ TIẾP:** Cập nhật docs/crm-kb/16 (bỏ 2 hạn chế đã sửa); Duyên: Actions xanh → Ctrl+F5 mọi máy
 
 ## 2026-11-27 (phiên Claude — TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN + CHỈ XEM + KHÔNG LẤY ĐƯỢC MÃ GAS) — BƯỚC 1/2 XONG (GAS, đã split + --check OK); BƯỚC 2/2 (web) ĐANG LÀM
 - ĐỀ BÀI Duyên: "tài khoản test vẫn xem được hết danh sách KH trong khi mình chọn có mỗi 1 sale; vẫn muốn tk test xem được thông tin + các tính năng đầy đủ nhưng không có quyền tác động vào CRM hay lấy được Apps Script".
