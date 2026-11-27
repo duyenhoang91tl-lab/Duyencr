@@ -2202,6 +2202,62 @@ function _demoClip_(out, action) {
   _demoMaskDeep_(o);
   return jsonOut_(o);
 }
+// ═══ TAI KHOAN TEST THEO PHIEN (2026-11-27, Duyen yeu cau) ═══
+// NGUYEN NHAN GOC "tai khoan test van xem het danh sach KH du chi chon 1 sale": role 'demo' di nhanh rieng bang demoToken DUNG CHUNG (khong biet la ai)
+// nen khong the loc theo sale da chon; _scopeVerdict_/_scopeAllowedNames_ coi demo la "khong gioi han"; client _inUserScope cung tra true cho demo.
+// Va POST chi bi chan khi co truong demo => bo truong do (chi gui token phien) la GHI duoc. Nay may chu NHAN RA tai khoan test tu TOKEN PHIEN (vai tro doc tu sheet Users):
+//  - GET: chi action trong DEMO_SESSION_GET_; action tra danh sach khach/don/lead bi LOC theo SDT cua cac sale duoc chon (luon enforce, khong phu thuoc scopeMode,
+//    khong co ngoai le via=search); tra cuu 1 SDT ngoai pham vi bi tu choi. Bao cao tong hop (khong loc duoc theo SDT) giu cat dong + che SDT nhu cu.
+//  - POST: tu choi MOI thao tac ghi (ke ca khong kem demoToken). getGasSource/setGasSource/setSetting... da can adminKey nen tai khoan test khong lay duoc ma Apps Script.
+//  - SDT khong bi che trong du lieu da loc (de tra cuu / mo ho so hoat dong); admin bat che bang Settings demoMaskPhone=1.
+var DEMO_SESSION_EXTRA_GET_ = ['customers', 'lookup', 'cskhDetail', 'donOrdersByPhone', 'reminders', 'cskhDuyen', 'users', 'roleConfig',
+  'priceSearch', 'priceCatalogFlat', 'priceCatalogTree', 'ctkmCatalog', 'ctkmSearch', 'comboList', 'comboSearch', 'topProducts', 'csStats', 'dashboard',
+  'teamAnalysis', 'orgOverview', 'posMonthK'];
+var DEMO_SESSION_GET_ = (function() {
+  var o = {};
+  Object.keys(DEMO_ALLOWED_GET_).forEach(function(k) { o[k] = 1; });
+  DEMO_SESSION_EXTRA_GET_.forEach(function(k) { o[k] = 1; });
+  return o;
+})();
+// Tra user (sheet Users) neu token phien hop le VA vai tro la 'demo'; nguoc lai null. Cache 60s ket qua "khong phai demo" theo username de khong doc sheet Users moi request.
+function _demoSessionUser_(tok) {
+  tok = String(tok || '');
+  if (!tok) return null;
+  try {
+    var p = _sessVerify_(tok);
+    if (!p) return null;
+    var cache = CacheService.getScriptCache();
+    var ck = 'dsr_' + String(p.u).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60);
+    if (cache.get(ck) === 'n') return null;
+    var u = _sessUser_(tok);
+    if (!u) return null;
+    if (String(u.role || '') !== 'demo') { cache.put(ck, 'n', 60); return null; }
+    return u;
+  } catch (e) { return null; }
+}
+function _demoMaskOn_() { try { return String(getSetting_('demoMaskPhone') || '').trim() === '1'; } catch (e) { return false; } }
+function _demoSessionGet_(action, p, e, user) {
+  if (DEMO_SESSION_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.', code: 'FORBIDDEN', action: action });
+  // Tra cuu 1 SDT: chi trong pham vi cac sale duoc chon (BO QUA via=search cua client).
+  if (SCOPE_ACTIONS_[action]) {
+    var ph = String(p.phone || '');
+    if (!ph || _scopeVerdict_(user, ph) !== true) return jsonOut_({ error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action });
+  }
+  if (!SCOPE_LIST_ACTIONS_[action]) return _demoClip_(doGetCore_(e), action);   // bao cao tong hop / bang gia: cat dong chi tiet + che SDT nhu cu
+  var resp = doGetCore_(e), obj;
+  try { obj = JSON.parse(resp.getContent()); } catch (e1) { return jsonOut_({ error: 'Khong doc duoc du lieu.', action: action }); }
+  var allowed = _scopeAllowedNames_(user) || {};
+  var phs = Object.keys(allowed).length ? _scopePhoneSet_(user, allowed) : {};   // chua chon sale nao -> khong thay khach nao
+  var f = _scopeFilterObj_(action, obj, phs), out = f.obj;
+  if (out && typeof out === 'object' && !Array.isArray(out)) {
+    if (action === 'cskhDuyenLite' || action === 'cskhDuyen') { out.total = f.kept; out.noPhone = 0; out.noPhoneSample = []; }   // so tong / ten khach khong SDT la cua ca cong ty
+    out._demo = true;
+    out._demoScoped = true;
+  }
+  if (_demoMaskOn_()) _demoMaskDeep_(out);
+  return jsonOut_(out);
+}
+
 // Dang nhap tai khoan test: kiem tra user role "demo" trong sheet Users (passHash do client gui len).
 function demoLogin_(data) {
   var uname = String((data && data.username) || '').trim().toLowerCase();
@@ -2696,7 +2752,7 @@ function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
   if (role === 'admin') return true;
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && role !== 'demo') return true;   // viewer/ceo/... : client khong gioi han (demo = gioi han nhu CS)
   var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
   var mine = Object.keys(allowed);
   if (!mine.length) return false;
@@ -2852,7 +2908,8 @@ function _viewExtraNames_(user) {
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
+  var isDemoRole = (role === 'demo');   // tai khoan test: pham vi = CHI cac sale duoc chon cho tai khoan (nhu CS), khong cong ten Quay/CSKH
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && !isDemoRole) return null;
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
@@ -2870,8 +2927,8 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
       });
     } catch (e) {}
   }
-  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_)
-  try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {}
+  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_). Tai khoan test khong duoc cong them.
+  if (!isDemoRole) { try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {} }
   return out;
 }
 function _scopeHit_(str, allowed) {
@@ -3041,6 +3098,7 @@ function doGet(e) {
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
+  if (p.token) { var _dsu = _demoSessionUser_(p.token); if (_dsu) return _demoSessionGet_(action, p, e, _dsu); }   // tai khoan test nhan ra tu token phien: loc theo sale da chon
   if (p.demo) {
     if (!_demoTokenOk_(p.demo)) return jsonOut_({ error: 'Phien tai khoan test khong hop le — dang nhap lai.' });
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
@@ -3468,7 +3526,7 @@ function doGetCore_(e) {
       var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
       var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
       if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); var csKeyA_ = {}; Object.keys(csSetA_).forEach(function(k) { csKeyA_[_scopeNameKey_(k)] = 1; }); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)] || csKeyA_[_scopeNameKey_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
-      return jsonOut_({ assignHistory: allAssignH_ });
+      return jsonOut_({ assignHistory: allAssignH_, deletedIds: _assignDeletedIds_() });   // deletedIds: may khac go ban cu cua dot admin da xoa
     }
     if (action === 'tasks') {
       var tasksOut_ = readTasks_(ss.getSheetByName(SH_TASK));
@@ -6062,70 +6120,64 @@ function buildSalesReportA_(filters) {
 // gui 2026-10-01. track dung de +-1 cap (F1<->F2<->F3, O1<->O2<->O3); probation=true: luon CHI
 // giu dung 1 thang roi tu dong chuyen F1 (bat ke ket qua thang do), khong xet 3 thang nhu binh
 // thuong; track 'OFLAT': khong bao gio doi bac, bo qua toan bo cong thuc tang/giam.
-var SALE_TIER_ORDER_ = ['TVF1', 'TVF2', 'F1', 'F2', 'F3', 'O1', 'O2', 'O3', 'O'];
-var SALE_TIER_DEFAULT_TARGETS_ = {
-  TVF1: 240000000, TVF2: 300000000,
-  F1: 400000000, F2: 500000000, F3: 600000000,
-  O1: 700000000, O2: 800000000, O3: 900000000,
-  O: 500000000
-};
+// ═══ 2026-11-27 (Duyên chốt): CHỈ CÒN 2 BẬC — Thử việc (KPI 100tr, ĐÚNG 1 THÁNG) rồi tháng sau tự lên Chính thức (KPI 500tr). Áp dụng cho cả Sale Offline.
+// BỎ hết hệ 9 bậc cũ (TVF1/TVF2/F1-F3/O1-O3/O) và quy tắc tự lên/xuống bậc theo 3 tháng. Bậc cũ trong cấu hình đã lưu được đổi 1 lần
+// (SALE_TIER_LEGACY_ → CT, xem _saleKpiMigrate_): cả đội cũ = Chính thức; chỉ thuongBT, nguyetTTA, ngocNM = Thử việc.
+var SALE_TIER_ORDER_ = ['TV', 'CT'];
+var SALE_TIER_DEFAULT_TARGETS_ = { TV: 100000000, CT: 500000000 };
 var SALE_TIER_META_ = {
-  TVF1: { track: 'F', level: 0, probation: true },
-  TVF2: { track: 'F', level: 0, probation: true },
-  F1: { track: 'F', level: 1 },
-  F2: { track: 'F', level: 2 },
-  F3: { track: 'F', level: 3 },
-  O1: { track: 'O', level: 1 },
-  O2: { track: 'O', level: 2 },
-  O3: { track: 'O', level: 3 },
-  O: { track: 'OFLAT', level: 0 }
+  TV: { track: 'TV', level: 0, probation: true },
+  CT: { track: 'CT', level: 0 }
 };
+var SALE_TIER_LEGACY_ = { TVF1: 1, TVF2: 1, F1: 1, F2: 1, F3: 1, O1: 1, O2: 1, O3: 1, O: 1 };   // bậc hệ cũ → coi là Chính thức
+var SALE_TIER_TRIAL_NAMES_ = ['thuongbt', 'nguyettta', 'ngocnm'];                                  // chỉ những bạn này là Thử việc khi chuyển đổi (khớp tiền tố, không phân biệt hoa/thường)
 var SALE_KPI_DEFAULT_CFG_ = {
   tierTargets: JSON.parse(JSON.stringify(SALE_TIER_DEFAULT_TARGETS_)),
-  startTier: {},                   // ten Sale (dung y het chuoi "Sale bán"/"Thẻ") -> 1 trong SALE_TIER_ORDER_
+  startTier: {},                   // ten Sale (dung y het chuoi "Sale bán"/"Thẻ") -> 'TV' | 'CT'
+  startMonth: {},                  // ten Sale -> 'YYYY-MM' thang BAT DAU bac (Thu viec = thang nay, thang sau tu len CT; thang truoc do KHONG tinh KPI). Trong = tu trackingStartMonth
+  tierModel: 2,                    // 2 = mo hinh 2 bac (27/11/2026)
   trackingStartMonth: '2026-09',   // 'YYYY-MM' - thang bat dau tu dong tinh bac theo quy che
   overrides: {}                    // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac tu dong)
 };
 
+// Chuyển cấu hình KPI hệ 9 bậc cũ → 2 bậc (1 LẦN, rồi lưu lại): mọi Sale đã được gán / có Commit riêng / đã phân loại đội → Chính thức (CT),
+// riêng thuongBT, nguyetTTA, ngocNM → Thử việc (TV) bắt đầu từ THÁNG HIỆN TẠI (Duyên sửa lại tháng ở Cài đặt KPI nếu khác). Trả true nếu có đổi.
+function _saleKpiMigrate_(out, o) {
+  var names = {};
+  Object.keys(out.startTier).forEach(function(n) { names[n] = 1; });
+  Object.keys(out.overrides || {}).forEach(function(n) { names[n] = 1; });
+  try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); Object.keys(oCh || {}).forEach(function(n) { if (oCh[n]) names[n] = 1; }); } } catch (eCh) {}
+  var cur = _todayYm_();
+  Object.keys(names).forEach(function(n) {
+    var low = String(n).trim().toLowerCase();
+    var trial = SALE_TIER_TRIAL_NAMES_.some(function(t) { return low.indexOf(t) === 0; });
+    out.startTier[n] = trial ? 'TV' : 'CT';
+    if (trial && !out.startMonth[n]) out.startMonth[n] = cur;
+  });
+  out.tierModel = 2;
+  return true;
+}
+
 function readSaleKpiConfig_() {
-  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_));
-  try {
-    var raw = getSetting_('saleKpiConfig');
-    if (raw) {
-      var o = JSON.parse(raw);
-      if (o && typeof o === 'object') {
-        if (o.tierTargets && typeof o.tierTargets === 'object') {
-          SALE_TIER_ORDER_.forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; });
-        }
-        if (o.trackingStartMonth) out.trackingStartMonth = String(o.trackingStartMonth);
-        if (o.startTier && typeof o.startTier === 'object') {
-          Object.keys(o.startTier).forEach(function(name) { if (SALE_TIER_META_[o.startTier[name]]) out.startTier[name] = o.startTier[name]; });
-        }
-        if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
-        // Migration tu cau hinh CU (truoc 2026-10, 3 bac chung "1"/"2"/"3" + 1 muc Online phang):
-        // neu CHUA co startTier moi ma con du lieu cu (o.tiers), tu suy startTier 1 lan de khong
-        // mat trang toan bo cau hinh da cham truoc do. "1"/"2"/"3" (Van phong) -> F1/F2/F3; Sale
-        // tung duoc gan saleChannels='online' nhung chua co trong o.tiers -> mac dinh 'O' (phang,
-        // an toan nhat vi khong biet ho dang o muc nao trong O1-O3) — Duyen sua lai tung nguoi sau.
-        if ((!o.startTier || !Object.keys(o.startTier).length)) {
-          var oldMap = { '1': 'F1', '2': 'F2', '3': 'F3' };
-          if (o.tiers && typeof o.tiers === 'object') {
-            Object.keys(o.tiers).forEach(function(name) { var mapped = oldMap[o.tiers[name]]; if (mapped) out.startTier[name] = mapped; });
-          }
-          try {
-            var rawCh = getSetting_('saleChannels');
-            if (rawCh) {
-              var oCh = JSON.parse(rawCh);
-              Object.keys(oCh || {}).forEach(function(name) { if (oCh[name] === 'online' && !out.startTier[name]) out.startTier[name] = 'O'; });
-            }
-          } catch (eCh) {}
-        }
-      }
-    }
-  } catch (e) {}
-  // Config cu chi co onlineTarget, chua tung luu targets.online rieng -> lay onlineTarget lam gia tri khoi diem.
-  if (out.targets.online === SALE_KPI_DEFAULT_CFG_.targets.online && out.onlineTarget !== SALE_KPI_DEFAULT_CFG_.onlineTarget) {
-    out.targets.online = out.onlineTarget;
+  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_)), o = null;
+  try { var raw = getSetting_('saleKpiConfig'); if (raw) { o = JSON.parse(raw); if (!o || typeof o !== 'object') o = null; } } catch (e) { o = null; }
+  if (!o) return out;
+  if (o.tierTargets && typeof o.tierTargets === 'object') {
+    SALE_TIER_ORDER_.forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0 && o.tierTargets[k] !== '' && o.tierTargets[k] != null) out.tierTargets[k] = n; });
+  }
+  if (o.trackingStartMonth) out.trackingStartMonth = String(o.trackingStartMonth);
+  if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
+  if (o.startMonth && typeof o.startMonth === 'object') Object.keys(o.startMonth).forEach(function(n) { if (/^\d{4}-\d{2}$/.test(String(o.startMonth[n]))) out.startMonth[n] = String(o.startMonth[n]); });
+  if (o.startTier && typeof o.startTier === 'object') {
+    Object.keys(o.startTier).forEach(function(name) {
+      var v = o.startTier[name];
+      if (SALE_TIER_META_[v]) out.startTier[name] = v; else if (SALE_TIER_LEGACY_[v]) out.startTier[name] = 'CT';
+    });
+  }
+  if (Number(o.tierModel) !== 2) {
+    // Cấu hình cũ (≤ 26/11/2026, hệ 9 bậc): đổi sang 2 bậc và lưu 1 lần để các lần đọc sau không đổi lại phần Duyên đã chỉnh.
+    _saleKpiMigrate_(out, o);
+    try { setSetting_('saleKpiConfig', JSON.stringify(out)); } catch (eS) {}
   }
   return out;
 }
@@ -6176,54 +6228,22 @@ function _computeSaleMonthlyRevenue_(months) {
   return out;
 }
 
-// State machine tinh bac tung thang cho 1 Sale, bat dau tu startTier o thang dau tien cua mang
-// months (= trackingStartMonth). Quy tac (theo sheet "Bậc" + xac nhan Duyen 2026-10-01, va xac
-// nhan rieng ve "Riêng Bậc 2" ngay 2026-10-04):
-//  - Bac thu viec (probation): CHI giu dung 1 thang. Thang ke tiep tu dong ky chinh thuc:
-//      + TVF1 -> F1 (binh thuong, khong co dieu kien gi them).
-//      + TVF2 -> F2 (vao thang chinh thuc DAU TIEN), NHUNG rieng truong hop nay phai qua them
-//        1 lan kiem tra rieng ("Riêng Bậc 2"): DUNG 2 THANG DAU TIEN lam F2 phai MOI THANG rieng
-//        deu dat >=100% KPI cua F2 — khong dat (du chi 1 trong 2 thang) thi HA NGAY xuong F1 o
-//        thang thu 3 de "chay lai" tu dau theo quy tac thuong (khong cho o lai F2 cho het 3 thang
-//        nhu quy tac tang/giam binh thuong). Neu qua duoc 2 thang nay, tu thang thu 3 tro di xet
-//        theo dung quy tac 3-thang binh thuong nhu moi bac khac.
-//  - Bac 'O' (track OFLAT): khong bao gio doi, giu nguyen KPI mai mai.
-//  - Bac chinh thuc (F1-F3, O1-O3) O NGOAI giai doan kiem tra rieng 2 thang dau cua F2 noi tren:
-//    moi thang, neu 3 thang LIEN TIEP NGAY TRUOC do CUNG o dung 1 bac nay (tranh xet nua voi
-//    trong luc dang doi bac):
-//      + TB doanh thu 3 thang do >= 125% KPI bac hien tai VA KHONG thang nao < 70% KPI bac hien
-//        tai => TANG 1 bac (toi da bac 3 trong track, F3/O3 khong tang them).
-//      + TB doanh thu 3 thang do < 80% KPI bac hien tai => GIAM 1 bac (toi thieu bac 1, F1/O1
-//        khong giam them).
-//      + Nguoc lai: giu nguyen bac.
-function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTargets) {
-  var timeline = {};
+// Bậc từng tháng của 1 Sale (mô hình 2 bậc, Duyên chốt 27/11/2026): Thử việc (TV) chỉ ĐÚNG 1 THÁNG, tháng sau tự lên Chính thức (CT) và giữ CT
+// (không còn tự lên/xuống bậc theo 3 tháng). beginYm (tuỳ chọn) = tháng bắt đầu của Sale: các tháng TRƯỚC đó không có bậc (chưa tính KPI);
+// nếu bắt đầu TV từ trước tháng đầu theo dõi mà đã qua 1 tháng thì tháng đầu theo dõi đã là CT.
+function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTargets, beginYm) {
+  var timeline = {}, begun = false, prev = '';
+  var first = months.length ? months[0] : '';
+  if (beginYm && first && beginYm < first && SALE_TIER_META_[startTier] && SALE_TIER_META_[startTier].probation) startTier = 'CT';
   for (var i = 0; i < months.length; i++) {
     var ym = months[i];
-    if (i === 0) { timeline[ym] = startTier; continue; }
-    var prevYm = months[i - 1], prevTier = timeline[prevYm], meta = SALE_TIER_META_[prevTier];
-    if (!meta) { timeline[ym] = prevTier; continue; }
-    if (meta.probation) { timeline[ym] = (prevTier === 'TVF2') ? 'F2' : 'F1'; continue; }
-    if (meta.track === 'OFLAT') { timeline[ym] = prevTier; continue; }
-    // "Riêng Bậc 2": dung luc dang o thang thu 3 lam F2 ke tu khi ky chinh thuc tu TVF2 (2 thang
-    // truoc la TVF2 -> F2, van con F2 den gio) — kiem tra RIENG 2 thang do thay vi quy tac 3-thang
-    // thuong. Dat dieu kien nay TRUOC quy tac 3-thang chung de khong bi dung nham (thang i-3 la
-    // TVF2 chu khong phai F2 nen quy tac 3-thang thuong cung khong khop o day, nhung ghi ro cho de doc).
-    if (prevTier === 'F2' && i >= 3 && timeline[months[i - 3]] === 'TVF2' && timeline[months[i - 2]] === 'F2') {
-      var kpiF2 = tierTargets['F2'] || 0;
-      var rm2 = monthlyRevenue[months[i - 2]] || 0, rm1 = monthlyRevenue[prevYm] || 0;
-      var passed2mo = kpiF2 > 0 && rm2 >= kpiF2 && rm1 >= kpiF2; // CA 2 thang deu phai rieng >=100%
-      timeline[ym] = passed2mo ? 'F2' : 'F1';
-      continue;
+    if (!begun) {
+      if (beginYm && ym < beginYm) continue;
+      begun = true; prev = startTier; timeline[ym] = prev; continue;
     }
-    if (i >= 3 && timeline[months[i - 3]] === prevTier && timeline[months[i - 2]] === prevTier) {
-      var kpi = tierTargets[prevTier] || 0;
-      var r1 = monthlyRevenue[months[i - 3]] || 0, r2 = monthlyRevenue[months[i - 2]] || 0, r3 = monthlyRevenue[prevYm] || 0;
-      var avg3 = (r1 + r2 + r3) / 3, min3 = Math.min(r1, r2, r3);
-      if (kpi > 0 && avg3 >= kpi * 1.25 && min3 >= kpi * 0.70 && meta.level < 3) { timeline[ym] = meta.track + (meta.level + 1); continue; }
-      if (kpi > 0 && avg3 < kpi * 0.80 && meta.level > 1) { timeline[ym] = meta.track + (meta.level - 1); continue; }
-    }
-    timeline[ym] = prevTier;
+    var meta = SALE_TIER_META_[prev];
+    if (meta && meta.probation) prev = 'CT';
+    timeline[ym] = prev;
   }
   return timeline;
 }
@@ -6273,9 +6293,10 @@ function buildSaleKpiReport_(filters) {
     var r = rowsMap[name];
     var target = null, source = 'no-tier', tierNow = '', timeline = null;
     if (cfg.startTier[name]) {
-      timeline = _computeSaleTierTimeline_(cfg.startTier[name], months, monthlyRevByName[name] || {}, cfg.tierTargets);
-      tierNow = timeline[monthsInRange[monthsInRange.length - 1]] || cfg.startTier[name];
-      target = monthsInRange.reduce(function(sum, ym) { return sum + (cfg.tierTargets[timeline[ym] || cfg.startTier[name]] || 0); }, 0);
+      timeline = _computeSaleTierTimeline_(cfg.startTier[name], months, monthlyRevByName[name] || {}, cfg.tierTargets, cfg.startMonth[name] || '');
+      // Tháng chưa bắt đầu (trước startMonth) không có bậc → không cộng KPI; bậc hiện tại = bậc tháng cuối trong kỳ xem (không có thì '').
+      tierNow = timeline[monthsInRange[monthsInRange.length - 1]] || '';
+      target = monthsInRange.reduce(function(sum, ym) { return sum + (timeline[ym] ? (cfg.tierTargets[timeline[ym]] || 0) : 0); }, 0);
       source = 'tier-auto';
     }
     // "Commit rieng" (cfg.overrides) tu 2026-10-04 la MUC TIEU SONG SONG voi KPI theo bac (xem
@@ -6287,13 +6308,13 @@ function buildSaleKpiReport_(filters) {
       commit = Number(cfg.overrides[name]) || 0;
     }
     var meta = tierNow ? SALE_TIER_META_[tierNow] : null;
-    var nhom = meta ? (meta.track === 'F' ? 'Văn phòng' : 'Online') : '(chưa gán bậc)';
+    var nhom = meta ? (meta.probation ? 'Thử việc' : 'Chính thức') : '(chưa gán bậc)';
     var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
     var pctCommit = (commit && commit > 0) ? Math.round(r.revenue / commit * 1000) / 10 : null;
     return { name: name, nhom: nhom, tier: tierNow, revenue: r.revenue, orders: r.orders,
       target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null,
       commit: commit, pctCommit: pctCommit, passedCommit: (pctCommit !== null) ? pctCommit >= 100 : null,
-      timeline: timeline,
+      timeline: timeline, startMonth: cfg.startMonth[name] || '',
       // Doi chung (Online/Van phong/CSKH/Quay...) — rieng cho LOC/hien thi, khong dinh gi den
       // target/tier/commit phia tren. nhomChung = '' neu chua phan loai o "🏷️ Phân loại đội Sale".
       nhomChungKey: r.nhomKey, nhomChung: r.nhomKey ? (_saleGroupLabel_(r.nhomKey, groupDefs) || r.nhomKey) : '' };
@@ -8555,6 +8576,7 @@ function doPost(e) {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
     if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.token && _demoSessionUser_(d0.token)) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.', code: 'FORBIDDEN' });   // ke ca khi bo truong demo, chi gui token phien
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
@@ -8664,7 +8686,7 @@ function doPostCore_(e) {
     if (action === 'leadAssign')          return leadAssign_(data);
     if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
-    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done, data.ids);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
@@ -11349,6 +11371,7 @@ function assignRowsOf_(h) {
 
 function saveAssignEntry_(entry) {
   if (!entry || !entry.id) return jsonOut_({ error: 'no entry.id' });
+  if (_assignDeletedIds_().indexOf(String(entry.id)) !== -1) return jsonOut_({ ok: true, skipped: 'deleted' });   // may khac con giu dot admin da xoa -> khong cho song lai
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   var last = sh.getLastRow(); var found = [];
   if (last >= 2) {
@@ -11373,24 +11396,31 @@ function saveAssignEntry_(entry) {
 // dong cua (cac) dot chia bi doi qua saveAssignEntry_ (an toan hon saveAssignHistory_ — khong xoa
 // trang roi ghi lai CA sheet, tranh dam vao CS khac dang luu cung luc). Dung LockService vi 1 CS co
 // the tich lien tuc nhieu SDT gan nhau (2 request ghi cung 1 dot chia de dam vao nhau neu khong khoa).
-function toggleAssignDone_(csName, phone, done) {
+function toggleAssignDone_(csName, phone, done, ids) {
   csName = String(csName || '').trim();
   phone = String(phone || '').trim();
   if (!csName || !phone) return jsonOut_({ error: 'Thiếu csName hoặc phone.' });
+  // Web gui kem `ids` (cac dot vua tich) -> chi dong vao dung cac dot do. Pancake AI khong gui ids -> tim theo ten CS nhu cu.
+  var idMap = null;
+  if (Array.isArray(ids) && ids.length) { idMap = {}; ids.forEach(function (id) { idMap[String(id)] = 1; }); }
+  var key = normPhone_(phone) || phone;   // sheet co the luu SDT mat so 0 / dang 84
+  var same = function (x) { return (normPhone_(x) || String(x)) === key; };
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return jsonOut_({ error: 'Đang có thao tác khác ghi dữ liệu chia, thử lại sau vài giây.' });
   try {
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
     var history = readAssign_(sh);
     var touched = [];
-    var csSetT = _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
+    var csSetT = idMap ? null : _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
     for (var i = 0; i < history.length; i++) {
       var h = history[i];
-      if (!csSetT[_normTxt_(h.csName)] || (h.phones || []).indexOf(phone) === -1) continue;
+      if (idMap ? !idMap[h.id] : !csSetT[_normTxt_(h.csName)]) continue;
+      var mine = (h.phones || []).filter(same);
+      if (!mine.length) continue;
       h.donePhones = h.donePhones || [];
-      var idx = h.donePhones.indexOf(phone);
-      if (done && idx === -1) { h.donePhones.push(phone); touched.push(h); }
-      else if (!done && idx !== -1) { h.donePhones.splice(idx, 1); touched.push(h); }
+      var has = h.donePhones.some(same);
+      if (done && !has) { h.donePhones.push(mine[0]); touched.push(h); }
+      else if (!done && has) { h.donePhones = h.donePhones.filter(function (x) { return !same(x); }); touched.push(h); }
     }
     for (var k = 0; k < touched.length; k++) saveAssignEntry_(touched[k]); // ghi tung dot bi doi, giu nguyen cac dot khac
     return jsonOut_({ ok: true, changed: touched.length });
@@ -11405,6 +11435,8 @@ function saveAssignHistory_(history) {
   // DUNG MA TRAN TRUOC, chi clearContents() khi da san sang ghi — truoc day clear xong moi stringify, neu setValues loi
   // (o > 50.000 ky tu) thi sheet bi xoa trang va MAT lich su chia tren server.
   var matrix = [ASSIGN_HEADERS];
+  var gone = _assignDeletedIds_();
+  history = history.filter(function (h) { return !h || gone.indexOf(String(h.id)) === -1; });   // dot da xoa khong duoc ghi lai
   for (var i = 0; i < history.length; i++) {
     var rs = assignRowsOf_(history[i]);
     for (var r = 0; r < rs.length; r++) matrix.push(rs[r]);
@@ -11568,6 +11600,16 @@ function leadAssign_(data) {
 // donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
 // 2026-11-27: xoa DUNG cac dot chia theo id. NGUYEN NHAN GOC: web xoa 1 dot bang cach ghi de CA sheet AssignData bang ban tren may admin (saveAssignHistory),
 // ban nay khong co dot Truong nhom vua chia lai / dot chia tu dong moi va giu tien do "da xong" cu -> mat du lieu cua nguoi khac. Quyen giong saveAssignHistory.
+// NHO cac dot chia da xoa (Script Properties 'assignDeletedIds', giu ~300 id gan nhat vi 1 gia tri toi da 9KB).
+// NGUYEN NHAN GOC: may khac van giu dot da xoa trong trinh duyet; may chu khong nho gi nen ho ghi lai la dot "song lai".
+function _assignDeletedIds_() {
+  try { var a = JSON.parse(PropertiesService.getScriptProperties().getProperty('assignDeletedIds') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function _rememberAssignDeleted_(ids) {
+  var list = _assignDeletedIds_().filter(function (id) { return ids.indexOf(id) === -1; }).concat(ids);
+  while (list.length > 300 || JSON.stringify(list).length > 8500) list.shift();   // bo id cu nhat
+  PropertiesService.getScriptProperties().setProperty('assignDeletedIds', JSON.stringify(list));
+}
 function deleteAssign_(data) {
   var u = (data && data.token) ? _sessUser_(data.token) : null;
   if (u && _roleBase_(u.role) !== 'admin') return jsonOut_({ error: 'Chi admin duoc xoa dot chia.', code: 'FORBIDDEN' });
@@ -11577,6 +11619,7 @@ function deleteAssign_(data) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
   try {
+    _rememberAssignDeleted_(Object.keys(ids));   // ghi nho TRUOC khi xoa dong
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), last = sh.getLastRow(), rows = [];
     if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { if (ids[String(r[0])]) rows.push(i + 2); });
     if (rows.length && sh.getMaxRows() - rows.length < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);   // Sheets khong cho xoa het cac dong duoi tieu de

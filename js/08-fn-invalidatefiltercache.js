@@ -304,7 +304,8 @@ function _inUserScope(c){
     if (currentUser._scopeNamesSrc !== _vn || currentUser._scopeNamesBase !== myNames){ currentUser._scopeNamesAll = myNames.concat(_vn); currentUser._scopeNamesSrc = _vn; currentUser._scopeNamesBase = myNames; }
     myNames = currentUser._scopeNamesAll;
   }
-  if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
+  // Tai khoan test ('demo') loc y nhu CS theo cac sale duoc chon (27/11) — truoc day roi xuong 'return true' cuoi ham nen thay HET khach. Khong cong viewNames (khop server).
+  if (currentUser.role === 'cs' || currentUser.role === 'manager' || currentUser.role === 'demo'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
     // (order-level seller, o.cs) — thêm chiều này để hỗ trợ đơn "chia nhiều sale": mỗi sale trong

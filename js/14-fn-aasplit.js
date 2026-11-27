@@ -1277,14 +1277,11 @@ function _applyAuthIdentity(acct){
   }
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
-    // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.
-    currentUser.perms = ['salesreport','pancake','kpipancake','mktchecklist','dailybrief'];
+    // Tai khoan test (27/11): xem du tab nhu tai khoan thuong (tab theo perms/vai tro), du lieu khach loc theo sale da chon (server + js/08); body.demo-mode an nut quan tri/Google Sheets, server chan moi thao tac ghi.
     document.body.classList.add('demo-mode');
     // Xoa cache CSKH-Duyen/don cua phien truoc tren cung trinh duyet + bo du lieu dang giu trong bo nho: test chi duoc thay 5 dong tu may chu.
     try { cskhData = {}; cskhMeta = { found: null, total: 0, noPhone: 0 }; ['ome_cskh_duyen', 'ome_cskh_duyen_meta'].forEach(function(k){ localStorage.removeItem(k); }); } catch(eC){}
     try { if (typeof _idbDel_ === 'function') { _idbDel_('cskh_lite_v1').catch(function(){}); _idbDel_('orders_v1').catch(function(){}); } } catch(eI){}
-    // Vao thang bao cao doanh so (tab Danh sach KH dang bi an voi tai khoan nay)
-    setTimeout(function(){ try { switchTab('salesreport', document.querySelector('[data-bar-id="reportsgroup"]')); } catch(eS){} }, 400);
   } else { document.body.classList.remove('demo-mode'); try { localStorage.removeItem('ome_demo_token'); } catch(eT){} }
   saveLS('ome_user', currentUser);
   if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();

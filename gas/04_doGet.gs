@@ -4,6 +4,7 @@ function doGet(e) {
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
+  if (p.token) { var _dsu = _demoSessionUser_(p.token); if (_dsu) return _demoSessionGet_(action, p, e, _dsu); }   // tai khoan test nhan ra tu token phien: loc theo sale da chon
   if (p.demo) {
     if (!_demoTokenOk_(p.demo)) return jsonOut_({ error: 'Phien tai khoan test khong hop le — dang nhap lai.' });
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
@@ -431,7 +432,7 @@ function doGetCore_(e) {
       var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
       var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
       if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); var csKeyA_ = {}; Object.keys(csSetA_).forEach(function(k) { csKeyA_[_scopeNameKey_(k)] = 1; }); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)] || csKeyA_[_scopeNameKey_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
-      return jsonOut_({ assignHistory: allAssignH_ });
+      return jsonOut_({ assignHistory: allAssignH_, deletedIds: _assignDeletedIds_() });   // deletedIds: may khac go ban cu cua dot admin da xoa
     }
     if (action === 'tasks') {
       var tasksOut_ = readTasks_(ss.getSheetByName(SH_TASK));

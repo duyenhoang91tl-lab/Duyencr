@@ -84,36 +84,63 @@ function switchAssignTab(tab, el) {
 // như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
 // trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
 function _advAssignValidBase() { return (_assignFilteredList || []).filter(isValidVnPhone); }   // chỉ SĐT di động VN hợp lệ
+// NGUYEN NHAN GOC (Duyen 27/11: loc khach thang 5 de chia data ra 0-5 KH trong khi Danh sach KH co nhieu khach thang 5): bo loc ngay cua BANG (js/90) tinh ngay
+// = ngay don Base (c.ymList) + ngay don POS (posOrdersByPhone), con Chia data chi doc c.ymList -> khach chi co don POS trong thang 5 hien o bang nhung bi loai o Chia data.
+// Ngoai ra cua so don POS mac dinh chi 90 ngay: khoang ngay xa hon thi phai tai them (posOrdersEnsureDays_) nhu bang vẫn lam, neu khong don POS thang 5 chua ve may.
+var _asgPosEnsuring = {};
+function _advAssignEnsurePos_(from) {
+  try {
+    var P = window.posOrders, t = new Date(from + 'T00:00:00').getTime();
+    if (!P || !P.loadedAt || !P.from || !(from < P.from) || !isFinite(t) || typeof window.posOrdersEnsureDays_ !== 'function') return;
+    var need = Math.ceil((Date.now() - t) / 86400000) + 1;
+    if (need <= (P.days || 0) || _asgPosEnsuring[need]) return;
+    _asgPosEnsuring[need] = 1;
+    window.posOrdersEnsureDays_(need).then(function (ch) { if (ch && typeof renderAssignCreate === 'function') { try { renderAssignCreate(); } catch (e) {} } }, function () {});
+  } catch (e) {}
+}
+// Ngay don cua 1 khach cho loc ngay Chia data = ymList (Base) + ngay don POS (cung ham thuan voi bang: posFilterView_ js/90).
+function _advAssignOrderDays_(c, phone) {
+  var yl = c.ymList || [];
+  try {
+    var by = window.posOrdersByPhone, rows = by && by[phone];
+    if (rows && rows.length && typeof window.posFilterView_ === 'function') { var v = window.posFilterView_(c, rows, '', ''); if (v && v.ymList) yl = v.ymList; }
+  } catch (e) {}
+  return yl;
+}
 function _advAssignDateFilteredList() {
   var _base = _advAssignValidBase();
   var hasSrc = _advAssign.srcSet && _advAssign.srcSet.size > 0;
   var hasDate = !!(_advAssign.dateFrom || _advAssign.dateTo);
+  _advAssign._diag = { noCust: 0, srcOut: 0, dateOut: 0 };
   if (!hasSrc && !hasDate) return _base;
+  if (hasDate && _advAssign.dateFrom) _advAssignEnsurePos_(_advAssign.dateFrom);
   // NGUYÊN NHÂN GỐC (đã sửa 2026-10-07): trước đây tra customerMap[p] — object THÔ (chỉ có orders), KHÔNG có
   // ymList (ymList chỉ tính sẵn trên các phần tử allCustomers trong buildCustomers) → luôn undefined → mọi KH bị
   // loại → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT → phần tử allCustomers).
   var _cm = _assignCustMap();
   return _base.filter(function (p) {
     var c = _cm.get(p);
-    if (!c) return false;
+    if (!c) { _advAssign._diag.noCust++; return false; }
     if (hasSrc) {
       var d = c.dataSrc || {}, ok = false;
       _advAssign.srcSet.forEach(function (k) { if (d[k]) ok = true; });
-      if (!ok) return false;
+      if (!ok) { _advAssign._diag.srcOut++; return false; }
     }
     if (!hasDate) return true;
-    var yl = c.ymList || [];
+    var yl = _advAssignOrderDays_(c, p);
     // Khách KHÔNG có ngày đơn nào (vd nguồn CSKH-Duyên): khoảng ngày không áp dụng được → khi đã chọn nguồn
     // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
     // NGUYEN NHAN GOC (da sua 2026-10-10): truoc day KH POS (dt/don/cs) KHONG co ngay don van lot qua khi da chon nguon -> chia "khach thang 9" bi lan khach khong ro ngay.
     // Nay chi KH thuoc nguon CSKH-Duyen (khong co ngay don) moi duoc miễn loc ngay, va chi khi CSKH nam trong nguon da chon.
-    if (!yl.some(function (o) { return o.ds; })) return hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh);
-    return yl.some(function (o) {
+    if (!yl.some(function (o) { return o.ds; })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
+    var inR = yl.some(function (o) {
       if (!o.ds) return false;
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
       if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
       return true;
     });
+    if (!inR) _advAssign._diag.dateOut++;
+    return inR;
   });
 }
 
@@ -441,7 +468,7 @@ function renderAssignCreate() {
       <button class="btn sm secondary" onclick="_advAssignOpenAdvFilter()" title="Mở Lọc nâng cao (CS, sản phẩm, nguồn, trạng thái CS/Zalo, trường tự tạo...) để chọn đúng data muốn chia">⚙ Lọc nâng cao${countAdvFilters()>0?` <span class="adv-filter-active-badge">${countAdvFilters()}</span>`:''}</button>
     </div>
     <div class="assign-preview" style="margin-bottom:10px">
-      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''} &nbsp;|&nbsp;
+      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''}${(function(){ var g = _advAssign._diag; return g && (g.dateOut || g.srcOut) ? ` <span style="color:#92400e;font-size:11px" title="Khách có trong bảng nhưng bị loại ở bước lọc thêm của Chia data. Ngày tính theo đơn Base + đơn POS.">(loại thêm: ${g.srcOut ? g.srcOut + ' ngoài nguồn đã chọn' : ''}${g.srcOut && g.dateOut ? ', ' : ''}${g.dateOut ? g.dateOut + ' không có đơn trong khoảng ngày' : ''})</span>` : ''; })()} &nbsp;|&nbsp;
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
       ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}
@@ -1725,6 +1752,19 @@ function careBadgeText(st) {
   return careStatusFullLabel(st) || st;
 }
 
+let _doneQueue_ = Promise.resolve();
+// Gui lan luot: bam tich roi bo tich nhanh phai toi may chu dung thu tu.
+function _pushDoneToGS_(csName, phone, done, ids) {
+  _doneQueue_ = _doneQueue_.then(async function () {
+    try {
+      const r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'toggleAssignDone', csName, phone, done, ids }) });
+      const j = await r.json();
+      if (!j || !j.ok) throw new Error((j && j.error) || 'máy chủ từ chối');
+    } catch (e) { if (typeof _writeFail_ === 'function') _writeFail_('đánh dấu "đã xong"', e && e.message); else console.warn('GS done push failed', e); }
+  });
+  return _doneQueue_;
+}
+
 function toggleMyDataDone(phone, csName, isDone) {
   // Update in all batches for this CS
   const touched = [];
@@ -1740,8 +1780,9 @@ function toggleMyDataDone(phone, csName, isDone) {
     touched.push(h);
   }
   saveLS('ome_assign_hist', assignHistory);
-  // Chi ghi cac dot bi doi (saveAssign): ghi ca lich su tu ban tren may co the xoa dot moi chia (vd Truong nhom vua chia lai) va de mat tien do cua nguoi khac.
-  if (gsUrl) (async function(){ for (const _e of touched) { await pushAssignToGS(_e); } })();
+  // Chi gui DUNG thay doi (1 SDT) cua cac dot bi doi, KHONG gui ca dot. NGUYEN NHAN GOC: ban dot tren may co the thieu dau tich Pancake AI vua ghi
+  // (gui ca dot la de mat) va co the la dot admin da xoa (gui ca dot la tao lai).
+  if (gsUrl && touched.length) _pushDoneToGS_(csName || touched[0].csName, phone, !!isDone, touched.map(h => h.id));
   updateMyDataBadge();
   renderMyDataTab();
 }
@@ -1822,7 +1863,7 @@ function showDeployGuideBanner() {
 }
 
 async function pushAssignToGS(entry) {
-  // Giữ tương thích: ghi 1 entry (dùng khi cập nhật tiến độ donePhones)
+  // Ghi 1 dot MOI. Tien do "da xong" KHONG di duong nay (xem _pushDoneToGS_).
   if (!gsUrl || !entry) return;
   try {
     const r = await fetch(gsUrl, {
@@ -1834,7 +1875,7 @@ async function pushAssignToGS(entry) {
 }
 
 // Xoa DUNG cac dot chia tren sheet AssignData. KHONG con duong "ghi de ca lich su tu ban tren may" (NGUYEN NHAN GOC 2026-11-27: lam mat dot Truong nhom
-// vua chia lai / he thong chia tu dong va tien do "da xong" cua nguoi khac). Dot moi / tien do: dung pushAssignToGS tung dot.
+// vua chia lai / he thong chia tu dong va tien do "da xong" cua nguoi khac). Dot moi: pushAssignToGS tung dot; "da xong": _pushDoneToGS_.
 async function deleteAssignOnGS_(ids) {
   let tk = ''; try { tk = localStorage.getItem('ome_sess_token') || ''; } catch (e) {}
   try {
@@ -1853,7 +1894,7 @@ function _checkAssignResp(txt) {
   else { _assignBackendOK = false; showAssignBackendWarning(); }
 }
 
-// Kéo chiến dịch từ sheet về (merge — chỉ BỔ SUNG, không bao giờ xoá entry đang có ở máy).
+// Kéo chiến dịch từ sheet về (merge): BỔ SUNG đợt mới; chỉ gỡ đợt máy chủ báo admin ĐÃ XOÁ (deletedIds). Đợt chỉ có ở máy (chưa gửi kịp) vẫn giữ.
 async function pullAssignHistory() {
   if (!gsUrl) return;
   try {
@@ -1866,27 +1907,34 @@ async function pullAssignHistory() {
       _assignBackendOK = false; showAssignBackendWarning(); return;
     }
     _assignBackendOK = true;
-    if (ad.assignHistory.length > 0) {
-      const localIds = new Set(assignHistory.map(h => h.id));
-      let added = 0;
-      for (const h of ad.assignHistory) {
-        if (!localIds.has(h.id)) {
-          // Normalize phones trong chiến dịch từ GS (có thể mất số 0 do Excel lưu kiểu số nguyên)
-          if (h.phones) h.phones = h.phones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
-          if (h.donePhones) h.donePhones = h.donePhones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
-          assignHistory.push(h); localIds.add(h.id); added++;
-        }
+    const gone = new Set((ad.deletedIds || []).map(String));
+    let removed = 0, added = 0;
+    for (let i = assignHistory.length - 1; i >= 0; i--) {
+      if (gone.has(String(assignHistory[i].id))) { assignHistory.splice(i, 1); removed++; }
+    }
+    const localIds = new Set(assignHistory.map(h => h.id));
+    for (const h of ad.assignHistory) {
+      if (!localIds.has(h.id) && !gone.has(String(h.id))) {
+        // Normalize phones trong chiến dịch từ GS (có thể mất số 0 do Excel lưu kiểu số nguyên)
+        if (h.phones) h.phones = h.phones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
+        if (h.donePhones) h.donePhones = h.donePhones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
+        assignHistory.push(h); localIds.add(h.id); added++;
       }
-      if (added > 0) {
-        assignHistory.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-        saveLS('ome_assign_hist', assignHistory);
-        if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
-        if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
-        if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
-        if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
-        // Làm mới danh sách KH ngay sau khi pull chiến dịch về
-        if (typeof applyFilters === 'function') applyFilters();
+    }
+    if (added > 0 || removed > 0) {
+      assignHistory.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      saveLS('ome_assign_hist', assignHistory);
+      if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
+      if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
+      if (typeof updateCampaignFilter === 'function') updateCampaignFilter();
+      if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
+      if (removed > 0) {   // man dang mo phai bo ngay dot vua go
+        try { const bs = document.getElementById('mydata-batch-sel'); if (bs && gone.has(bs.value)) bs.value = ''; if (typeof renderMyDataTab === 'function') renderMyDataTab(); } catch (e) {}
+        // 'assign-body' dung chung cho tab Tao/Lich su/Bao cao/Tu dong -> chi ve lai khi dang xem Lich su (khong de len form dang nhap do)
+        try { if (document.querySelector('#assign-body .assign-hist-item')) renderAssignHistory(); } catch (e) {}
       }
+      // Làm mới danh sách KH ngay sau khi pull chiến dịch về
+      if (typeof applyFilters === 'function') applyFilters();
     }
   } catch(e) { console.warn('Pull assignHistory failed:', e.message); }
 }

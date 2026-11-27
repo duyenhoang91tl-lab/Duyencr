@@ -9,7 +9,7 @@
 (function(){
   'use strict';
   function ov_(){ return document.getElementById('pnm-overlay'); }
-  function isAdmin_(){ return typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'demo'); }
+  function isAdmin_(){ return typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin'; }
 
   function ensure_(){
     var ov = ov_(); if (ov) return ov;
