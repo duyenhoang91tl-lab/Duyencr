@@ -1082,11 +1082,11 @@ function _injectV9UI(){
     // (tabVisible) thì tự động không xuất hiện trong dropdown; nếu ẩn hết cả 4 thì cả nút
     // "📊 Báo cáo ▾" cũng tự ẩn theo.
     var reportDefs = [
-      { id:'salesreport', label:'📈 Báo cáo doanh số' },
-      { id:'pancake',     label:'📥 Báo cáo Pancake' },
-      { id:'kpipancake',  label:'📈 KPI Pancake' },
-      { id:'mktchecklist',label:'✅ Checklist MKT' },
-      { id:'dailybrief',  label:'🎯 Báo cáo ngày' }
+      { id:'dailybrief',  label:'🎯 Báo cáo ngày',      grp:'Hằng ngày' },
+      { id:'salesreport', label:'📈 Báo cáo doanh số',  grp:'Doanh số' },
+      { id:'pancake',     label:'📥 Báo cáo Pancake',   grp:'Marketing' },
+      { id:'kpipancake',  label:'📈 KPI Pancake',       grp:'Marketing' },
+      { id:'mktchecklist',label:'✅ Checklist MKT',      grp:'Marketing' }
     ];
     var visibleReportDefs = reportDefs.filter(function(d){ return tabVisible[d.id] !== false; });
     if (visibleReportDefs.length){
@@ -1102,7 +1102,17 @@ function _injectV9UI(){
       var rgList = document.createElement('div');
       rgList.id = 'reportsgroup-list';
       rgList.style.cssText = 'display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:200px;z-index:950;padding:6px;';
+      var _lastRg = '';
       visibleReportDefs.forEach(function(d){
+        if (d.grp && d.grp !== _lastRg){   // tiêu đề nhóm: chỉ để nhìn, không bấm được, không có data-bar-id nên không dính cơ chế kéo mục ra/vào ☰ Menu
+          _lastRg = d.grp;
+          var gh = document.createElement('div');
+          gh.className = 'rg-head';
+          gh.style.cssText = 'padding:6px 10px 2px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);cursor:default';
+          gh.textContent = d.grp;
+          gh.setAttribute('onclick', 'event.stopPropagation()');
+          rgList.appendChild(gh);
+        }
         var item = document.createElement('div');
         item.className = 'tab';
         item.id = 'v9tab-' + d.id;
