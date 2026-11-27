@@ -47,6 +47,9 @@ jobs:
       - name: Kiểm tra sức khoẻ web (file thiếu, nạp trùng, thiếu ?v=, hàm trùng, cú pháp)
         run: node tools/check-health.js
 
+      - name: Kiểm tra ngân sách nguồn (tổng js/css, số thẻ script, !important)
+        run: node tools/test-budget.js
+
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
 

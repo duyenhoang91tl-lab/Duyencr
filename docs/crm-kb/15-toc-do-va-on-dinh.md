@@ -4,6 +4,10 @@
 JS 119 file · **691 KB gzip** (2144 KB sau nén) · CSS 34 file · 55 KB gzip. Nặng nhất (gzip): js/11 44 KB, js/12 25, js/13 25, js/07 22, js/14 22. 117+ thẻ script đồng bộ. Đã có sẵn: nén (terser/clean-css) + test tương đương `test-dist-equivalence`, Cloudflare Static Assets, `sw.js` ưu tiên mạng (4 giây rồi dùng bản lưu), preconnect fonts/cdnjs.
 Công cụ: `node tools/measure-load.js [--check]` (cần build trước). CI chạy `--check` với NGÂN SÁCH js ≤ 780 KB, css ≤ 70 KB, 1 file ≤ 60 KB gzip (đặt ~13% trên số đo); vượt thì KHÔNG deploy. Muốn nới → sửa `BUDGET` + ghi lý do vào HANDOFF.
 
+## Hai ngân sách (đều chạy trong CI deploy-web)
+- `tools/test-budget.js` (có từ 15/11): đo NGUỒN — tổng js/css, số `<script src>`, số `!important`. 26/11 phát hiện nó **đã đỏ 3 chỗ từ lâu và không nằm trong CI** → đặt lại trần ≈ +6% trên số đo (js 3,3 MB, gzip 1,05 MB, 119 thẻ → trần 3,5 MB / 1,11 MB / 126 thẻ) và đưa vào CI.
+- `tools/measure-load.js --check` (mới): đo BẢN NÉN thật người dùng tải (js 691 KB gz…). Muốn nới trần phải sửa số ở file + ghi lý do vào HANDOFF.
+
 ## Đã cân nhắc và CHỦ Ý KHÔNG làm (đừng thử lại nếu chưa có số đo trình duyệt thật)
 - **Gộp (bundle) nhiều file thành 1**: test jsdom cho thấy lúc nạp đã có **8 lỗi chạy ở cấp file** (bản gốc và bản nén đều 8). Mỗi `<script>` riêng nên lỗi 1 file chỉ dừng file đó; gộp lại thì lỗi sẽ cắt luôn các file phía sau ⇒ hỏng dây chuyền.
 - **`defer`/`async` hàng loạt**: 6 khối `<script>` viết thẳng trong index.html phụ thuộc thứ tự nạp với các file js.
