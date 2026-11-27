@@ -2202,6 +2202,62 @@ function _demoClip_(out, action) {
   _demoMaskDeep_(o);
   return jsonOut_(o);
 }
+// ═══ TAI KHOAN TEST THEO PHIEN (2026-11-27, Duyen yeu cau) ═══
+// NGUYEN NHAN GOC "tai khoan test van xem het danh sach KH du chi chon 1 sale": role 'demo' di nhanh rieng bang demoToken DUNG CHUNG (khong biet la ai)
+// nen khong the loc theo sale da chon; _scopeVerdict_/_scopeAllowedNames_ coi demo la "khong gioi han"; client _inUserScope cung tra true cho demo.
+// Va POST chi bi chan khi co truong demo => bo truong do (chi gui token phien) la GHI duoc. Nay may chu NHAN RA tai khoan test tu TOKEN PHIEN (vai tro doc tu sheet Users):
+//  - GET: chi action trong DEMO_SESSION_GET_; action tra danh sach khach/don/lead bi LOC theo SDT cua cac sale duoc chon (luon enforce, khong phu thuoc scopeMode,
+//    khong co ngoai le via=search); tra cuu 1 SDT ngoai pham vi bi tu choi. Bao cao tong hop (khong loc duoc theo SDT) giu cat dong + che SDT nhu cu.
+//  - POST: tu choi MOI thao tac ghi (ke ca khong kem demoToken). getGasSource/setGasSource/setSetting... da can adminKey nen tai khoan test khong lay duoc ma Apps Script.
+//  - SDT khong bi che trong du lieu da loc (de tra cuu / mo ho so hoat dong); admin bat che bang Settings demoMaskPhone=1.
+var DEMO_SESSION_EXTRA_GET_ = ['customers', 'lookup', 'cskhDetail', 'donOrdersByPhone', 'reminders', 'cskhDuyen', 'users', 'roleConfig',
+  'priceSearch', 'priceCatalogFlat', 'priceCatalogTree', 'ctkmCatalog', 'ctkmSearch', 'comboList', 'comboSearch', 'topProducts', 'csStats', 'dashboard',
+  'teamAnalysis', 'orgOverview', 'posMonthK'];
+var DEMO_SESSION_GET_ = (function() {
+  var o = {};
+  Object.keys(DEMO_ALLOWED_GET_).forEach(function(k) { o[k] = 1; });
+  DEMO_SESSION_EXTRA_GET_.forEach(function(k) { o[k] = 1; });
+  return o;
+})();
+// Tra user (sheet Users) neu token phien hop le VA vai tro la 'demo'; nguoc lai null. Cache 60s ket qua "khong phai demo" theo username de khong doc sheet Users moi request.
+function _demoSessionUser_(tok) {
+  tok = String(tok || '');
+  if (!tok) return null;
+  try {
+    var p = _sessVerify_(tok);
+    if (!p) return null;
+    var cache = CacheService.getScriptCache();
+    var ck = 'dsr_' + String(p.u).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60);
+    if (cache.get(ck) === 'n') return null;
+    var u = _sessUser_(tok);
+    if (!u) return null;
+    if (String(u.role || '') !== 'demo') { cache.put(ck, 'n', 60); return null; }
+    return u;
+  } catch (e) { return null; }
+}
+function _demoMaskOn_() { try { return String(getSetting_('demoMaskPhone') || '').trim() === '1'; } catch (e) { return false; } }
+function _demoSessionGet_(action, p, e, user) {
+  if (DEMO_SESSION_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.', code: 'FORBIDDEN', action: action });
+  // Tra cuu 1 SDT: chi trong pham vi cac sale duoc chon (BO QUA via=search cua client).
+  if (SCOPE_ACTIONS_[action]) {
+    var ph = String(p.phone || '');
+    if (!ph || _scopeVerdict_(user, ph) !== true) return jsonOut_({ error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action });
+  }
+  if (!SCOPE_LIST_ACTIONS_[action]) return _demoClip_(doGetCore_(e), action);   // bao cao tong hop / bang gia: cat dong chi tiet + che SDT nhu cu
+  var resp = doGetCore_(e), obj;
+  try { obj = JSON.parse(resp.getContent()); } catch (e1) { return jsonOut_({ error: 'Khong doc duoc du lieu.', action: action }); }
+  var allowed = _scopeAllowedNames_(user) || {};
+  var phs = Object.keys(allowed).length ? _scopePhoneSet_(user, allowed) : {};   // chua chon sale nao -> khong thay khach nao
+  var f = _scopeFilterObj_(action, obj, phs), out = f.obj;
+  if (out && typeof out === 'object' && !Array.isArray(out)) {
+    if (action === 'cskhDuyenLite' || action === 'cskhDuyen') { out.total = f.kept; out.noPhone = 0; out.noPhoneSample = []; }   // so tong / ten khach khong SDT la cua ca cong ty
+    out._demo = true;
+    out._demoScoped = true;
+  }
+  if (_demoMaskOn_()) _demoMaskDeep_(out);
+  return jsonOut_(out);
+}
+
 // Dang nhap tai khoan test: kiem tra user role "demo" trong sheet Users (passHash do client gui len).
 function demoLogin_(data) {
   var uname = String((data && data.username) || '').trim().toLowerCase();
@@ -2696,7 +2752,7 @@ function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
   if (role === 'admin') return true;
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && role !== 'demo') return true;   // viewer/ceo/... : client khong gioi han (demo = gioi han nhu CS)
   var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
   var mine = Object.keys(allowed);
   if (!mine.length) return false;
@@ -2852,7 +2908,8 @@ function _viewExtraNames_(user) {
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
+  var isDemoRole = (role === 'demo');   // tai khoan test: pham vi = CHI cac sale duoc chon cho tai khoan (nhu CS), khong cong ten Quay/CSKH
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && !isDemoRole) return null;
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
@@ -2870,8 +2927,8 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
       });
     } catch (e) {}
   }
-  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_)
-  try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {}
+  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_). Tai khoan test khong duoc cong them.
+  if (!isDemoRole) { try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {} }
   return out;
 }
 function _scopeHit_(str, allowed) {
@@ -3041,6 +3098,7 @@ function doGet(e) {
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
+  if (p.token) { var _dsu = _demoSessionUser_(p.token); if (_dsu) return _demoSessionGet_(action, p, e, _dsu); }   // tai khoan test nhan ra tu token phien: loc theo sale da chon
   if (p.demo) {
     if (!_demoTokenOk_(p.demo)) return jsonOut_({ error: 'Phien tai khoan test khong hop le — dang nhap lai.' });
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
@@ -3049,6 +3107,8 @@ function doGet(e) {
   if (PLIB_GET_ACTIONS_[action] === 1) return plibDoGet_(action, p);   // thu vien san pham (thu muc anh theo SP/combo): tu kiem token
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
+  if (LOYALTY_GET_ACTIONS_[action] === 1) return loyaltyDoGet_(action, p);   // diem tich luy + lich su hang khach (token, moi tai khoan dang nhap)
+  if (CRM_ORDER_GET_ACTIONS_[action] === 1) return crmOrderDoGet_(action, p);   // danh sach Don CRM (sheet rieng, token): admin xem tat ca, tai khoan khac chi don cua minh
   if (TEAMBONUS_GET_ACTIONS_[action] === 1) return teamBonusDoGet_(action, p);   // thuong phat doi Sale Online/Van phong (Bao cao B): token -> phan quyen
   if (SPLIT_GET_ACTIONS_[action] === 1) return splitDoGet_(action, p);   // don chia (bao cao M + danh sach don chia): token -> phan quyen theo vai tro
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
@@ -6060,70 +6120,64 @@ function buildSalesReportA_(filters) {
 // gui 2026-10-01. track dung de +-1 cap (F1<->F2<->F3, O1<->O2<->O3); probation=true: luon CHI
 // giu dung 1 thang roi tu dong chuyen F1 (bat ke ket qua thang do), khong xet 3 thang nhu binh
 // thuong; track 'OFLAT': khong bao gio doi bac, bo qua toan bo cong thuc tang/giam.
-var SALE_TIER_ORDER_ = ['TVF1', 'TVF2', 'F1', 'F2', 'F3', 'O1', 'O2', 'O3', 'O'];
-var SALE_TIER_DEFAULT_TARGETS_ = {
-  TVF1: 240000000, TVF2: 300000000,
-  F1: 400000000, F2: 500000000, F3: 600000000,
-  O1: 700000000, O2: 800000000, O3: 900000000,
-  O: 500000000
-};
+// ═══ 2026-11-27 (Duyên chốt): CHỈ CÒN 2 BẬC — Thử việc (KPI 100tr, ĐÚNG 1 THÁNG) rồi tháng sau tự lên Chính thức (KPI 500tr). Áp dụng cho cả Sale Offline.
+// BỎ hết hệ 9 bậc cũ (TVF1/TVF2/F1-F3/O1-O3/O) và quy tắc tự lên/xuống bậc theo 3 tháng. Bậc cũ trong cấu hình đã lưu được đổi 1 lần
+// (SALE_TIER_LEGACY_ → CT, xem _saleKpiMigrate_): cả đội cũ = Chính thức; chỉ thuongBT, nguyetTTA, ngocNM = Thử việc.
+var SALE_TIER_ORDER_ = ['TV', 'CT'];
+var SALE_TIER_DEFAULT_TARGETS_ = { TV: 100000000, CT: 500000000 };
 var SALE_TIER_META_ = {
-  TVF1: { track: 'F', level: 0, probation: true },
-  TVF2: { track: 'F', level: 0, probation: true },
-  F1: { track: 'F', level: 1 },
-  F2: { track: 'F', level: 2 },
-  F3: { track: 'F', level: 3 },
-  O1: { track: 'O', level: 1 },
-  O2: { track: 'O', level: 2 },
-  O3: { track: 'O', level: 3 },
-  O: { track: 'OFLAT', level: 0 }
+  TV: { track: 'TV', level: 0, probation: true },
+  CT: { track: 'CT', level: 0 }
 };
+var SALE_TIER_LEGACY_ = { TVF1: 1, TVF2: 1, F1: 1, F2: 1, F3: 1, O1: 1, O2: 1, O3: 1, O: 1 };   // bậc hệ cũ → coi là Chính thức
+var SALE_TIER_TRIAL_NAMES_ = ['thuongbt', 'nguyettta', 'ngocnm'];                                  // chỉ những bạn này là Thử việc khi chuyển đổi (khớp tiền tố, không phân biệt hoa/thường)
 var SALE_KPI_DEFAULT_CFG_ = {
   tierTargets: JSON.parse(JSON.stringify(SALE_TIER_DEFAULT_TARGETS_)),
-  startTier: {},                   // ten Sale (dung y het chuoi "Sale bán"/"Thẻ") -> 1 trong SALE_TIER_ORDER_
+  startTier: {},                   // ten Sale (dung y het chuoi "Sale bán"/"Thẻ") -> 'TV' | 'CT'
+  startMonth: {},                  // ten Sale -> 'YYYY-MM' thang BAT DAU bac (Thu viec = thang nay, thang sau tu len CT; thang truoc do KHONG tinh KPI). Trong = tu trackingStartMonth
+  tierModel: 2,                    // 2 = mo hinh 2 bac (27/11/2026)
   trackingStartMonth: '2026-09',   // 'YYYY-MM' - thang bat dau tu dong tinh bac theo quy che
   overrides: {}                    // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac tu dong)
 };
 
+// Chuyển cấu hình KPI hệ 9 bậc cũ → 2 bậc (1 LẦN, rồi lưu lại): mọi Sale đã được gán / có Commit riêng / đã phân loại đội → Chính thức (CT),
+// riêng thuongBT, nguyetTTA, ngocNM → Thử việc (TV) bắt đầu từ THÁNG HIỆN TẠI (Duyên sửa lại tháng ở Cài đặt KPI nếu khác). Trả true nếu có đổi.
+function _saleKpiMigrate_(out, o) {
+  var names = {};
+  Object.keys(out.startTier).forEach(function(n) { names[n] = 1; });
+  Object.keys(out.overrides || {}).forEach(function(n) { names[n] = 1; });
+  try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); Object.keys(oCh || {}).forEach(function(n) { if (oCh[n]) names[n] = 1; }); } } catch (eCh) {}
+  var cur = _todayYm_();
+  Object.keys(names).forEach(function(n) {
+    var low = String(n).trim().toLowerCase();
+    var trial = SALE_TIER_TRIAL_NAMES_.some(function(t) { return low.indexOf(t) === 0; });
+    out.startTier[n] = trial ? 'TV' : 'CT';
+    if (trial && !out.startMonth[n]) out.startMonth[n] = cur;
+  });
+  out.tierModel = 2;
+  return true;
+}
+
 function readSaleKpiConfig_() {
-  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_));
-  try {
-    var raw = getSetting_('saleKpiConfig');
-    if (raw) {
-      var o = JSON.parse(raw);
-      if (o && typeof o === 'object') {
-        if (o.tierTargets && typeof o.tierTargets === 'object') {
-          SALE_TIER_ORDER_.forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; });
-        }
-        if (o.trackingStartMonth) out.trackingStartMonth = String(o.trackingStartMonth);
-        if (o.startTier && typeof o.startTier === 'object') {
-          Object.keys(o.startTier).forEach(function(name) { if (SALE_TIER_META_[o.startTier[name]]) out.startTier[name] = o.startTier[name]; });
-        }
-        if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
-        // Migration tu cau hinh CU (truoc 2026-10, 3 bac chung "1"/"2"/"3" + 1 muc Online phang):
-        // neu CHUA co startTier moi ma con du lieu cu (o.tiers), tu suy startTier 1 lan de khong
-        // mat trang toan bo cau hinh da cham truoc do. "1"/"2"/"3" (Van phong) -> F1/F2/F3; Sale
-        // tung duoc gan saleChannels='online' nhung chua co trong o.tiers -> mac dinh 'O' (phang,
-        // an toan nhat vi khong biet ho dang o muc nao trong O1-O3) — Duyen sua lai tung nguoi sau.
-        if ((!o.startTier || !Object.keys(o.startTier).length)) {
-          var oldMap = { '1': 'F1', '2': 'F2', '3': 'F3' };
-          if (o.tiers && typeof o.tiers === 'object') {
-            Object.keys(o.tiers).forEach(function(name) { var mapped = oldMap[o.tiers[name]]; if (mapped) out.startTier[name] = mapped; });
-          }
-          try {
-            var rawCh = getSetting_('saleChannels');
-            if (rawCh) {
-              var oCh = JSON.parse(rawCh);
-              Object.keys(oCh || {}).forEach(function(name) { if (oCh[name] === 'online' && !out.startTier[name]) out.startTier[name] = 'O'; });
-            }
-          } catch (eCh) {}
-        }
-      }
-    }
-  } catch (e) {}
-  // Config cu chi co onlineTarget, chua tung luu targets.online rieng -> lay onlineTarget lam gia tri khoi diem.
-  if (out.targets.online === SALE_KPI_DEFAULT_CFG_.targets.online && out.onlineTarget !== SALE_KPI_DEFAULT_CFG_.onlineTarget) {
-    out.targets.online = out.onlineTarget;
+  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_)), o = null;
+  try { var raw = getSetting_('saleKpiConfig'); if (raw) { o = JSON.parse(raw); if (!o || typeof o !== 'object') o = null; } } catch (e) { o = null; }
+  if (!o) return out;
+  if (o.tierTargets && typeof o.tierTargets === 'object') {
+    SALE_TIER_ORDER_.forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0 && o.tierTargets[k] !== '' && o.tierTargets[k] != null) out.tierTargets[k] = n; });
+  }
+  if (o.trackingStartMonth) out.trackingStartMonth = String(o.trackingStartMonth);
+  if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
+  if (o.startMonth && typeof o.startMonth === 'object') Object.keys(o.startMonth).forEach(function(n) { if (/^\d{4}-\d{2}$/.test(String(o.startMonth[n]))) out.startMonth[n] = String(o.startMonth[n]); });
+  if (o.startTier && typeof o.startTier === 'object') {
+    Object.keys(o.startTier).forEach(function(name) {
+      var v = o.startTier[name];
+      if (SALE_TIER_META_[v]) out.startTier[name] = v; else if (SALE_TIER_LEGACY_[v]) out.startTier[name] = 'CT';
+    });
+  }
+  if (Number(o.tierModel) !== 2) {
+    // Cấu hình cũ (≤ 26/11/2026, hệ 9 bậc): đổi sang 2 bậc và lưu 1 lần để các lần đọc sau không đổi lại phần Duyên đã chỉnh.
+    _saleKpiMigrate_(out, o);
+    try { setSetting_('saleKpiConfig', JSON.stringify(out)); } catch (eS) {}
   }
   return out;
 }
@@ -6174,54 +6228,22 @@ function _computeSaleMonthlyRevenue_(months) {
   return out;
 }
 
-// State machine tinh bac tung thang cho 1 Sale, bat dau tu startTier o thang dau tien cua mang
-// months (= trackingStartMonth). Quy tac (theo sheet "Bậc" + xac nhan Duyen 2026-10-01, va xac
-// nhan rieng ve "Riêng Bậc 2" ngay 2026-10-04):
-//  - Bac thu viec (probation): CHI giu dung 1 thang. Thang ke tiep tu dong ky chinh thuc:
-//      + TVF1 -> F1 (binh thuong, khong co dieu kien gi them).
-//      + TVF2 -> F2 (vao thang chinh thuc DAU TIEN), NHUNG rieng truong hop nay phai qua them
-//        1 lan kiem tra rieng ("Riêng Bậc 2"): DUNG 2 THANG DAU TIEN lam F2 phai MOI THANG rieng
-//        deu dat >=100% KPI cua F2 — khong dat (du chi 1 trong 2 thang) thi HA NGAY xuong F1 o
-//        thang thu 3 de "chay lai" tu dau theo quy tac thuong (khong cho o lai F2 cho het 3 thang
-//        nhu quy tac tang/giam binh thuong). Neu qua duoc 2 thang nay, tu thang thu 3 tro di xet
-//        theo dung quy tac 3-thang binh thuong nhu moi bac khac.
-//  - Bac 'O' (track OFLAT): khong bao gio doi, giu nguyen KPI mai mai.
-//  - Bac chinh thuc (F1-F3, O1-O3) O NGOAI giai doan kiem tra rieng 2 thang dau cua F2 noi tren:
-//    moi thang, neu 3 thang LIEN TIEP NGAY TRUOC do CUNG o dung 1 bac nay (tranh xet nua voi
-//    trong luc dang doi bac):
-//      + TB doanh thu 3 thang do >= 125% KPI bac hien tai VA KHONG thang nao < 70% KPI bac hien
-//        tai => TANG 1 bac (toi da bac 3 trong track, F3/O3 khong tang them).
-//      + TB doanh thu 3 thang do < 80% KPI bac hien tai => GIAM 1 bac (toi thieu bac 1, F1/O1
-//        khong giam them).
-//      + Nguoc lai: giu nguyen bac.
-function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTargets) {
-  var timeline = {};
+// Bậc từng tháng của 1 Sale (mô hình 2 bậc, Duyên chốt 27/11/2026): Thử việc (TV) chỉ ĐÚNG 1 THÁNG, tháng sau tự lên Chính thức (CT) và giữ CT
+// (không còn tự lên/xuống bậc theo 3 tháng). beginYm (tuỳ chọn) = tháng bắt đầu của Sale: các tháng TRƯỚC đó không có bậc (chưa tính KPI);
+// nếu bắt đầu TV từ trước tháng đầu theo dõi mà đã qua 1 tháng thì tháng đầu theo dõi đã là CT.
+function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTargets, beginYm) {
+  var timeline = {}, begun = false, prev = '';
+  var first = months.length ? months[0] : '';
+  if (beginYm && first && beginYm < first && SALE_TIER_META_[startTier] && SALE_TIER_META_[startTier].probation) startTier = 'CT';
   for (var i = 0; i < months.length; i++) {
     var ym = months[i];
-    if (i === 0) { timeline[ym] = startTier; continue; }
-    var prevYm = months[i - 1], prevTier = timeline[prevYm], meta = SALE_TIER_META_[prevTier];
-    if (!meta) { timeline[ym] = prevTier; continue; }
-    if (meta.probation) { timeline[ym] = (prevTier === 'TVF2') ? 'F2' : 'F1'; continue; }
-    if (meta.track === 'OFLAT') { timeline[ym] = prevTier; continue; }
-    // "Riêng Bậc 2": dung luc dang o thang thu 3 lam F2 ke tu khi ky chinh thuc tu TVF2 (2 thang
-    // truoc la TVF2 -> F2, van con F2 den gio) — kiem tra RIENG 2 thang do thay vi quy tac 3-thang
-    // thuong. Dat dieu kien nay TRUOC quy tac 3-thang chung de khong bi dung nham (thang i-3 la
-    // TVF2 chu khong phai F2 nen quy tac 3-thang thuong cung khong khop o day, nhung ghi ro cho de doc).
-    if (prevTier === 'F2' && i >= 3 && timeline[months[i - 3]] === 'TVF2' && timeline[months[i - 2]] === 'F2') {
-      var kpiF2 = tierTargets['F2'] || 0;
-      var rm2 = monthlyRevenue[months[i - 2]] || 0, rm1 = monthlyRevenue[prevYm] || 0;
-      var passed2mo = kpiF2 > 0 && rm2 >= kpiF2 && rm1 >= kpiF2; // CA 2 thang deu phai rieng >=100%
-      timeline[ym] = passed2mo ? 'F2' : 'F1';
-      continue;
+    if (!begun) {
+      if (beginYm && ym < beginYm) continue;
+      begun = true; prev = startTier; timeline[ym] = prev; continue;
     }
-    if (i >= 3 && timeline[months[i - 3]] === prevTier && timeline[months[i - 2]] === prevTier) {
-      var kpi = tierTargets[prevTier] || 0;
-      var r1 = monthlyRevenue[months[i - 3]] || 0, r2 = monthlyRevenue[months[i - 2]] || 0, r3 = monthlyRevenue[prevYm] || 0;
-      var avg3 = (r1 + r2 + r3) / 3, min3 = Math.min(r1, r2, r3);
-      if (kpi > 0 && avg3 >= kpi * 1.25 && min3 >= kpi * 0.70 && meta.level < 3) { timeline[ym] = meta.track + (meta.level + 1); continue; }
-      if (kpi > 0 && avg3 < kpi * 0.80 && meta.level > 1) { timeline[ym] = meta.track + (meta.level - 1); continue; }
-    }
-    timeline[ym] = prevTier;
+    var meta = SALE_TIER_META_[prev];
+    if (meta && meta.probation) prev = 'CT';
+    timeline[ym] = prev;
   }
   return timeline;
 }
@@ -6271,9 +6293,10 @@ function buildSaleKpiReport_(filters) {
     var r = rowsMap[name];
     var target = null, source = 'no-tier', tierNow = '', timeline = null;
     if (cfg.startTier[name]) {
-      timeline = _computeSaleTierTimeline_(cfg.startTier[name], months, monthlyRevByName[name] || {}, cfg.tierTargets);
-      tierNow = timeline[monthsInRange[monthsInRange.length - 1]] || cfg.startTier[name];
-      target = monthsInRange.reduce(function(sum, ym) { return sum + (cfg.tierTargets[timeline[ym] || cfg.startTier[name]] || 0); }, 0);
+      timeline = _computeSaleTierTimeline_(cfg.startTier[name], months, monthlyRevByName[name] || {}, cfg.tierTargets, cfg.startMonth[name] || '');
+      // Tháng chưa bắt đầu (trước startMonth) không có bậc → không cộng KPI; bậc hiện tại = bậc tháng cuối trong kỳ xem (không có thì '').
+      tierNow = timeline[monthsInRange[monthsInRange.length - 1]] || '';
+      target = monthsInRange.reduce(function(sum, ym) { return sum + (timeline[ym] ? (cfg.tierTargets[timeline[ym]] || 0) : 0); }, 0);
       source = 'tier-auto';
     }
     // "Commit rieng" (cfg.overrides) tu 2026-10-04 la MUC TIEU SONG SONG voi KPI theo bac (xem
@@ -6285,13 +6308,13 @@ function buildSaleKpiReport_(filters) {
       commit = Number(cfg.overrides[name]) || 0;
     }
     var meta = tierNow ? SALE_TIER_META_[tierNow] : null;
-    var nhom = meta ? (meta.track === 'F' ? 'Văn phòng' : 'Online') : '(chưa gán bậc)';
+    var nhom = meta ? (meta.probation ? 'Thử việc' : 'Chính thức') : '(chưa gán bậc)';
     var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
     var pctCommit = (commit && commit > 0) ? Math.round(r.revenue / commit * 1000) / 10 : null;
     return { name: name, nhom: nhom, tier: tierNow, revenue: r.revenue, orders: r.orders,
       target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null,
       commit: commit, pctCommit: pctCommit, passedCommit: (pctCommit !== null) ? pctCommit >= 100 : null,
-      timeline: timeline,
+      timeline: timeline, startMonth: cfg.startMonth[name] || '',
       // Doi chung (Online/Van phong/CSKH/Quay...) — rieng cho LOC/hien thi, khong dinh gi den
       // target/tier/commit phia tren. nhomChung = '' neu chua phan loai o "🏷️ Phân loại đội Sale".
       nhomChungKey: r.nhomKey, nhomChung: r.nhomKey ? (_saleGroupLabel_(r.nhomKey, groupDefs) || r.nhomKey) : '' };
@@ -8553,6 +8576,7 @@ function doPost(e) {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
     if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.token && _demoSessionUser_(d0.token)) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.', code: 'FORBIDDEN' });   // ke ca khi bo truong demo, chi gui token phien
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
@@ -8583,6 +8607,8 @@ function doPostCore_(e) {
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
+    if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);   // dung diem tru vao don (token)
+    if (CRM_ORDER_POST_ACTIONS_[action] === 1) return crmOrderDoPost_(action, data);   // len Don CRM (sheet rieng 'Don CRM', KHONG ghi DT Tong; token)
     if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
@@ -23737,4 +23763,417 @@ function buildTopProducts_(p) {
   agg.teams = teamNames.concat([TOPSP_UNASSIGNED_TEAM_]);
   agg.exclude = excl;
   return agg;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+//  ĐIỂM TÍCH LUỸ + LỊCH SỬ ĐỔI HẠNG (mục 9, docs/CRM-11-HANG-MUC-TRANG-THAI.md) — bước 2: HÀM THUẦN, chưa nối sheet/UI.
+//  Quy tắc chốt (Duyên 2026-11-27): điểm tích 1% giá trị đơn; 1 điểm = 1.000đ; dùng điểm TRỪ THẲNG vào đơn;
+//  điểm tính THEO NĂM (tích năm nào hết hạn 31/12 năm đó); đơn hoàn → trừ lại đúng số điểm của đơn đó;
+//  hạng giữ TRỌN ĐỜI (chỉ lên, không xuống). GIẢ ĐỊNH chưa được xác nhận (đổi ở Settings 'loyaltyConfig'): điểm tích trên số tiền
+//  KHÁCH THỰC TRẢ (sau khi trừ điểm); làm tròn xuống điểm nguyên.
+// ════════════════════════════════════════════════════════════════════════════════════════
+var LOYALTY_SECTION_ = 1;
+var LOYALTY_DEFAULT_ = { rate: 0.01, pointValue: 1000 };
+// raw = {rate, pointValue} hoặc chuỗi JSON; giá trị sai/thiếu → dùng mặc định từng trường (không bao giờ ném lỗi).
+function _loyaltyCfgNormalize_(raw) {
+  var o = raw; if (typeof raw === 'string') { try { o = JSON.parse(raw); } catch (e) { o = null; } }
+  o = o || {};
+  var rate = Number(o.rate), pv = Number(o.pointValue);
+  return { rate: (isFinite(rate) && rate > 0 && rate <= 1) ? rate : LOYALTY_DEFAULT_.rate,
+           pointValue: (isFinite(pv) && pv >= 1) ? pv : LOYALTY_DEFAULT_.pointValue };
+}
+// Điểm tích của 1 đơn = floor(số tiền khách trả × tỷ lệ ÷ giá trị 1 điểm). Đơn hủy/hoàn/số âm → 0.
+function _loyaltyEarnPoints_(amountPaid, cfg) {
+  cfg = _loyaltyCfgNormalize_(cfg); var a = Number(amountPaid);
+  if (!isFinite(a) || a <= 0) return 0;
+  return Math.floor(Math.round(a * cfg.rate * 1000000) / 1000000 / cfg.pointValue);
+}
+function _loyaltyYearOf_(ymd) { var m = /^(\d{4})-\d{2}-\d{2}/.exec(String(ymd || '')); return m ? Number(m[1]) : 0; }
+// Số dư điểm còn dùng được tại ngày asOfYmd. Mỗi năm 1 "quỹ" riêng; quỹ năm trước đã hết hạn (không cộng dồn sang).
+// events: {type:'earn'|'refund'|'redeem'|'undo', key, orderId, date:'YYYY-MM-DD', points}. undo: orderId = key của dòng redeem bị hoàn tác. refund trừ vào quỹ của NĂM ĐƠN GỐC (tra theo orderId).
+function _loyaltyBalance_(events, asOfYmd) {
+  var asYear = _loyaltyYearOf_(asOfYmd), pools = {}, earnYear = {}, redeemYear = {};
+  function pool(y) { return pools[y] || (pools[y] = { earned: 0, refunded: 0, redeemed: 0 }); }
+  var list = (events || []).filter(function (e) { return e && String(e.date || '').slice(0, 10) <= String(asOfYmd).slice(0, 10); });
+  list.forEach(function (e) {
+    if (e.type === 'earn' && e.orderId != null) earnYear[e.orderId] = _loyaltyYearOf_(e.date);
+    if (e.type === 'redeem' && e.key != null) redeemYear[e.key] = _loyaltyYearOf_(e.date);   // để 'undo' trả điểm về đúng quỹ năm của lần dùng gốc
+  });
+  list.forEach(function (e) {
+    var p = Math.max(0, Math.floor(Number(e.points) || 0)), y = _loyaltyYearOf_(e.date); if (!y) return;
+    if (e.type === 'earn') pool(y).earned += p;
+    else if (e.type === 'refund') pool(earnYear[e.orderId] || y).refunded += p;
+    else if (e.type === 'redeem') pool(y).redeemed += p;
+    else if (e.type === 'undo') pool(redeemYear[e.orderId] || y).redeemed -= p;   // hoàn tác dùng điểm (orderId = key dòng redeem gốc)
+  });
+  var cur = pool(asYear), net = cur.earned - cur.refunded - cur.redeemed, expired = 0;
+  Object.keys(pools).forEach(function (y) { if (Number(y) < asYear) expired += Math.max(0, pools[y].earned - pools[y].refunded - pools[y].redeemed); });
+  return { year: asYear, earned: cur.earned, refunded: cur.refunded, redeemed: cur.redeemed,
+           balance: Math.max(0, net), deficit: Math.max(0, -net), expiresOn: asYear + '-12-31', expired: expired };
+}
+// Dùng điểm cho 1 đơn: tối đa = min(số điểm khách muốn dùng, số dư, giá trị đơn ÷ giá trị 1 điểm). Trả điểm dùng, tiền giảm, tiền phải trả.
+function _loyaltyRedeem_(orderValue, balance, wantPoints, cfg) {
+  cfg = _loyaltyCfgNormalize_(cfg);
+  var v = Math.max(0, Number(orderValue) || 0), cap = Math.floor(v / cfg.pointValue);
+  var pts = Math.max(0, Math.min(Math.floor(Number(wantPoints) || 0), Math.floor(Number(balance) || 0), cap));
+  return { points: pts, discount: pts * cfg.pointValue, payable: v - pts * cfg.pointValue };
+}
+function _loyaltyTierIndex_(rev, tierCfg) {
+  var i = tierCfg.length - 1; while (i > 0 && !(Number(rev) >= tierCfg[i].min)) i--; return i;
+}
+// Lịch sử đổi hạng từ danh sách đơn (hạng theo doanh thu cộng dồn các đơn HỢP LỆ; đơn refunded/hủy không tính). Hạng giữ trọn đời: chỉ ghi khi LÊN hạng.
+// orders: [{orderId, date:'YYYY-MM-DD', value, refunded}]; tierCfg: dạng _TIER_DEFAULT_ (mặc định nếu bỏ trống).
+function _loyaltyTierHistory_(orders, tierCfg) {
+  var cfg = (tierCfg && tierCfg.length) ? tierCfg : _TIER_DEFAULT_;
+  var list = (orders || []).map(function (o, i) { return { o: o, i: i }; }).filter(function (x) { return x.o && !x.o.refunded && Number(x.o.value) > 0; });
+  list.sort(function (a, b) { return String(a.o.date).localeCompare(String(b.o.date)) || (a.i - b.i); });
+  var cum = 0, best = 0, hist = [];
+  list.forEach(function (x) {
+    cum += Number(x.o.value); var idx = _loyaltyTierIndex_(cum, cfg);
+    if (idx > best) { hist.push({ date: x.o.date, orderId: x.o.orderId, from: cfg[best].key, to: cfg[idx].key, cumulative: cum }); best = idx; }
+  });
+  return { tier: cfg[best].key, cumulative: cum, history: hist };
+}
+
+// ── Bước 2b: SỔ ĐIỂM (sheet LoyaltyPoints) + LỊCH SỬ HẠNG (sheet LoyaltyTier) + action loyaltyGet / loyaltyRedeem ──
+// Sổ điểm TỰ ĐỒNG BỘ từ đơn POS của SĐT mỗi lần xem/dùng điểm (idempotent theo cột key → gọi bao nhiêu lần cũng không nhân đôi):
+//   đơn hợp lệ → dòng earn; đơn hủy/hoàn mà đã từng earn → dòng refund (trừ đúng điểm đơn gốc); dùng điểm → dòng redeem.
+// POS không có mã đơn ổn định → orderId = SĐT|ngày|giá trị|số thứ tự trong nhóm cùng ngày+giá trị (không đổi khi dòng bị dịch do archive).
+var SH_LOYALTY_ = 'LoyaltyPoints';
+var LOYALTY_HEADERS_ = ['key', 'phone', 'type', 'orderId', 'date', 'points', 'amount', 'note', 'by', 'at'];
+var SH_LOYALTY_TIER_ = 'LoyaltyTier';
+var LOYALTY_TIER_HEADERS_ = ['key', 'phone', 'date', 'orderId', 'from', 'to', 'cumulative', 'at'];
+var LOYALTY_GET_ACTIONS_ = { loyaltyGet: 1 };
+var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1 };
+function _loyaltyCfg_() { var c = null; try { c = getSetting_('loyaltyConfig'); } catch (e) {} return _loyaltyCfgNormalize_(c); }
+function _loyaltyYmdCell_(v) { if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : _vnYmd_(v); return String(v || '').slice(0, 10); }
+function _loyaltyOrdersOfPhone_(phone, rows) {
+  var ph = normPhone_(String(phone || '')), seen = {}, out = [];
+  (rows || []).forEach(function (o) {
+    if (normPhone_(String(o.soDienThoai || '')) !== ph) return;
+    var v = Number(o.giaTriSauGiam) || 0, d = parseVNDate_(o.ngayTaoDon), ymd = d ? _vnYmd_(d) : '';
+    if (!ymd || v <= 0) return;
+    var base = ph + '|' + ymd + '|' + v, n = (seen[base] = (seen[base] || 0) + 1);
+    out.push({ orderId: base + '|' + n, date: ymd, value: v, refunded: _donHasExcludedStatus_(o.trangThai) });
+  });
+  return out;
+}
+function _loyaltyRead_(name, headers, phone) {
+  var sh = getSheet_(name, headers), last = sh.getLastRow(), out = [];
+  if (last < 2) return out;
+  var pi = headers.indexOf('phone');
+  sh.getRange(2, 1, last - 1, headers.length).getValues().forEach(function (r) {
+    if (normPhone_(String(r[pi] || '')) !== phone) return;
+    var o = {}; headers.forEach(function (h, i) { o[h] = r[i]; }); out.push(o);
+  });
+  return out;
+}
+function _loyaltyAppend_(name, headers, rows) {
+  if (!rows.length) return;
+  var sh = getSheet_(name, headers), rng = sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length);
+  if (rng.setNumberFormat) rng.setNumberFormat('@');   // SĐT/ngày giữ nguyên dạng chữ (khỏi mất số 0 đầu, khỏi thành Date)
+  rng.setValues(rows);
+}
+// Đồng bộ sổ điểm + lịch sử hạng của 1 SĐT từ đơn POS. Trả số dòng mới thêm.
+function loyaltySync_(phone, posRows) {
+  var ph = normPhone_(String(phone || '')); if (!ph) return { error: 'Thieu so dien thoai.' };
+  var cfg = _loyaltyCfg_(), orders = _loyaltyOrdersOfPhone_(ph, posRows || readDonChiTiet_());
+  var have = {}, earnPts = {}, now = new Date(), today = _vnYmd_(now), add = [], nE = 0, nR = 0;
+  _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph).forEach(function (r) { have[r.key] = 1; if (r.type === 'earn') earnPts[r.orderId] = Number(r.points) || 0; });
+  orders.forEach(function (o) {
+    var ek = 'earn|' + o.orderId, rk = 'refund|' + o.orderId;
+    if (!o.refunded && !have[ek]) {
+      var p = _loyaltyEarnPoints_(o.value, cfg);
+      if (p > 0) { add.push([ek, ph, 'earn', o.orderId, o.date, p, o.value, '', 'auto', now]); have[ek] = 1; earnPts[o.orderId] = p; nE++; }
+    }
+    if (o.refunded && have[ek] && !have[rk]) { add.push([rk, ph, 'refund', o.orderId, today, earnPts[o.orderId] || 0, o.value, 'don hoan/huy', 'auto', now]); have[rk] = 1; nR++; }
+  });
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, add);
+  var th = _loyaltyTierHistory_(orders, _tierCfg_()), haveT = {}, addT = [];
+  _loyaltyRead_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, ph).forEach(function (r) { haveT[r.key] = 1; });
+  th.history.forEach(function (h) { var k = ph + '|' + h.to; if (!haveT[k]) { addT.push([k, ph, h.date, h.orderId, h.from, h.to, h.cumulative, now]); haveT[k] = 1; } });
+  _loyaltyAppend_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, addT);
+  return { earn: nE, refund: nR, tier: addT.length };
+}
+function loyaltyState_(phone) {
+  var ph = normPhone_(String(phone || '')), cfg = _loyaltyCfg_(), tcfg = _tierCfg_(), today = _vnYmd_(new Date());
+  var ledger = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph).map(function (r) {
+    return { key: String(r.key), type: String(r.type), orderId: String(r.orderId), date: _loyaltyYmdCell_(r.date), points: Number(r.points) || 0, amount: Number(r.amount) || 0, note: String(r.note || ''), by: String(r.by || '') };
+  });
+  var undoneKeys = {}; ledger.forEach(function (r) { if (r.type === 'undo') undoneKeys[r.orderId] = true; });
+  ledger.forEach(function (r) { if (r.type === 'redeem' && undoneKeys[r.key]) r.undone = true; });
+  var tierRows = _loyaltyRead_(SH_LOYALTY_TIER_, LOYALTY_TIER_HEADERS_, ph).map(function (r) { return { date: _loyaltyYmdCell_(r.date), orderId: String(r.orderId), from: String(r.from), to: String(r.to), cumulative: Number(r.cumulative) || 0 }; });
+  tierRows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var curKey = tierRows.length ? tierRows[tierRows.length - 1].to : tcfg[0].key, lab = {}; tcfg.forEach(function (t) { lab[t.key] = t.label; });
+  tierRows.forEach(function (h) { h.fromLabel = lab[h.from] || h.from; h.toLabel = lab[h.to] || h.to; });
+  return { ok: true, phone: ph, tier: curKey, tierLabel: lab[curKey] || curKey, tierHistory: tierRows,
+    points: _loyaltyBalance_(ledger, today), config: cfg,
+    ledger: ledger.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }).slice(0, 50) };
+}
+function loyaltyDoGet_(action, p) {
+  try {
+    var a = _khoAuth_(p); if (a.err) return a.err;
+    return _khoWithLock_(function () { var s = loyaltySync_(p && p.phone); if (s.error) return jsonOut_({ ok: false, error: s.error }); var out = loyaltyState_(p.phone); out.synced = s; return jsonOut_(out); });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi diem tich luy: ' + (err && err.message || err) }); }
+}
+// Dùng điểm cho 1 đơn: d = {token, phone, orderValue, points, refKey?}. refKey (tuỳ chọn) chống bấm 2 lần: cùng refKey → không trừ lần 2.
+function loyaltyDoPost_(action, d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    if (action === 'loyaltyUndo') return _khoWithLock_(function () { return _loyaltyUndo_(d, a); });
+    return _khoWithLock_(function () {
+      var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
+      var s = loyaltySync_(ph); if (s.error) return jsonOut_({ ok: false, error: s.error });
+      var key = d.refKey ? 'redeem|' + ph + '|' + String(d.refKey).slice(0, 60) : 'redeem|' + ph + '|' + new Date().getTime() + '|' + Math.floor(Math.random() * 1e6);
+      var st = loyaltyState_(ph);
+      if (st.ledger.filter(function (r) { return r.key === key; }).length) return jsonOut_({ ok: false, error: 'Don nay da tru diem roi.', code: 'DUPLICATE', points: st.points });
+      var r = _loyaltyRedeem_(d.orderValue, st.points.balance, d.points, st.config);
+      if (r.points <= 0) return jsonOut_({ ok: false, error: 'Khong co diem de dung (het diem hoac don 0d).', points: st.points });
+      var now = new Date(), who = String(a.user.username || a.user.name || '');
+      _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[key, ph, 'redeem', String(d.orderRef || ''), _vnYmd_(now), r.points, Number(d.orderValue) || 0, String(d.note || '').slice(0, 200), who, now]]);
+      return jsonOut_({ ok: true, redeemed: r, points: loyaltyState_(ph).points });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi dung diem: ' + (err && err.message || err) }); }
+}
+
+// Hoàn tác 1 lần dùng điểm (CHỈ ADMIN). KHÔNG xoá dòng cũ: thêm dòng 'undo' (key 'undo|<key redeem>', orderId = key redeem gốc) để còn dấu vết,
+// và ghi AuditLog. Điểm quay về quỹ NĂM CỦA LẦN DÙNG GỐC (nếu năm đó đã qua thì điểm đó đã hết hạn — đúng luật 31/12).
+function _loyaltyAudit_(who, action, phone, oldV, newV) {
+  try { var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS); sh.getRange(sh.getLastRow() + 1, 1, 1, AUDIT_HEADERS.length).setValues([[new Date().toISOString(), who, action, phone, _auditClip_(oldV), _auditClip_(newV)]]); } catch (e) {}
+}
+// Lõi hoàn tác (KHÔNG kiểm quyền — nơi gọi tự kiểm): trả object {ok,...} / {ok:false,error,code}. Dùng cho nút admin (_loyaltyUndo_) và khi Hủy/Hoàn đơn CRM (bước 4b).
+function _loyaltyUndoApply_(d, who) {
+  var ph = normPhone_(String(d && d.phone || '')), key = String(d && d.key || '').trim();
+  if (!ph || !key) return { ok: false, error: 'Thieu so dien thoai hoac ma lan dung diem.' };
+  var rows = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph), uk = 'undo|' + key;
+  var orig = rows.filter(function (r) { return String(r.key) === key && r.type === 'redeem'; })[0];
+  if (!orig) return { ok: false, error: 'Khong tim thay lan dung diem nay.', code: 'NOTFOUND' };
+  if (rows.some(function (r) { return String(r.key) === uk; })) return { ok: false, error: 'Lan dung diem nay da duoc hoan tac roi.', code: 'DUPLICATE' };
+  var now = new Date(), pts = Number(orig.points) || 0;
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[uk, ph, 'undo', key, _vnYmd_(now), pts, Number(orig.amount) || 0, String(d.note || 'hoan tac dung diem').slice(0, 200), who, now]]);
+  _loyaltyAudit_(who, 'loyalty:undo', ph, 'dung ' + pts + ' diem (don ' + (Number(orig.amount) || 0) + 'd) ngay ' + _loyaltyYmdCell_(orig.date), 'hoan tac');
+  return { ok: true, undone: { key: key, points: pts }, points: loyaltyState_(ph).points };
+}
+function _loyaltyUndo_(d, a) {
+  if (a.user.role !== 'admin') return jsonOut_({ ok: false, error: 'Chi admin moi duoc hoan tac dung diem.', code: 'FORBIDDEN' });
+  return jsonOut_(_loyaltyUndoApply_(d, String(a.user.username || a.user.name || '')));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ĐƠN CRM (bước 1, backend): CRM tự LÊN ĐƠN theo màn "Tạo đơn" của Pancake POS (clip 27/11/2026) và ghi vào sheet RIÊNG "Đơn CRM"
+//  trong file CRM. KHÔNG ghi DT Tổng / OrderData / Pos (saveOrders vẫn TẮT có chủ ý — Duyên đang TEST tính năng này nên tách sheet riêng).
+//  NGUYÊN TẮC: server tự TÍNH LẠI mọi số tiền từ dòng sản phẩm (không tin tổng client gửi) → sửa/đổi giao diện không làm lệch tiền.
+//  Công thức (khớp clip: 990.000 − KM 10% 99.000 + ship 40.000 = tiền cần thu 931.000; chuyển khoản 300.000 → còn thiếu 631.000):
+//    tiền cần thu = Σ(SL×giá) − Σ giảm giá dòng + Σ thuế dòng − giảm giá đơn + phí vận chuyển (0 nếu miễn phí giao hàng) + phụ thu;  còn thiếu = max(0, cần thu − chuyển khoản)
+//  Thuế % của dòng do người lên đơn TỰ ĐIỀN (Duyên chốt 27/11): thuế dòng = làm tròn(thành tiền sau giảm giá dòng × thuế%), CỘNG vào tiền cần thu (mặc định 0%).
+//  Action: POST crmOrderSave {token, refKey?, order} (refKey chống bấm Lưu 2 lần → trả lại đơn cũ, duplicate:true); GET crmOrders {token, phone?, from?, to?, limit?}.
+//  Quyền lên đơn: mọi tài khoản đăng nhập. QUYỀN XEM (Duyên chốt 27/11) theo cấp bậc _roleBase_: admin + viewer(CEO) = tất cả | manager (Trưởng phòng/Quản lý) =
+//  đơn của mình + người thuộc các phòng được giao (cột team của tài khoản = key phòng, tên Sale gắn phòng ở saleDepts) | leader (Trưởng team) = mình + team mình làm trưởng
+//  | còn lại (cs, vai trò lạ) = chỉ đơn của mình. Đơn thuộc về người TẠO (createdBy) hoặc Sale ghi trên đơn (saleName, mặc định = người tạo).
+// ═══════════════════════════════════════════════════════════════
+var CRMORDER_SECTION_ = 1;
+var SH_CRM_ORDER_ = 'Đơn CRM';
+var CRM_ORDER_HEADERS_ = ['orderId', 'refKey', 'createdAt', 'createdBy', 'status', 'source', 'warehouse', 'saleName', 'packerName', 'careName', 'marketer', 'tags',
+  'custName', 'phone', 'gender', 'email', 'birthday', 'recvName', 'recvPhone', 'province', 'district', 'ward', 'address', 'expectedDate',
+  'carrier', 'shipCode', 'items', 'itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'note', 'printNote', 'tax',   // 'tax' ở CUỐI (bước 1b)
+  'statusAt', 'statusBy', 'statusNote',
+  'pointsUsed', 'pointsDiscount'];   // 2 cột cuối thêm ở bước 4b (điểm tích luỹ đã dùng + số tiền giảm tương ứng)   // 3 cột cuối thêm ở bước 4a (đổi trạng thái/huỷ); getSheet_ tự bổ sung tiêu đề cho sheet cũ
+var CRM_ORDER_GET_ACTIONS_ = { crmOrders: 1 };
+var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1, crmOrderStatus: 1 };
+// Đổi trạng thái / huỷ đơn (bước 4a). Chỉ cho đi theo đường hợp lệ; 'Hủy' và 'Hoàn' là trạng thái CUỐI (không mở lại — muốn bán tiếp thì lên đơn mới).
+// Hủy = đơn chưa giao thành công; Hoàn = hàng đã/đang giao nhưng khách trả lại. Hủy/Hoàn BẮT BUỘC có lý do (để tra cứu về sau).
+var CRM_ORDER_FLOW_ = { 'Mới': ['Đã xác nhận', 'Hủy'], 'Đã xác nhận': ['Đang giao', 'Hủy'], 'Đang giao': ['Đã giao', 'Hoàn', 'Hủy'], 'Đã giao': ['Hoàn'], 'Hủy': [], 'Hoàn': [] };
+function _crmStatusCheck_(from, to, note) {
+  from = String(from || 'Mới'); to = String(to || '');
+  if (!CRM_ORDER_FLOW_.hasOwnProperty(to)) return 'Trang thai khong hop le.';
+  if (!CRM_ORDER_FLOW_.hasOwnProperty(from)) return 'Don dang o trang thai la (' + from + '), khong doi duoc.';
+  if (CRM_ORDER_FLOW_[from].indexOf(to) < 0) return 'Khong the chuyen tu ' + from + ' sang ' + to + '.';
+  if ((to === 'Hủy' || to === 'Hoàn') && !_crmStr_(note, 300)) return 'Huy/hoan don phai ghi ly do.';
+  return '';
+}
+var CRM_ORDER_MAX_ITEMS_ = 60;
+function _crmNum_(v) { var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
+function _crmStr_(v, max) { return String(v == null ? '' : v).replace(/^\s+|\s+$/g, '').slice(0, max || 200); }
+// Giảm giá của 1 dòng/đơn: type 'pct' (0-100%) hoặc 'amt' (đồng); luôn trong [0, base].
+function _crmDiscount_(base, type, value) {
+  var v = Math.max(0, _crmNum_(value)); base = Math.max(0, base);
+  var d = String(type || '') === 'pct' ? Math.round(base * Math.min(v, 100) / 100) : Math.round(v);
+  return Math.min(d, base);
+}
+// Chuẩn hoá + kiểm tra + TÍNH TIỀN. Trả { error } hoặc { order: {...đã chuẩn hoá + số tiền} }. Hàm thuần (không đụng sheet).
+function _crmOrderNormalize_(raw) {
+  raw = raw || {};
+  var phone = normPhone_(String(raw.phone || ''));
+  if (!phone) return { error: 'Thieu so dien thoai khach.' };
+  var src = raw.items; if (!src || !src.length) return { error: 'Don chua co san pham.' };
+  if (src.length > CRM_ORDER_MAX_ITEMS_) return { error: 'Don co qua nhieu dong san pham (toi da ' + CRM_ORDER_MAX_ITEMS_ + ').' };
+  var items = [], gross = 0, itemDiscount = 0, qty = 0, taxTotal = 0;
+  for (var i = 0; i < src.length; i++) {
+    var it = src[i] || {}, q = Math.floor(_crmNum_(it.qty)), price = Math.round(_crmNum_(it.price));
+    var name = _crmStr_(it.name, 200), code = _crmStr_(it.code, 60);
+    if (!name && !code) return { error: 'Dong san pham ' + (i + 1) + ' thieu ten/ma.' };
+    if (!(q >= 1)) return { error: 'Dong san pham ' + (i + 1) + ': so luong phai >= 1.' };
+    if (price < 0) return { error: 'Dong san pham ' + (i + 1) + ': don gia am.' };
+    var line = q * price, dType = String(it.discType || '') === 'pct' ? 'pct' : 'amt', dVal = Math.max(0, _crmNum_(it.discValue));
+    var dis = _crmDiscount_(line, dType, dVal);
+    var taxPct = Math.min(100, Math.max(0, _crmNum_(it.taxPct))), tax = Math.round((line - dis) * taxPct / 100);
+    items.push({ code: code, name: name, qty: q, price: price, discType: dType, discValue: dVal, discount: dis, taxPct: taxPct, tax: tax, note: _crmStr_(it.note, 200), amount: line - dis });
+    gross += line; itemDiscount += dis; qty += q; taxTotal += tax;
+  }
+  var afterItems = gross - itemDiscount;
+  var orderDiscount = _crmDiscount_(afterItems, raw.discType, raw.discValue);
+  var freeShip = raw.freeShip === true || raw.freeShip === 'true' || raw.freeShip === 1;
+  var shipFee = freeShip ? 0 : Math.max(0, Math.round(_crmNum_(raw.shipFee)));
+  var surcharge = Math.max(0, Math.round(_crmNum_(raw.surcharge)));
+  var total = afterItems + taxTotal - orderDiscount + shipFee + surcharge;
+  var paid = Math.max(0, Math.round(_crmNum_(raw.paid)));
+  var tags = raw.tags; if (Object.prototype.toString.call(tags) === '[object Array]') tags = tags.map(function (t) { return _crmStr_(t, 60); }).filter(String).join(', ');
+  return { order: {
+    source: _crmStr_(raw.source, 60), warehouse: _crmStr_(raw.warehouse, 60), saleName: _crmStr_(raw.saleName, 80), packerName: _crmStr_(raw.packerName, 80),
+    careName: _crmStr_(raw.careName, 80), marketer: _crmStr_(raw.marketer, 80), tags: _crmStr_(tags, 300),
+    custName: _crmStr_(raw.custName, 120), phone: phone, gender: _crmStr_(raw.gender, 20), email: _crmStr_(raw.email, 120), birthday: _crmStr_(raw.birthday, 20),
+    recvName: _crmStr_(raw.recvName, 120), recvPhone: normPhone_(String(raw.recvPhone || '')) || phone, province: _crmStr_(raw.province, 80), district: _crmStr_(raw.district, 80),
+    ward: _crmStr_(raw.ward, 80), address: _crmStr_(raw.address, 300), expectedDate: _crmStr_(raw.expectedDate, 20), carrier: _crmStr_(raw.carrier, 60), shipCode: _crmStr_(raw.shipCode, 60),
+    items: items, itemCount: items.length, qty: qty, gross: gross, itemDiscount: itemDiscount, orderDiscount: orderDiscount, shipFee: shipFee, surcharge: surcharge,
+    tax: taxTotal, total: total, paid: paid, due: Math.max(0, total - paid), note: _crmStr_(raw.note, 1000), printNote: _crmStr_(raw.printNote, 1000) } };
+}
+// Mã đơn: CRM + yyMMdd + '-' + số thứ tự trong ngày (4 chữ số). existingIds: mã đã có (để không trùng).
+// Khoá sổ điểm của lần dùng điểm cho 1 đơn CRM (cố định theo mã đơn → Hủy/Hoàn tìm đúng dòng để hoàn tác).
+function _crmRedeemKey_(phone, orderId) { return 'redeem|' + phone + '|crm|' + orderId; }
+function _crmNextOrderId_(ymd, existingIds) {
+  var pre = 'CRM' + String(ymd || '').replace(/-/g, '').slice(2), n = 0, re = new RegExp('^' + pre + '-(\\d+)$');
+  (existingIds || []).forEach(function (id) { var m = re.exec(String(id)); if (m) n = Math.max(n, parseInt(m[1], 10) || 0); });
+  n++; return pre + '-' + ('0000' + n).slice(-4);
+}
+function _crmOrderRowToObj_(r) {
+  var o = {}; CRM_ORDER_HEADERS_.forEach(function (h, i) { o[h] = r[i]; });
+  var items = []; try { items = JSON.parse(String(o.items || '[]')); } catch (e) {}
+  o.items = items; ['itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'tax', 'pointsUsed', 'pointsDiscount'].forEach(function (k) { o[k] = Number(o[k]) || 0; });
+  o.phone = normPhone_(String(o.phone || '')); o.createdAt = Object.prototype.toString.call(o.createdAt) === '[object Date]' ? o.createdAt.getTime() : o.createdAt;
+  return o;
+}
+function _crmReadAll_() {
+  var sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, CRM_ORDER_HEADERS_.length).getValues().map(_crmOrderRowToObj_);
+}
+// Phạm vi XEM đơn của 1 tài khoản → { level: 'all'|'dept'|'team'|'own', keys: {tên chuẩn hoá→1}, usernames: {username thường→1} }.
+function _crmScopeFor_(user) {
+  var base = _roleBase_(user.role), own = {};
+  [user.name, user.username].concat(user.names || []).forEach(function (n) { n = String(n || '').trim(); if (n) own[n] = 1; });
+  if (base === 'admin' || base === 'viewer') return { level: 'all' };
+  var allowed = {}, level = 'own';
+  Object.keys(own).forEach(function (n) { allowed[n] = 1; });
+  if (base === 'leader') {
+    level = 'team';
+    try {
+      readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) {
+        if (own[String(t.leader || '').trim()] || (user.team && String(t.name || '') === String(user.team))) {
+          if (t.leader) allowed[String(t.leader).trim()] = 1;
+          (t.members || []).forEach(function (m) { m = String(m || '').trim(); if (m) allowed[m] = 1; });
+        }
+      });
+    } catch (eT) {}
+  } else if (base === 'manager') {
+    level = 'dept';
+    var dk = {}; String(user.team || '').split(',').forEach(function (k) { k = String(k).trim(); if (k) dk[k] = 1; });
+    try { var sd = readSaleDepts_().raw; Object.keys(sd).forEach(function (n) { if (dk[sd[n]]) allowed[n] = 1; }); } catch (eD) {}
+  }
+  var keys = _scopeSameNameKeys_(allowed), usernames = {};
+  try {
+    readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function (u) {   // tài khoản của người thuộc phạm vi → đơn họ TẠO cũng thấy được
+      var nm = [u.name, u.username].concat(u.names || []);
+      for (var i = 0; i < nm.length; i++) { var n = String(nm[i] || '').trim(); if (n && (keys[_normTxt_(n)] || keys[_scopeNameKey_(n)])) { usernames[String(u.username || '').trim().toLowerCase()] = 1; break; } }
+    });
+  } catch (eU) {}
+  usernames[String(user.username || '').trim().toLowerCase()] = 1;
+  return { level: level, keys: keys, usernames: usernames };
+}
+function _crmCanSee_(sc, o) {
+  if (sc.level === 'all') return true;
+  if (sc.usernames[String(o.createdBy || '').trim().toLowerCase()]) return true;
+  var names = String(o.saleName || '').split(',');
+  for (var i = 0; i < names.length; i++) { var n = names[i].trim(); if (n && (sc.keys[_normTxt_(n)] || sc.keys[_scopeNameKey_(n)])) return true; }
+  return false;
+}
+function crmOrderDoPost_(action, d) {
+  if (action === 'crmOrderStatus') return crmOrderStatusDoPost_(d);
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    var n = _crmOrderNormalize_(d && d.order); if (n.error) return jsonOut_({ ok: false, error: n.error });
+    return _khoWithLock_(function () {
+      var all = _crmReadAll_(), refKey = _crmStr_(d.refKey, 80);
+      if (refKey) for (var i = 0; i < all.length; i++) if (String(all[i].refKey) === refKey) return jsonOut_({ ok: true, duplicate: true, order: all[i] });
+      var now = new Date(), who = String(a.user.username || a.user.name || ''), o = n.order;
+      o.orderId = _crmNextOrderId_(_vnYmd_(now), all.map(function (x) { return String(x.orderId); }));
+      o.refKey = refKey; o.createdAt = now.getTime(); o.createdBy = who; o.status = 'Mới';
+      if (!o.saleName) o.saleName = String(a.user.name || who);   // Sale mặc định = người tạo (để Trưởng team/phòng lọc đúng theo tên Sale)
+      // Dùng điểm tích luỹ (bước 4b): 1 điểm = pointValue đồng, TRỪ THẲNG vào đơn. Muốn dùng nhiều hơn mức cho phép → TỪ CHỐI (không âm thầm cắt, vì người lên đơn đã thấy tổng tiền).
+      var want = Math.floor(_crmNum_(d.pointsUse)), redeemKey = '';
+      o.pointsUsed = 0; o.pointsDiscount = 0;
+      if (want > 0) {
+        var sync = loyaltySync_(o.phone); if (sync.error) return jsonOut_({ ok: false, error: sync.error });
+        var st = loyaltyState_(o.phone), rd = _loyaltyRedeem_(o.total, st.points.balance, want, st.config);
+        if (rd.points < want) return jsonOut_({ ok: false, code: 'POINTS', error: 'Khong du diem: muon dung ' + want + ' diem, toi da dung duoc ' + rd.points + ' diem (so du ' + st.points.balance + ', don ' + o.total + 'd).', maxPoints: rd.points, points: st.points });
+        o.pointsUsed = rd.points; o.pointsDiscount = rd.discount; o.total = o.total - rd.discount; o.due = Math.max(0, o.total - o.paid);
+        redeemKey = _crmRedeemKey_(o.phone, o.orderId);
+        _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[redeemKey, o.phone, 'redeem', o.orderId, _vnYmd_(now), rd.points, rd.discount + o.total, 'Don CRM ' + o.orderId, who, now]]);
+      }
+      var row = CRM_ORDER_HEADERS_.map(function (h) { return h === 'items' ? JSON.stringify(o.items) : (o[h] == null ? '' : o[h]); });
+      try {
+        var sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_), rng = sh.getRange(sh.getLastRow() + 1, 1, 1, row.length);
+        if (rng.setNumberFormat) rng.setNumberFormat('@');   // SĐT/ngày giữ dạng chữ (khỏi mất số 0 đầu)
+        rng.setValues([row]);
+      } catch (eW) {   // ghi đơn lỗi sau khi đã trừ điểm → hoàn lại điểm ngay, không để khách mất điểm mà không có đơn
+        if (redeemKey) { try { _loyaltyUndoApply_({ phone: o.phone, key: redeemKey, note: 'ghi don loi, hoan diem' }, who); } catch (eU) {} }
+        throw eW;
+      }
+      return jsonOut_({ ok: true, duplicate: false, order: o });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
+}
+// POST crmOrderStatus {token, orderId, status, note?}: admin đổi mọi đơn; tài khoản khác chỉ đơn mình tạo. Ghi statusAt/statusBy/statusNote (lý do huỷ ở statusNote).
+function crmOrderStatusDoPost_(d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    var id = _crmStr_(d && d.orderId, 40), to = _crmStr_(d && d.status, 30), note = _crmStr_(d && d.note, 300);
+    if (!id) return jsonOut_({ ok: false, error: 'Thieu ma don.' });
+    return _khoWithLock_(function () {
+      var all = _crmReadAll_(), idx = -1;
+      for (var i = 0; i < all.length; i++) if (String(all[i].orderId) === id) { idx = i; break; }
+      if (idx < 0) return jsonOut_({ ok: false, error: 'Khong tim thay don ' + id + '.' });
+      var o = all[idx], who = String(a.user.username || a.user.name || '');
+      if (_roleBase_(a.user.role) !== 'admin' && String(o.createdBy).toLowerCase() !== who.toLowerCase()) return jsonOut_({ ok: false, error: 'Ban chi doi duoc trang thai don do minh tao.' });   // CEO/viewer chi xem; Truong team/phong xem duoc nhung CHUA duoc doi don cua team (cho Duyen chot)
+      if (String(o.status) === to) return jsonOut_({ ok: true, unchanged: true, order: o });   // bấm 2 lần cùng trạng thái: không lỗi, không ghi
+      var err = _crmStatusCheck_(o.status, to, note); if (err) return jsonOut_({ ok: false, error: err });
+      // Hủy/Hoàn đơn có dùng điểm → hoàn lại điểm TRƯỚC khi đổi trạng thái (lỗi thật thì dừng, trạng thái giữ nguyên; đã hoàn tác tay rồi/không thấy dòng = bỏ qua).
+      var refunded = 0;
+      if ((to === 'Hủy' || to === 'Hoàn') && Number(o.pointsUsed) > 0) {
+        var ur = _loyaltyUndoApply_({ phone: o.phone, key: _crmRedeemKey_(o.phone, o.orderId), note: (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId }, who);
+        if (ur.ok) refunded = ur.undone.points; else if (ur.code !== 'DUPLICATE' && ur.code !== 'NOTFOUND') return jsonOut_({ ok: false, error: 'Khong hoan duoc diem, don giu nguyen trang thai: ' + ur.error });
+      }
+      var now = Date.now(), sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_);
+      var col = function (h) { return CRM_ORDER_HEADERS_.indexOf(h) + 1; };
+      var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
+      set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
+      o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
+      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, order: o });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
+}
+function crmOrderDoGet_(action, p) {
+  try {
+    var a = _khoAuth_(p); if (a.err) return a.err;
+    var sc = _crmScopeFor_(a.user), ph = p && p.phone ? normPhone_(String(p.phone)) : '';
+    var from = _crmStr_(p && p.from, 10), to = _crmStr_(p && p.to, 10), limit = Math.max(1, Math.min(500, parseInt(p && p.limit, 10) || 100));
+    var rows = _crmReadAll_().filter(function (o) {
+      if (!_crmCanSee_(sc, o)) return false;
+      if (ph && o.phone !== ph) return false;
+      var ymd = o.createdAt ? _vnYmd_(new Date(Number(o.createdAt))) : '';
+      if (from && ymd < from) return false; if (to && ymd > to) return false;
+      return true;
+    });
+    rows.sort(function (x, y) { return (Number(y.createdAt) || 0) - (Number(x.createdAt) || 0); });
+    return jsonOut_({ ok: true, scope: sc.level, total: rows.length, orders: rows.slice(0, limit) });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi doc don CRM: ' + (err && err.message || err) }); }
 }

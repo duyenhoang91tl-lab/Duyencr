@@ -225,6 +225,7 @@ function doPost(e) {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
     if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.token && _demoSessionUser_(d0.token)) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.', code: 'FORBIDDEN' });   // ke ca khi bo truong demo, chi gui token phien
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
@@ -255,6 +256,8 @@ function doPostCore_(e) {
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
+    if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);   // dung diem tru vao don (token)
+    if (CRM_ORDER_POST_ACTIONS_[action] === 1) return crmOrderDoPost_(action, data);   // len Don CRM (sheet rieng 'Don CRM', KHONG ghi DT Tong; token)
     if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
