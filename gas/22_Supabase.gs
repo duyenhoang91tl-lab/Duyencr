@@ -2105,29 +2105,6 @@ function _storeCaseBuildCtx_(posNameSet) {
   };
 }
 
-// Phan Sale 30% khach qua cua hang (Bao cao L) gom THEO TEAM — de Bao cao B "Theo Team Sale" cong them duoc nhu bang "Theo Sale".
-// NGUYEN NHAN GOC B "chua gom doanh thu don qua cua hang 30%" o bang Theo Team: client chi gop phan L vao bang Theo Sale (_srMergeStoreIntoBySale_),
-// con Theo Team Sale lay thang byTeamSale cua B (chi co don Pos) nen thieu phan nay. Cung quy tac loc voi client: bo dong khach KHONG den,
-// don hoan (excluded), phan chia bi danh dau Trung / <= 0. Moi (don, team) dem 1 don. resolveTeam(tenSale) -> ten Team (cung _makeTeamResolver_ cua B).
-function _storeCaseByTeam_(outRows, resolveTeam, unassignedTeam) {
-  var acc = {};
-  (outRows || []).forEach(function (row) {
-    if (row.koDen) return;
-    (row.orders || []).forEach(function (o, oi) {
-      if (o.excluded) return;
-      var seenT = {};
-      (o.credits || []).forEach(function (cr) {
-        var amt = Number(cr.amount) || 0;
-        if (cr.dup || !(amt > 0) || !cr.sale) return;
-        var t = resolveTeam(cr.sale) || unassignedTeam;
-        var x = acc[t] || (acc[t] = { name: t, amount: 0, orders: 0 });
-        x.amount += amt;
-        if (!seenT[t]) { seenT[t] = true; x.orders++; }
-      });
-    });
-  });
-  return Object.keys(acc).map(function (k) { return acc[k]; }).sort(function (a, b) { return b.amount - a.amount; });
-}
 function buildStoreCaseReport_(filters) {
   filters = filters || {};
   var todayYmd = _vnYmd_(new Date());
@@ -2339,7 +2316,6 @@ function buildStoreCaseReport_(filters) {
   return {
     ok: true, sheetId: sheet.sheetId, sheetName: sheet.sheetName, dateFrom: from, dateTo: to, sharePct: Math.round(share * 1000) / 10,
     rows: outRows, bySale: bySale, totals: totals, dataQuality: dq,
-    byTeam: (function () { try { return _storeCaseByTeam_(outRows, _makeTeamResolver_('(chưa có Team)'), '(chưa có Team)'); } catch (eT) { return []; } })(),   // phan Sale 30% theo Team (B: Theo Team Sale)
     unresolved: Object.keys(unresolved).map(function(k) { return unresolved[k]; }),
     acctCheck: { ok: !acct.err, error: acct.err, tabs: acct.tabs, soMa: Object.keys(acct.codes).length, summary: acctSum, missing: missing, lech: lech,
                  sheetUrl: 'https://docs.google.com/spreadsheets/d/' + ACCT_SPLIT_SS_ID_ },
