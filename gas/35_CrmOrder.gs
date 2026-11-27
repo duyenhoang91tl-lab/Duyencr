@@ -14,9 +14,21 @@ var CRMORDER_SECTION_ = 1;
 var SH_CRM_ORDER_ = 'Đơn CRM';
 var CRM_ORDER_HEADERS_ = ['orderId', 'refKey', 'createdAt', 'createdBy', 'status', 'source', 'warehouse', 'saleName', 'packerName', 'careName', 'marketer', 'tags',
   'custName', 'phone', 'gender', 'email', 'birthday', 'recvName', 'recvPhone', 'province', 'district', 'ward', 'address', 'expectedDate',
-  'carrier', 'shipCode', 'items', 'itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'note', 'printNote', 'tax'];   // 'tax' ở CUỐI (không lệch chỉ số cột cũ)
+  'carrier', 'shipCode', 'items', 'itemCount', 'qty', 'gross', 'itemDiscount', 'orderDiscount', 'shipFee', 'surcharge', 'total', 'paid', 'due', 'note', 'printNote', 'tax',   // 'tax' ở CUỐI (bước 1b)
+  'statusAt', 'statusBy', 'statusNote'];   // 3 cột cuối thêm ở bước 4a (đổi trạng thái/huỷ); getSheet_ tự bổ sung tiêu đề cho sheet cũ
 var CRM_ORDER_GET_ACTIONS_ = { crmOrders: 1 };
-var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1 };
+var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1, crmOrderStatus: 1 };
+// Đổi trạng thái / huỷ đơn (bước 4a). Chỉ cho đi theo đường hợp lệ; 'Hủy' và 'Hoàn' là trạng thái CUỐI (không mở lại — muốn bán tiếp thì lên đơn mới).
+// Hủy = đơn chưa giao thành công; Hoàn = hàng đã/đang giao nhưng khách trả lại. Hủy/Hoàn BẮT BUỘC có lý do (để tra cứu về sau).
+var CRM_ORDER_FLOW_ = { 'Mới': ['Đã xác nhận', 'Hủy'], 'Đã xác nhận': ['Đang giao', 'Hủy'], 'Đang giao': ['Đã giao', 'Hoàn', 'Hủy'], 'Đã giao': ['Hoàn'], 'Hủy': [], 'Hoàn': [] };
+function _crmStatusCheck_(from, to, note) {
+  from = String(from || 'Mới'); to = String(to || '');
+  if (!CRM_ORDER_FLOW_.hasOwnProperty(to)) return 'Trang thai khong hop le.';
+  if (!CRM_ORDER_FLOW_.hasOwnProperty(from)) return 'Don dang o trang thai la (' + from + '), khong doi duoc.';
+  if (CRM_ORDER_FLOW_[from].indexOf(to) < 0) return 'Khong the chuyen tu ' + from + ' sang ' + to + '.';
+  if ((to === 'Hủy' || to === 'Hoàn') && !_crmStr_(note, 300)) return 'Huy/hoan don phai ghi ly do.';
+  return '';
+}
 var CRM_ORDER_MAX_ITEMS_ = 60;
 function _crmNum_(v) { var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function _crmStr_(v, max) { return String(v == null ? '' : v).replace(/^\s+|\s+$/g, '').slice(0, max || 200); }
@@ -121,6 +133,7 @@ function _crmCanSee_(sc, o) {
   return false;
 }
 function crmOrderDoPost_(action, d) {
+  if (action === 'crmOrderStatus') return crmOrderStatusDoPost_(d);
   try {
     var a = _khoAuth_(d); if (a.err) return a.err;
     var n = _crmOrderNormalize_(d && d.order); if (n.error) return jsonOut_({ ok: false, error: n.error });
@@ -138,6 +151,29 @@ function crmOrderDoPost_(action, d) {
       return jsonOut_({ ok: true, duplicate: false, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
+}
+// POST crmOrderStatus {token, orderId, status, note?}: admin đổi mọi đơn; tài khoản khác chỉ đơn mình tạo. Ghi statusAt/statusBy/statusNote (lý do huỷ ở statusNote).
+function crmOrderStatusDoPost_(d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    var id = _crmStr_(d && d.orderId, 40), to = _crmStr_(d && d.status, 30), note = _crmStr_(d && d.note, 300);
+    if (!id) return jsonOut_({ ok: false, error: 'Thieu ma don.' });
+    return _khoWithLock_(function () {
+      var all = _crmReadAll_(), idx = -1;
+      for (var i = 0; i < all.length; i++) if (String(all[i].orderId) === id) { idx = i; break; }
+      if (idx < 0) return jsonOut_({ ok: false, error: 'Khong tim thay don ' + id + '.' });
+      var o = all[idx], who = String(a.user.username || a.user.name || '');
+      if (_roleBase_(a.user.role) !== 'admin' && String(o.createdBy).toLowerCase() !== who.toLowerCase()) return jsonOut_({ ok: false, error: 'Ban chi doi duoc trang thai don do minh tao.' });   // CEO/viewer chi xem; Truong team/phong xem duoc nhung CHUA duoc doi don cua team (cho Duyen chot)
+      if (String(o.status) === to) return jsonOut_({ ok: true, unchanged: true, order: o });   // bấm 2 lần cùng trạng thái: không lỗi, không ghi
+      var err = _crmStatusCheck_(o.status, to, note); if (err) return jsonOut_({ ok: false, error: err });
+      var now = Date.now(), sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_);
+      var col = function (h) { return CRM_ORDER_HEADERS_.indexOf(h) + 1; };
+      var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
+      set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
+      o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
+      return jsonOut_({ ok: true, unchanged: false, order: o });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
 }
 function crmOrderDoGet_(action, p) {
   try {
