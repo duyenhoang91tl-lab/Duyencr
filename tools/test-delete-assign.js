@@ -1,13 +1,14 @@
 // GAS deleteAssign_: chi xoa dung dot chia theo id, giu cac dot khac. Chay: node tools/test-delete-assign.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const src = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8');
-const f = src.match(/^function deleteAssign_\([\s\S]*?\n}\n/m)[0];
+const f = ['_assignDeletedIds_', '_rememberAssignDeleted_', 'deleteAssign_'].map(n => src.match(new RegExp('^function ' + n + '\\([\\s\\S]*?\\n}\\n', 'm'))[0]).join('');
+const props = {};
 let fail = 0; const ok = (n, v) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + n); if (!v) fail++; };
 let rows, max, calls;
 const sh = { getLastRow: () => rows.length + 1, getMaxRows: () => max, insertRowsAfter: (_, n) => { max += n; },
   getRange: (r, c, n) => ({ getValues: () => rows.slice(r - 2, r - 2 + n).map(x => [x]) }),
   deleteRows: (start, n) => { if (max - n < 2) throw new Error('khong xoa duoc het dong'); calls++; rows.splice(start - 2, n); max -= n; } };
-const g = { String, Array, SH_ASSIGN: 'A', ASSIGN_HEADERS: [], jsonOut_: o => o, getSheet_: () => sh, LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+const g = { String, Array, JSON, PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k], setProperty: (k, v) => { props[k] = v; } }) }, SH_ASSIGN: 'A', ASSIGN_HEADERS: [], jsonOut_: o => o, getSheet_: () => sh, LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
   _sessUser_: t => ({ A: { role: 'admin' }, X: { role: 'sep' }, L: { role: 'leader' } })[t] || null, _roleBase_: r => r === 'sep' ? 'admin' : r };
 vm.createContext(g); vm.runInContext(f, g);
 const reset = a => { rows = a.slice(); max = 1000; calls = 0; };
@@ -22,4 +23,5 @@ reset(['a']); r = g.deleteAssign_({ token: 'L', ids: ['a'] });
 ok('Truong nhom / CS bi chan', r.code === 'FORBIDDEN' && rows.length === 1);
 r = g.deleteAssign_({ token: 'A', ids: [] });
 ok('thieu id -> bao loi', !!r.error && rows.length === 1);
+ok('nho id dot da xoa (ke ca id khong con tren sheet), khong nho lan bi chan', JSON.parse(props.assignDeletedIds).join() === 'b,khong-co,a');
 process.exit(fail ? 1 : 0);

@@ -3466,7 +3466,7 @@ function doGetCore_(e) {
       var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
       var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
       if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); var csKeyA_ = {}; Object.keys(csSetA_).forEach(function(k) { csKeyA_[_scopeNameKey_(k)] = 1; }); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)] || csKeyA_[_scopeNameKey_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
-      return jsonOut_({ assignHistory: allAssignH_ });
+      return jsonOut_({ assignHistory: allAssignH_, deletedIds: _assignDeletedIds_() });   // deletedIds: may khac go ban cu cua dot admin da xoa
     }
     if (action === 'tasks') {
       var tasksOut_ = readTasks_(ss.getSheetByName(SH_TASK));
@@ -8660,7 +8660,7 @@ function doPostCore_(e) {
     if (action === 'leadAssign')          return leadAssign_(data);
     if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
-    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done, data.ids);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
@@ -11345,6 +11345,7 @@ function assignRowsOf_(h) {
 
 function saveAssignEntry_(entry) {
   if (!entry || !entry.id) return jsonOut_({ error: 'no entry.id' });
+  if (_assignDeletedIds_().indexOf(String(entry.id)) !== -1) return jsonOut_({ ok: true, skipped: 'deleted' });   // may khac con giu dot admin da xoa -> khong cho song lai
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   var last = sh.getLastRow(); var found = [];
   if (last >= 2) {
@@ -11369,24 +11370,31 @@ function saveAssignEntry_(entry) {
 // dong cua (cac) dot chia bi doi qua saveAssignEntry_ (an toan hon saveAssignHistory_ — khong xoa
 // trang roi ghi lai CA sheet, tranh dam vao CS khac dang luu cung luc). Dung LockService vi 1 CS co
 // the tich lien tuc nhieu SDT gan nhau (2 request ghi cung 1 dot chia de dam vao nhau neu khong khoa).
-function toggleAssignDone_(csName, phone, done) {
+function toggleAssignDone_(csName, phone, done, ids) {
   csName = String(csName || '').trim();
   phone = String(phone || '').trim();
   if (!csName || !phone) return jsonOut_({ error: 'Thiếu csName hoặc phone.' });
+  // Web gui kem `ids` (cac dot vua tich) -> chi dong vao dung cac dot do. Pancake AI khong gui ids -> tim theo ten CS nhu cu.
+  var idMap = null;
+  if (Array.isArray(ids) && ids.length) { idMap = {}; ids.forEach(function (id) { idMap[String(id)] = 1; }); }
+  var key = normPhone_(phone) || phone;   // sheet co the luu SDT mat so 0 / dang 84
+  var same = function (x) { return (normPhone_(x) || String(x)) === key; };
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return jsonOut_({ error: 'Đang có thao tác khác ghi dữ liệu chia, thử lại sau vài giây.' });
   try {
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
     var history = readAssign_(sh);
     var touched = [];
-    var csSetT = _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
+    var csSetT = idMap ? null : _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
     for (var i = 0; i < history.length; i++) {
       var h = history[i];
-      if (!csSetT[_normTxt_(h.csName)] || (h.phones || []).indexOf(phone) === -1) continue;
+      if (idMap ? !idMap[h.id] : !csSetT[_normTxt_(h.csName)]) continue;
+      var mine = (h.phones || []).filter(same);
+      if (!mine.length) continue;
       h.donePhones = h.donePhones || [];
-      var idx = h.donePhones.indexOf(phone);
-      if (done && idx === -1) { h.donePhones.push(phone); touched.push(h); }
-      else if (!done && idx !== -1) { h.donePhones.splice(idx, 1); touched.push(h); }
+      var has = h.donePhones.some(same);
+      if (done && !has) { h.donePhones.push(mine[0]); touched.push(h); }
+      else if (!done && has) { h.donePhones = h.donePhones.filter(function (x) { return !same(x); }); touched.push(h); }
     }
     for (var k = 0; k < touched.length; k++) saveAssignEntry_(touched[k]); // ghi tung dot bi doi, giu nguyen cac dot khac
     return jsonOut_({ ok: true, changed: touched.length });
@@ -11401,6 +11409,8 @@ function saveAssignHistory_(history) {
   // DUNG MA TRAN TRUOC, chi clearContents() khi da san sang ghi — truoc day clear xong moi stringify, neu setValues loi
   // (o > 50.000 ky tu) thi sheet bi xoa trang va MAT lich su chia tren server.
   var matrix = [ASSIGN_HEADERS];
+  var gone = _assignDeletedIds_();
+  history = history.filter(function (h) { return !h || gone.indexOf(String(h.id)) === -1; });   // dot da xoa khong duoc ghi lai
   for (var i = 0; i < history.length; i++) {
     var rs = assignRowsOf_(history[i]);
     for (var r = 0; r < rs.length; r++) matrix.push(rs[r]);
@@ -11564,6 +11574,16 @@ function leadAssign_(data) {
 // donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
 // 2026-11-27: xoa DUNG cac dot chia theo id. NGUYEN NHAN GOC: web xoa 1 dot bang cach ghi de CA sheet AssignData bang ban tren may admin (saveAssignHistory),
 // ban nay khong co dot Truong nhom vua chia lai / dot chia tu dong moi va giu tien do "da xong" cu -> mat du lieu cua nguoi khac. Quyen giong saveAssignHistory.
+// NHO cac dot chia da xoa (Script Properties 'assignDeletedIds', giu ~300 id gan nhat vi 1 gia tri toi da 9KB).
+// NGUYEN NHAN GOC: may khac van giu dot da xoa trong trinh duyet; may chu khong nho gi nen ho ghi lai la dot "song lai".
+function _assignDeletedIds_() {
+  try { var a = JSON.parse(PropertiesService.getScriptProperties().getProperty('assignDeletedIds') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function _rememberAssignDeleted_(ids) {
+  var list = _assignDeletedIds_().filter(function (id) { return ids.indexOf(id) === -1; }).concat(ids);
+  while (list.length > 300 || JSON.stringify(list).length > 8500) list.shift();   // bo id cu nhat
+  PropertiesService.getScriptProperties().setProperty('assignDeletedIds', JSON.stringify(list));
+}
 function deleteAssign_(data) {
   var u = (data && data.token) ? _sessUser_(data.token) : null;
   if (u && _roleBase_(u.role) !== 'admin') return jsonOut_({ error: 'Chi admin duoc xoa dot chia.', code: 'FORBIDDEN' });
@@ -11573,6 +11593,7 @@ function deleteAssign_(data) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
   try {
+    _rememberAssignDeleted_(Object.keys(ids));   // ghi nho TRUOC khi xoa dong
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), last = sh.getLastRow(), rows = [];
     if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { if (ids[String(r[0])]) rows.push(i + 2); });
     if (rows.length && sh.getMaxRows() - rows.length < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);   // Sheets khong cho xoa het cac dong duoi tieu de
