@@ -1070,7 +1070,7 @@ function pushOrderCareCS(phone, careCS){
   if (!gsUrl || !phone) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
     body: JSON.stringify({ action:'setOrderCareCS', phone:String(phone), careCS:careCS||'' }) })
-    .catch(function(){});
+    .then(_writeCheck_('CS chăm sóc của đơn (SĐT ' + phone + ')')).catch(_writeCatch_('CS chăm sóc của đơn (SĐT ' + phone + ')'));   // 26/11: trước đây .catch rỗng nuốt lỗi
 }
 
 // ── Ô "CS chăm sóc" trong panel: gõ tên để tìm rồi chọn ──

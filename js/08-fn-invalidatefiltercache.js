@@ -1113,7 +1113,7 @@ function pushMktTeamsToGS(){
   saveLS('ome_mkt_teams', mktTeams);
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).then(_writeCheck_('danh sách đội Marketing')).catch(_writeCatch_('danh sách đội Marketing'));
 }
 async function _mktLoadPages_(){
   if (_mktPagesCache || _mktPagesLoading || !gsUrl) return;
@@ -1201,7 +1201,7 @@ function _mktSetShare(id,pageId,val){
 function pushTeamsToGS(){
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).then(_writeCheck_('danh sách Team')).catch(_writeCatch_('danh sách Team'));
 }
 function renderTeamTab(){
   var wrap = document.getElementById('team-wrap');

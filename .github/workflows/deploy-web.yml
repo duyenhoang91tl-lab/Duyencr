@@ -62,6 +62,9 @@ jobs:
       - name: Kiểm thử hộp thoại thống nhất (js/96)
         run: node tools/test-ui-dialogs.js
 
+      - name: Kiểm thử báo lỗi ghi dữ liệu (js/97)
+        run: node tools/test-write-guard.js
+
       - name: Deploy lên Cloudflare
         if: env.HAS_CF == 'true'
         id: deploy
