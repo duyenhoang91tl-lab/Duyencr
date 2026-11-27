@@ -2202,6 +2202,62 @@ function _demoClip_(out, action) {
   _demoMaskDeep_(o);
   return jsonOut_(o);
 }
+// ═══ TAI KHOAN TEST THEO PHIEN (2026-11-27, Duyen yeu cau) ═══
+// NGUYEN NHAN GOC "tai khoan test van xem het danh sach KH du chi chon 1 sale": role 'demo' di nhanh rieng bang demoToken DUNG CHUNG (khong biet la ai)
+// nen khong the loc theo sale da chon; _scopeVerdict_/_scopeAllowedNames_ coi demo la "khong gioi han"; client _inUserScope cung tra true cho demo.
+// Va POST chi bi chan khi co truong demo => bo truong do (chi gui token phien) la GHI duoc. Nay may chu NHAN RA tai khoan test tu TOKEN PHIEN (vai tro doc tu sheet Users):
+//  - GET: chi action trong DEMO_SESSION_GET_; action tra danh sach khach/don/lead bi LOC theo SDT cua cac sale duoc chon (luon enforce, khong phu thuoc scopeMode,
+//    khong co ngoai le via=search); tra cuu 1 SDT ngoai pham vi bi tu choi. Bao cao tong hop (khong loc duoc theo SDT) giu cat dong + che SDT nhu cu.
+//  - POST: tu choi MOI thao tac ghi (ke ca khong kem demoToken). getGasSource/setGasSource/setSetting... da can adminKey nen tai khoan test khong lay duoc ma Apps Script.
+//  - SDT khong bi che trong du lieu da loc (de tra cuu / mo ho so hoat dong); admin bat che bang Settings demoMaskPhone=1.
+var DEMO_SESSION_EXTRA_GET_ = ['customers', 'lookup', 'cskhDetail', 'donOrdersByPhone', 'reminders', 'cskhDuyen', 'users', 'roleConfig',
+  'priceSearch', 'priceCatalogFlat', 'priceCatalogTree', 'ctkmCatalog', 'ctkmSearch', 'comboList', 'comboSearch', 'topProducts', 'csStats', 'dashboard',
+  'teamAnalysis', 'orgOverview', 'posMonthK'];
+var DEMO_SESSION_GET_ = (function() {
+  var o = {};
+  Object.keys(DEMO_ALLOWED_GET_).forEach(function(k) { o[k] = 1; });
+  DEMO_SESSION_EXTRA_GET_.forEach(function(k) { o[k] = 1; });
+  return o;
+})();
+// Tra user (sheet Users) neu token phien hop le VA vai tro la 'demo'; nguoc lai null. Cache 60s ket qua "khong phai demo" theo username de khong doc sheet Users moi request.
+function _demoSessionUser_(tok) {
+  tok = String(tok || '');
+  if (!tok) return null;
+  try {
+    var p = _sessVerify_(tok);
+    if (!p) return null;
+    var cache = CacheService.getScriptCache();
+    var ck = 'dsr_' + String(p.u).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60);
+    if (cache.get(ck) === 'n') return null;
+    var u = _sessUser_(tok);
+    if (!u) return null;
+    if (String(u.role || '') !== 'demo') { cache.put(ck, 'n', 60); return null; }
+    return u;
+  } catch (e) { return null; }
+}
+function _demoMaskOn_() { try { return String(getSetting_('demoMaskPhone') || '').trim() === '1'; } catch (e) { return false; } }
+function _demoSessionGet_(action, p, e, user) {
+  if (DEMO_SESSION_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.', code: 'FORBIDDEN', action: action });
+  // Tra cuu 1 SDT: chi trong pham vi cac sale duoc chon (BO QUA via=search cua client).
+  if (SCOPE_ACTIONS_[action]) {
+    var ph = String(p.phone || '');
+    if (!ph || _scopeVerdict_(user, ph) !== true) return jsonOut_({ error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action });
+  }
+  if (!SCOPE_LIST_ACTIONS_[action]) return _demoClip_(doGetCore_(e), action);   // bao cao tong hop / bang gia: cat dong chi tiet + che SDT nhu cu
+  var resp = doGetCore_(e), obj;
+  try { obj = JSON.parse(resp.getContent()); } catch (e1) { return jsonOut_({ error: 'Khong doc duoc du lieu.', action: action }); }
+  var allowed = _scopeAllowedNames_(user) || {};
+  var phs = Object.keys(allowed).length ? _scopePhoneSet_(user, allowed) : {};   // chua chon sale nao -> khong thay khach nao
+  var f = _scopeFilterObj_(action, obj, phs), out = f.obj;
+  if (out && typeof out === 'object' && !Array.isArray(out)) {
+    if (action === 'cskhDuyenLite' || action === 'cskhDuyen') { out.total = f.kept; out.noPhone = 0; out.noPhoneSample = []; }   // so tong / ten khach khong SDT la cua ca cong ty
+    out._demo = true;
+    out._demoScoped = true;
+  }
+  if (_demoMaskOn_()) _demoMaskDeep_(out);
+  return jsonOut_(out);
+}
+
 // Dang nhap tai khoan test: kiem tra user role "demo" trong sheet Users (passHash do client gui len).
 function demoLogin_(data) {
   var uname = String((data && data.username) || '').trim().toLowerCase();
@@ -2696,7 +2752,7 @@ function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');   // vai tro tu tao (goc leader) bi gioi han thang cung loc
   if (role === 'admin') return true;
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && role !== 'demo') return true;   // viewer/ceo/... : client khong gioi han (demo = gioi han nhu CS)
   var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
   var mine = Object.keys(allowed);
   if (!mine.length) return false;
@@ -2852,7 +2908,8 @@ function _viewExtraNames_(user) {
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
   var role = (user.viewMonths && user.viewMonths.length && _leadMonths_(user).length) ? 'leader' : String(user.role || '');
-  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
+  var isDemoRole = (role === 'demo');   // tai khoan test: pham vi = CHI cac sale duoc chon cho tai khoan (nhu CS), khong cong ten Quay/CSKH
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader' && !isDemoRole) return null;
   var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
   var out = {};
   mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
@@ -2870,8 +2927,8 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
       });
     } catch (e) {}
   }
-  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_)
-  try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {}
+  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_). Tai khoan test khong duoc cong them.
+  if (!isDemoRole) { try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {} }
   return out;
 }
 function _scopeHit_(str, allowed) {
@@ -3041,6 +3098,7 @@ function doGet(e) {
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
+  if (p.token) { var _dsu = _demoSessionUser_(p.token); if (_dsu) return _demoSessionGet_(action, p, e, _dsu); }   // tai khoan test nhan ra tu token phien: loc theo sale da chon
   if (p.demo) {
     if (!_demoTokenOk_(p.demo)) return jsonOut_({ error: 'Phien tai khoan test khong hop le — dang nhap lai.' });
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
@@ -8518,6 +8576,7 @@ function doPost(e) {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
     if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.token && _demoSessionUser_(d0.token)) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.', code: 'FORBIDDEN' });   // ke ca khi bo truong demo, chi gui token phien
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
