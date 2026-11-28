@@ -7,6 +7,12 @@
 - 🔧 Đang làm: không.
 - ➡️ Kế tiếp: Duyên Ctrl+F5, đăng nhập tài khoản test thử.
 - ⚠ Cho phiên MINI GAME T11: sau commit f518294 còn 2 test đỏ — `test-team-daily-revenue.js` (chưa nạp hàm `_tbTierFor_`) và `test-team-bonus-ui.js` (chỉ số cột lệch do thêm cột "Mini game T11"). Phiên này không sửa.
+## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO VẪN BÁO THIẾU GIÁ SAU KHI ĐÃ LƯU GIÁ TỪNG MÓN — bước 3) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
+- Duyên đã điền & lưu đơn giá từng món ở tab 🎁 Combo nhưng ➕ Tạo đơn vẫn báo thiếu giá như cũ.
+- NGUYÊN NHÂN GỐC (khả năng cao nhất, chưa xác nhận bằng sheet thật): danh sách combo ở màn Tạo đơn chỉ tải MỘT lần (`_coCmbToggle` chỉ gọi `_coCmbLoad` khi rows rỗng) nên sửa combo xong mà chưa tải lại trang vẫn dùng bản CŨ chưa có giá.
+- ✅ ĐÃ SỬA: `_coCmbFresh` — mỗi lần bấm ＋ Thêm gọi lại `comboList` lấy đúng combo (theo mã) mới nhất; mở panel Combo luôn tải lại; cảnh báo thiếu giá giờ hiện kèm «nội dung itemsText sheet đang lưu» để biết ngay sheet có giá hay không. Test cập nhật dùng await; 17 test crm-order/combo PASS. index.html ?v=20261128g. Không đổi gas_v13.js.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → thêm lại combo. Nếu cảnh báo vẫn hiện, gửi lại nội dung trong «…» của cảnh báo: nếu thiếu `| 380000 |` thì tab Combo CHƯA lưu được giá (kiểm tra GAS có deploy bản mới + bấm Lưu); nếu có giá mà vẫn lỗi thì báo lại để dò tiếp.
+
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO VẪN BÁO "CHƯA CÓ ĐƠN GIÁ TỪNG MÓN" DÙ TAB COMBO ĐÃ CÓ GIÁ) — XONG, ĐÃ PUSH (bước 2, js/99-d-crm-order.js)
 - Duyên đã điền đơn giá từng món ở tab 🎁 Combo (380000×2, 1550000, 990000) nhưng ➕ Tạo đơn vẫn báo thiếu giá.
 - NGUYÊN NHÂN GỐC: tab Combo tự đọc giá từ chuỗi `itemsText` (`_cbParseItems`), còn Tạo đơn chỉ dùng mảng `items` do GAS `comboList` trả về. GAS đang deploy là bản CŨ (chưa parse cột đơn giá, cũng chưa có `posPrice`) nên `items` không kèm giá → màn Tạo đơn thấy giá 0.

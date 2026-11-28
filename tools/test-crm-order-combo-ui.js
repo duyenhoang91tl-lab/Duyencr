@@ -40,7 +40,7 @@ w.window = w; vm.createContext(w); vm.runInContext(fs.readFileSync(path.join(roo
   const vis = w._coCmbVisible(); ok(vis.length === 6 && !vis.some(c => c.code === 'CB3'), 'chỉ hiện combo đang áp dụng (ẩn combo hết hạn)');
   ok(/Combo Ngũ hành/.test(fakeEl('co-cmb-res').innerHTML) && /2\.700\.000đ/.test(fakeEl('co-cmb-res').innerHTML) && /miễn ship/.test(fakeEl('co-cmb-res').innerHTML), 'danh sách: tên, giá sau giảm, miễn ship');
   // thêm combo 1: giá chia theo tỉ lệ, tổng = finalPrice
-  w._coCmbAdd(0);
+  await w._coCmbAdd(0);
   let it = w._co.items; ok(it.length === 3, 'combo 1 → 2 món + 1 quà = 3 dòng');
   ok(it[0].price === 1485000 && it[1].price === 1215000 && it[0].price + it[1].price === 2700000, 'giá chia tỉ lệ: 1.485.000 + 1.215.000 = 2.700.000 (giá combo sau giảm)');
   ok(it[2].name === 'Túi tiền' && it[2].price === 0 && /Quà tặng/.test(it[2].note), 'quà trong combo = dòng 0đ');
@@ -74,7 +74,7 @@ w.window = w; vm.createContext(w); vm.runInContext(fs.readFileSync(path.join(roo
   // xoá hết dòng combo → không còn ghi chú combo
   w._co.items = []; ok(!/Combo/.test(w._coPayload(w._co).note), 'xoá dòng combo → bỏ khỏi ghi chú');
   // kết hợp CTKM giá vẫn dùng ô giảm giá đơn riêng
-  w._co = w._coBlank(); w._coCmbAdd(0); w._coDiscType('pct'); w._coDiscInput('10'); c = w._coCalc(w._coNow());
+  w._co = w._coBlank(); await w._coCmbAdd(0); w._coDiscType('pct'); w._coDiscInput('10'); c = w._coCalc(w._coNow());
   ok(c.orderDiscount === 270000 && c.total === 2430000, 'combo + giảm đơn 10% vẫn cộng được: 2.430.000');
   // tìm combo
   urls = []; w._coCmb.q = 'ngu hanh'; await w._coCmbLoad(); ok(/q=ngu%20hanh/.test(urls[0]), 'tìm combo gửi từ khoá lên GAS');

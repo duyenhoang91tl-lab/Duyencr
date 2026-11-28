@@ -340,7 +340,7 @@ async function _coCmbLoad(){
 }
 function _coCmbVisible(){ return (_coCmb.rows || []).filter(function(c){ return c && c.usable; }).slice(0, 8); }
 function _coCmbQ(v){ _coCmb.q = v || ''; clearTimeout(_coCmb.timer); _coCmb.timer = setTimeout(_coCmbLoad, 400); }
-function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.rows.length && !_coCmb.loading) _coCmbLoad(); }
+function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.loading) _coCmbLoad(); }
 // Hàm thuần: combo → { lines:[dòng đơn], freeShip, ship, warn }.
 function _coCmbLines(c){
   var its = (c && c.items) || [], paid = its.filter(function(it){ return !it.gift; }), gifts = its.filter(function(it){ return it.gift; });
@@ -386,6 +386,15 @@ function _coCmbWithText(c){
   var t = _coCmbParseText(c.itemsText);
   return t.some(function(it){ return !it.gift && it.price > 0; }) ? Object.assign({}, c, { items: t }) : c;
 }
+async function _coCmbFresh(c){
+  try {
+    if (typeof gsUrl === 'undefined' || !gsUrl || !c || !c.code) return c;
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=comboList&q=' + encodeURIComponent(c.code) + '&_=' + Date.now(), { redirect:'follow' }), d = await r.json();
+    var f = d && d.ok && (d.rows || []).filter(function(x){ return x && String(x.code).toUpperCase() === String(c.code).toUpperCase(); })[0];
+    if (f){ var k = (_coCmb.rows || []).findIndex(function(x){ return x && x.code === f.code; }); if (k >= 0) _coCmb.rows[k] = f; return f; }
+  } catch (e) {}
+  return c;
+}
 async function _coCmbFillPrices(c){
   var its = ((c && c.items) || []).map(function(it){ return Object.assign({}, it); }), idx = [];
   its.forEach(function(it, k){ if (!it.gift && !(Number(it.price) > 0)) idx.push(k); });
@@ -399,10 +408,10 @@ async function _coCmbFillPrices(c){
 }
 async function _coCmbAdd(i){
   var c = _coCmbVisible()[i]; if (!c) return;
-  c = _coCmbWithText(c);
+  c = _coCmbWithText(await _coCmbFresh(c));   // luôn lấy bản combo MỚI NHẤT từ sheet: danh sách ở màn này chỉ tải 1 lần, sửa combo xong mà chưa tải lại trang sẽ còn giá cũ
   if ((c.items || []).some(function(it){ return !it.gift && !(Number(it.price) > 0); })){ _coCmb.msg = 'Đang tra giá từng món…'; _coCmbResRender(); c = await _coCmbFillPrices(c); }
   var r = _coCmbLines(c);
-  if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món (hoặc báo để deploy lại GAS) rồi thêm lại.';
+  if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món và bấm LƯU combo rồi thêm lại. (Sheet đang lưu: «' + String(c.itemsText || '(trống)').replace(/\\s*\\n\\s*/g, ' ⏎ ').slice(0, 140) + '»)';
   if (!r.lines.length){ _coCmb.msg = 'Combo này chưa có món nào.'; _coCmbResRender(); return; }
   r.lines.forEach(function(l){ _co.items.push(l); });
   if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
