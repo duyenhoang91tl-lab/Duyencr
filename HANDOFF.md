@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — ĐANG LÀM
+- ĐỀ BÀI Duyên: "ok áp dụng nhé" (phương án 1: ẩn với tài khoản test các màn máy chủ không phục vụ).
+- NGUYÊN NHÂN GỐC: tài khoản test mặc định thấy mọi màn, nhưng máy chủ không mở dữ liệu cho một số màn nên bấm vào chỉ gặp "không được phép".
+- ✅ Đã xong: (1) `js/05` — `_DEMO_HIDDEN_TABS_`: Zalo AI, Chat, Thư viện, Chat nội bộ, Công việc, Giai đoạn, Kho sản phẩm, Đơn CRM, Up dữ liệu bị ẩn với role demo (thắng cả phân quyền riêng). Tài khoản khác không đổi.
+- 🔧 Đang làm: `js/07` — tài khoản test đang bị hiện khung "Apps Script bản cũ… Copy Apps Script" khi máy chủ từ chối đợt chia.
+- ➡️ Kế tiếp: test, `docs/TAI-KHOAN-TEST.md`, chạy toàn bộ.
+
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
 - NGUYÊN NHÂN GỐC: `_coCmbLines` chỉ chia giá theo tỉ lệ khi các món có đơn giá > 0. Món không mang đơn giá (combo lưu dạng 4 trường cũ, hoặc GAS đang chạy chưa phải bản có cột giá) → tổng niêm yết = 0 → rơi nhánh "chưa có giá": cả giá combo gán vào món đầu (3.300.000 / SL2 = 1.650.000), các món sau 0đ. Thêm: giá món nhập theo NGHÌN đồng (1550) trong khi giá combo là đồng đầy đủ thì sẽ chia ra vài trăm đồng.
