@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — SIDEBAR: Ô "TẤT CẢ" PHÂN LOẠI KH ĐỒNG BỘ VỚI Ô "TẤT CẢ" TÌNH TRẠNG CHĂM SÓC) — XONG BƯỚC 1/1 (web css/01 + index.html)
+- ĐỀ BÀI Duyên: ô "Tất cả" ở Phân loại KH khác ô "Tất cả" ở Tình trạng chăm sóc; chọn đồng bộ theo kiểu Tình trạng chăm sóc (nền xám nhạt, chữ thường, số không tô đậm).
+- NGUYÊN NHÂN GỐC: Phân loại KH dùng class `.fi.active` (nền hồng/xanh `--green-bg`, chữ màu, số trắng trên nền đậm); Tình trạng chăm sóc dùng `.section-btn.active` (nền `--surface2`, chữ `--text`) — 2 class khác nhau nên khác kiểu.
+- ✅ ĐÃ SỬA: thêm class `fi-all` cho riêng nút Tất cả Phân loại KH (index.html) + 2 rule `.fi.fi-all.active` ở css/01-base.css cho cùng kiểu `.section-btn.active`. Các hàng VIP/Thân thiết/Tiềm năng/Chưa bán lại được và ô "Đã mua" (data-buy) GIỮ NGUYÊN (vẫn tô màu khi chọn). `index.html` css ?v=20261128a. check-health 0 lỗi.
+- ➡️ BƯỚC KẾ TIẾP: Duyên Ctrl+F5 xem. Nếu muốn cả các hàng hạng KH khi chọn cũng nền xám giống Tình trạng chăm sóc (hoặc ô "Đã mua → Tất cả"), nói để đổi `.fi.active` chung.
+
 ## 2026-11-28 (phiên Claude — 11 HẠNG MỤC CRM, MỤC 9: BÁO GIÁ QUYỀN LỢI THẺ CHO MÀN TẠO ĐƠN) — BƯỚC 9c-1 XONG (GAS, CẦN DEPLOY); 9c-2 (web) CHƯA LÀM
 - Cách nối ÍT RỦI RO: server chỉ BÁO GIÁ, màn Tạo đơn tự điền; `crmOrderSave`/`gas/35_CrmOrder.gs` (của phiên khác) KHÔNG đổi, nên không lo giảm 2 lần hay lệch cách tính tiền.
 - ✅ POST `loyaltyBenefitQuote {phone, items:[{name,qty,price}]}` (mọi tài khoản đăng nhập, CHỈ ĐỌC — test khẳng định không ghi sổ điểm): trả `level` (none/vip/super) + `label`, `history {orders, cumulative}`, từng dòng `{pct, discount, rule: full|cap|excluded|none}`, `discount`, `afterDiscount`, `freeShip`, `freeShipMin`. Lịch sử xét thẻ = đơn POS hợp lệ (không Hủy/Hoàn) + đơn CRM **Đã xác nhận / Đang giao / Đã giao** của SĐT (đơn CRM 'Mới' CHƯA tính vì có thể bị hủy; Hoàn/Hủy không tính). Ví dụ test: POS 30tr + CRM 20tr = 50tr → SUPER giảm 10%.
