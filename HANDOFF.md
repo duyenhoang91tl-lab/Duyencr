@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TẠO ĐƠN CRM: ĐỊA CHỈ MỚI/CŨ + DROPDOWN TỈNH–QUẬN–PHƯỜNG TÌM ĐƯỢC) — BƯỚC 1/3 XONG (dữ liệu + build); ĐANG LÀM BƯỚC 2/3 (giao diện)
+- ĐỀ BÀI Duyên: ô "Nhận hàng" của màn Tạo đơn: theo địa chỉ MỚI hoặc CŨ; nếu CŨ thì có ô tích; danh mục tỉnh/quận/phường-xã theo hệ mới/cũ tương ứng, chọn bằng dropdown và gõ tìm được.
+- QUYẾT ĐỊNH THIẾT KẾ: mặc định địa chỉ MỚI (từ 01/07/2025: Tỉnh/Thành → Phường/Xã, KHÔNG có Quận/Huyện); tích "Dùng địa chỉ cũ" → Tỉnh → Quận/Huyện → Phường/Xã (63/696/10.035). Backend KHÔNG đổi (đơn vẫn lưu `province/district/ward/address` dạng chữ; địa chỉ mới thì `district` rỗng) → không cần deploy GAS.
+- ✅ BƯỚC 1/3: `data/vn-address-new.json` (65 KB: 34 tỉnh, 3.321 phường/xã) + `data/vn-address-old.json` (215 KB: 63 tỉnh, 696 huyện, 10.035 xã; 5 huyện đảo không có xã: Bạch Long Vĩ, Cồn Cỏ, Hoàng Sa, Lý Sơn, Côn Đảo) sinh bởi `tools/gen-vn-address.js` (nguồn npm `vn-local-divisions`, MIT, mã GSO; chạy lại: `npm i --no-save vn-local-divisions && node tools/gen-vn-address.js`). Để NGOÀI `js/` vì ngân sách trang đã gần trần (126/126 thẻ script) — sẽ nạp lười bằng fetch khi mở màn Tạo đơn (file cũ chỉ tải khi tích địa chỉ cũ). `tools/build-dist.js` copy `data/*.json` vào dist; `deploy-web.yml` thêm trigger `data/**`.
+- ➡️ BƯỚC 2/3: `js/99-d-crm-order.js` — khối Nhận hàng: ô tích, 3 ô `<select>` (ô tìm nhanh toàn cục js/99-e tự áp), nạp dữ liệu, dự phòng về ô gõ tay nếu tải lỗi; test `tools/test-crm-order-address.js`. BƯỚC 3/3: kiểm tra màn danh sách/chi tiết đơn (js/99-d-crm-orders.js đã ghép địa chỉ từ chuỗi → dự kiến không cần đổi).
+- Duyên: sau khi Actions deploy-web xanh → Ctrl+F5.
+
 ## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — XONG, ĐÃ PUSH
 - ĐỀ BÀI Duyên: "ok áp dụng nhé" (phương án 1: ẩn với tài khoản test các màn máy chủ không phục vụ).
 - NGUYÊN NHÂN GỐC: tài khoản test mặc định thấy mọi màn, nhưng máy chủ không mở dữ liệu cho một số màn nên bấm vào chỉ gặp "không được phép".
