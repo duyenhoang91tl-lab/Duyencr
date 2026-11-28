@@ -521,7 +521,8 @@ var HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'
 // ═══════════════════════════════════════════════════════
 //  NHẮC HẸN — thông báo góc dưới phải màn hình
 // ═══════════════════════════════════════════════════════
-let _reminderPanelOpen = true;
+// Dien thoai (<=640px): mac dinh THU thanh chuong co so. NGUYEN NHAN GOC: bang nhac hen mo san che 1/3 duoi man hinh, de len dung nut dang can bam.
+let _reminderPanelOpen = !(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width:640px)').matches);
 let _reminderTimer = null;
 // parseVNDate_: đọc chuỗi ngày dạng "dd/MM/yyyy" hoặc "dd/MM/yyyy HH:mm" mà backend
 // (readAllOrders_/readDTTong_ trong gas_v13.js) trả về cho các trường ngày của đơn hàng.
