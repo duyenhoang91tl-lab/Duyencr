@@ -3210,7 +3210,7 @@ function doGetCore_(e) {
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
     // can biet truoc ten cot (tu doc dong tieu de dong 1). ──
-    if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
+    if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : '', null, !!(e && e.parameter && String(e.parameter.combo) === '1')));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
@@ -12817,7 +12817,9 @@ function _priceCatalogRowsCached_() {
   return rows || [];
 }
 // GET action=priceAsk&q=<cau hoi>. Tra { ok, found:true, text, unit } | { ok, found:false, suggestions:[ten san pham gan dung] } | { ok:false, error }.
-function priceAsk_(q, out) {
+function priceAsk_(q, out, comboOnly) {
+  // comboOnly (Duyen 2026-11-18: o tich 'Combo' o Tro ly AI gia): CHI tra combo, khong tra san pham le. Khong co combo khop → combos:[] (giao dien bao 'khong co combo').
+  if (comboOnly) return { ok: true, found: false, text: '', unit: '', suggestions: [], combos: _priceAskCombos_(String(q || '').slice(0, 200), 8), comboOnly: true };
   var r = priceAskBase_(q, out);
   if (r && r.ok) r.combos = _priceAskCombos_(String(q || '').slice(0, 200));   // + combo co san khop (sheet COMBO)
   return r;
@@ -12845,11 +12847,12 @@ function priceAskBase_(q, out) {
   return { ok: true, found: false, suggestions: names };
 }
 // Combo dang ap dung khop cau hoi (toi da 5) — gan vao ket qua priceAsk_ de Tro ly AI "Gia san pham" hien kem. Loi/khong co sheet -> [].
-function _priceAskCombos_(q) {
+function _priceAskCombos_(q, max) {
   try {
     var rows = readComboCatalog_().filter(function (c) { return c.usable; });
     if (!rows.length) return [];
-    return searchCombos_(rows, q, true).slice(0, 5);
+    // text = chu hien thi theo mau moi (gia giam, dong SP co vang/gia, ship, qua) — Tro ly AI / extension dung thang, khong tu ghep lai.
+    return searchCombos_(rows, q, true).slice(0, max || 5).map(function (c) { c.text = _comboFormatText_(c); return c; });
   } catch (e) { return []; }
 }
 // GET action=priceItem&name=<TEN san pham chinh xac (lay tu goi y cua priceAsk)>.

@@ -14,8 +14,8 @@
   - 🐞 Bẫy test (ghi cho phiên sau): `ctkmComboList` cũng phải được mock trả lời NGAY trong tools/test-combo-tab.js (nếu không test treo im lặng, mã 0); khối test lượt 2 bọc trong `{ }` riêng vì tên biến (pk, pd, pi…) trùng test cũ.
   - ⚠ Chưa nối: thẻ combo trong tab + nút 📋 Copy + trợ lý AI/extension CHƯA hiển thị theo mẫu mới (bước 4).
   - 🧪 Duyên (sau khi GAS deploy + Ctrl+F5): tab Combo → 🎁 CTKM combo → thêm "Giảm 200k" (giảm tiền 200000) và 1 CTKM tặng quà có ảnh → ➕ Thêm combo → chọn SP, tích vàng, nhập ship 40000, tích CTKM → xem khung Xem trước → Lưu.
-- [ ] BƯỚC 4 hiển thị/copy combo theo mẫu mới (CRM web + Pancake/Zalo + trợ lý AI).
-- [ ] BƯỚC 5 ô tích "Combo" ở AI tra giá (CRM web js/38 + Pancake/Zalo nếu có ô Hỏi AI giá).
+- ✅ BƯỚC 4+5 phần CRM WEB + GAS (js/93 `?v=20261118f`, js/38 `?v=20261118b`; test-combo/test-combo-tab/test-price-ask xanh) — CẦN DEPLOY GAS: thẻ combo trong tab + nút 📋 Copy dùng `_cbFormatText` (mẫu mới, ảnh quà tặng dưới thẻ); `priceAsk` trả mỗi combo thêm `text` (chữ mẫu mới) và nhận `combo=1` (`priceAsk_(q,null,true)` = CHỈ combo, `comboOnly:true`, tối đa 8); Trợ lý AI giá (js/38, chế độ 💰) có ô tích "🎁 Chỉ tìm COMBO": tích → gọi `&combo=1`, hiện chữ mẫu mới + ảnh combo (≤6) + ảnh quà (nhãn "🎁 Quà: …"), không có combo → báo rõ.
+- [ ] BƯỚC 6 EXTENSION (chưa làm): Pancake (`extension-pancake/pancake-content.js` ~dòng 3770-3830 khối combo của ô tra giá) và Zalo (zalo-content.js) hiện vẫn hiển thị combo theo mẫu CŨ — đổi sang dùng `c.text` (GAS đã dựng sẵn) + ảnh quà; thêm ô tích "Combo" ở ô tra giá nếu có (gọi `priceAsk&combo=1`). Sửa xong nhắc Duyên reload extension ở chrome://extensions.
 
 ## 2026-11-26 (phiên Claude — XUẤT DOANH THU BÁO CÁO B: CẢ TEAM / TỪNG SALE ĐỂ CÁC BẠN TỰ CHECK) — XONG 2/2 (chỉ web, Ctrl+F5; không đụng GAS; chờ Duyên thử thật)
 - ĐỀ BÀI Duyên: cho quyền xuất file doanh thu của Báo cáo B, xuất được cả team hoặc từng sale để các bạn check doanh thu.
