@@ -9,7 +9,7 @@ ok(a > 0 && b > a, 'tim thay khoi code that');
 ok(j37.includes("'bannedWordsCfg'") && j37.includes('_cfgBannedHtml_() +'), 'da noi vao _cfgLoad (getSettings) va _cfgRender');
 const els = {}, calls = [], toasts = [];
 const ctx = { esc: s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), gsUrl: 'http://gas', currentUser: { name: 'Duyên' }, _cfgRender() {}, toast: m => toasts.push(m),
-  confirm: () => true, document: { getElementById: id => els[id] || null },
+  confirm: () => true, get uiConfirm() { return async (...a) => this.confirm(...a); }, document: { getElementById: id => els[id] || null },
   fetch: async (u, o) => { calls.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; } };
 vm.createContext(ctx); vm.runInContext(j37.slice(a, b), ctx);
 const run = e => vm.runInContext(e, ctx);
@@ -58,9 +58,9 @@ run('_cfgBannedApply_({})');
   els['cfg-ban-list'] = { value: Array.from({ length: 501 }, (_, i) => 'w' + i).join('\n') }; toasts.length = 0; await run('_cfgBannedSave()');
   ok(calls.length === 0 && toasts.some(t => /Tối đa 500/.test(t)), '>500 tu bi chan');
   // tắt sheet + rỗng: hỏi xác nhận; từ chối => không gửi
-  els['cfg-ban-list'] = { value: '' }; els['cfg-ban-sheet'] = { checked: false }; ctx.confirm = () => false; await run('_cfgBannedSave()');
+  els['cfg-ban-list'] = { value: '' }; els['cfg-ban-sheet'] = { checked: false }; ctx.confirm = () => false; ctx.uiConfirm = async (...a) => ctx.confirm(...a); await run('_cfgBannedSave()');
   ok(calls.length === 0, 'tat sheet + rong, khong xac nhan => khong gui');
-  ctx.confirm = () => true; await run('_cfgBannedSave()');
+  ctx.confirm = () => true; ctx.uiConfirm = async (...a) => ctx.confirm(...a); await run('_cfgBannedSave()');
   ok(JSON.parse(calls.find(c => c.action === 'setSetting').value).useSheet === false, 'xac nhan => gui useSheet=false');
   // về mặc định => gửi {} (server hiểu = bật sheet, không từ thêm)
   calls.length = 0; await run('_cfgBannedSave(true)');

@@ -72,7 +72,7 @@ async function confirmDeleteDupOrders(){
     var row = g && g.rows[+b.getAttribute('data-ri')];
     if (row) items.push({sheet: row.sheet, rowIndex: row.rowIndex});
   });
-  if (!confirm('Xác nhận XÓA '+items.length+' đơn hàng trùng?\n\nThao tác này không thể hoàn tác trên Google Sheets. Hãy chắc chắn bạn đã kiểm tra đúng dòng cần xóa (nhất là các nhóm có cảnh báo doanh thu khác nhau).')) return;
+  if (!(await uiConfirm('Xác nhận XÓA '+items.length+' đơn hàng trùng?\n\nThao tác này không thể hoàn tác trên Google Sheets. Hãy chắc chắn bạn đã kiểm tra đúng dòng cần xóa (nhất là các nhóm có cảnh báo doanh thu khác nhau).'))) return;
   var btn = document.getElementById('dup-orders-delete-btn');
   btn.disabled = true; btn.textContent = '⏳ Đang xóa...';
   try {

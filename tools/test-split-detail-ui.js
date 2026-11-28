@@ -83,7 +83,7 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   ok(w.splitGhepBtnHtml_(false, true) === '', 'khong phai Admin: KHONG hien nut cong tac');
   ok(/TẮT/.test(w.splitGhepBtnHtml_(true, false)) && !/primary/.test(w.splitGhepBtnHtml_(true, false)) && /BẬT/.test(w.splitGhepBtnHtml_(true, true)) && /primary/.test(w.splitGhepBtnHtml_(true, true)), 'Admin: nut hien dung trang thai TAT/BAT');
   const sets = []; let loads = 0, conf = true, confMsg = '';
-  w.confirm = m => { confMsg = m; return conf; }; w._srLoad = () => { loads++; };
+  w.confirm = m => { confMsg = m; return conf; }; w.uiConfirm = async m => w.confirm(m); w._srLoad = () => { loads++; };
   w.fetch = async (u, o) => { sets.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; };
   w.eval("_srState.ghepMin1 = false"); conf = false; await w._srMToggleGhep_(); ok(sets.length === 0 && loads === 0, 'huy hop xac nhan -> khong ghi gi');
   conf = true; await w._srMToggleGhep_(); await sleep(5);

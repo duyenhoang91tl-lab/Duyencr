@@ -79,7 +79,7 @@ function clCanApprove_(name){
   if (r !== 'leader' && r !== 'manager') return false;
   return clAllowedNames_(currentUser, teams, accounts).map(function(n){ return n.toLowerCase(); }).indexOf(String(name).toLowerCase()) !== -1;
 }
-function clSave_(ov){
+async function clSave_(ov){
   var l = clReadForm_(), today = scYmd_(new Date());
   if (!l.name || !l.from){ scToast_('Chọn nhân viên và "Từ ngày".'); return; }
   if (l.to && l.to < l.from){ scToast_('"Đến ngày" phải sau hoặc bằng "Từ ngày".'); return; }
@@ -90,7 +90,7 @@ function clSave_(ov){
   if (p.noTarget){ scToast_(l.mode === 'to' ? 'Người nhận không hợp lệ (trùng người nghỉ hoặc đang nghỉ).' : 'Không có CS cùng team đang đi làm để chia đều.'); return; }
   var future = l.from > today, canApprove = clCanApprove_(l.name);
   if (!canApprove){ if (!confirm('Gửi yêu cầu nghỉ của ' + l.name + ' từ ' + l.from + (l.to ? ' đến ' + l.to : '') + '? Admin/trưởng nhóm duyệt xong mới giao ' + p.rows.length + ' khách.')) return; l.pending = true; _csLeaves.push(l); clSaveLeaves_(); ov.remove(); if (typeof renderOverdueTab === 'function') renderOverdueTab(); scToast_('✓ Đã gửi yêu cầu nghỉ — chờ admin/trưởng nhóm duyệt'); return; }
-  if (!confirm(future ? 'Lưu kỳ nghỉ của ' + l.name + ' từ ' + l.from + '? Đến ngày đó hệ thống sẽ tự giao khách.' : 'Giao ' + p.rows.length + ' khách của ' + l.name + ' ngay bây giờ?')) return;
+  if (!(await uiConfirm(future ? 'Lưu kỳ nghỉ của ' + l.name + ' từ ' + l.from + '? Đến ngày đó hệ thống sẽ tự giao khách.' : 'Giao ' + p.rows.length + ' khách của ' + l.name + ' ngay bây giờ?'))) return;
   _csLeaves.push(l);
   var msg = '✓ Đã lưu kỳ nghỉ';
   if (!future){ var r = clApplyLeave_(l, today); msg = '✓ Đã giao ' + r.n + ' khách của ' + l.name; }
@@ -107,18 +107,18 @@ async function clReturn_(id){
   if (!pending && !(await clLoadHanded_(l))){ scToast_('Chưa nạp được danh sách khách đã giao (kiểm tra mạng rồi thử lại).'); return; }
   var p = clReturnPlan_(l, careData);
   var msg = l.pending ? 'Huỷ/từ chối yêu cầu nghỉ của ' + l.name + '? (chưa giao khách nào)' : pending ? 'Huỷ kỳ nghỉ hẹn của ' + l.name + '? (chưa giao khách nào)' : 'Trả lại ' + p.rows.length + ' khách cho ' + l.name + '?' + (p.skipped ? '\n(' + p.skipped + ' khách đã được đổi CS sau đó → giữ nguyên, không đè)' : '');
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm(msg))) return;
   var r = clReturnLeave_(l);
   try { if (typeof updateSchedBadges === 'function') updateSchedBadges(); } catch (e) {}
   if (typeof renderOverdueTab === 'function') renderOverdueTab();
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
   scToast_(pending ? '✓ Đã huỷ kỳ nghỉ' : '✓ Đã trả lại ' + r.rows.length + ' khách cho ' + l.name + (r.skipped ? ' · giữ nguyên ' + r.skipped : ''));
 }
-function clApprove_(id){
+async function clApprove_(id){
   var l = (_csLeaves || []).filter(function(x){ return x.id === id; })[0]; if (!l || !l.pending || !clCanApprove_(l.name)) return;
   var today = scYmd_(new Date()), day = l.from > today ? l.from : today, p = clPlanFor_(l, day);
   if (p.noTarget){ scToast_('Không giao được (người nhận không hợp lệ / không có CS cùng team đi làm) — từ chối hoặc bảo nhân viên đặt lại.'); return; }
-  if (!confirm('Duyệt kỳ nghỉ của ' + l.name + (l.from > today ? ' (tự giao khi tới ' + l.from + ')?' : ' và giao ' + p.rows.length + ' khách ngay?'))) return;
+  if (!(await uiConfirm('Duyệt kỳ nghỉ của ' + l.name + (l.from > today ? ' (tự giao khi tới ' + l.from + ')?' : ' và giao ' + p.rows.length + ' khách ngay?')))) return;
   l.pending = false; l.approvedBy = (currentUser && currentUser.name) || '';
   var msg = '✓ Đã duyệt kỳ nghỉ';
   if (l.from <= today){ var r = clApplyLeave_(l, today); msg = '✓ Đã duyệt + giao ' + r.n + ' khách của ' + l.name; }

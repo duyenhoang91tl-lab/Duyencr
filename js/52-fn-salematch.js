@@ -129,10 +129,10 @@ function _smAddTo(primary, names){
   names.forEach(function(n){ if (!seen[_smF(n)]) { seen[_smF(n)] = 1; _sm.tags[primary].push(n); } });
   _smDirty();
 }
-function _smBodyClick(e){
+async function _smBodyClick(e){
   var t;
   if ((t = e.target.closest('[data-smrm]'))) { _smRemoveFromGroups(t.getAttribute('data-smrm')); _smDirty(); _smRender(); return; }
-  if ((t = e.target.closest('[data-smdel]'))) { var p = t.getAttribute('data-smdel'); if (confirm('Tách nhóm “' + p + '”? Các tên sẽ về “Chưa khớp”.')) { delete _sm.tags[p]; _smDirty(); _smRender(); } return; }
+  if ((t = e.target.closest('[data-smdel]'))) { var p = t.getAttribute('data-smdel'); if ((await uiConfirm('Tách nhóm “' + p + '”? Các tên sẽ về “Chưa khớp”.'))) { delete _sm.tags[p]; _smDirty(); _smRender(); } return; }
   if ((t = e.target.closest('[data-smren]'))) {
     var old = t.getAttribute('data-smren'), nn = (prompt('Tên chính của nhóm:', old) || '').trim();
     if (nn && nn !== old) { var members = (_sm.tags[old] || []).slice(); delete _sm.tags[old]; _smRemoveFromGroups(nn); _sm.tags[nn] = members.filter(function(m){ return _smF(m) !== _smF(nn); }); if (_smF(nn) !== _smF(old) && !_sm.tags[nn].some(function(m){ return _smF(m) === _smF(old); })) _sm.tags[nn].unshift(old); _smDirty(); _smRender(); }

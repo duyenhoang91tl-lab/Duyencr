@@ -1542,10 +1542,10 @@ function _bpFilteredProducts_(){
     return true;
   });
 }
-function _bpProdPickAll(){
+async function _bpProdPickAll(){
   var list = _bpFilteredProducts_();
   if (!list.length) return;
-  if (list.length > 50 && !confirm('Tích tất cả '+list.length+' sản phẩm đang hiển thị?')) return;
+  if (list.length > 50 && !(await uiConfirm('Tích tất cả '+list.length+' sản phẩm đang hiển thị?'))) return;
   var items = _bpDraft.prodRules.items = _bpDraft.prodRules.items || [];
   list.forEach(function(x){
     if (!items.some(function(it){ return String(it.code).toLowerCase() === String(x.code).toLowerCase(); })) items.push({code:x.code, name:x.name||'', amount:''});
@@ -1735,8 +1735,8 @@ function _bpDelete(id){
 // 80tr->100k, 3 CT rieng vi 1 CT "revenue" chi giu duoc 1 muc — xem _computeBonusData_, cac CT
 // cung nhom "doanh so/ngay" da tu dong chi lay muc CAO NHAT dat duoc). CHI ap dung cho Sale da
 // duoc dat "Ngay bat dau" o Quan ly tai khoan (xem _bonusProgramApplies_).
-function _bpSeedProbationTemplate_(){
-  if (!confirm('Tạo mới 5 chương trình mẫu theo đúng văn bản "Cơ chế thưởng kích hoạt Sale mới" (11/08/2026 - 31/12/2026)? Bạn nên kiểm tra lại từng chương trình (đặc biệt khoảng ngày) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
+async function _bpSeedProbationTemplate_(){
+  if (!(await uiConfirm('Tạo mới 5 chương trình mẫu theo đúng văn bản "Cơ chế thưởng kích hoạt Sale mới" (11/08/2026 - 31/12/2026)? Bạn nên kiểm tra lại từng chương trình (đặc biệt khoảng ngày) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.'))) return;
   var common = { dateFrom: '2026-08-11', dateTo: '2026-12-31', audience: {online:false, offline:false}, product:'', extraNote:'', exclusionNote:'' };
   var mk = function(o){ var p = _bpNewProgram(); return Object.assign(p, common, o, {id: 'bp_'+Date.now()+'_'+Math.floor(Math.random()*1000)}); };
   var seeded = [

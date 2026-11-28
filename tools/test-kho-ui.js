@@ -13,7 +13,7 @@ function boot(user, role) {
   w.localStorage.setItem('ome_sess_token', 'TOK');
   w.gsUrl = 'https://gas.test/exec';
   w.esc = s => (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  w.toast = m => toasts.push(m); w.confirm = () => true;
+  w.toast = m => toasts.push(m); w.confirm = () => true; w.uiConfirm = async (...a) => w.confirm(...a);
   w._authAccount = { username: user, role };
   w.accounts = [{ username: 'Trang', name: 'Trang' }, { username: 'Lan', name: 'Lan' }, { username: 'Bao', name: 'Bao' }];
   const items = [

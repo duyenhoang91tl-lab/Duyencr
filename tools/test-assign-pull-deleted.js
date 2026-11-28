@@ -1,7 +1,7 @@
 // Tai lich su chia: go dot admin da xoa (deletedIds), giu dot chi co o may, them dot moi. Chay: node tools/test-assign-pull-deleted.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const s = fs.readFileSync(path.join(__dirname, '..', 'js', '07-openassignmodal.js'), 'utf8');
-const f = s.match(/^async function pullAssignHistory\([\s\S]*?\n}\n/m)[0];
+const f = ['function _assignMergeDone_', 'async function pullAssignHistory'].map(n => s.match(new RegExp('^' + n + '\\([\\s\\S]*?\\n}\\n', 'm'))[0]).join('');
 let fail = 0; const ok = (n, v) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + n); if (!v) fail++; };
 let reply, saved, hist, sel, filtered, histShown;
 const bs = { value: '' };

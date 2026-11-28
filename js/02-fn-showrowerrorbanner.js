@@ -117,10 +117,10 @@ async function gsGetOrderCount() {
 // ── ĐỒNG BỘ 2 CHIỀU OrderData: làm Google Sheets KHỚP CHÍNH XÁC dữ liệu đang có trên máy ──
 async function fullSyncOrdersToGS() {
   if (!gsUrl) { toast('Chưa kết nối Google Sheets'); return; }
-  if (!confirm('ĐỒNG BỘ 2 CHIỀU (GỘP đơn — KHÔNG xóa đơn nào):\n\n'
+  if (!(await uiConfirm('ĐỒNG BỘ 2 CHIỀU (GỘP đơn — KHÔNG xóa đơn nào):\n\n'
     + '①  TẢI mọi đơn từ Google Sheets về máy (gộp vào dữ liệu đang có)\n'
     + '②  ĐẨY các đơn mới trên máy lên Google Sheets\n\n'
-    + 'Kết quả: cả máy và Sheet đều có đủ đơn của nhau, không đơn nào bị xóa.\n\nTiếp tục?')) return;
+    + 'Kết quả: cả máy và Sheet đều có đủ đơn của nhau, không đơn nào bị xóa.\n\nTiếp tục?'))) return;
   // ① TẢI đơn từ Sheet → gộp vào máy (dùng luồng pull sẵn có: mergeRows + dựng lại danh sách)
   const beforePull = Object.values(customerMap).reduce((s,c)=>s+c.orders.length,0);
   await syncFromGS({ pullOrders: true, manual: true });
@@ -878,6 +878,15 @@ function applyFilters() {
 //  TABLE
 // ═══════════════════════════════════════════════════════
 // ── HTML cho 1 dòng KH (tách riêng để virtual table tái sử dụng) ──
+// Dòng thứ 3 của "thẻ khách" (CHỈ hiện ≤640px, máy tính ẩn bằng CSS): CS phụ trách + nút Gọi / Zalo, để dùng được ngay trên điện thoại mà không phải vuốt ngang tìm cột.
+// CS ưu tiên người đang chăm; nút nằm trong dòng bấm-mở-hồ-sơ nên chặn nổi bọt (stopPropagation) để bấm Gọi/Zalo không mở hồ sơ.
+function _cardLineHtml_(c, csNames) {
+  var ph = String(c.phone || '').replace(/[^0-9+]/g, '');
+  var who = c.careCS ? (typeof _csCanonText_ === 'function' ? _csCanonText_(c.careCS) : c.careCS) : (csNames && csNames[0]) || '';
+  return '<div class="cm-line"><span class="cm-cs">' + (who ? '👤 ' + esc(who) : '') + '</span>'
+    + (ph ? '<a class="cm-btn" href="tel:' + esc(ph) + '" onclick="event.stopPropagation()">📞 Gọi</a>'
+      + '<a class="cm-btn" href="https://zalo.me/' + esc(ph) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">💬 Zalo</a>' : '') + '</div>';
+}
 function _rowHtml(c) {
   const tb = tierBadge(c.tier);
   const cb = careBadge(c.careStatus);
@@ -951,7 +960,7 @@ function _rowHtml(c) {
   }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
     <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
-    <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+    <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div>${_cardLineHtml_(c, csNames)}</td>
     <td class="col-tier">${tb}</td>
     <td class="col-hang">${hangBadge(c.hangKey)}</td>
     <td class="col-level" style="${levelDisp}">${levelHtml}</td>

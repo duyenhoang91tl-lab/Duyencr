@@ -47,7 +47,8 @@ const PARTS = [
   ['34_Loyalty', 'var LOYALTY_SECTION_ ='],
   ['34b_Ticket', 'var TICKET_SECTION_ ='],
   ['34c_CommClose', 'var COMMCLOSE_SECTION_ ='],
-  ['35_CrmOrder', 'var CRMORDER_SECTION_ =']
+  ['35_CrmOrder', 'var CRMORDER_SECTION_ ='],
+  ['36_CrmStage', 'var CRMSTAGE_SECTION_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

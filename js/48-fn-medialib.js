@@ -167,7 +167,7 @@ var MLIB = (function () {
     S.items = S.items.filter(function (i) { return i.id !== j.item.id; }); S.items.unshift(j.item); S.edit = null; say('✓ Đã lưu mẫu tin'); refresh();
   }
   async function del(id) {
-    if (!confirm('Xoá mục này khỏi thư viện?')) return;
+    if (!(await uiConfirm('Xoá mục này khỏi thư viện?'))) return;
     var j = await post({ action: 'mlibDelete', id: id }); if (!j || !j.ok) { say('✕ ' + ((j && j.error) || 'Xoá lỗi')); return; }
     S.items = S.items.filter(function (i) { return i.id !== id; }); render();
   }

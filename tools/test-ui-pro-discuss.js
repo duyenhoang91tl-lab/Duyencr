@@ -9,7 +9,7 @@ w.localStorage.setItem('ome_sess_token','TOK');
 w.eval('var gsUrl="https://gs.example/exec"; var currentUser={name:"Hà",role:"cs"}; var _activeV9Tab="chat"; var currentPhone=""; var _posStatsOn=false; var donStatsByPhone={}; var schedules=[]; var SCHED_TYPES=[]; var CARE_STATUS_TREE=[{label:"Chốt",value:"Chốt"}]; function _custRev_(){return 0;} function _ymd(d){return d.toISOString().slice(0,10);} var careData={"0934230669":{status:"Chốt",note:""}}; var _synced=[],_saved=[],_touched=[],_mentions=[]; function queueCareSync(p){_synced.push(p)} function saveLS(k,v){_saved.push(k)} function _touchCare(p){_touched.push(p)} function ntNoteMention(p,t){_mentions.push([p,t])}');
 const s03=src('03-fn-refreshopendptab.js');w.eval(['_parseNotes','_notesToStr','_fmtNoteTime'].map(n=>fn(s03,n)).join('\n'));
 w.allCustomers=[{phone:'0934230669',name:'Mến Hoàng',tier:'Vàng',orders:[]}];
-const toasts=[];w.toast=m=>toasts.push(m);w.confirm=()=>true;w.openDp=()=>{};
+const toasts=[];w.toast=m=>toasts.push(m);w.confirm=()=>true; w.uiConfirm = async (...a) => w.confirm(...a);w.openDp=()=>{};
 let sendFail=false,forbid=false,skipNames=[];
 w.fetch=async(u,o)=>{const body=o&&o.body?JSON.parse(o.body):null;reqs.push({u,body,method:o&&o.method||'GET'});let r={};
  if(u.includes('pkChatInbox'))r={conversations:[{id:'C1',name:'Mến Hoàng',phone:'+84 934 230 669',lastText:'x',lastAt:iso(1),seen:true,type:'INBOX'},{id:'C2',name:'Không SĐT',phone:'',lastText:'y',lastAt:iso(2),seen:true,type:'INBOX'}]};

@@ -258,6 +258,7 @@ function doPostCore_(e) {
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
     if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);   // dung diem tru vao don (token)
     if (CRM_ORDER_POST_ACTIONS_[action] === 1) return crmOrderDoPost_(action, data);   // len Don CRM (sheet rieng 'Don CRM', KHONG ghi DT Tong; token)
+    if (KENH_POST_ACTIONS_[action] === 1) return kenhDoPost_(action, data);   // Don cac kenh theo giai doan: tao/sua/chuyen giai doan/viec con/binh luan (token)
     if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
@@ -402,6 +403,8 @@ function doPostCore_(e) {
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
     if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatPropose')        return vietTatPropose_(data, _tplCaller_(data.token, data.ek, data.by));   // gửi đề xuất sửa/thêm mục chung → báo admin duyệt
+    if (action === 'vietTatDecide')         return vietTatDecide_(data, _tplCaller_(data.token, '', ''));              // CHỈ admin (theo token phiên): approve / reject
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'vietTatUsage')          return jsonOut_(vietTatUsage_(data, _tplCaller_(data.token, data.ek, data.by)));   // dong bo so luot dung Viet tat giua cac may (cong don delta, tra ve tong cua rieng nguoi goi)
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)

@@ -22,6 +22,8 @@ ctx._sessUser_ = () => tokenUser;
 let pos = [];
 ctx.readDonChiTiet_ = () => pos;
 ctx.getSetting_ = () => '';
+// 28/11: đơn CRM nay tự TÍCH điểm. File này chỉ kiểm phép tính DÙNG điểm/hoàn điểm nên tắt bước tích để các số dư giữ ổn định; tích điểm có test riêng: tools/test-crm-order-earn.js.
+ctx._loyaltyCrmEarn_ = () => ({ points: 0 }); ctx._loyaltyCrmRevoke_ = () => ({ points: 0, earned: 0 });
 const J = o => JSON.parse(o.getContent());
 const rowsOf = n => (sheets[n] ? sheets[n].rows.slice(1) : []);
 const save = (order, refKey) => J(ctx.crmOrderDoPost_('crmOrderSave', { token: 't', order, refKey }));

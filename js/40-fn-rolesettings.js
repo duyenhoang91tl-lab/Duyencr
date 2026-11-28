@@ -233,9 +233,9 @@ function _rsToggle(kind, id, fid){
   var full = all.every(function(x){ return p.indexOf(x) !== -1; });
   _rsSetPerms(kind, id, full ? null : p); _rsDirty(); _rsRender();
 }
-function _rsDiscard(){
+async function _rsDiscard(){
   if (!_rs.dirty) return;
-  if (!confirm('Bỏ mọi thay đổi chưa lưu và tải lại cấu hình từ máy chủ?')) return;
+  if (!(await uiConfirm('Bỏ mọi thay đổi chưa lưu và tải lại cấu hình từ máy chủ?'))) return;
   _rs.dirty = false; openRoleSettings();
 }
 // Tóm tắt 1 lần lưu từ AuditLog (oldValue/newValue là JSON cấu hình): vai trò / phòng nào đổi quyền.

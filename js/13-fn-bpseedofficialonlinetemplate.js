@@ -9,8 +9,8 @@
 // không tách được theo CHẤT LIỆU/sản phẩm CHÍNH XÁC (chỉ khớp theo giá trị đơn hoặc từ khoá tên
 // sản phẩm) đều có ghi chú nhắc kế toán đối chiếu tay trước khi chốt — đúng tinh thần các mục 5/8
 // (ghi chú tự do, không tự động chấm) đã có sẵn trong hệ thống.
-function _bpSeedOfficialOnlineTemplate_(){
-  if (!confirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
+async function _bpSeedOfficialOnlineTemplate_(){
+  if (!(await uiConfirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.'))) return;
   // Duyen xac nhan 2026-10: bang nay ap dung cho MOI Sale CHINH THUC (ca online lan offline),
   // KHONG phai rieng Sale online — "online" trong ten bang/cot chi noi den kenh ban hang, khong
   // phai loai nhan vien. Chi loai tru Sale dang "Thu viec (TV)" (xem fix channel==='probation'
