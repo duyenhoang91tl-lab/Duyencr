@@ -1,10 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-28 (phiên Claude — TỐI ƯU GIAO DIỆN TIẾP: TÊN MỤC CỦA BIỂU ĐỒ THANH / NHÃN THẺ SỐ KHÔNG BỊ CẮT) — BƯỚC 1/2 XONG (css/06-pro.css)
+## 2026-11-28 (phiên Claude — TỐI ƯU GIAO DIỆN TIẾP: TÊN MỤC CỦA BIỂU ĐỒ THANH / NHÃN THẺ SỐ KHÔNG BỊ CẮT) — XONG 2/2 (css/06-pro.css + css/20-kit.css)
 - ĐỀ BÀI Duyên: "tối ưu tiếp giao diện đang làm, không làm các mục phiên khác đang dở, làm mục mới". Tiếp nối mục "TỔNG QUAN: TÊN NGUỒN KHÁCH BỊ CẮT" (yêu cầu gốc: các ô khác cũng phải hiển thị được tên tiêu đề). KHÔNG đụng: thẻ khách điện thoại (3 gợi ý bước 3/3), menu gọn, các mục 11 hạng mục/lên đơn CRM.
 - NGUYÊN NHÂN GỐC (bước 1): biểu đồ thanh của Tổng quan PRO (`proBars_` js/36 → `.pro-bar-row`) cùng lỗi với `_hsBars`: cột tên `minmax(90px,170px)` + `.pro-bar-lbl` nowrap/ellipsis nên tên dài bị cắt "…", thanh cột `1fr` chiếm hết chỗ.
 - ✅ ĐÃ SỬA `css/06-pro.css`: cột tên `minmax(130px,2fr)` cho xuống dòng, thanh `minmax(56px,1fr)` ngắn lại, số liệu `auto` (đã nowrap). `index.html` ?v=20261128a. Test ui-pro, ui-pro-home, kho-info xanh, check-health 0 lỗi.
-- ➡️ BƯỚC 2/2 (làm ngay sau): nhãn thẻ số `.ui-stat-lb` (css/20-kit.css) đang nowrap+ellipsis → cho xuống dòng. Chưa làm: tên giai đoạn dạng mũi tên `.pro-stage>li` (cố định 34px, cắt "…") — cần ảnh thật mới chỉnh an toàn.
+- ✅ BƯỚC 2/2 XONG: `.ui-stat-lb` (css/20-kit.css, nhãn thẻ số do `js/68-ui-kit.js` vẽ) đang nowrap+ellipsis → cho xuống dòng, `index.html` css/20 ?v=20261128a; test kit/ui-pro xanh, check-health 0 lỗi.
+- ➡️ VIỆC KẾ TIẾP (chưa làm): tên giai đoạn dạng mũi tên `.pro-stage>li` (cố định 34px, cắt "…") — cần ảnh thật mới chỉnh an toàn.
 - Duyên: Ctrl+F5, xem Tổng quan; gửi ảnh nếu ô nào còn bị cắt tên.
 
 ## 2026-11-28 (phiên Claude — SỬA TEST `test-config-hub.js` ĐANG FAIL SẴN) — XONG, ĐÃ PUSH

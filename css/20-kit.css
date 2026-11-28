@@ -15,7 +15,8 @@
 .ui-stat{display:flex;align-items:center;gap:var(--ui-sp-3);min-width:0;padding:var(--ui-sp-4);font-family:var(--ui-font);background:var(--ui-grad-soft);border:1px solid var(--ui-border);border-radius:var(--ui-r-xl);box-shadow:var(--ui-shadow-sm)}
 .ui-stat-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;font-size:var(--ui-fs-xl);color:var(--uk-tone,var(--ui-brand));background:var(--uk-tone-soft,var(--ui-brand-soft));border:1px solid var(--uk-tone-line,var(--ui-brand-mid));border-radius:var(--ui-r-xl)}
 .ui-stat-body{min-width:0}
-.ui-stat-lb{font-size:var(--ui-fs-sm);color:var(--ui-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Duyen 28/11: tieu de the so hien du chu (cho xuong dong, khong cat '…'); the cao theo noi dung vi .ui-stat la flex align-items:center */
+.ui-stat-lb{font-size:var(--ui-fs-sm);color:var(--ui-text-muted);line-height:1.3;white-space:normal;overflow-wrap:anywhere}
 .ui-stat-n{font-size:var(--ui-fs-3xl);font-weight:var(--ui-fw-bold);line-height:1.15;color:var(--ui-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .ui-stat-sub{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-sp-2);margin-top:2px;font-size:var(--ui-fs-xs);color:var(--ui-text-hint)}
 .ui-delta{display:inline-block;padding:1px 7px;font-weight:var(--ui-fw-semibold);color:var(--ui-success);background:var(--ui-success-soft);border-radius:var(--ui-r-pill)}
