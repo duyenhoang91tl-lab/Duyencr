@@ -8,9 +8,9 @@
 
 ## 2026-11-28 (phiên Claude — LÀM NỐT CÁC VIỆC DANG DỞ: CỘT BẢNG KH → ĐIỂM ĐƠN CRM → ĐƠN CÁC KÊNH B3-B8 → MÀN CAM KẾT KPI)
 - ĐỀ BÀI Duyên (28/11 20:11): "Làm tiếp các bước còn dang dở". 4 việc trên đã dừng >5 tiếng, phiên NÀY đang nhận — phiên khác ĐỪNG làm trùng.
-- ✅ **ĐÃ XONG:** (1/4) Danh sách KH mặc định 7 cột chính (người đã chỉnh cột giữ nguyên); bảng vừa khít khung khi ẩn cột. Chụp Chromium 1200px + 390px, test-list-cols-default. Cần Ctrl+F5.
-- 🔧 **ĐANG LÀM:** (2/4) Đơn CRM: hiện điểm tích/trừ trên web (js/99-d).
-- ➡️ **BƯỚC KẾ TIẾP:** Điểm đơn CRM → Đơn các kênh B3-B8 → màn cam kết KPI. Việc 'CRM đơn giản' bước 3 (rà Báo cáo/Chia data/Cài đặt) còn để sau.
+- ✅ **ĐÃ XONG:** (1/4) Danh sách KH mặc định 7 cột, bảng vừa khít (Ctrl+F5). (2/4) Đơn CRM web: ô tóm tắt hiện '🎖️ Sẽ tích +N điểm (hạn 31/12/năm)', số dư ghi hạn; màn Đã lưu đơn hiện điểm vừa tích + nút Tích lại khi lỗi; Hủy/Hoàn báo số điểm hoàn lại và bị trừ. Test test-crm-order-points-web.
+- 🔧 **ĐANG LÀM:** (3/4) Đơn các kênh B3 (js/100-b-kenh-create.js).
+- ➡️ **BƯỚC KẾ TIẾP:** B3 → B8 → màn cam kết KPI. Việc 'CRM đơn giản' bước 3 còn để sau.
 
 ## 2026-11-28 (phiên Claude — SỬA 4 TEST ĐỎ CÓ SẴN TRÊN MAIN)
 - ĐỀ BÀI Duyên: "Tiếp" → xử lý test-demo-scope, test-team-daily-revenue, test-team-bonus-ui, test-srb-filter-menu (mỗi file một bước, push ngay).
