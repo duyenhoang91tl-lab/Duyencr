@@ -4,7 +4,7 @@
 //  nằm trên nội dung + header (200) nhưng DƯỚI lớp nhắc hẹn/thanh tab/dock/hộp thoại (≥300) nên không che thao tác.
 //  Rất nhẹ: 8–16 cánh nhỏ (5–9px), rơi chậm 16–32px/giây, mờ 38–68%; tự dừng khi tab bị ẩn.
 //  Tôn trọng "giảm chuyển động" của hệ điều hành (prefers-reduced-motion) → không chạy.
-//  Bật/tắt: ☰ → ⚙ Settings → "🌸 Tắt/Bật cánh đào rơi" (mọi vai trò); lưu localStorage 'ome_sakura' ('0' = tắt, mặc định bật).
+//  Bật/tắt: ☰ → ⚙ Settings → "🌸 Tắt/Bật cánh đào rơi" (mọi vai trò); lưu localStorage 'ome_sakura' ('0' = tắt, mặc định bật trên máy tính, TẮT trên điện thoại ≤640px nếu chưa chọn).
 //  GỠ HẲN: xoá thẻ <script src="js/66-sakura-petals.js"> trong index.html + mục act:sakura ở js/29-sidenav.js.
 // ════════════════════════════════════════════════════════════════════
 (function(){
@@ -15,7 +15,9 @@
   var COLORS = ['#ffc6d9', '#ffb7cf', '#ffd6e5', '#f8a9c6', '#ffe0ec'];
   var canvas = null, ctx = null, petals = [], raf = 0, last = 0, W = 0, H = 0, dpr = 1, rzTimer = 0;
 
-  function isOn(){ try { return localStorage.getItem(KEY) !== '0'; } catch(e){ return true; } }
+  function onPhone(){ try { return (window.innerWidth || document.documentElement.clientWidth || 9999) <= 640; } catch(e){ return false; } }
+  // Điện thoại (≤640px): hiệu ứng trang trí vẽ đè lên nút ở đáy màn hình → MẶC ĐỊNH TẮT nếu người dùng chưa từng chọn; đã bấm bật ('1') hoặc tắt ('0') thì theo lựa chọn đó. Máy tính giữ mặc định bật như cũ.
+  function isOn(){ try { var v = localStorage.getItem(KEY); return v === '1' ? true : v === '0' ? false : !onPhone(); } catch(e){ return !onPhone(); } }
   function reduced(){ try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; } }
   function rnd(a, b){ return a + Math.random() * (b - a); }
   function targetCount(){ return Math.max(8, Math.min(16, Math.round(W / 95))); }   // màn nhỏ 8 cánh, màn rộng tối đa 16
