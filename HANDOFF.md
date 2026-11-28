@@ -4,7 +4,7 @@
 - ĐỀ BÀI Duyên (clip + 3 ảnh Base): làm bảng đơn theo giai đoạn y như Base "ĐƠN CÁC KÊNH 2025-2026": bên trái danh sách kênh, bên phải các cột giai đoạn (Tiếp nhận đơn → Tạo đơn POS → Phân loại đơn → Phòng sản xuất → Kho thành phẩm → Đóng hàng → Hoàn thành / Thất bại). Form lên đơn y như Base (SĐT làm tên nhiệm vụ, Kênh bán, Sale bán, Sản phẩm order, Phân loại [Thanh toán toàn bộ / Cọc trước / Thu COD], Giá trị cọc, Tổng giá trị đơn (ko ship), Giá trị chênh đơn đổi, hình ảnh chuyển khoản, mô tả, người theo dõi, tài liệu đính kèm). Trang chi tiết như clip (thanh giai đoạn, trường dữ liệu, danh sách công việc, thảo luận, cột phải: mã bộ đếm / mã nhiệm vụ / người tạo / thời gian từng giai đoạn). Cần check tiền → tạo CÔNG VIỆC con ngay trong đơn giao bộ phận khác. Bình luận tương tác như Base.
 - QUYẾT ĐỊNH THIẾT KẾ: thực thể RIÊNG "Đơn Kênh" (sheet riêng, KHÔNG đụng sheet "Đơn CRM"/kho/điểm tích luỹ/DT Tổng — đúng quy tắc 14). Đơn CRM có cấu trúc (js/99-d) vẫn giữ nguyên. Quyền xem tái dùng `_crmCanSee_` (admin/CEO tất cả, trưởng phòng/team theo phạm vi, còn lại đơn của mình) + người được theo dõi + người được giao công việc trong đơn.
 - Sheet mới: "Đơn Kênh", "Đơn Kênh GĐ" (nhật ký giai đoạn, để tính thời gian từng giai đoạn), "Đơn Kênh Việc" (công việc con), "Đơn Kênh BL" (bình luận + dòng hệ thống).
-- [ ] **B1** GAS backend: khối `36_CrmStage` cuối gas_v13.js (+ PARTS trong tools/split-gas.js, gas/ tự sinh) — action kenhBoard / kenhOrder / kenhSave / kenhUpdate / kenhMove / kenhComment / kenhTaskSave / kenhTaskDone / kenhFollow. Test: tools/test-kenh-gas.js.
+- [x] **B1 XONG (đã push)** GAS backend: khối `36_CrmStage` cuối gas_v13.js (+ PARTS trong tools/split-gas.js, gas/ tự sinh) — action kenhBoard / kenhOrder / kenhSave / kenhUpdate / kenhMove / kenhComment / kenhTaskSave / kenhTaskDone / kenhFollow. Test: tools/test-kenh-gas.js.
 - [ ] **B2** `js/100-a-kenh-board.js`: tab "📦 Đơn các kênh": cột trái = kênh (có đếm), phải = cột giai đoạn, thẻ đơn, lọc ngày/tìm, kéo/nhấn chuyển giai đoạn.
 - [ ] **B3** `js/100-b-kenh-create.js`: modal "Tạo nhiệm vụ mới" đúng form ảnh 2–3 (+ đầu vào giai đoạn Tiếp nhận đơn).
 - [ ] **B4** `js/100-c-kenh-detail.js`: trang chi tiết như clip (thanh giai đoạn, trường dữ liệu, cột phải thông tin + thời gian từng giai đoạn).
@@ -12,8 +12,8 @@
 - [ ] **B6** `js/100-e-kenh-comments.js`: thảo luận/bình luận trong đơn.
 - [ ] **B7** Ảnh/tệp đính kèm (hình chuyển khoản, tài liệu, ảnh trong bình luận) — tái dùng cách upload Drive của thư viện ảnh.
 - [ ] **B8** Thông báo (chuông) khi được giao công việc / có bình luận; KB `docs/crm-kb/17-don-kenh.md` + dòng định tuyến trong 00-READ-FIRST.
-- 🔧 **ĐANG LÀM:** B1.
-- ➡️ **BƯỚC KẾ TIẾP:** B2 sau khi B1 push xong.
+- 🔧 **ĐANG LÀM:** B2 (js/100-a-kenh-board.js, chưa tạo file).
+- ➡️ **BƯỚC KẾ TIẾP:** B2 → B3 → B4… (xem danh sách trên). B1 đã có đủ API cho cả bảng/chi tiết/việc/bình luận; phiên khác chỉ cần gọi: GET kenhBoard {token,from,to,kenh,q} trả {stages, channels:[{name,count}], stageCount, orders[thẻ]}; GET kenhOrder {token,id} trả {order, canEdit, isAdmin, me, log, tasks, comments}; POST kenhSave/kenhUpdate/kenhMove/kenhComment/kenhTaskSave/kenhTaskDone/kenhFollow (chi tiết đầu khối `36_CrmStage`). Kênh mặc định lấy từ Settings key `kenhBanList` (phân cách bằng dấu phẩy/xuống dòng) + các kênh đã có đơn. GAS: workflow tự deploy (không nhắc deploy). Test: `node tools/test-kenh-gas.js`.
 
 ## 2026-11-28 (phiên Claude — ĐƠN CRM TÍCH ĐIỂM + HỦY/HOÀN TRỪ ĐIỂM, KHÔNG ÂM) — BƯỚC 1/2 XONG (GAS: CẦN DEPLOY GAS); BƯỚC 2/2 (web hiện điểm) làm tiếp
 - ĐỀ BÀI Duyên: "tạo đơn trên CRM còn có thể tích/trừ điểm của những đơn đã mua trước đó trong năm; điểm chỉ tích trong năm, qua năm sau hết hạn; đơn hoàn/hủy thì trừ điểm (không tính âm)".
