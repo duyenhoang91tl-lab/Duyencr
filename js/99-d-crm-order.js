@@ -22,6 +22,24 @@ var _coCat = { items:[], loaded:false, loading:false, err:'' };
 var _coPick = { q:'', list:[] };
 function _coNum(v){ var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function _coVnd(n){ n = Math.round(Number(n) || 0); return (n < 0 ? '-' : '') + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+// Ô nhập TIỀN hiện dấu chấm ngăn hàng nghìn khi gõ (100000 → 100.000). Ô là type=text inputmode=numeric; dữ liệu giữ NGUYÊN là số thuần
+// (chỉ chữ số → _coNum không hiểu nhầm dấu chấm thành dấu thập phân). Ô giảm % KHÔNG dùng (cần số lẻ như 7.5).
+function _coFmtMoney(n){ if (n === '' || n == null) return ''; var d = String(Math.round(Number(n) || 0)); return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function _coMoneyIn(el, fn){
+  var raw = String(el.value || ''), pos = el.selectionStart == null ? raw.length : el.selectionStart;
+  var before = raw.slice(0, pos).replace(/\D/g, '').length;                    // số chữ số nằm bên trái con trỏ
+  var d = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');                     // chỉ giữ chữ số, bỏ số 0 đầu thừa
+  var out = d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (out !== raw){
+    el.value = out;
+    var p = 0, c = 0; while (p < out.length && c < before){ if (out.charAt(p) !== '.') c++; p++; }   // đặt lại con trỏ sau đúng chừng ấy chữ số
+    try { el.setSelectionRange(p, p); } catch (e) {}
+  }
+  fn(d);
+}
+function _coMoneyItem(el, i, k){ _coMoneyIn(el, function(v){ _coItemSet(i, k, v); }); }
+function _coMoneyNum(el, key){ _coMoneyIn(el, function(v){ _coSetNum(key, v); }); }
+function _coMoneyDisc(el){ _coMoneyIn(el, _coDiscInput); }
 function _coKToVnd(n){ n = Math.round(Number(n) || 0); return n > 0 && n < 100000 ? n * 1000 : n; }   // bảng giá ghi nghìn; ≥100000 coi là đồng đầy đủ
 function _coFold(s){ try { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ​-‍﻿]/g, '').replace(/[đĐðÐ]/g, 'd').toLowerCase(); } catch(e){ return String(s == null ? '' : s).toLowerCase(); } }
 function _coWords(s){ return ' ' + _coFold(s).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
@@ -403,7 +421,7 @@ function _coField(label, key, opt){
     'oninput="_coSet(\'' + key + '\',this.value)"' + (opt.onchange ? ' onchange="' + opt.onchange + '"' : '') + ' style="' + _coInp + '"></label>';
 }
 function _coMoneyField(label, key, ph){
-  return '<label style="display:block;font-size:12px;color:var(--muted)">' + label + '<input id="co-f-' + key + '" type="number" min="0" value="' + (_co[key] ? _coEsc(_co[key]) : '') + '" placeholder="' + (ph || '0') + '" oninput="_coSetNum(\'' + key + '\',this.value)" style="' + _coInp + '"></label>';
+  return '<label style="display:block;font-size:12px;color:var(--muted)">' + label + '<input id="co-f-' + key + '" type="text" inputmode="numeric" autocomplete="off" value="' + (_co[key] ? _coFmtMoney(_co[key]) : '') + '" placeholder="' + (ph || '0') + '" oninput="_coMoneyNum(this,\'' + key + '\')" style="' + _coInp + '"></label>';
 }
 // Nút chọn kiểu giảm: [đ | %] (thay hộp chọn nhỏ cũ — chỉ hiện chữ "đ" nên dễ bỏ sót lựa chọn %). fnAmt/fnPct = chuỗi onclick.
 function _coSeg(isPct, fnAmt, fnPct){
@@ -420,8 +438,8 @@ function _coItemRow(it, i){
     (it.comboName ? '<div style="font-size:11px;color:#b5305a;margin:-2px 0 4px">🎁 Combo: ' + _coEsc(it.comboName) + ' — giá đã chia theo giá combo</div>' : '') + '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;align-items:end">' +
       '<label style="font-size:11px;color:var(--muted)">Số lượng<input type="number" min="1" value="' + _coEsc(it.qty) + '" oninput="_coItemSet(' + i + ',\'qty\',this.value)" style="' + _coInp + '"></label>' +
-      '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="number" min="0" value="' + _coEsc(it.price) + '" oninput="_coItemSet(' + i + ',\'price\',this.value)" style="' + _coInp + '"></label>' +
-      '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px"><input type="number" min="0" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' +
+      '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="text" inputmode="numeric" autocomplete="off" value="' + _coFmtMoney(it.price) + '" oninput="_coMoneyItem(this,' + i + ',\'price\')" style="' + _coInp + '"></label>' +
+      '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px">' + (pct ? '<input type="number" min="0" max="100" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' : '<input type="text" inputmode="numeric" autocomplete="off" value="' + (it.discValue ? _coFmtMoney(it.discValue) : '') + '" oninput="_coMoneyItem(this,' + i + ',\'discValue\')" style="' + _coInp + '">') +
         _coSeg(pct, '_coItemDiscType(' + i + ',\'amt\')', '_coItemDiscType(' + i + ',\'pct\')') + '</span></label>' +
       '<label style="font-size:11px;color:var(--muted)">Thuế (%)<input type="number" min="0" max="100" value="' + (it.taxPct ? _coEsc(it.taxPct) : '') + '" placeholder="0" oninput="_coItemSet(' + i + ',\'taxPct\',this.value)" style="' + _coInp + '"></label>' +
       '<div style="font-size:11px;color:var(--muted)">Thành tiền<div id="co-line-' + i + '" style="font-size:14px;font-weight:700;color:var(--text,inherit)"></div></div>' +
@@ -476,7 +494,7 @@ function _coRender(keepFocus){
     '<div style="' + grid + ';margin-top:8px">' + _coField('Ghi chú nội bộ', 'note') + _coField('Ghi chú in trên đơn', 'printNote') + '</div>' +
     '</div><div style="flex:1;min-width:260px;position:sticky;top:8px">' +
     sec('💰 Thanh toán') + '<div style="border:1px solid var(--border);border-radius:10px;padding:10px">' +
-    '<div style="margin-bottom:8px"><div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:12px;color:var(--muted)">Giảm giá đơn (chọn giảm tiền hoặc giảm %)<input id="co-f-discValue" type="number" min="0"' + (_co.discType === 'pct' ? ' max="100"' : '') + ' value="' + (_co.discValue ? _coEsc(_co.discValue) : '') + '" placeholder="' + (_co.discType === 'pct' ? '% giảm, vd 10' : 'số tiền giảm, vd 50000') + '" oninput="_coDiscInput(this.value)" style="' + _coInp + '"></label></div>' +
+    '<div style="margin-bottom:8px"><div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:12px;color:var(--muted)">Giảm giá đơn (chọn giảm tiền hoặc giảm %)<input id="co-f-discValue" ' + (_co.discType === 'pct' ? 'type="number" min="0" max="100" value="' + (_co.discValue ? _coEsc(_co.discValue) : '') + '" oninput="_coDiscInput(this.value)"' : 'type="text" inputmode="numeric" autocomplete="off" value="' + (_co.discValue ? _coFmtMoney(_co.discValue) : '') + '" oninput="_coMoneyDisc(this)"') + ' placeholder="' + (_co.discType === 'pct' ? '% giảm, vd 10' : 'số tiền giảm, vd 50.000') + '" style="' + _coInp + '"></label></div>' +
     _coSeg(_co.discType === 'pct', '_coDiscType(\'amt\')', '_coDiscType(\'pct\')') + '</div><div id="co-disc-hint" style="font-size:11px;color:var(--muted);margin-top:3px;min-height:14px"></div></div>' +
     '<div id="co-promo" style="margin-bottom:8px;padding:8px;border:1px dashed var(--border);border-radius:8px"></div>' +
     '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Phí vận chuyển', 'shipFee') + '</div>' +
