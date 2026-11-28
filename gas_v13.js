@@ -23326,7 +23326,10 @@ var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1, teamPe
 //  D3. Top 1 tỷ lệ chốt tháng 1.000.000đ (monthlyReward, cơ chế sẵn có: tương tác >= TB team).
 //  D4. Sale ONLINE không lương cứng: doanh số tháng >= 700tr → +1.000.000đ phụ cấp.
 //  Doanh số tính theo NGƯỜI TẠO ĐƠN trên đơn Base (cùng nguồn với thưởng ngày hiện có: _dtOrderRevenue_, đã loại đơn đổi trả/bảo hành/thay dây/trạng thái loại).
+// ⚠ 27/11: mục A (SP trọng điểm), B (bill combo/vòng mix) và C (DS ngày 60tr/100tr) ĐÃ CÓ SẴN ở Báo cáo G (BONUS_PROGRAMS, seed js/13, đúng số Phụ lục 02) →
+// thưởng DS ngày ở đây (dayTargetsEnabled) MẶC ĐỊNH TẮT để không trả 2 lần. Mục D (mốc tháng, Top 1 DT, phụ cấp Online) CHỈ có ở đây.
 var TEAM_BONUS_DEFAULT_ = {
+  dayTargetsEnabled: false,
   dailyTiers: [ { min: 60000000, reward: 50000 }, { min: 100000000, reward: 100000 } ],
   monthTiers: [ { min: 500000000, reward: 500000 }, { min: 600000000, reward: 700000 }, { min: 800000000, reward: 1000000 }, { min: 1000000000, reward: 1500000 }, { min: 1200000000, reward: 2000000 },
                 { min: 1500000000, reward: 2500000 }, { min: 1800000000, reward: 3000000 }, { min: 2000000000, reward: 3500000 }, { min: 2500000000, reward: 4500000 }, { min: 3000000000, reward: 5000000 } ],
@@ -23357,6 +23360,7 @@ function teamBonusCfg_() {
       var a = raw[k].map(function (x) { return { min: Number(x && x.min), reward: Number(x && x.reward) }; }).filter(function (x) { return isFinite(x.min) && x.min > 0 && isFinite(x.reward) && x.reward >= 0; }).sort(function (a1, b1) { return a1.min - b1.min; });
       if (a.length) cfg[k] = a;
     });
+    if (typeof raw.dayTargetsEnabled === 'boolean') cfg.dayTargetsEnabled = raw.dayTargetsEnabled;
     if (raw.topRevenue && typeof raw.topRevenue === 'object') {
       var tr = raw.topRevenue, nm = Number(tr.minRevenue), np = Number(tr.pct);
       if (isFinite(nm) && nm >= 0) cfg.topRevenue.minRevenue = nm; if (isFinite(np) && np >= 0) cfg.topRevenue.pct = np;
@@ -23471,7 +23475,7 @@ function _tbComputeRewards_(month, cfg) {
     var dy = dc[dd] || { rev: {} };
     Object.keys(dy.rev || {}).forEach(function (n) {
       var rv = dy.rev[n] || 0; monthRev[n] = (monthRev[n] || 0) + rv; totalRev += rv;
-      var tr = _tbTierFor_(cfg.dailyTiers, rv);
+      var tr = cfg.dayTargetsEnabled ? _tbTierFor_(cfg.dailyTiers, rv) : null;
       if (tr) out.dayTargets.push({ date: dd, name: n, revenue: Math.round(rv), min: tr.min, reward: tr.reward, partial: dd === today });
     });
   }
@@ -23517,7 +23521,7 @@ function teamBonusReport_(p, acc) {
   var month = String(p.month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(month)) month = _vnYmd_(new Date()).substring(0, 7);
   var cfg = teamBonusCfg_(), today = _vnYmd_(new Date()), mEnd = _tbMonthEnd_(month);
-  var ck = 'tb_rw_v2_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe, cfg.dailyTiers, cfg.monthTiers, cfg.topRevenue, cfg.onlineAllowance]), rw = null;
+  var ck = 'tb_rw_v2_' + month + '_' + JSON.stringify([cfg.dayTargetsEnabled, cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe, cfg.dailyTiers, cfg.monthTiers, cfg.topRevenue, cfg.onlineAllowance]), rw = null;
   try { var raw = _cacheGetBig_(ck); if (raw) rw = JSON.parse(raw); } catch (e0) {}
   if (!rw || p.nocache === '1') {
     rw = _tbComputeRewards_(month, cfg);

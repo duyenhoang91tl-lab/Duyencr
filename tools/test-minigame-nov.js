@@ -25,6 +25,9 @@ vm.runInContext(src.slice(defStart, src.indexOf('\n};', defStart) + 3), ctx);
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const J = JSON.stringify;
 const o = (d, sale, rev, extra) => Object.assign({ ngayTao: d, nguoiTao: sale, saleBan: sale, trangThai: 'Thành công', phanLoai: 'Bán mới', kenhBan: 'Fb Shop', giaiDoan: '', bhZero: false, rev }, extra || {});
+const cfg0 = vm.runInContext('teamBonusCfg_()', ctx);
+ok(cfg0.dayTargetsEnabled === false, 'thuong DS ngay (muc C) MAC DINH TAT vi Bao cao G da tinh (tranh tra 2 lan)');
+settings.teamBonusCfg = { dayTargetsEnabled: true };
 const cfg = vm.runInContext('teamBonusCfg_()', ctx);
 ok(cfg.dailyTiers.length === 2 && cfg.monthTiers.length === 10 && cfg.monthTiers[9].min === 3e9 && cfg.monthTiers[9].reward === 5e6 && cfg.topRevenue.minRevenue === 1e9 && cfg.onlineAllowance.minRevenue === 7e8 && cfg.monthlyReward === 1e6, 'mac dinh dung Phu luc 02: 2 moc ngay, 10 moc thang, top DT >=1 ty, phu cap Online 700tr, top ty le chot 1tr');
 const T = (v) => (vm.runInContext('_tbTierFor_', ctx)(cfg.monthTiers, v) || {}).reward || 0;
@@ -59,9 +62,12 @@ ctx.Date = class extends RealDate { constructor(...a) { if (a.length === 0) supe
 const rep2 = vm.runInContext('teamBonusReport_', ctx)({ month: '2026-11', nocache: '1' }, { admin: true, seeAll: true, u: {} });
 ok(!rep2.rewards.some(r => r.kind === 'monthTarget' || r.kind === 'topRevenue' || r.kind === 'allowance') && rep2.rewards.some(r => r.kind === 'dayTarget') && rep2.monthTargets.length > 0 && rep2.monthTargets[0].partial, 'giua thang: thuong NGAY da cong, thuong THANG/top DT/phu cap chi tam tinh (partial)');
 // base = team
-settings.teamBonusCfg = { topRevenue: { base: 'team' } };
+settings.teamBonusCfg = { dayTargetsEnabled: true, topRevenue: { base: 'team' } };
 ctx.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super(RealDate.UTC(2026, 11, 5, 5, 0, 0)); else super(...a); } static UTC(...a) { return RealDate.UTC(...a); } static now() { return RealDate.UTC(2026, 11, 5, 5, 0, 0); } };
 const rep3 = vm.runInContext('teamBonusReport_', ctx)({ month: '2026-11', nocache: '1' }, { admin: true, seeAll: true, u: {} });
 const tr3 = rep3.rewards.filter(r => r.kind === 'topRevenue')[0];
 ok(tr3 && tr3.amount === Math.round((1109e6 + 865e6 + 710e6) * 0.001), 'base=team: 0,1% x tong DS doi (' + Math.round((1109e6 + 865e6 + 710e6) * 0.001) + ')');
+settings.teamBonusCfg = undefined;
+const rep4 = vm.runInContext('teamBonusReport_', ctx)({ month: '2026-11', nocache: '1' }, { admin: true, seeAll: true, u: {} });
+ok(!rep4.rewards.some(r => r.kind === 'dayTarget') && rep4.rewards.some(r => r.kind === 'monthTarget'), 'mac dinh: khong co thuong DS ngay (tranh trung Bao cao G), van co thuong moc thang');
 process.exit(fail ? 1 : 0);

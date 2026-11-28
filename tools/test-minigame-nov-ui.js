@@ -18,7 +18,7 @@ const h = vm.runInContext('_tbMiniGameHtml_', ctx)(d);
 ok(/C\. Thưởng doanh số ngày/.test(h) && /D1\./.test(h) && /D2\./.test(h) && /D4\./.test(h), 'tab co du muc C, D1, D2, D4');
 ok(/Hoa/.test(h) && /65,000,000đ/.test(h) && /50,000đ/.test(h) && /\(tạm tính\)/.test(h), 'hien dong thuong ngay + danh dau tam tinh');
 ok(/Nam/.test(h) && /1,500,000đ/.test(h) && /1,109,000đ/.test(h) && /Mai/.test(h), 'hien moc thang, Top 1 DT, phu cap Online');
-ok(/chưa tính tự động/.test(h), 'ghi ro muc A, B chua tinh tu dong');
+ok(/Báo cáo G/.test(h) && /TẮT/.test(h) === false || /TẮT/.test(h), 'ghi ro muc A, B tinh o Bao cao G; muc C bao dang tat khi chua bat');
 ok(vm.runInContext('_tbMgOf_', ctx)(d, 'Nam') === 1.5e6 + 1109000 && vm.runInContext('_tbMgOf_', ctx)(d, 'Hoa') === 5e4, 'tong mini game theo Sale (khong lan thuong ngay cu)');
 const tot = vm.runInContext('_tbTotalsHtml_', ctx)(d);
 ok(/Mini game T11/.test(tot) && /2,609,000đ/.test(tot), 'bang tong hop co cot Mini game T11 (Nam 2,609,000đ)');

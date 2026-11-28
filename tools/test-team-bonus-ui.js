@@ -68,7 +68,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // xuat Excel: dung dung cac so cua panel
   resp = D; await w.eval('_tbLoad(true)');
   const X = w.eval('_tbExportRows_(_tbState.data)');
-  ok(X.sum.length === 3 && X.sum[1][0] === 'Hoa' && X.sum[1][7] === 200000 && X.sum[1][9] === -150000, 'xuat: tong hop co thuong/phat/thuc nhan');
+  ok(X.sum.length === 3 && X.sum[1][0] === 'Hoa' && X.sum[1][8] === 200000 && X.sum[1][10] === -150000, 'xuat: tong hop co thuong/phat/thuc nhan (them cot Mini game T11 o vi tri 6)');
   ok(X.day.length === 3 && X.day[2][1] === 'Tạm tính' && X.day[1][1] === 'Đạt' && X.day[1][2] === 'Hoa' && X.day[1][6] === 50000 && X.day[2][6] === 0, 'xuat: ngay tam tinh khong co tien, ngay da ket thuc 50k');
   ok(X.per.some(r => r[0] === 'Tuần' && r[3] === 'Hoa' && r[10] === 50000) && X.per.some(r => r[0] === 'Tháng' && r[2] === 'Tạm tính' && r[10] === 0), 'xuat: tuan da ket thuc 50k, thang tam tinh 0');
   ok(X.pen.length === 2 && X.pen[1][4] === 200000 && X.rule.length === 9, 'xuat: nhat ky phat + 4 dong thuong/5 dong phat trong quy dinh');
