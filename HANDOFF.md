@@ -6,6 +6,15 @@
 - 🔧 Đang làm: 2 test thứ tự báo cáo (`test-report-n-pure.js`, `test-reports-config.js`).
 - ➡️ Kế tiếp: test web tài khoản test, cập nhật `docs/TAI-KHOAN-TEST.md`, chạy lại toàn bộ.
 
+## 2026-11-28 (phiên Claude — TẠO ĐƠN: Ô TIỀN HIỆN DẤU CHẤM NGĂN HÀNG NGHÌN) — XONG, ĐÃ PUSH
+- Yêu cầu Duyên: ở màn lên đơn, khi điền tiền hiện dấu `.` cho dễ nhìn (100000 → 100.000).
+- Nguyên nhân gốc: các ô tiền là `<input type="number">` (trình duyệt không cho hiện dấu ngăn nghìn) và `_coNum` coi dấu `.` là dấu thập phân (nếu chỉ đổi hiển thị thành "100.000" thì dữ liệu bị đọc thành 100).
+- ✅ Đã làm (`js/99-d-crm-order.js`): helper `_coFmtMoney` / `_coMoneyIn` (+ `_coMoneyItem`, `_coMoneyNum`, `_coMoneyDisc`). Các ô tiền chuyển sang `type="text" inputmode="numeric"` (bàn phím số trên điện thoại), định dạng ngay khi gõ, GIỮ đúng vị trí con trỏ; dữ liệu lưu/gửi đi vẫn là SỐ THUẦN (chỉ chữ số). Áp cho: Đơn giá (đ), Giảm giá dòng (khi chọn đ), Giảm giá đơn (khi chọn đ), Phí vận chuyển, Phụ thu, Đã chuyển khoản. KHÔNG áp cho: Số lượng, Thuế %, ô giảm % (cần số lẻ như 7.5), Số điểm dùng. Tăng `?v=20261128d` cho script trong index.html.
+- Test: mới `tools/test-crm-order-money-format.js` (21 kiểm tra: định dạng, gõ thêm/xoá, con trỏ giữa dãy số, ký tự lạ, số 0 đầu, % giữ ô số, dữ liệu đơn không có dấu chấm) PASS; 9 test đơn cũ (`test-crm-order*.js`, `test-order-sale-ovr-ui.js`) vẫn PASS. Chưa thử trên trình duyệt thật.
+- Không đổi gas_v13.js: không cần deploy GAS. Chỉ cần Ctrl+F5, không cần reload extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên thử gõ ở Tạo đơn (nhất là gõ giữa dãy số và trên điện thoại) và báo nếu con trỏ nhảy lạ. Chưa áp dụng cho ô tiền ở các màn khác (vd. Phiếu quyền lợi thẻ `js/99-e-crm-card-benefit.js`, màn nhập chi phí) — nói tên màn nào cần thì làm tiếp bằng chính `_coMoneyIn`.
+
+## 2026-11-28 (phiên Claude — MÀN TẠO ĐƠN: GIẢM GIÁ CHỌN đ / % + Ô ÁP DỤNG CTKM + CHỌN COMBO CÓ SẴN) — XONG BƯỚC 1/3 (web, js/99-d-crm-order.js)
 ## 2026-11-28 (phiên Claude — MÀN TẠO ĐƠN: GIẢM GIÁ CHỌN đ / % + Ô ÁP DỤNG CTKM + CHỌN COMBO CÓ SẴN) — XONG CẢ 3/3 BƯỚC (web, js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: ở màn ➕ Tạo đơn, mục giảm giá phải chọn được giảm % hoặc giảm tiền; thêm ô áp dụng CTKM (có mục tạo combo có sẵn → chọn combo / áp CTKM có sẵn để áp luôn).
 - NGUYÊN NHÂN GỐC (bước 1): giảm giá đơn/dòng ĐÃ có kiểu đ|% nhưng là hộp `<select>` hẹp chỉ hiện chữ "đ" (thấy như chỉ có giảm tiền), không nói rõ nhập số tiền hay %. Logic tính tiền (`_coDisc`/`_coCalc`) và server `_crmOrderNormalize_` đã hỗ trợ pct từ trước → KHÔNG đổi công thức, KHÔNG đổi GAS.
