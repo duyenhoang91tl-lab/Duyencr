@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — 4c-2: MÃ SP Ở TẠO ĐƠN + KẾT QUẢ TRỪ KHO) — ĐANG LÀM (phiên này đã NHẬN, phiên khác đừng làm trùng)
+- ĐỀ BÀI Duyên (28/11 21:01): "Làm tiếp mấy việc đang dang dở đi". Phiên này KHÔNG đụng Đơn các kênh (js/100-*, đang có phiên khác làm B4→B8).
+- ✅ Đã xong: (chưa)
+- 🔧 Đang làm: `js/99-d-crm-order.js` — ô Mã SP mỗi dòng đơn (tự gợi ý từ đơn POS, sửa tay được).
+- ➡️ Kế tiếp: `js/99-d-crm-orders.js` hiện kết quả kho + nút "Chạy lại trừ kho" → test → xét 7c chốt kỳ hoa hồng.
+
 ## 2026-11-28 (phiên Claude — 11b TICKET: SỔ TICKET + ACTION) — BƯỚC 1/2 XONG (GAS: CẦN DEPLOY, workflow tự deploy); BƯỚC 2/2 (giao diện) đang làm
 - Duyên chọn làm 11b (28/11 20:45). Chưa chốt "ai được giao" → làm CẤU HÌNH: Settings `ticketConfig.owners[loại]` ([0] = người được giao, cả danh sách = người được BÁO khi trễ); chưa điền thì giao cho CHÍNH người tạo (không ai bị bỏ sót).
 - ✅ `gas_v13.js` (trong khối TICKET_SECTION_, → gas/34b_Ticket.gs; split-gas --check OK 39 file): sheet `Ticket` (id, type, status, createdAt/By, phone, custName, title, note, assignee, dueAt, doneAt/By/Note, updatedAt); GET `ticketList {token, status?, phone?}` · POST `ticketSave {type,title,phone?,custName?,note?,assignee?}` · POST `ticketDone {id,note?}`. Quyền: mọi tài khoản tạo; admin/manager/leader xem hết, người khác chỉ ticket mình tạo/được giao; chỉ quản lý chọn được người giao; đóng = quản lý/người tạo/người được giao; đóng ghi ĐÈ cùng dòng; AuditLog `ticket:create|done` (ghi chú "tre" nếu quá hạn). Mỗi dòng trả `sla {state open|overdue|done_ontime|done_late, overdueMinutes…}` + `escalateTo` (khi trễ). Hạn = `_ticketDueMs_` (24h khiếu nại/hỗ trợ · 72h đổi trả/đánh bóng · 7 ngày bảo hành/kiểm định).
