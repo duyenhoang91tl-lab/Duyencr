@@ -4,6 +4,7 @@
 - ĐỀ BÀI Duyên: "xử lý nốt cho mình nhé" (3 chỗ đã báo ở mục CRM dễ dùng): (1) điện thoại: danh sách khách dạng thẻ (2) menu gọn (3) trang trí không che nội dung.
 - ✅ **ĐÃ XONG (do phiên "3 GỢI Ý CÒN LẠI" làm):** trang trí tắt mặc định trên điện thoại; menu tách nhóm Giao diện khỏi Settings. Phiên này KHÔNG đổi code web/GAS.
 - 🔧 **ĐANG LÀM:** thẻ khách trên điện thoại = việc của phiên "3 GỢI Ý CÒN LẠI" (bước 3/3). Phiên này không làm.
+- ⚠ **2 TEST ĐANG ĐỎ trên main** (sau commit 950759f tách nhóm menu `ui`): `tools/test-config-hub.js` (1 lỗi) và `tools/test-mascot-samoyed.js` ("menu Settings có act:mascot + act:garden"). Phiên làm menu cần sửa; deploy-web.yml không chạy 2 test này nên không chặn deploy.
 - ➡️ **BƯỚC KẾ TIẾP:** phiên đang làm thẻ khách cứ làm tiếp. Nếu cần tham khảo, có bản CSS nháp (chưa bật, đã gỡ): `git show ef0d371 -- css/16-mobile-list.css` (thẻ cao cố định 96px cho cuộn ảo). Lưu ý khung lọc cột (js/05 openColDropdown, position:fixed theo rect.left) có thể tràn mép phải khi tiêu đề thành dải nút.
 
 ## 2026-11-28 (phiên Claude — SIDEBAR: Ô "TẤT CẢ" PHÂN LOẠI KH ĐỒNG BỘ VỚI Ô "TẤT CẢ" TÌNH TRẠNG CHĂM SÓC) — XONG BƯỚC 1/1 (web css/01 + index.html)
