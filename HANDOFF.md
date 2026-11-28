@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — 4d: IN ĐƠN CRM + GHI CHÚ 7c) — ĐANG LÀM (phiên này đã NHẬN 4d, phiên khác đừng làm trùng)
+- 🔧 Đang làm: nút "🖨 In đơn" trong chi tiết đơn ở `js/99-d-crm-orders.js`.
+- ⏸ **7c chốt kỳ hoa hồng — DỪNG, cần Duyên trả lời:** sổ `CommLedger` cần MÃ ĐƠN cố định (chống trả/trừ 2 lần). `_donConvertRows_` đọc sheet "dữ liệu đơn" KHÔNG lấy cột A; đơn trong Báo cáo B chỉ có `posRow` (đổi khi nhập lại file) và mã bộ đếm trong ghi chú (đơn ghép/tách, có đơn không có). Hỏi: cột nào là mã đơn Pancake, có giữ nguyên khi nhập lại file không? Thêm lưu ý: Báo cáo B LOẠI đơn Đã hoàn/Đang hoàn khỏi `orders` → muốn trừ lại phải dò trạng thái riêng theo mã đơn.
+- ➡️ Kế tiếp: xong 4d → kiểm tra tổng → chờ Duyên trả lời 7c.
+
 ## 2026-11-28 (phiên Claude — 4c-2: MÃ SP Ở TẠO ĐƠN + KẾT QUẢ TRỪ KHO) — XONG 4c-2 (web)
 - ĐỀ BÀI Duyên (28/11 21:01): "Làm tiếp mấy việc đang dang dở đi". Phiên này KHÔNG đụng Đơn các kênh (js/100-*, đang có phiên khác làm B4→B8).
 - ✅ Đã xong (a): `js/99-d-crm-order.js` ô **Mã SP** mỗi dòng (tự điền chỉ khi tên trên đơn POS chứa đủ chất liệu, còn lại gợi ý + "Dùng mã"; sửa tay được; thiếu mã → cảnh báo kho sẽ giữ đơn). Test `tools/test-crm-order-code.js`.
