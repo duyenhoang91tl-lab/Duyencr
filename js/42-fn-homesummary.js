@@ -24,8 +24,10 @@ async function hsLoad(d, list, isAll){
 function _hsBars(rows, valFn, labFn, color){
   var max = Math.max.apply(null, rows.map(valFn).concat([1]));
   return rows.map(function(r){
-    return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px"><div style="width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
-      '<div style="flex:1;background:var(--surface2);border-radius:4px;height:10px"><div style="height:10px;border-radius:4px;background:' + color + ';width:' + Math.max(2, Math.round(valFn(r) / max * 100)) + '%"></div></div><div style="width:92px;text-align:right;flex-shrink:0">' + labFn(r) + '</div></div>';
+    // NGUYEN NHAN GOC (Duyen 28/11: ten nguon bi cat 'Facebook / Phạm…' vi cot ten cung 120px + nowrap/ellipsis, thanh cot chiem het cho con lai, so lieu 92px bi rot dong):
+    // nay cot ten co gian (min 150px, cho xuong dong, KHONG cat), thanh cot ngan lai (28%, toi thieu 56px), so lieu khong rot dong.
+    return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12.5px"><div style="flex:1 1 0;min-width:150px;line-height:1.3;white-space:normal;overflow-wrap:anywhere" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
+      '<div style="flex:0 0 28%;min-width:56px;background:var(--surface2);border-radius:4px;height:10px"><div style="height:10px;border-radius:4px;background:' + color + ';width:' + Math.max(2, Math.round(valFn(r) / max * 100)) + '%"></div></div><div style="flex-shrink:0;white-space:nowrap;text-align:right">' + labFn(r) + '</div></div>';
   }).join('');
 }
 function hsRender(){

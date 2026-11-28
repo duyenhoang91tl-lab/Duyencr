@@ -42,7 +42,10 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist','act:leadassign','act:leadreport'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:pancakemap','act:ordersale','act:splitextra','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:sakura','act:mascot','act:garden','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
+    // 🎨 Giao diện & trợ giúp: tuỳ chọn CÁ NHÂN dùng được ở mọi vai trò, tách khỏi ⚙ Settings (chỉ còn cấu hình quản trị) để người mới không phải lục trong 17 mục.
+    // PHẢI đứng TRƯỚC 'st': mục chưa khai báo dồn vào nhóm CUỐI ("Khác", xem gOf) nên Settings phải luôn là nhóm cuối.
+    { k:'ui',  t:'🎨 Giao diện & trợ giúp',  ids:['act:theme','act:help','act:sakura','act:mascot','act:garden'] },
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {

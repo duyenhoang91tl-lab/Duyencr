@@ -1,10 +1,24 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-28 (phiên Claude — XỬ LÝ NỐT: KHÁCH DẠNG THẺ TRÊN ĐIỆN THOẠI, MENU GỌN, TRANG TRÍ KHÔNG CHE)
+## 2026-11-28 (phiên Claude — XỬ LÝ NỐT: KHÁCH DẠNG THẺ TRÊN ĐIỆN THOẠI, MENU GỌN, TRANG TRÍ KHÔNG CHE) — PHIÊN NÀY ĐÃ DỪNG ĐỂ KHÔNG LÀM TRÙNG
 - ĐỀ BÀI Duyên: "xử lý nốt cho mình nhé" (3 chỗ đã báo ở mục CRM dễ dùng): (1) điện thoại: danh sách khách dạng thẻ (2) menu gọn (3) trang trí không che nội dung.
-- ✅ **ĐÃ XONG:** Bước 1/5 CSS thẻ khách trên điện thoại (css/16-mobile-list.css; chưa bật tới khi js/02 gắn class kh-card). Trang trí không che trên điện thoại: phiên khác ĐÃ làm (js/66 + js/79, mục bên dưới) → không làm lại.
-- 🔧 **ĐANG LÀM:** Bước 2/5: js/02 bật dạng thẻ + nút đổi Dạng bảng/thẻ + nút Gọi. PHIÊN NÀY đang làm thẻ khách + menu gọn (Duyên đã bảo 'xử lý nốt') → phiên khác đừng làm trùng.
-- ➡️ **BƯỚC KẾ TIẾP:** js/05 chặn khung lọc cột tràn màn; menu gọn (js/29); kiểm tra cuối.
+- ✅ **ĐÃ XONG (do phiên "3 GỢI Ý CÒN LẠI" làm):** trang trí tắt mặc định trên điện thoại; menu tách nhóm Giao diện khỏi Settings. Phiên này KHÔNG đổi code web/GAS.
+- 🔧 **ĐANG LÀM:** thẻ khách trên điện thoại = việc của phiên "3 GỢI Ý CÒN LẠI" (bước 3/3). Phiên này không làm.
+- ➡️ **BƯỚC KẾ TIẾP:** phiên đang làm thẻ khách cứ làm tiếp. Nếu cần tham khảo, có bản CSS nháp (chưa bật, đã gỡ): `git show ef0d371 -- css/16-mobile-list.css` (thẻ cao cố định 96px cho cuộn ảo). Lưu ý khung lọc cột (js/05 openColDropdown, position:fixed theo rect.left) có thể tràn mép phải khi tiêu đề thành dải nút.
+
+## 2026-11-28 (phiên Claude — 11 HẠNG MỤC CRM, MỤC 9: BÁO GIÁ QUYỀN LỢI THẺ CHO MÀN TẠO ĐƠN) — BƯỚC 9c-1 XONG (GAS, CẦN DEPLOY); 9c-2 (web) CHƯA LÀM
+- Cách nối ÍT RỦI RO: server chỉ BÁO GIÁ, màn Tạo đơn tự điền; `crmOrderSave`/`gas/35_CrmOrder.gs` (của phiên khác) KHÔNG đổi, nên không lo giảm 2 lần hay lệch cách tính tiền.
+- ✅ POST `loyaltyBenefitQuote {phone, items:[{name,qty,price}]}` (mọi tài khoản đăng nhập, CHỈ ĐỌC — test khẳng định không ghi sổ điểm): trả `level` (none/vip/super) + `label`, `history {orders, cumulative}`, từng dòng `{pct, discount, rule: full|cap|excluded|none}`, `discount`, `afterDiscount`, `freeShip`, `freeShipMin`. Lịch sử xét thẻ = đơn POS hợp lệ (không Hủy/Hoàn) + đơn CRM **Đã xác nhận / Đang giao / Đã giao** của SĐT (đơn CRM 'Mới' CHƯA tính vì có thể bị hủy; Hoàn/Hủy không tính). Ví dụ test: POS 30tr + CRM 20tr = 50tr → SUPER giảm 10%.
+- 🧪 `tools/test-loyalty-sheet.js` thêm 11 kiểm (khách mới, 1 đơn POS → VIP, POS hoàn không tính, CRM mới/đã giao/hoàn/hủy, ngưỡng 50tr gộp POS+CRM, thiếu SĐT, chưa đăng nhập, chỉ đọc). Thử cho đơn CRM 'Mới' được tính ⇒ test đỏ đúng chỗ. test-loyalty/-benefit/-crm-order/-entrypoints/-ticket-sla vẫn xanh; `split-gas --check` OK 36 file.
+- ⏳ **DUYÊN CẦN LÀM:** deploy GAS (Actions `deploy-gas` xanh) — chưa có giao diện nên chưa thấy gì trên web.
+- [ ] **VIỆC KẾ TIẾP (9c-2, web):** file mới `js/99-e-crm-card-benefit.js` (KHÔNG sửa js/99-d-crm-order.js của phiên khác ngoài việc gọi API công khai `_co`): trong màn ➕ Tạo đơn, khi có SĐT + sản phẩm → gọi `loyaltyBenefitQuote`, hiện 1 dòng ngắn "Thẻ VIP: giảm 5% · miễn ship" + nút "Áp dụng" điền `discType:'pct'/discValue` từng dòng và tick Miễn ship. LƯU Ý Duyên đã dặn CRM KHÔNG thêm các dòng chỉ dẫn dài → nhãn ngắn thôi. Sau đó hiện thẻ ở khối "Hạng & điểm" (hồ sơ khách). Rồi 7b hoa hồng chốt kỳ 1–5 + trừ đơn hoàn kỳ sau; 8b KPI tự cam kết.
+
+## 2026-11-28 (phiên Claude — TỔNG QUAN: TÊN NGUỒN KHÁCH / GIAI ĐOẠN BỊ CẮT) — XONG BƯỚC 1/1 (web `js/42`)
+- ĐỀ BÀI Duyên: "ô cột thì ngắn lại, tên dài ra để nhìn được tên mục biểu đồ 'Nguồn khách (đơn Pos)' trong tổng quan; các ô khác cũng nên làm tương tự".
+- NGUYÊN NHÂN GỐC: `_hsBars` (js/42) cho cột tên cố định 120px + nowrap/ellipsis (cắt "Facebook / Phạm…"), thanh cột `flex:1` chiếm hết chỗ còn lại, ô số liệu 92px nên "489 đơn" bị rớt dòng.
+- ✅ ĐÃ SỬA `js/42-fn-homesummary.js` `_hsBars`: cột tên co giãn (min 150px, xuống dòng, không cắt, vẫn có tooltip), thanh cột ngắn lại (28%, tối thiểu 56px), số liệu không rớt dòng. `_hsBars` dùng chung cho 2 thẻ (Nguồn khách + Phân bổ giai đoạn đơn) nên cả 2 đã đổi. Đã grep: không còn chỗ nào khác trong js/ dùng kiểu cột tên cố định + ellipsis. `index.html` ?v=20261128a. Đã syntax-check + thử render tên dài (không cắt).
+- 🔧 ĐANG LÀM: không còn việc code; chờ Duyên xem thật.
+- ➡️ BƯỚC KẾ TIẾP: Duyên Ctrl+F5, xem Tổng quan → thẻ Nguồn khách. Nếu còn ô/biểu đồ khác bị cắt tên (ở tab nào), gửi ảnh để chỉnh tiếp.
 
 ## 2026-11-28 (phiên Claude — CRM DỄ DÙNG: GỠ CÁC DÒNG CHỈ DẪN DO PHIÊN TRƯỚC THÊM) — XONG (chỉ web; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên (gửi lại): "trình bày CRM ai không biết dùng cũng dùng được, KHÔNG cần thêm mấy dòng chỉ dẫn; mình mới update giao diện mới rồi hãy làm tiếp". Một phiên khác ĐÃ làm 5/5 bước dễ dùng (mục ngay bên dưới) → KHÔNG làm lại.
@@ -12,11 +26,12 @@
 - GIỮ NGUYÊN (không phải chỉ dẫn): thông báo lỗi, ghi chú "~ = ước tính" ở báo cáo Pancake (js/10, ngắn, báo số không thật), dòng trạng thái SĐT gộp ngày (js/09 ~963, của phiên SĐT). Hoa rơi/linh vật/vườn là do Duyên yêu cầu, canvas `pointer-events:none` (không chặn nút) + có nút tắt ở ☰ → Settings → KHÔNG đổi.
 - [ ] **VIỆC KẾ TIẾP (gợi ý, chưa làm — cần Duyên chọn):** (a) danh sách khách dạng thẻ trên điện thoại; (b) gọn menu (bớt mục, gom nhóm); (c) mặc định TẮT hoa rơi trên điện thoại. Duyên xem giao diện mới rồi nói muốn làm mục nào / màn nào còn khó dùng (gửi ảnh càng tốt).
 
-## 2026-11-28 (phiên Claude — CRM DỄ DÙNG, TIẾP THEO SAU 5/5 BƯỚC: 3 GỢI Ý CÒN LẠI) — BƯỚC 1/3 XONG (chỉ web, Ctrl+F5); BƯỚC 2–3 CHỜ DUYÊN CHỌN HƯỚNG (chưa làm)
+## 2026-11-28 (phiên Claude — CRM DỄ DÙNG, TIẾP THEO SAU 5/5 BƯỚC: 3 GỢI Ý CÒN LẠI) — BƯỚC 1/3 XONG (chỉ web, Ctrl+F5); BƯỚC 2/3 XONG (gọn menu); ĐANG LÀM BƯỚC 3/3 (thẻ khách điện thoại)
 - ĐỀ BÀI Duyên: "trình bày CRM ai không biết dùng cũng dùng được, không thêm dòng chỉ dẫn; mình mới update giao diện mới rồi hãy làm tiếp". Làm tiếp 3 gợi ý phiên trước chưa làm: (1) trang trí che nút trên điện thoại, (2) gọn menu, (3) danh sách khách dạng thẻ trên điện thoại. KHÔNG thêm dòng hướng dẫn nào.
 - ✅ **BƯỚC 1/3 XONG (js/66 cánh đào + js/79 linh vật/vườn):** hai canvas vẽ đè lên nút ở đáy màn hình điện thoại (chúng `pointer-events:none` nên không chặn bấm, chỉ che mắt). Đây là hiệu ứng Duyên TỰ yêu cầu nên KHÔNG gỡ: `isOn()` đổi thành "chưa từng chọn → điện thoại (innerWidth ≤ 640) TẮT, máy tính BẬT như cũ; đã bấm bật ('1') / tắt ('0') thì theo lựa chọn". Nút ☰ → ⚙ Settings vẫn bật/tắt như cũ (nhãn tự đổi "Bật/Tắt"). Bump `?v=20261128a` cho js/66, js/79. Test: `tools/test-mascot-samoyed.js` (108, thêm 7 ca mặc định theo thiết bị; ca cũ ở bề rộng điện thoại đặt `ome_mascot:'1'`), `tools/test-sakura-phone-default.js` (6). Nút vườn hoa-bướm-ong (`ome_garden`) không đổi, tự theo linh vật.
-- 🔧 **ĐANG LÀM:** không còn việc code; chờ Duyên chọn hướng cho bước 2–3 (đổi cách sắp xếp menu / bố cục danh sách khách là thay đổi lớn, môi trường này không xem được giao diện thật để kiểm).
-- ➡️ **BƯỚC KẾ TIẾP (đề xuất, chưa làm):** (2) Gọn menu: hiện `js/29-sidenav.js` GROUPS có 10 nhóm; nhóm ⚙ Settings 17 mục trộn tuỳ chọn cá nhân (chế độ tối, cánh đào, linh vật, vườn, hướng dẫn) với cấu hình quản trị → đề xuất tách "🎨 Giao diện" riêng cho mọi vai trò, Settings chỉ còn mục quản trị (admin) — không xoá chức năng nào. (3) Danh sách khách dạng THẺ trên điện thoại (≤640px: tên + SĐT + CS + nút Gọi/Zalo; bảng đầy đủ vẫn cho máy tính), `index.html` bảng khách + css/16 + js/90. Duyên: Ctrl+F5, mở trên điện thoại kiểm tra không còn hoa/chó che nút (muốn thấy lại: ☰ → Settings → Bật), rồi báo làm (2), (3) hoặc cả hai.
+- ✅ **BƯỚC 2/3 XONG (gọn menu, chỉ web, Ctrl+F5):** Duyên chọn "1 gọn menu ok". `js/29-sidenav.js` GROUPS: thêm nhóm `ui` "🎨 Giao diện & trợ giúp" (chế độ tối, hướng dẫn sử dụng, cánh đào, linh vật, vườn — mọi vai trò dùng được) ĐỨNG TRƯỚC `st`; ⚙ Settings còn 12 mục quản trị (từ 17). `st` PHẢI luôn là nhóm cuối vì mục chưa khai báo dồn vào nhóm cuối ("Khác", `gOf`). Mã quyền (id `act:*`) giữ nguyên → phân quyền cũ không đổi; trang Phân quyền (`_rsCatalog`) tự hiện thêm mục "🎨 Giao diện & trợ giúp". Không xoá chức năng nào. Test mới `node tools/test-sidenav-groups.js` (12: không mất/trùng mục, Settings vẫn cuối, 5 mục open:true) + test-roles-page/ui xanh. Bump `?v=20261128a`.
+- 🔧 **ĐANG LÀM:** bước 3/3 danh sách khách dạng THẺ trên điện thoại (≤640px).
+- ➡️ **BƯỚC KẾ TIẾP:** đọc bảng khách (`index.html` #list, js/90, css/16 phần điện thoại hiện đã thu cột "Ngày mua gần nhất"), làm thẻ: tên + SĐT + CS + nút Gọi/Zalo; máy tính giữ bảng. Duyên: Ctrl+F5 → ☰ xem nhóm "🎨 Giao diện & trợ giúp"; muốn trả mục về Settings báo lại.
 
 ## 2026-11-28 (phiên Claude — BÁO CÁO: THẺ KPI KÉO NGANG, SỐ TIỀN KHÔNG NGẮT DÒNG) — XONG (chỉ web CSS; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên: ở Báo cáo, ô doanh thu (vd 4.361.866.600₫, 2.300.834.167₫) bị ngắt thành 2 dòng; muốn kéo ngang ra.
