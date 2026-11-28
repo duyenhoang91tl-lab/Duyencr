@@ -155,6 +155,10 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_commPeriodOf_`, `_commNextPeriod_`, `_commPeriodState_`, `_commSettle_`, `_commLedgerRows_`
 - Hằng/biến: `COMMCLOSE_SECTION_`, `COMMCLOSE_DEFAULT_`
 
+## 34d_KpiCommit.gs
+- Hàm: `_kpiCommitCfgNormalize_`, `_kpiFold_`, `_kpiPeriodOf_`, `_kpiCommitKey_`, `_kpiIsApprover_`, `_kpiNewRec_`, `_kpiLog_`, `_kpiCommitSubmit_`, `_kpiCommitDecide_`, `_kpiCommitEffective_`
+- Hằng/biến: `KPICOMMIT_SECTION_`, `KPICOMMIT_DEFAULT_`
+
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`, `_vpTarget_`, `_vpRead_`, `_vpTargetCur_`, `_vpApprovers_`, `_vpIsAdminName_`, `_vpNotifClear_`, `_vpNotifyAdmins_`, `vietTatPropose_`, `_vpOwn_`, `_vpSummaryFor_`, `vietTatProposalsList_`, `vietTatDecide_`, `_vpApply_`
 - Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`, `SH_VT_PROP`, `VT_PROP_HEADERS`, `VT_PROP_MAX_PENDING`
