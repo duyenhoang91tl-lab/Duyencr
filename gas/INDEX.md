@@ -147,6 +147,10 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
 
+## 34b_Ticket.gs
+- Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
+- Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
+
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`
 - Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`
