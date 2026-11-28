@@ -1069,6 +1069,7 @@ function _renderVirtualWindow(force) {
   const list = _vt.list;
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
+    reapplyColVisibility();
     return;
   }
   const wrap = _vtWrap();

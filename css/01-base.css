@@ -578,7 +578,8 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 
 /* ════════════ V9 ADDITIONS ════════════ */
 /* Virtual table: stable column widths so rows don't jitter while windowing */
-#main-table{table-layout:fixed;width:100%;min-width:1640px;}
+#main-table{table-layout:fixed;width:100%;}   /* rộng = max(khung, tổng cột ĐANG HIỆN); không đặt min-width cứng vì ẩn bớt cột sẽ thừa khoảng trống */
+#main-table th[data-cf-th]{width:130px;}
 #main-table th,#main-table td{overflow:hidden;}
 #main-table tbody tr:not(.vspacer){height:58px;}
 .vspacer td{padding:0!important;border:none!important;height:auto;}
@@ -587,7 +588,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .col-cs{width:150px;} .col-carecs{width:140px;} .col-source{width:120px;} .col-note{width:185px;} .col-sched{width:132px;}
 #cs-note-history { max-height: 320px; overflow-y: auto; }
 #cs-note-new { resize: vertical; }
-.col-lastpos{width:112px;} .col-lastact{width:130px;} .col-tacdong{width:140px;}
+.col-lastpos{width:112px;} .col-lastact{width:130px;} .col-tacdong{width:140px;} .col-bcstatus{width:140px;}
 #main-table td.col-product .btags,#main-table td.col-cs .cs-badge-wrap,#main-table td.col-source .btags{white-space:nowrap;overflow:hidden;flex-wrap:nowrap;}
 #main-table td.col-name .cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 

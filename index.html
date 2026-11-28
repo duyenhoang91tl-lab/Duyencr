@@ -28,7 +28,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/00-tokens.css?v=20261114b"><!-- R1: mã thiết kế --ui-* (chỉ thêm biến, chưa đổi giao diện); PHẢI nạp trước 01-base -->
-<link rel="stylesheet" href="css/01-base.css?v=20261128a">
+<link rel="stylesheet" href="css/01-base.css?v=20261128k1">
 <link rel="stylesheet" href="css/02-style.css?v=20261126a">
 </head>
 <body>
@@ -594,20 +594,20 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('lastpos',this)"> Ngày mua gần nhất</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('hang',this)"> Phân hạng KH</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('level',this)"> Mức (nóng/ấm/nguội)</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('hang',this)"> Phân hạng KH</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('level',this)"> Mức (nóng/ấm/nguội)</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('zalo',this)"> Zalo</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('zalo',this)"> Zalo</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('order',this)"> Đơn/DT</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('product',this)"> Sản phẩm</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('product',this)"> Sản phẩm</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('cs',this)"> CS phụ trách</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('carecs',this)"> CS chăm sóc</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('carecs',this)"> CS chăm sóc</label>
         <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('source',this)"> Nguồn</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('bcstatus',this)"> Trạng thái gửi TN</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('note',this)"> Ghi chú</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('bcstatus',this)"> Trạng thái gửi TN</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('note',this)"> Ghi chú</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('sched',this)"> Lịch kế tiếp</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('lastact',this)"> Lần tác động</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tacdong',this)"> Thời gian tác động</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('lastact',this)"> Lần tác động</label>
+        <label class="col-toggle-chip"><input type="checkbox" onchange="toggleCol('tacdong',this)"> Thời gian tác động</label>
         <span style="width:1px;height:16px;background:var(--border-md);margin:0 6px;flex-shrink:0;display:inline-block"></span>
         <label class="col-toggle-chip no-action-chip-label" id="no-action-chip" onclick="toggleNoActionChip(event)" style="cursor:pointer">
           <input type="checkbox" id="no-action-checkbox" style="display:none"> ⚡ Chưa tác động
@@ -980,11 +980,11 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <script src="js/96-ui-dialogs.js?v=20261127a"></script><!-- hop thoai thong nhat: ghi de window.alert (khong chan, xep hang, Esc/Enter dong); lui ve cu: localStorage ome_native_alert=1 -->
 <script src="js/97-write-guard.js?v=20261126a"></script>
 <script src="js/01-fn-splitmulti.js?v=20261126b"></script>
-<script src="js/02-fn-showrowerrorbanner.js?v=20261128a"></script>
+<script src="js/02-fn-showrowerrorbanner.js?v=20261128k1"></script>
 <script src="js/03-fn-refreshopendptab.js?v=20261126b"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261117a"></script>
-<script src="js/05-fn-saveeditphone.js?v=20261128b"></script>
-<script src="js/06-main-renew-sources.js?v=20261128c"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261128k1"></script>
+<script src="js/06-main-renew-sources.js?v=20261128k1"></script>
 
 <!-- ASSIGN DATA MODAL -->
 <div class="assign-modal-overlay" id="assign-modal">

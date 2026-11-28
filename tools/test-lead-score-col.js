@@ -82,7 +82,7 @@ ok(/toggleCol\('level',this\)/.test(idx), 'index.html: có chip bật/tắt cộ
 ok(/<td class="col-hang">[^\n]*\n\s*<td class="col-level"/.test(j02), 'js/02: <td class="col-level"> ngay sau col-hang (cùng thứ tự với <th>)');
 ok(/lsLevelSortList_\(list, _lsLevelSortDir\)/.test(j02) && /else if \(_lastPosSortDir !== 0\)/.test(j02), 'js/02: nhánh xếp theo Mức đứng TRƯỚC, 2 kiểu xếp cũ thành else-if (loại trừ nhau)');
 ok(/lsResetLevelSort_/.test(j05), 'js/05: xếp theo Ngày mua/Lần tác động tắt xếp theo Mức');
-ok(/level:true/.test(j06), 'js/06: cột Mức mặc định HIỆN (colVisible.level)');
+ok(/level:false/.test(j06) && /toggleCol\('level'/.test(idx), 'js/06: cột Mức mặc định ẨN (bảng gọn 7 cột), bật được ở Cột hiển thị');
 ok(/_lsLevelSortDir/.test(j08), 'js/08: _filterSignature có chiều xếp theo Mức (không trả danh sách cũ)');
 ok(/\.col-level\{width:/.test(read('css/26-lead-score.css')), 'css/26: có độ rộng cột Mức (token-only)');
 ok(/js\/77-lead-score\.js\?v=\d{8}[a-z]/.test(idx), 'index.html: js/77 có mã ?v= chống cache');

@@ -557,7 +557,9 @@ var NAME_ALLOWED_CHARS_RE = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
 // ═══════════════════════════════════════════════════════
 var PTS_RATE = 0.01, PTS_VALUE = 1000;
 // Column visibility state
-const _colVisDefault = { lastpos:true, name:true, tier:true, hang:true, level:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
+// Mặc định chỉ 7 cột chính (Ngày mua, Khách, Phân loại, Tình trạng CS, Đơn/DT, CS phụ trách, Lịch kế tiếp); cột khác bật ở nút "📋 Cột hiển thị".
+// Ai đã từng bật/tắt cột thì giữ nguyên bố cục đã lưu (localStorage + tài khoản).
+const _colVisDefault = { lastpos:true, name:true, tier:true, hang:false, level:false, care:true, zalo:false, order:true, product:false, cs:true, source:false, note:false, sched:true, lastact:false, tacdong:false, carecs:false, bcstatus:false };
 const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') || {});
 
 // ── Tab chính (Dashboard/Quản lý Team/Nhật ký/Báo cáo doanh số/Báo cáo Pancake/KPI

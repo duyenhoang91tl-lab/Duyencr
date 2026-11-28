@@ -768,6 +768,10 @@ function reapplyColVisibility() {
     const col = cb.getAttribute('onchange')?.match(/toggleCol\('(\w+)'/)?.[1];
     if (col && col in colVisible) cb.checked = colVisible[col];
   });
+  // table-layout:fixed: ô trải ngang (dòng đệm cuộn ảo, "Không có kết quả") phải đúng SỐ CỘT ĐANG HIỆN, thừa colspan sinh cột trống bên phải.
+  let shown = 0;
+  document.querySelectorAll('#main-table thead th').forEach(th => { if (th.style.display !== 'none') shown++; });
+  if (shown) document.querySelectorAll('#main-table tbody td[colspan]').forEach(td => td.colSpan = shown);
 }
 
 function _tabVisAcctKey(){
