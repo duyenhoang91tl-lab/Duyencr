@@ -6,7 +6,7 @@ let ok = 0, fail = 0; const t = (n, v) => { console.log((v ? 'OK  ' : 'FAIL') + 
 const J = v => JSON.stringify(v);
 const lead = { username: 'lead1', name: 'Mai', names: ['Mai'], role: 'leader', team: 'A', viewMonths: [] };
 const teams = [{ name: 'A', leader: 'Mai', members: ['Lan', 'Minh'] }, { name: 'B', leader: 'Hoa', members: ['Tu'] }];
-let history, written, saved, users = { L: lead, C: { username: 'lan', name: 'Lan', names: ['Lan'], role: 'cs' }, A: { username: 'ad', role: 'admin' } };
+let aliases = {}, history, written, saved, users = { L: lead, C: { username: 'lan', name: 'Lan', names: ['Lan'], role: 'cs' }, A: { username: 'ad', role: 'admin' } };
 const orders = { '0900000001': ['15/04/2026'], '0900000002': ['02/09/2026'], '0900000003': ['30/06/2026'], '0900000009': ['01/09/2026'] };
 const ctx = {
   console, JSON, Math, Date, Object, Array, String, Number, RegExp,
@@ -28,10 +28,11 @@ const ctx = {
   readOrdersByPhone_: p => (orders[p] || []).map(d => ({ date: d })),
   readDonChiTiet_: () => [{ soDienThoai: '0900000004', ngayTaoDon: '05/05/2026' }], findDonRowsByPhone_: () => [],
   _viewExtraNames_: () => ({ names: [] }),
+  _userAliasGroups_: () => aliases,
   _scopeAssignIndex_: () => { const i = {}; history.forEach(h => h.phones.forEach(p => (i[p] = i[p] || []).push(h.csName))); return i; }
 };
 vm.createContext(ctx);
-['_normTxt_', '_viewMonthsNorm_', '_leadMonths_', '_leadOwnNames_', '_leadTeam_', '_ymOfOrderDate_', '_phoneHasOrderInMonths_', '_leadMonthFilterSet_', '_leadUser_', 'leadAssignInfo_', 'leadAssign_', 'saveAssignHistoryGuarded_', '_scopeAllowedNames_', '_scopeVerdict_'].forEach(n => vm.runInContext(grab(n), ctx));
+['_normTxt_', '_viewMonthsNorm_', '_leadMonths_', '_leadOwnNames_', '_stripVN_', '_scopeNameKey_', '_scopeSameNameKeys_', '_leadNameResolver_', '_leadOwnKeys_', '_leadTeam_', '_ymOfOrderDate_', '_phoneHasOrderInMonths_', '_leadMonthFilterSet_', '_leadUser_', 'leadAssignInfo_', 'leadAssign_', 'saveAssignHistoryGuarded_', '_scopeAllowedNames_', '_scopeVerdict_'].forEach(n => vm.runInContext(grab(n), ctx));
 const reset = () => { written = null; saved = []; history = [
   { id: '1', csName: 'Mai', phones: ['0900000001', '0900000002'], donePhones: [] },
   { id: '2', csName: 'Lan', phones: ['0900000003'], donePhones: [] },
@@ -57,6 +58,24 @@ t('CS goi thang leadAssign -> chan', ctx.leadAssign_({ token: 'C', entries: [{ c
 r = ctx.saveAssignHistoryGuarded_({ token: 'C', history: [{ id: '2', csName: 'Lan', phones: [], donePhones: ['0900000003'] }, { id: '1', csName: 'Mai', donePhones: ['0900000001'] }] });
 t('CS gui ca lich su: chi cap nhat "xong" dot cua minh, khong ghi de sheet', r.doneOnly && r.written === 1 && saved.length === 1 && saved[0].id === '2' && saved[0].phones.length === 1);
 t('admin / khong token: ghi de nhu cu', ctx.saveAssignHistoryGuarded_({ token: 'A', history: [1] }).overwritten === 1 && ctx.saveAssignHistoryGuarded_({ history: [1, 2] }).overwritten === 2);
+
+// Dot chia ghi ten khac cach viet / ten dang nhap / the Khop sale
+aliases = { lan: ['Lan', 'lanpk95'] };
+written = null; history = [
+  { id: 'u', csName: 'lead1', phones: ['0900000001'] },
+  { id: 'd', csName: 'M\u00e0i', phones: ['0900000002'] },
+  { id: 't', csName: 'lanpk95', phones: ['0900000003'] },
+  { id: 'x', csName: 'Tu', phones: ['0900000009'] }];
+r = ctx.leadAssignInfo_({ parameter: { token: 'L' } });
+t('ten dang nhap / co dau / the khop sale: van vao man cua Lead, ten quy ve team', J(r.assignHistory.map(h => [h.id, h.csName])) === J([['u', 'lead1'], ['d', 'Mai'], ['t', 'Lan']]));
+r = ctx.leadAssign_({ token: 'L', entries: [{ csName: 'Minh', phones: ['0900000001', '0900000002'] }] });
+t('chia lai duoc data ghi theo ten dang nhap / co dau', r.ok && r.total === 2);
+written = null; r = ctx.leadAssign_({ token: 'L', entries: [{ csName: 'Minh', phones: ['0900000003'] }] });
+t('data cua thanh vien (the khop sale) khong tinh la cua Lead', r.code === 'FORBIDDEN' && !written);
+history = [{ id: 'd', csName: 'M\u00e0i', phones: ['0900000009'] }];
+const lmA = Object.assign({}, lead, { viewMonths: ['2026-04'] });
+t('loc thang: data chia cho Lead ghi ten co dau van xem duoc du ngoai thang', ctx._scopeVerdict_(lmA, '0900000009', () => ({})) === true && ctx._leadMonthFilterSet_(lmA, { '0900000009': 1 }, ['2026-04'])['0900000009'] === 1);
+aliases = {};
 
 // Gioi han thang 4,5,6
 const lm = Object.assign({}, lead, { viewMonths: ['2026-04', '2026-05', '2026-06'] });

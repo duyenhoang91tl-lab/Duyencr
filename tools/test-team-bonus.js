@@ -25,14 +25,14 @@ const ctx = {
   _srCloseRateSectionsFromBase_: (f, rows, by) => { ctx.__by = by; return ctx.__close(f, rows); },
 };
 vm.createContext(ctx);
-['_tbPad_', '_tbYmdAdd_', '_tbDow_', '_tbMonthEnd_', '_tbFmtDm_', 'teamBonusCfg_', '_tbTeam_', '_tbOrderCounts_', '_tbDailyCounts_', '_tbPickClose_', '_tbCloseFor_', '_tbComputeRewards_'].forEach(n => vm.runInContext(grab(n), ctx));
+['_tbPad_', '_tbYmdAdd_', '_tbDow_', '_tbMonthEnd_', '_tbFmtDm_', 'teamBonusCfg_', '_tbTeam_', '_tbOrderCounts_', '_tbDailyCounts_', '_tbPickClose_', '_tbCloseFor_', '_tbTierFor_', '_tbComputeRewards_'].forEach(n => vm.runInContext(grab(n), ctx));
 vm.runInContext("var TEAM_BONUS_DEFAULT_ = " + src.slice(src.indexOf('var TEAM_BONUS_DEFAULT_ = ') + 26, src.indexOf('};', src.indexOf('var TEAM_BONUS_DEFAULT_ = ')) + 2) + ";", ctx);
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const J = JSON.stringify;
 const o = (d, sale, extra) => Object.assign({ ngayTao: d, nguoiTao: sale, saleBan: sale, trangThai: 'Thành công', phanLoai: 'Bán mới', kenhBan: 'Fb Shop', giaiDoan: '', bhZero: false, rev: 10000000 }, extra || {});
 const many = (n, d, sale, extra) => Array.from({ length: n }, () => o(d, sale, extra));
 const cfg = vm.runInContext('teamBonusCfg_()', ctx);
-ok(cfg.dailyMinOrders === 6 && cfg.dailyReward === 50000 && cfg.weeklyReward === 50000 && cfg.monthlyReward === 100000, 'mac dinh: min 6 don, 50k ngay, 50k tuan, 100k thang');
+ok(cfg.dailyMinOrders === 6 && cfg.dailyReward === 50000 && cfg.weeklyReward === 50000 && cfg.monthlyReward === 1000000, 'mac dinh: min 6 don, 50k ngay, 50k tuan, Top ty le chot THANG 1tr (Phu luc 02 thang 11)');
 ok(cfg.penalties.length === 9 && J(cfg.penalties.map(p => p.amount)) === '[50000,50000,50000,200000,50000,200000,1000000,50000,50000]', '9 loai phat: 50k/50k/50k/200k/50k + PCMT 200k, Ptucam 1tr, Pxltc 50k, Psaiqt 50k');
 
 // Doi sale = chi online + offline (Quay, Thu viec khong thuoc doi)

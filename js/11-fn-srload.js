@@ -187,10 +187,18 @@ async function _srLoad(useCache){
 function _srSubSelectHtml_(){
   var admin = _srIsAdmin();   // danh sách + tên + bật/tắt theo Cấu hình (_srItems_ ở js/06); admin vẫn thấy báo cáo đang ẩn
   var items = _srItems_().filter(function(it){ return admin || !it[2]; }).map(function(it){ return [it[0], it[1] + (it[2] ? ' (đang ẩn)' : '')]; });
-  if (_srIsAdmin()) items.push(['J','📤 Nhập dữ liệu Base/Pos']);
   var cur = _srCurCode_();
-  return '<select onchange="_srSetSub(this.value)" title="Chọn báo cáo" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:600;font-size:13px;max-width:100%">' +
-    items.map(function(it){ return '<option value="' + it[0] + '"' + (it[0] === cur ? ' selected' : '') + '>' + it[1] + '</option>'; }).join('') + '</select>';
+  function opt(it){ return '<option value="' + it[0] + '"' + (it[0] === cur ? ' selected' : '') + '>' + it[1] + '</option>'; }
+  var used = {}, body = '';
+  (typeof _SR_GROUPS_ !== 'undefined' ? _SR_GROUPS_ : []).forEach(function(g){
+    var inG = items.filter(function(it){ return g[1].indexOf(it[0]) >= 0; });
+    inG.forEach(function(it){ used[it[0]] = 1; });
+    if (inG.length) body += '<optgroup label="' + g[0] + '">' + inG.map(opt).join('') + '</optgroup>';
+  });
+  var rest = items.filter(function(it){ return !used[it[0]]; });   // mã mới chưa xếp nhóm: vẫn hiện, không mất
+  if (rest.length) body += '<optgroup label="Khác">' + rest.map(opt).join('') + '</optgroup>';
+  if (_srIsAdmin()) body += '<optgroup label="⚙ Quản trị">' + opt(['J','📤 Nhập dữ liệu Base/Pos']) + '</optgroup>';
+  return '<select onchange="_srSetSub(this.value)" title="Chọn báo cáo" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:600;font-size:13px;max-width:100%">' + body + '</select>';
 }
 function _srSetSub(sub){ _srApplySub_(sub); _srLoad(true); }   // duong XEM: duoc dung bo nho dem 60s (xem _srLoad)
 function _srSetField(key, val){ _srState[key] = val; }
@@ -800,7 +808,7 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
       '<div style="font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+')</div>'+_srCrExtraCells_(team, true)+'</div>';
     bars = '<div style="overflow-x:auto"><div style="min-width:560px">'+head+teamRow+bars+'</div></div>';
   }
-  var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
+  var isAdmin = currentUser.role === 'admin';   // tai khoan test chi xem: khong co nut sua moc ty le chot
   var legend = _srCrLegendHtml_(lv);
   var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
   return '<div style="padding:4px 0 10px">'+

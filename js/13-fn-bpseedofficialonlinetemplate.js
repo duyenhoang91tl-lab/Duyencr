@@ -1661,7 +1661,8 @@ function doAssignByTeam(){
   _rebuildAssignIndex();
   if (typeof _applyCareCSToAssigned === 'function') _applyCareCSToAssigned(entries);
   entries.forEach(function(e){ logAudit('assign', '', '', 'Team '+e.team+': '+e.phones.length+' KH → '+e.csName); });
-  if (gsUrl && typeof pushAssignHistToGS==='function') pushAssignHistToGS();
+  // Chi day CAC DOT MOI (saveAssign tung dot). NGUYEN NHAN GOC (2026-11-27): ghi de ca lich su tu ban tren may admin lam mat dot Truong nhom vua chia lai / chia tu dong va tien do "da xong".
+  if (gsUrl && typeof pushAssignToGS==='function') (async function(){ for (var i = 0; i < entries.length; i++) await pushAssignToGS(entries[i]); })().catch(function(e){ console.warn('pushAssignToGS lỗi:', e); });
   toast('✓ Đã chia '+cursor+' KH cho '+entries.length+' CS ('+active.length+' team)');
   if (typeof updateMyDataBadge==='function') updateMyDataBadge();
   if (typeof closeAssignModal==='function') closeAssignModal();   // chia xong tự đóng

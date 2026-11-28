@@ -73,7 +73,7 @@ const nav = R('js/29-sidenav.js');
 const stIds = (nav.match(/k:'st'[^\]]*ids:\[([^\]]*)\]/) || [])[1] || '';
 const stActs = (stIds.match(/act:([a-z]+)/g) || []).map(s => s.slice(4));
 const hubKeys = (() => { const c = load(NEW, true); c._SN_ACTS = {}; return vm.runInContext('_cfgHubGroups_()', c).reduce((a, g) => a.concat(g.items.map(i => i.key)), []); })();
-t(stActs.length >= 12, 'đọc được danh sách mục rời của nhóm Settings (' + stActs.length + ' mục)');
+t(stActs.length >= 10, 'đọc được danh sách mục rời của nhóm Settings (' + stActs.length + ' mục)');   // 10 mục act:* (nhóm còn 2 tab thường: config, audit — không phải act nên không đếm)
 const left = stActs.filter(k => hubKeys.indexOf(k) < 0);
 t(!left.length, 'mọi mục act: của nhóm Settings đều có trong trung tâm lối tắt' + (left.length ? ' — CÒN RỜI: ' + left.join(', ') : ''));
 t(hubKeys.indexOf('audit') >= 0, 'có lối tắt Nhật ký thay đổi (tab audit)');

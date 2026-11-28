@@ -72,12 +72,12 @@ function proAnswerHtml_(t){ return proEsc_(t).replace(/\n/g,'<br>'); }
 // ── HỎI GIÁ SẢN PHẨM: tra TRỰC TIẾP bảng giá DANH_MUC qua GAS action=priceAsk (không để AI tự nghĩ giá) ──
 // Câu hỏi giá: có từ "giá"/"bảng giá"/"đơn giá"/"bao nhiêu tiền"/"nhiêu tiền" (so sánh không dấu).
 function proPriceIntent_(q){ return /\bgia\b|bang gia|don gia|bao nhieu tien|nhieu tien/.test(proNorm_(q)); }
-async function proPriceRequest_(gsUrl, question, fetchFn, timeoutMs)
+async function proPriceRequest_(gsUrl, question, fetchFn, timeoutMs, comboOnly)
 {
   if (!gsUrl) return { ok:false, error:'Chưa kết nối Google Sheets (chưa có link GAS).' };
   var ac = (typeof AbortController!=='undefined') ? new AbortController() : null, timer = ac ? setTimeout(function(){ ac.abort(); }, timeoutMs||30000) : null;
   try {
-    var url = gsUrl + (String(gsUrl).indexOf('?')>=0 ? '&' : '?') + 'action=priceAsk&q=' + encodeURIComponent(String(question||'').slice(0,200));
+    var url = gsUrl + (String(gsUrl).indexOf('?')>=0 ? '&' : '?') + 'action=priceAsk&q=' + encodeURIComponent(String(question||'').slice(0,200)) + (comboOnly ? '&combo=1' : '');
     var r = await fetchFn(url, { method:'GET', redirect:'follow', signal: ac ? ac.signal : undefined });
     var d = await r.json();
     if (d && d.ok) return { ok:true, found:!!d.found, text:String(d.text||''), unit:d.unit||'', suggestions:Array.isArray(d.suggestions)?d.suggestions:[], combos:Array.isArray(d.combos)?d.combos:[] };
@@ -92,16 +92,21 @@ function proComboText_(combos){
   var cs = (combos||[]).filter(function(c){ return c && c.name; });
   if (!cs.length) return '';
   return '🎁 COMBO CÓ SẴN:\n' + cs.map(function(c){
+    var tail = (c.note ? '\n   📝 ' + String(c.note).replace(/\s+/g,' ').trim() : '') + (c.end ? '\n   ⏰ đến ' + c.end.split('-').reverse().join('/') : '');
+    if (c.text) return c.text + tail;   // chữ hiển thị theo mẫu mới do GAS dựng (giá giảm, dòng SP có vàng/giá, ship, quà)
     var items = (c.items||[]).map(function(it){ var d = [it.chatLieu, it.size].filter(Boolean).join(', '); return '   • ' + (it.qty||1) + ' × ' + it.name + (d ? ' (' + d + ')' : ''); }).join('\n');
     return '▸ ' + c.name + (c.code ? ' [' + c.code + ']' : '') + ' — 💰 ' + (c.priceVnd ? Number(c.priceVnd).toLocaleString('vi-VN') + 'đ' : (c.priceText||'')) + '\n' + items +
       (c.note ? '\n   📝 ' + String(c.note).replace(/\s+/g,' ').trim() : '') + (c.end ? '\n   ⏰ đến ' + c.end.split('-').reverse().join('/') : '');
-  }).join('\n');
+  }).join('\n\n');
 }
 // ẢNH COMBO (Duyên 18/11/2026): combo khớp câu hỏi giá mang `images` (link ảnh đã đổi sang thumbnail ở server) → dải ảnh dưới câu trả lời, mỗi ảnh có tên combo bên dưới để biết ảnh nào của combo nào.
 function proComboImages_(combos){
   var out = [];
-  (combos||[]).forEach(function(c){ ((c && c.images) || []).slice(0,4).forEach(function(u){ if (/^https?:\/\/\S+$/i.test(String(u||''))) out.push({ url:String(u), name:String((c && c.name) || '') }); }); });
-  return out.slice(0, 8);
+  (combos||[]).forEach(function(c){
+    ((c && c.images) || []).slice(0,6).forEach(function(u){ if (/^https?:\/\/\S+$/i.test(String(u||''))) out.push({ url:String(u), name:String((c && c.name) || '') }); });
+    ((c && c.gifts) || []).forEach(function(g){ ((g && g.images) || []).slice(0,2).forEach(function(u){ if (/^https?:\/\/\S+$/i.test(String(u||''))) out.push({ url:String(u), name:'🎁 Quà: ' + String((g && (g.gift || g.name)) || '') }); }); });   // ảnh quà tặng của CTKM combo
+  });
+  return out.slice(0, 12);
 }
 function proImgsHtml_(imgs){
   if (!imgs || !imgs.length) return '';
@@ -112,6 +117,7 @@ function proImgsHtml_(imgs){
 function proPriceFormat_(r){
   if (!r || !r.ok) return '⚠ ' + ((r && r.error) || 'Không tra được bảng giá');
   var cb = proComboText_(r.combos);
+  if (r.comboOnly) return cb || 'Không có combo đang áp dụng khớp câu hỏi. Thử gõ tên sản phẩm có trong combo, hoặc chỉ gõ "combo" để xem các combo.';
   if (r.found) return 'Giá theo BẢNG GIÁ (DANH_MUC), đơn vị nghìn đồng — ví dụ 2.310 = 2.310.000đ:\n' + r.text + (cb ? '\n\n' + cb : '');
   if (cb) return cb + '\n\n(Không có sản phẩm lẻ khớp rõ trong bảng giá' + ((r.suggestions||[]).length ? ' — gợi ý: ' + r.suggestions.slice(0,5).join('; ') : '') + ')';
   var sg = (r.suggestions||[]).slice(0,8);
@@ -476,6 +482,7 @@ function proDockEnsure_(){
     + '<div class="pro-ai-range" id="pro-ai-range" style="display:none"></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
     + '<div class="pro-ai-log" id="pro-ai-log"></div><div class="pro-ai-sug" id="pro-ai-sug"></div>'
+    + '<label id="pro-ai-combo-wrap" style="display:none;font-size:12px;margin:4px 0;align-items:center;gap:6px"><input type="checkbox" id="pro-ai-combo"> 🎁 Chỉ tìm COMBO (tích để chỉ ra combo có sẵn)</label>'
     + '<div class="pro-ai-in"><textarea id="pro-ai-q" rows="2" maxlength="600" placeholder="Hỏi về khách hoặc doanh số…"></textarea><button type="button" id="pro-ai-send" class="btn primary">Gửi</button></div>';
   document.body.appendChild(p);
   p.onclick = function(e){ var t = e.target; if (!t.closest) return;
@@ -501,6 +508,7 @@ function proAiMode_(m){
   if (m !== _proDock.mode){ _proDock.mode = m; _proDock.log = []; }
   var p = document.getElementById('pro-ai'); if (!p) return;
   p.querySelectorAll('[data-mode]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });
+  var cw = document.getElementById('pro-ai-combo-wrap'); if (cw) cw.style.display = m==='price' ? 'flex' : 'none';   // ô tích Combo chỉ ở chế độ 💰 Giá sản phẩm
   var qIn = document.getElementById('pro-ai-q'); if (qIn) qIn.placeholder = m==='price' ? 'Hỏi giá sản phẩm… (vd: giá + tên sản phẩm)' : m==='leads' ? 'Hỏi về khách nóng/ấm/nguội… (vd: ai sắp mất?)' : 'Hỏi về khách hoặc doanh số…';
   proRangeRender_();
   document.getElementById('pro-ai-sug').innerHTML = PRO_AI_SUGGEST[m].map(function(x){ return '<button type="button" class="pro-chip" data-sug="'+proEsc_(x)+'">'+proEsc_(x)+'</button>'; }).join('');
@@ -713,9 +721,10 @@ async function proAiSend_(){
   if (_proDock.mode==='price' || (proPriceIntent_(question) && !proIntent_(_proDock.mode, question))){
     _proDock.log.push({ role:'user', text:question }); q.value = ''; _proDock.busy = true;
     _proDock.log.push({ role:'bot', text:'⏳ Đang tra bảng giá…' }); proAiLogRender_();
-    var pr = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch);
+    var comboOnly = _proDock.mode==='price' && !!(document.getElementById('pro-ai-combo') && document.getElementById('pro-ai-combo').checked);
+    var pr = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch, 30000, comboOnly);
     _proDock.log.pop();
-    var pm = { role:'bot', text:proPriceFormat_(pr), images:proComboImages_(pr.combos), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' };
+    var pm = { role:'bot', text:proPriceFormat_(pr), images:proComboImages_(pr.combos), provider:comboOnly ? 'Combo có sẵn (tra trực tiếp, không dùng AI)' : 'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' };
     if (pr.ok && !pr.found && (pr.suggestions||[]).length){ pm.text = proPriceNotFoundText_(); pm.chips = pr.suggestions.slice(0,8).map(function(n){ return { kind:'name', label:n }; }); }   // gợi ý thành nút bấm → xem thông tin + giá
     _proDock.log.push(pm);
     _proDock.busy = false; proAiLogRender_(); return;

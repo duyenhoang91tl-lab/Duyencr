@@ -53,6 +53,9 @@ jobs:
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
 
+      - name: Kiểm tra ?v= theo nội dung + _headers (cache dài an toàn)
+        run: node tools/test-dist-hash.js
+
       - name: Kiểm tra ngân sách dung lượng (JS/CSS sau gzip)
         run: node tools/measure-load.js --check
 

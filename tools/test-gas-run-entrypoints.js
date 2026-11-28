@@ -12,7 +12,7 @@ function walk(d, out) { for (const n of fs.readdirSync(d)) { const p = path.join
 
 // 1) Khong con huong dan nao bao "chon <ham co _ cuoi>" (Editor khong hien ham do)
 const files = ['gas_v13.js', 'index.html', 'README.md'].map(f => path.join(ROOT, f)).filter(fs.existsSync)
-  .concat(walk(path.join(ROOT, 'js'), []).filter(f => f.endsWith('.js')), walk(path.join(ROOT, 'docs'), []).filter(f => f.endsWith('.md')));
+  .concat(walk(path.join(ROOT, 'js'), []).filter(f => f.endsWith('.js')), walk(path.join(ROOT, 'docs'), []).filter(f => f.endsWith('.md') && !f.includes('handoff-archive')));   // kho lich su: nhac lai huong dan cu, khong phai huong dan dang dung
 const bad = [];
 const re = /(chon|chọn)\s+(ham|hàm)?\s*[\"'`“]?(?:<b>)?\s*([A-Za-z][A-Za-z0-9]*_)(?![A-Za-z0-9_])/gi;
 for (const f of files) { const lines = fs.readFileSync(f, 'utf8').split('\n'); lines.forEach((l, i) => { let m; re.lastIndex = 0; while ((m = re.exec(l))) bad.push(path.relative(ROOT, f) + ':' + (i + 1) + ' -> ' + m[3]); }); }

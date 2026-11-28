@@ -225,6 +225,7 @@ function doPost(e) {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
     if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.token && _demoSessionUser_(d0.token)) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.', code: 'FORBIDDEN' });   // ke ca khi bo truong demo, chi gui token phien
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
@@ -255,6 +256,8 @@ function doPostCore_(e) {
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
+    if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);   // dung diem tru vao don (token)
+    if (CRM_ORDER_POST_ACTIONS_[action] === 1) return crmOrderDoPost_(action, data);   // len Don CRM (sheet rieng 'Don CRM', KHONG ghi DT Tong; token)
     if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
@@ -311,9 +314,9 @@ function doPostCore_(e) {
     if (action === 'importBaseSource')    return doImportBaseSource_(data.items, data.dryRun, _impWho_(data.token));   // 2026-11-21: cap nhat Kenh ban (cot M) cua Base tu bao cao nguon, khop ma don/ma bo dem
     if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
-    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows, data.daily);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
-    if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
+    if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows, data.daily);
     if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
     if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
@@ -330,8 +333,9 @@ function doPostCore_(e) {
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
     if (action === 'saveAssignHistory')   return saveAssignHistoryGuarded_(data);
     if (action === 'leadAssign')          return leadAssign_(data);
+    if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
-    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done, data.ids);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──

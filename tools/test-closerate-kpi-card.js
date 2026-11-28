@@ -17,8 +17,9 @@ let h = ctx._srCloseRateKpiCard_({ saleCloseRateFrom: '2026-10-01', saleCloseRat
 ok(/kpi-card/.test(h) && />0\.8%</.test(h) && /333 đơn ÷ 39\.781 tương tác Pancake/.test(h) && /Tỷ lệ chốt TB/.test(h), 'the hien 0.8% + (333 don ÷ 39.781 tuong tac)');
 ok(ctx._srCloseRateKpiCard_({ saleCloseRate: [{ held: 10, closed: 1 }] }) === '', 'chua nap Pancake (khong co saleCloseRateFrom) -> khong ve the');
 ok(ctx._srCloseRateKpiCard_({ saleCloseRateFrom: 'x', saleCloseRate: [] }) === '' && ctx._srCloseRateKpiCard_(null) === '', 'khong du lieu -> khong ve the');
-ok(/_srCloseRateKpiCard_\(d\) \+\s*\n\s*'<\/div>' \+/.test(js), 'Bao cao A goi the trong cum KPI');
-const rb = js.slice(js.indexOf('function _srRenderB(d)'), js.indexOf('function _srRenderB(d)') + 1800);
-ok(/_srCloseRateKpiCard_\(d\)/.test(rb), 'Bao cao B goi the trong cum KPI');
+// 2026-11-26: Bao cao A + B tinh the nay tren dKd_ (chi phong kinh doanh) thay vi d.
+ok(/_srCloseRateKpiCard_\(dKd_\) \+\s*\n\s*'<\/div>' \+/.test(js), 'Bao cao A goi the trong cum KPI');
+const rb = fnSrc('_srRenderB');
+ok(/_srCloseRateKpiCard_\(dKd_\)/.test(rb), 'Bao cao B goi the trong cum KPI');
 ok(/Tỷ lệ chốt TB \(%\)/.test(xl) && (xl.match(/_srCloseRateAvg_\(/g) || []).length >= 2, 'xuat Excel A va B them dong Ty le chot TB');
 console.log(fail ? '\nFAILED ' + fail : '\nALL CLOSERATE KPI CARD TESTS PASSED'); process.exit(fail ? 1 : 0);

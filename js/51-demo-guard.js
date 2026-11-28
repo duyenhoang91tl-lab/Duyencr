@@ -106,5 +106,21 @@
   }
   if (!patchXlsx()) { var iv = setInterval(function () { if (patchXlsx()) clearInterval(iv); }, 300); setTimeout(function () { clearInterval(iv); }, 60000); }
 
+  // ── (3) CHI XEM (2026-11-27): chan moi POST len may chu ngay o trinh duyet, bao 1 cau de hieu thay vi loi chung chung. ──
+  // Day chi la lop giao dien (nguoi co token tu goi duoc fetch rieng): may chu moi la noi chan that (gas_v13.js doPost: token cua tai khoan test -> tu choi het).
+  // Chi cho qua dang nhap (webLogin/demoLogin). Giu body nguyen ven, khong cham den request cua tai khoan thuong.
+  var _POST_OK = /"action"\s*:\s*"(webLogin|demoLogin)"/, _lastToast = 0, _origFetch = window.fetch.bind(window);
+  window.fetch = function (u, o) {
+    try {
+      if (isDemo() && o && o.method && String(o.method).toUpperCase() === 'POST' && typeof gsUrl !== 'undefined' && gsUrl && typeof u === 'string' && u.indexOf(gsUrl) === 0 &&
+          !_POST_OK.test(String(o.body || '').slice(0, 800))) {
+        var now = Date.now();
+        if (now - _lastToast > 4000) { _lastToast = now; try { if (typeof toast === 'function') toast('Tài khoản test chỉ xem — không lưu/sửa được dữ liệu.'); } catch (eT) {} }
+        return Promise.resolve(new Response(JSON.stringify({ ok: false, error: 'Tài khoản test chỉ xem, không ghi được dữ liệu.', code: 'FORBIDDEN' }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      }
+    } catch (e) {}
+    return _origFetch(u, o);
+  };
+
   window.__demoGuard = { maskText: maskText, encBytes: encBytes, isDemo: isDemo };
 })();
