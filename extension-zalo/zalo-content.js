@@ -2155,7 +2155,7 @@
   }
     function _zaiLocalStripVN_(s) {
     if (!s) return '';
-    s = String(s).toLowerCase();
+    s = String(s).normalize('NFC').toLowerCase();
     s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
       .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
       .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd');

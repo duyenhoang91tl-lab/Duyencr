@@ -184,7 +184,8 @@ function isValidVnPhone_(p) {
 // Bo dau tieng Viet de tim kiem khong phan biet co dau/khong dau, hoa/thuong.
 function _stripVN_(s) {
   if (!s) return '';
-  s = String(s).toLowerCase();
+  // NFC truoc: chu tu Mac/iOS (hay dan vao sheet bang gia / tin nhan) co the o dang TO HOP (a + dau roi) -> gop ve dang DUNG SAN de cac bang ky tu ben duoi khop.
+  s = String(s).normalize('NFC').toLowerCase();
   s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a');
   s = s.replace(/[èéẹẻẽêềếệểễ]/g, 'e');
   s = s.replace(/[ìíịỉĩ]/g, 'i');
@@ -192,6 +193,7 @@ function _stripVN_(s) {
   s = s.replace(/[ùúụủũưừứựửữ]/g, 'u');
   s = s.replace(/[ỳýỵỷỹ]/g, 'y');
   s = s.replace(/đ/g, 'd');
+  s = s.replace(/[\u0300-\u036f]/g, '');   // dau roi con sot (to hop la/hiem)
   return s;
 }
 

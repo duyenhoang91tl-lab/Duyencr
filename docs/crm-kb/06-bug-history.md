@@ -53,4 +53,4 @@ Thêm mục mới ở CUỐI, mỗi mục: triệu chứng → nguyên nhân g�
 - **Mọi hộp/modal `max-height:NNvh` chỉ còn dải trắng trên app Android:** WebView kẹt `vh`=0 (đã thấy ở hộp chip Tổng quan, rồi rà ra 22 chỗ js + 21 chỗ css + 14 chỗ index.html). Sửa chung bằng biến `--vh` (xem `10-ui-redesign-notes.md`).
 - **Quy ước test:** khi thêm hàm mới vào mã thật mà test có danh sách hàm nạp thủ công (`grab(...)`/`NAMES`), grep `tools/test-*.js` tìm danh sách đó và thêm hàm mới. ĐỪNG ghim cứng `?v=` hay class/inline-style cụ thể trong test (dùng `\d{8}[a-z]`) — 2 test đã đỏ chỉ vì tăng `?v=`.
 - **Test so thân hàm với `HEAD`** (vd `test-dept-frame`) sẽ đỏ trước commit nếu cố ý sửa đúng hàm đó; tự hết đỏ sau commit.
-
+- **Tìm giá (Trợ lý AI "Giá sản phẩm") không ra dù có trong bảng giá (2026-11-18):** `_stripVN_` chỉ đổi chữ có dấu DỰNG SẴN; chữ tổ hợp NFD (dán từ Mac/iOS) vỡ thành mảnh → không khớp. Đã gộp `normalize('NFC')` + test `tools/test-price-nfd.js`. Quy ước: mọi hàm bỏ dấu tự viết PHẢI `normalize('NFC')` (hoặc NFD rồi xoá `[\u0300-\u036f]`) trước khi đổi bảng ký tự.
