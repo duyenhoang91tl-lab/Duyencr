@@ -8,9 +8,9 @@
 
 ## 2026-11-28 (phiên Claude — CRM DỄ DÙNG CHO NGƯỜI MỚI, KHÔNG THÊM DÒNG HƯỚNG DẪN)
 - ĐỀ BÀI Duyên: "hãy trình bày crm của mình ai không biết dùng đều có thể sử dụng được, mà không cần thêm mấy dòng chỉ dẫn". 5 bước: (1) nút lớn Tổng quan (2) Data của tôi nút Gọi/Xong (3) điện thoại: nhắc hẹn thu thành chuông (4) điện thoại: bảng khách thấy tên (5) lỗi dễ hiểu + Thử lại.
-- ✅ **ĐÃ XONG:** Bước 1/5 (js/36-fn-homechips ?v=20261128a): màn Tổng quan có hàng NÚT LỚN theo vai trò/quyền (Khách được giao, Tìm khách, Lịch gọi khách, Tạo đơn, Đơn hàng, Tin nhắn; admin: Chia data, Doanh số, Tài khoản); đổi nhãn "Cơ hội thiếu hoạt động" → "Khách lâu chưa cập nhật". 464 test OK, đã xem ảnh chụp máy tính + điện thoại (dữ liệu giả).
-- 🔧 **ĐANG LÀM:** Bước 2/5 Data của tôi (js/07)
-- ➡️ **BƯỚC KẾ TIẾP:** js/07 renderMyDataTab: nút Gọi / Xong thay ô tích nhỏ
+- ✅ **ĐÃ XONG:** Bước 1/5 nút lớn Tổng quan; bước 2/5 Data của tôi (js/07 ?v=20261128b): mỗi khách có nút 📞 Gọi · Xem khách · ✓ Xong / ↩ Chưa xong (thay ô tích nhỏ). 466 test OK, đã xem ảnh máy tính + điện thoại.
+- 🔧 **ĐANG LÀM:** Bước 3/5 điện thoại: nhắc hẹn thu thành chuông (js/06)
+- ➡️ **BƯỚC KẾ TIẾP:** js/06: _reminderPanelOpen mặc định đóng khi màn ≤640px
 
 ## 2026-11-28 (phiên Claude — CHIA DATA: CHỌN THÁNG 5 VẪN BỊ LOẠI HÀNG LOẠT, LẦN 2) — XONG BƯỚC 1/1 (web `js/07`, chưa thử bằng dữ liệu thật)
 - ĐỀ BÀI Duyên: "phần chọn data khách thấy loại 1 loạt trong khi mình chọn của tháng 5 thì phải có tất cả đơn của tháng 5, khách nào có đơn ở đó thì đều tính" (không kèm ảnh). Lần sửa 27/11 (đơn POS + tải thêm cửa sổ POS) đã vào nhưng còn 2 chỗ nữa.
