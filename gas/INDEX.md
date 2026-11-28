@@ -156,8 +156,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `COMMCLOSE_SECTION_`, `COMMCLOSE_DEFAULT_`
 
 ## 34d_KpiCommit.gs
-- Hàm: `_kpiCommitCfgNormalize_`, `_kpiFold_`, `_kpiPeriodOf_`, `_kpiCommitKey_`, `_kpiIsApprover_`, `_kpiNewRec_`, `_kpiLog_`, `_kpiCommitSubmit_`, `_kpiCommitDecide_`, `_kpiCommitEffective_`
-- Hằng/biến: `KPICOMMIT_SECTION_`, `KPICOMMIT_DEFAULT_`
+- Hàm: `_kpiCommitCfgNormalize_`, `_kpiFold_`, `_kpiPeriodOf_`, `_kpiCommitKey_`, `_kpiIsApprover_`, `_kpiNewRec_`, `_kpiLog_`, `_kpiCommitSubmit_`, `_kpiCommitDecide_`, `_kpiCommitEffective_`, `_kpiCommitCfg_`, `_kpiMyNames_`, `_kpiCommitRowToRec_`, `_kpiCommitRecToRow_`, `_kpiCommitReadAll_`, `_kpiCommitUpsert_`, `_kpiOverrideOf_`, `kpiCommitDoGet_`, `kpiCommitDoPost_`
+- Hằng/biến: `KPICOMMIT_SECTION_`, `KPICOMMIT_DEFAULT_`, `SH_KPICOMMIT_`, `KPICOMMIT_HEADERS_`, `KPICOMMIT_GET_ACTIONS_`, `KPICOMMIT_POST_ACTIONS_`
 
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`, `_vpTarget_`, `_vpRead_`, `_vpTargetCur_`, `_vpApprovers_`, `_vpIsAdminName_`, `_vpNotifClear_`, `_vpNotifyAdmins_`, `vietTatPropose_`, `_vpOwn_`, `_vpSummaryFor_`, `vietTatProposalsList_`, `vietTatDecide_`, `_vpApply_`

@@ -256,7 +256,8 @@ function doPostCore_(e) {
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
-    if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);   // dung diem tru vao don (token)
+    if (LOYALTY_POST_ACTIONS_[action] === 1) return loyaltyDoPost_(action, data);
+    if (KPICOMMIT_POST_ACTIONS_[action] === 1) return kpiCommitDoPost_(action, data);   // KPI tu cam ket: gui / duyet (token)   // dung diem tru vao don (token)
     if (CRM_ORDER_POST_ACTIONS_[action] === 1) return crmOrderDoPost_(action, data);   // len Don CRM (sheet rieng 'Don CRM', KHONG ghi DT Tong; token)
     if (KENH_POST_ACTIONS_[action] === 1) return kenhDoPost_(action, data);   // Don cac kenh theo giai doan: tao/sua/chuyen giai doan/viec con/binh luan (token)
     if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)

@@ -66,3 +66,75 @@ function _kpiCommitEffective_(rec, overrideValue, cfg) {
   return { commit: pick ? pick[1] : null, source: pick ? pick[0] : null, pendingAmount: pend > 0 ? pend : 0 };
 }
 
+// ── Bước 8b-2: SỔ CAM KẾT (sheet KpiCommit) + action kpiCommitList / kpiCommitSubmit / kpiCommitDecide ──
+// Mỗi (tháng, sale) đúng 1 dòng (key = kỳ|tên bỏ dấu); sửa = ghi đè dòng + nối `history` (JSON). Mọi thay đổi ghi thêm AuditLog 'kpi-commit:<hành động>'.
+// "Sale" của tài khoản = tên hiển thị (user.name) hoặc 1 trong các tên gắn kèm (user.names). Chỉ admin/leader (approverRoles) thấy cam kết của người khác.
+var SH_KPICOMMIT_ = 'KpiCommit';
+var KPICOMMIT_HEADERS_ = ['key', 'period', 'sale', 'amount', 'approvedAmount', 'status', 'submittedBy', 'submittedAt', 'decidedBy', 'decidedAt', 'history', 'updatedAt'];
+var KPICOMMIT_GET_ACTIONS_ = { kpiCommitList: 1 };
+var KPICOMMIT_POST_ACTIONS_ = { kpiCommitSubmit: 1, kpiCommitDecide: 1 };
+function _kpiCommitCfg_() { var c = null; try { c = getSetting_('kpiCommitConfig'); } catch (e) {} return _kpiCommitCfgNormalize_(c); }
+function _kpiMyNames_(user) {
+  var out = [], seen = {};
+  [user && user.name].concat(Array.isArray(user && user.names) ? user.names : []).forEach(function (n) { n = String(n || '').trim(); if (n && !seen[_kpiFold_(n)]) { seen[_kpiFold_(n)] = 1; out.push(n); } });
+  if (!out.length && user && user.username) out.push(String(user.username));
+  return out;
+}
+function _kpiCommitRowToRec_(r) {
+  var h = []; try { h = r[10] ? JSON.parse(r[10]) : []; } catch (e) { h = []; }
+  return { key: String(r[0]), period: String(r[1]), sale: String(r[2]), amount: Number(r[3]) || 0, approvedAmount: (r[4] === '' || r[4] === null || r[4] === undefined) ? null : Number(r[4]),
+           status: String(r[5] || 'none'), submittedBy: String(r[6] || ''), submittedAt: Number(r[7]) || 0, decidedBy: String(r[8] || ''), decidedAt: Number(r[9]) || 0, history: h };
+}
+function _kpiCommitRecToRow_(rec, now) {
+  return [rec.key, rec.period, rec.sale, rec.amount, rec.approvedAmount === null || rec.approvedAmount === undefined ? '' : rec.approvedAmount, rec.status, rec.submittedBy || '', rec.submittedAt || '', rec.decidedBy || '', rec.decidedAt || '', JSON.stringify(rec.history || []), now];
+}
+function _kpiCommitReadAll_() {
+  var sh = getSheet_(SH_KPICOMMIT_, KPICOMMIT_HEADERS_), last = sh.getLastRow();
+  return last < 2 ? [] : sh.getRange(2, 1, last - 1, KPICOMMIT_HEADERS_.length).getValues().map(_kpiCommitRowToRec_);
+}
+function _kpiCommitUpsert_(rec) {
+  var sh = getSheet_(SH_KPICOMMIT_, KPICOMMIT_HEADERS_), last = sh.getLastRow(), row = 0, now = new Date();
+  if (last >= 2) { var keys = sh.getRange(2, 1, last - 1, 1).getValues(); for (var i = 0; i < keys.length; i++) if (String(keys[i][0]) === rec.key) { row = i + 2; break; } }
+  var rng = sh.getRange(row || last + 1, 1, 1, KPICOMMIT_HEADERS_.length);
+  if (rng.setNumberFormat) rng.setNumberFormat('@');
+  rng.setValues([_kpiCommitRecToRow_(rec, now)]);
+}
+function _kpiOverrideOf_(overrides, sale) {
+  var f = _kpiFold_(sale), v = null; Object.keys(overrides || {}).forEach(function (n) { if (v === null && _kpiFold_(n) === f) v = overrides[n]; }); return v;
+}
+function kpiCommitDoGet_(action, p) {
+  try {
+    var a = _khoAuth_(p); if (a.err) return a.err;
+    var cfg = _kpiCommitCfg_(), period = String((p && p.period) || _kpiPeriodOf_(_vnYmd_(new Date()))), mgr = _kpiIsApprover_(a.user.role, cfg), mine = _kpiMyNames_(a.user).map(_kpiFold_);
+    var ov = {}; try { ov = readSaleKpiConfig_().overrides || {}; } catch (e) {}
+    var rows = _kpiCommitReadAll_().filter(function (r) { return r.period === period && (mgr || mine.indexOf(_kpiFold_(r.sale)) >= 0); })
+      .map(function (r) { r.effective = _kpiCommitEffective_(r, _kpiOverrideOf_(ov, r.sale), cfg); return r; });
+    return jsonOut_({ ok: true, period: period, canApprove: mgr, myNames: _kpiMyNames_(a.user), requireApproval: cfg.requireApproval, pending: rows.filter(function (r) { return r.status === 'pending'; }).length, rows: rows });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi doc cam ket KPI: ' + (err && err.message || err) }); }
+}
+function kpiCommitDoPost_(action, d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    return _khoWithLock_(function () {
+      var cfg = _kpiCommitCfg_(), names = _kpiMyNames_(a.user), role = a.user.role, now = new Date(), nowMs = now.getTime(), today = _vnYmd_(now), period = String((d && d.period) || ''), res;
+      var all = _kpiCommitReadAll_();
+      function find(sale) { var k = _kpiCommitKey_(period, sale); return all.filter(function (r) { return r.key === k; })[0] || null; }
+      if (action === 'kpiCommitSubmit') {
+        var asked = String(d.sale || '').trim(), mineHit = names.filter(function (n) { return _kpiFold_(n) === _kpiFold_(asked); })[0];
+        var sale = asked ? (mineHit || asked) : (names[0] || ''), by = mineHit || names[0] || '';
+        var old = find(sale); res = _kpiCommitSubmit_(old, { period: period, sale: sale, amount: d.amount, by: by, role: role, nowMs: nowMs, todayYmd: today }, cfg);
+        if (!res.ok) return jsonOut_({ ok: false, error: res.error, code: res.code || '' });
+        _kpiCommitUpsert_(res.rec);
+        _loyaltyAudit_(by, 'kpi-commit:' + res.rec.history[res.rec.history.length - 1].action, period + '|' + sale, (old ? old.amount + 'd/' + old.status : '(chua co)'), res.rec.amount + 'd/' + res.rec.status);
+        return jsonOut_({ ok: true, rec: res.rec });
+      }
+      var sale2 = String(d.sale || '').trim(), old2 = find(sale2), by2 = names[0] || '';
+      res = _kpiCommitDecide_(old2, { decision: d.decision, by: by2, role: role, nowMs: nowMs, note: String(d.note || '').slice(0, 200) }, cfg);
+      if (!res.ok) return jsonOut_({ ok: false, error: res.error, code: res.code || '' });
+      _kpiCommitUpsert_(res.rec);
+      _loyaltyAudit_(by2, 'kpi-commit:' + d.decision, period + '|' + sale2, old2.amount + 'd/' + old2.status, res.rec.amount + 'd/' + res.rec.status);
+      return jsonOut_({ ok: true, rec: res.rec });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi cam ket KPI: ' + (err && err.message || err) }); }
+}
+
