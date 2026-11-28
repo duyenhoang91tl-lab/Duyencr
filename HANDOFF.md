@@ -6,6 +6,19 @@
 - ĐÃ SỬA (gas_v13.js, đã split-gas): `_pkApplyRealDaily_` — trong `buildPancakeReport_`, ngày Page đã rải (est>0) mà có số THẬT Page×ngày trong PancakeStatsDaily thì byDay/byDayPage dùng thẳng số thật (TLC từng ngày = đúng số Pancake, est=0); ngày chỉ có ước tính (est=2) giữ nguyên; ngày có dòng NV thật (est=0) không bị đè. Test `node tools/test-pk-byday-exact.js` (5).
 - [ ] **VIỆC KẾ TIẾP:** Duyên nạp file tháng 8 (Up dữ liệu) nếu chưa; xem Báo cáo Pancake tháng 8 + tuần lẻ. Số theo NHÂN VIÊN trong tuần lẻ vẫn là ước tính (file tháng không tách NV theo ngày) — cần file theo ngày nếu muốn số thật. Các test `test-close-rate-page-head`, `test-closerate-kpi-card` lỗi sẵn từ trước, không do mục này.
 
+## 2026-11-28 (phiên Claude — CRM DỄ DÙNG CHO NGƯỜI MỚI, KHÔNG THÊM DÒNG HƯỚNG DẪN)
+- ĐỀ BÀI Duyên: "hãy trình bày crm của mình ai không biết dùng đều có thể sử dụng được, mà không cần thêm mấy dòng chỉ dẫn". 5 bước: (1) nút lớn Tổng quan (2) Data của tôi nút Gọi/Xong (3) điện thoại: nhắc hẹn thu thành chuông (4) điện thoại: bảng khách thấy tên (5) lỗi dễ hiểu + Thử lại.
+- ✅ **ĐÃ XONG:** Bước 1/5 (js/36-fn-homechips ?v=20261128a): màn Tổng quan có hàng NÚT LỚN theo vai trò/quyền (Khách được giao, Tìm khách, Lịch gọi khách, Tạo đơn, Đơn hàng, Tin nhắn; admin: Chia data, Doanh số, Tài khoản); đổi nhãn "Cơ hội thiếu hoạt động" → "Khách lâu chưa cập nhật". 464 test OK, đã xem ảnh chụp máy tính + điện thoại (dữ liệu giả).
+- 🔧 **ĐANG LÀM:** Bước 2/5 Data của tôi (js/07)
+- ➡️ **BƯỚC KẾ TIẾP:** js/07 renderMyDataTab: nút Gọi / Xong thay ô tích nhỏ
+
+## 2026-11-28 (phiên Claude — CHIA DATA: CHỌN THÁNG 5 VẪN BỊ LOẠI HÀNG LOẠT, LẦN 2) — XONG BƯỚC 1/1 (web `js/07`, chưa thử bằng dữ liệu thật)
+- ĐỀ BÀI Duyên: "phần chọn data khách thấy loại 1 loạt trong khi mình chọn của tháng 5 thì phải có tất cả đơn của tháng 5, khách nào có đơn ở đó thì đều tính" (không kèm ảnh). Lần sửa 27/11 (đơn POS + tải thêm cửa sổ POS) đã vào nhưng còn 2 chỗ nữa.
+- NGUYÊN NHÂN GỐC (2 chỗ, so với bảng Danh sách KH): (1) bộ lọc THÁNG của bảng dùng `o.yr/o.mo`, còn Chia data chỉ dùng `o.ds` (ngày đầy đủ) → đơn Base biết tháng nhưng không đọc được ngày (`ds` rỗng) hiện ở bảng nhưng bị loại ở Chia data; (2) khi chọn nguồn "Dữ liệu đơn", khách có đơn POS nhưng `c.dataSrc.don` chưa bật (`donPhoneSet` tải riêng, có thể cũ/chưa về) bị tính là "ngoài nguồn".
+- ✅ ĐÃ SỬA `js/07-openassignmodal.js` (`_advAssignDateFilteredList`): đơn chỉ có tháng/năm → tính nếu tháng đó giao với khoảng ngày; có đơn POS + đã chọn khoảng ngày + nguồn có "don" → tính là nguồn đơn. `index.html` ?v=20261128a. Test `node tools/test-assign-date-pos.js` thêm ca tháng 5 (xanh); test-assign-* khác xanh (riêng test-assign-create-ui cần jsdom, môi trường này không có — lỗi từ trước, không do sửa).
+- 🔧 ĐANG LÀM: không còn việc code; chờ Duyên thử thật.
+- ➡️ BƯỚC KẾ TIẾP: Duyên Ctrl+F5 → Chia data → chọn 01/05–31/05 → so số "Bộ lọc hiện tại" với bảng Danh sách KH. Nếu vẫn lệch, gửi ẢNH dòng "(loại thêm: …)" + 1 SĐT cụ thể có đơn tháng 5 mà không hiện để dò tiếp. Lưu ý: "Chưa chia/Đã chia" chỉ là thống kê, không loại khách.
+
 ## 2026-11-27 (phiên Claude — 11 HẠNG MỤC CRM: BƯỚC 3 KIỂM NHẬT KÝ ĐỔI CẤU HÌNH + CHỐT 2e) — XONG (chỉ test + tài liệu; không đổi GAS/web)
 - ✅ **2e không làm lại:** phiên "Lên đơn CRM 4b" đã nối điểm THẲNG vào đơn (trừ thẳng, `pointsUse`, Hủy/Hoàn tự hoàn điểm) — xem mục 4b bên dưới. Tránh làm trùng (đã gặp 2 lần: combo, ô dùng điểm).
 - ✅ **Bước 3 (quy tắc chung "nhật ký đổi cấu hình"):** KẾT LUẬN từ code: chỉ có 1 đường ghi cài đặt là `setSetting_` (gas_v13.js ~1697) và nó luôn ghi `AuditLog` (`config:setting:<khoá>`, giờ, người theo token, cũ → mới; khoá nhạy cảm chỉ "đã đổi"; khoá máy tự cập nhật bị bỏ qua). Hạng/KPI/điểm/hoa hồng/thưởng đều đi đường này → ĐÃ có dấu vết, không cần sửa code. Có màn xem ở Cấu hình (`js/37`).

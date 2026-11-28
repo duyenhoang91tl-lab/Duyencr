@@ -124,6 +124,9 @@ function _advAssignDateFilteredList() {
     if (hasSrc) {
       var d = c.dataSrc || {}, ok = false;
       _advAssign.srcSet.forEach(function (k) { if (d[k]) ok = true; });
+      // NGUYEN NHAN GOC (Duyen 28/11: chon thang 5 van bi loai hang loat): khach co don POS la khach "Du lieu don" du c.dataSrc.don chua bat
+      // (donPhoneSet la danh sach SDT tai rieng, co the cu/chua ve) -> co don POS thi tinh la nguon don khi da chon nguon don.
+      if (!ok && hasDate && _advAssign.srcSet.has('don')) { try { var _pr = window.posOrdersByPhone && window.posOrdersByPhone[p]; if (_pr && _pr.length) ok = true; } catch (e) {} }
       if (!ok) { _advAssign._diag.srcOut++; return false; }
     }
     if (!hasDate) return true;
@@ -132,9 +135,17 @@ function _advAssignDateFilteredList() {
     // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
     // NGUYEN NHAN GOC (da sua 2026-10-10): truoc day KH POS (dt/don/cs) KHONG co ngay don van lot qua khi da chon nguon -> chia "khach thang 9" bi lan khach khong ro ngay.
     // Nay chi KH thuoc nguon CSKH-Duyen (khong co ngay don) moi duoc miễn loc ngay, va chi khi CSKH nam trong nguon da chon.
-    if (!yl.some(function (o) { return o.ds; })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
+    if (!yl.some(function (o) { return o.ds || (o.yr && o.mo); })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
     var inR = yl.some(function (o) {
-      if (!o.ds) return false;
+      if (!o.ds) {
+        // NGUYEN NHAN GOC: don Base co thang/nam nhung khong doc duoc ngay (o.ds rong) thi bo loc THANG cua bang van tinh, con Chia data loai -> khach thang 5 bi mat.
+        // Nay: don chi biet thang -> tinh neu thang do giao voi khoang ngay da chon.
+        if (!o.yr || !o.mo) return false;
+        var _ms = o.yr + '-' + String(o.mo).padStart(2, '0') + '-01', _me = o.yr + '-' + String(o.mo).padStart(2, '0') + '-31';
+        if (_advAssign.dateFrom && _me < _advAssign.dateFrom) return false;
+        if (_advAssign.dateTo && _ms > _advAssign.dateTo) return false;
+        return true;
+      }
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
       if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
       return true;
