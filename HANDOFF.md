@@ -1,5 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
+- ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
+- NGUYÊN NHÂN GỐC: `_coCmbLines` chỉ chia giá theo tỉ lệ khi các món có đơn giá > 0. Món không mang đơn giá (combo lưu dạng 4 trường cũ, hoặc GAS đang chạy chưa phải bản có cột giá) → tổng niêm yết = 0 → rơi nhánh "chưa có giá": cả giá combo gán vào món đầu (3.300.000 / SL2 = 1.650.000), các món sau 0đ. Thêm: giá món nhập theo NGHÌN đồng (1550) trong khi giá combo là đồng đầy đủ thì sẽ chia ra vài trăm đồng.
+- ✅ ĐÃ SỬA: (1) tổng niêm yết < 100.000 mà giá combo ≥ 100.000 → coi giá món là nghìn đồng, nhân 1000 (cùng quy ước `_comboVnd_` của GAS); (2) món chưa có giá → `_coCmbFillPrices` gọi GAS `posPrice` (đơn giá POS gần nhất) rồi mới chia theo tỉ lệ; (3) vẫn không tra được giá → giữ cách cũ nhưng hiện CẢNH BÁO nói rõ phải điền đơn giá từng món. `_coCmbAdd` thành async (không đổi chỗ gọi: nút ＋ Thêm).
+- Test: `tools/test-crm-order-combo-ui.js` thêm combo Vòng cầu đơn (giá nghìn đồng và giá thiếu có/không có POS) → 380.000×2 + 1.550.000 + 990.000 = 3.300.000; 16 test crm-order/combo khác vẫn PASS. Chưa thử trên trình duyệt thật.
+- Không đổi gas_v13.js (nên không phải đồng bộ khối gas-code-v9). index.html js/99-d-crm-order.js ?v=20261128e. Chỉ cần Ctrl+F5, không cần reload extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 → ➕ Tạo đơn → 🎁 Combo có sẵn → thêm "Vòng cầu đơn". Nếu vẫn lệch: mở tab 🎁 Combo xem từng món có ô đơn giá chưa; nếu sheet COMBO đã có giá mà đơn vẫn 0đ thì GAS đang chạy là bản cũ → deploy lại (dán gas_v13.js mới nhất → Deploy → Manage deployments → New version) và gọi `count` kiểm `ver`.
+
 ## 2026-11-28 (phiên Claude — KIỂM TRA & SỬA LỖI HIỆN HÀNH) — XONG, ĐÃ PUSH
 - ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành" → "tiếp".
 - ✅ Đã xong: tài khoản test lọc theo sale + chỉ xem (cùng phiên khác, xem mục "TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN"); sửa 3 test đỏ do sắp lại menu/báo cáo (`test-mascot-samoyed`, `test-report-n-pure`, `test-reports-config`); thêm `tools/test-demo-scope-web.js`; cập nhật `docs/TAI-KHOAN-TEST.md`; sinh lại `css/99-dark-auto.css`.

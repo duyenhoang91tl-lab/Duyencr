@@ -11,12 +11,21 @@ const COMBOS = [
   { code: 'CB2', name: 'Combo chưa có giá món', usable: true, priceVnd: 2000000, discount: 0, finalPrice: 2000000, freeship: false, ship: 30000, gifts: [{ name: 'Quà CTKM', gift: 'Hộp quà' }],
     items: [{ name: 'MẶT DÂY', qty: 2, price: 0, gift: false }, { name: 'DÂY', qty: 1, price: 0, gift: false }] },
   { code: 'CB3', name: 'Combo hết hạn', usable: false, priceVnd: 1, discount: 0, finalPrice: 1, items: [{ name: 'X', qty: 1, price: 1 }] },
-  { code: 'CB4', name: 'Combo giá cao hơn niêm yết', usable: true, priceVnd: 500000, discount: 0, finalPrice: 500000, items: [{ name: 'A', qty: 1, price: 300000 }, { name: 'B', qty: 1, price: 100000 }] }
+  { code: 'CB4', name: 'Combo giá cao hơn niêm yết', usable: true, priceVnd: 500000, discount: 0, finalPrice: 500000, items: [{ name: 'A', qty: 1, price: 300000 }, { name: 'B', qty: 1, price: 100000 }] },
+  { code: 'CB5', name: 'Vòng cầu đơn', usable: true, priceVnd: 3300000, discount: 0, finalPrice: 3300000, freeship: false, ship: 0, gifts: [],
+    items: [{ name: 'CHARM BI MÂU SÔ 10 SIZE 3', qty: 2, price: 380, gift: false }, { name: 'CHUỖI LAM THỦY 6 LI', qty: 1, price: 1550, gift: false }, { name: 'HẠT ĐÔNG ĐIÊU LAM THỦY', qty: 1, price: 990, gift: false }] },
+  { code: 'CB6', name: 'Vòng cầu đơn (món chưa lưu giá)', usable: true, priceVnd: 3300000, discount: 0, finalPrice: 3300000, freeship: false, ship: 0, gifts: [],
+    items: [{ name: 'CHARM BI MÂU SÔ 10 SIZE 3', qty: 2, price: 0, gift: false }, { name: 'CHUỖI LAM THỦY 6 LI', qty: 1, price: 0, gift: false }, { name: 'HẠT ĐÔNG ĐIÊU LAM THỦY', qty: 1, price: 0, gift: false }] },
 ];
+const POS = { 'CHARM BI': 380000, 'CHUOI LAM THUY': 1550000, 'HAT DONG DIEU': 990000 };
 let urls = [];
 const w = { gsUrl: 'https://gs/exec', currentUser: { name: 'Hoa' }, registerExtraTab: () => {}, toast: () => {}, confirm: () => true,
   document: { getElementById: id => id === 'xt-wrap-taodon' ? fakeEl(id) : (els[id] || null), addEventListener() {} },
-  fetch: async (u) => { urls.push(u); return { json: async () => (/comboList/.test(u) ? { ok: true, total: 4, count: 4, rows: COMBOS } : {}) }; },
+  fetch: async (u) => { urls.push(u); return { json: async () => {
+    if (/comboList/.test(u)) return { ok: true, total: COMBOS.length, count: COMBOS.length, rows: COMBOS };
+    if (/posPrice/.test(u) && w.__posOn) { const q = JSON.parse(decodeURIComponent(u.split('q=')[1])); const strip = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D').toUpperCase();
+      return { ok: true, results: q.map(o => { const k = Object.keys(POS).find(n => strip(o.t).indexOf(n) === 0); return k ? { found: true, price: POS[k] } : { found: false }; }) }; }
+    return {}; } }; },
   Math, Date, Number, String, Object, JSON, isFinite, setTimeout, clearTimeout, console, encodeURIComponent, Array, RegExp };
 w.window = w; vm.createContext(w); vm.runInContext(fs.readFileSync(path.join(root, 'js/99-d-crm-order.js'), 'utf8'), w);
 (async () => {
@@ -25,7 +34,7 @@ w.window = w; vm.createContext(w); vm.runInContext(fs.readFileSync(path.join(roo
   ok(urls.length === 0, 'chưa mở thì chưa gọi GAS');
   w._coCmbToggle(); await new Promise(r => setTimeout(r, 20));
   ok(urls.length === 1 && /action=comboList/.test(urls[0]), 'mở → gọi GAS comboList');
-  const vis = w._coCmbVisible(); ok(vis.length === 3 && !vis.some(c => c.code === 'CB3'), 'chỉ hiện combo đang áp dụng (ẩn combo hết hạn)');
+  const vis = w._coCmbVisible(); ok(vis.length === 5 && !vis.some(c => c.code === 'CB3'), 'chỉ hiện combo đang áp dụng (ẩn combo hết hạn)');
   ok(/Combo Ngũ hành/.test(fakeEl('co-cmb-res').innerHTML) && /2\.700\.000đ/.test(fakeEl('co-cmb-res').innerHTML) && /miễn ship/.test(fakeEl('co-cmb-res').innerHTML), 'danh sách: tên, giá sau giảm, miễn ship');
   // thêm combo 1: giá chia theo tỉ lệ, tổng = finalPrice
   w._coCmbAdd(0);
@@ -37,14 +46,23 @@ w.window = w; vm.createContext(w); vm.runInContext(fs.readFileSync(path.join(roo
   let c = w._coCalc(w._coNow()); ok(c.total === 2700000 && c.orderDiscount === 0 && c.itemDiscount === 0, 'Cần thu 2.700.000, KHÔNG dùng ô giảm giá (để dành cho CTKM/thẻ)');
   ok(/Đã thêm combo/.test(fakeEl('co-cmb-res').innerHTML), 'báo đã thêm');
   // combo 2: chưa có giá từng món → gán cả giá combo vào món đầu, ship combo, quà CTKM
-  w._co = w._coBlank(); w._coCmbAdd(1); it = w._co.items;
+  w._co = w._coBlank(); await w._coCmbAdd(1); it = w._co.items;
   ok(it[0].qty === 2 && it[0].price * 2 === 2000000 && it[1].price === 0, 'combo chưa có giá món: cả 2.000.000 gán vào món đầu (SL2 × 1.000.000), món sau 0đ');
   ok(it.some(x => x.name === 'Hộp quà' && x.price === 0), 'quà CTKM của combo thành dòng 0đ');
   ok(w._co.shipFee === 30000 && !w._co.freeShip, 'combo có phí ship 30.000 → điền Phí vận chuyển (đang trống)');
   // combo 4: giá cao hơn niêm yết → giữ niêm yết + cảnh báo
-  w._co = w._coBlank(); w._coCmbAdd(2); ok(w._co.items[0].price === 300000 && w._co.items[1].price === 100000 && /cao hơn/.test(w._coCmb.msg), 'giá combo > niêm yết: giữ niêm yết + cảnh báo');
+  w._co = w._coBlank(); await w._coCmbAdd(2); ok(w._co.items[0].price === 300000 && w._co.items[1].price === 100000 && /cao hơn/.test(w._coCmb.msg), 'giá combo > niêm yết: giữ niêm yết + cảnh báo');
+  // combo 5 (ví dụ Duyên): giá món lưu theo NGHÌN đồng (1550 / 990 / 380×2 = 3300) → phải ra đúng 1.550.000 / 990.000 / 380.000×2
+  w._co = w._coBlank(); await w._coCmbAdd(3); it = w._co.items;
+  ok(it.length === 3 && it[0].price === 380000 && it[0].qty === 2 && it[1].price === 1550000 && it[2].price === 990000, 'Vòng cầu đơn (giá nghìn đồng): 380.000×2, 1.550.000, 990.000');
+  c = w._coCalc(w._coNow()); ok(c.total === 3300000, 'Vòng cầu đơn: Cần thu 3.300.000');
+  // combo 6: món chưa lưu giá → tra giá POS rồi chia (có POS) / báo rõ (không có POS)
+  w.__posOn = true; w._co = w._coBlank(); await w._coCmbAdd(4); it = w._co.items;
+  ok(it[0].price === 380000 && it[1].price === 1550000 && it[2].price === 990000 && w._coCalc(w._coNow()).total === 3300000, 'món chưa có giá → tra POS: 380.000×2 + 1.550.000 + 990.000 = 3.300.000');
+  w.__posOn = false; w._co = w._coBlank(); await w._coCmbAdd(4);
+  ok(w._co.items[0].price * 2 === 3300000 && /đơn giá từng món/.test(w._coCmb.msg), 'không tra được giá → giữ cách cũ nhưng CẢNH BÁO rõ');
   // payload + server
-  w._co = w._coBlank(); Object.assign(w._co, { phone: '0912345678', custName: 'An' }); w._coCmbAdd(0);
+  w._co = w._coBlank(); Object.assign(w._co, { phone: '0912345678', custName: 'An' }); await w._coCmbAdd(0);
   const P = w._coPayload(w._co); ok(/\[Combo: Combo Ngũ hành\]/.test(P.note), 'ghi chú đơn có tên combo');
   const sv = g._crmOrderNormalize_(P); ok(!sv.error && sv.order.total === 2700000, 'server nhận đơn combo, tổng 2.700.000 khớp');
   // xoá hết dòng combo → không còn ghi chú combo

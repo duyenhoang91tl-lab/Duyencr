@@ -346,6 +346,8 @@ function _coCmbLines(c){
   var its = (c && c.items) || [], paid = its.filter(function(it){ return !it.gift; }), gifts = its.filter(function(it){ return it.gift; });
   var fin = Math.max(0, Math.round(Number(c.finalPrice != null ? c.finalPrice : (Number(c.priceVnd) || 0) - (Number(c.discount) || 0)) || 0)), list = 0, warn = '';
   paid.forEach(function(it){ list += Math.max(0, Number(it.price) || 0) * Math.max(1, Math.floor(Number(it.qty) || 1)); });
+  // Giá món nhập theo NGHÌN đồng (1550 = 1.550.000đ, giống ô Giá bán DANH_MUC) trong khi giá combo là đồng đầy đủ → nhân 1000, nếu không sẽ chia ra vài trăm đồng.
+  if (list > 0 && list < 100000 && fin >= 100000){ paid = paid.map(function(it){ return Object.assign({}, it, { price: (Number(it.price) || 0) * 1000 }); }); list *= 1000; }
   var mk = function(it, price, extra){ return Object.assign({ code:'', name:String(it.name || ''), note:[it.chatLieu, it.size, it.vang].filter(function(v){ return v && String(v).trim(); }).join(' · '), qty:Math.max(1, Math.floor(Number(it.qty) || 1)), price:price, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }, extra || {}); };
   var lines = [];
   if (list > 0){
@@ -364,9 +366,23 @@ function _coCmbLines(c){
   (c.gifts || []).forEach(function(g){ var nm = g && (g.gift || g.name); if (nm) lines.push({ code:'', name:String(nm), note:'Quà tặng combo', qty:1, price:0, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }); });
   return { lines: lines, freeShip: !!c.freeship, ship: Math.max(0, Math.round(Number(c.ship) || 0)), warn: warn };
 }
-function _coCmbAdd(i){
+// Combo chưa lưu đơn giá từng món (món có giá ≤ 0) → tra giá POS gần nhất (GAS posPrice) để chia đúng tỉ lệ; không tra được thì giữ nguyên (cách cũ: cả giá combo vào món đầu).
+async function _coCmbFillPrices(c){
+  var its = ((c && c.items) || []).map(function(it){ return Object.assign({}, it); }), idx = [];
+  its.forEach(function(it, k){ if (!it.gift && !(Number(it.price) > 0)) idx.push(k); });
+  if (!idx.length) return c;
+  try {
+    var q = idx.map(function(k){ return { t: its[k].name || '', c: its[k].chatLieu || '', s: its[k].size || '' }; });
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=posPrice&q=' + encodeURIComponent(JSON.stringify(q)), { redirect:'follow' }), d = await r.json();
+    if (d && d.ok && Array.isArray(d.results)) idx.forEach(function(k, j){ var x = d.results[j]; if (x && x.found && Number(x.price) > 0) its[k].price = Math.round(Number(x.price)); });
+  } catch (e) {}
+  return Object.assign({}, c, { items: its });
+}
+async function _coCmbAdd(i){
   var c = _coCmbVisible()[i]; if (!c) return;
+  if ((c.items || []).some(function(it){ return !it.gift && !(Number(it.price) > 0); })){ _coCmb.msg = 'Đang tra giá từng món…'; _coCmbResRender(); c = await _coCmbFillPrices(c); }
   var r = _coCmbLines(c);
+  if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món (hoặc báo để deploy lại GAS) rồi thêm lại.';
   if (!r.lines.length){ _coCmb.msg = 'Combo này chưa có món nào.'; _coCmbResRender(); return; }
   r.lines.forEach(function(l){ _co.items.push(l); });
   if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
