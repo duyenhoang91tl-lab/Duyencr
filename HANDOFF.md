@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — HỒ SƠ KHÁCH: "+ THÊM ĐƠN HÀNG" PHẢI LÀ TẠO ĐƠN THẬT) — XONG (chỉ web, Ctrl+F5)
+- ĐỀ BÀI Duyên (ảnh chụp tab Lịch sử đơn): form "+ Thêm đơn hàng" chỉ có Sản phẩm/Doanh thu gõ tay → "phải tạo đơn giống tạo đơn thông thường". Phần combo bỏ qua.
+- NGUYÊN NHÂN GỐC: nút ở js/03 (`renderHistTab`) và nút "🛒 Tạo đơn" ở js/33 vẫn mở form cũ `#add-order-form` (`addManualOrder`), không dùng màn ➕ Tạo đơn (js/99-d: chọn SP từ bảng giá, địa chỉ, ship, khuyến mãi, điểm, thẻ POS).
+- ĐÃ SỬA: file mới `js/99-g-order-from-profile.js` (`_coOpenFromProfile(phone)`: đóng hồ sơ → sang tab Tạo đơn → đơn trống + điền SĐT/tên/điểm). 2 nút gọi nó; thiếu file → tự rơi về form cũ (form cũ giữ nguyên trong DOM). Test `tools/test-order-from-profile.js` xanh; test-ui-pro-profile, pos-tags, points-web vẫn xanh.
+- ➡️ BƯỚC KẾ TIẾP: Duyên thử: mở khách → Lịch sử đơn → + Thêm đơn hàng → phải nhảy sang màn ➕ Tạo đơn có sẵn SĐT. Nếu cần xoá hẳn form cũ thì báo.
+
 ## 2026-11-28 (phiên Claude — LÀM NỐT CÁC VIỆC DANG DỞ: CỘT BẢNG KH → ĐIỂM ĐƠN CRM → ĐƠN CÁC KÊNH B3-B8 → MÀN CAM KẾT KPI)
 - ĐỀ BÀI Duyên (28/11 20:11): "Làm tiếp các bước còn dang dở". 4 việc trên đã dừng >5 tiếng, phiên NÀY đang nhận — phiên khác ĐỪNG làm trùng.
 - ✅ **ĐÃ XONG:** (1/4) Danh sách KH mặc định 7 cột chính (người đã chỉnh cột giữ nguyên); bảng vừa khít khung khi ẩn cột. Chụp Chromium 1200px + 390px, test-list-cols-default. Cần Ctrl+F5.

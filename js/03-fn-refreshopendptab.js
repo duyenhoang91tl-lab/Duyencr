@@ -538,7 +538,7 @@ function renderHistTab(c) {
   const _posLoading = !_posOn && _posOrdersState[c.phone] === 'loading';
 
   return `<div class="dp-section">${dlBrands}${dlDetails}${dlSources}
-    <button class="save-btn" style="margin-bottom:10px" onclick="_toggleAddOrderForm()">+ Thêm đơn hàng</button>
+    <button class="save-btn" style="margin-bottom:10px" data-phone="${esc(c.phone)}" onclick="if(!(typeof _coOpenFromProfile==='function'&&_coOpenFromProfile(this.dataset.phone)))_toggleAddOrderForm()">+ Thêm đơn hàng</button>
     <div id="add-order-form" style="display:none;margin-bottom:14px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <div>
