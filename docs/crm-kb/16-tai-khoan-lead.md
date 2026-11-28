@@ -42,5 +42,6 @@ Làm 2026-11-26/27. Vai trò: base `leader` (nhãn "Trưởng nhóm"; vai trò t
 
 ## Hạn chế đã biết (chưa sửa)
 - Đợt xoá TRƯỚC khi có `assignDeletedIds` không nằm trong danh sách: máy khác vẫn giữ (bấm "đã xong" không còn ghi lại đợt đó lên sheet).
-- Web không tự cập nhật tiến độ "đã xong" (vd tích ở Pancake AI) cho đợt đã tải về máy.
+- (ĐÃ SỬA 2026-11-28) Web tự cập nhật "đã xong" (vd tích/bỏ tích ở Pancake AI) cho đợt đã tải về: `_assignMergeDone_` (js/07) so 3 bên theo từng SĐT, mốc `h.srvDone` = bản máy chủ thấy lần trước. Máy chủ đổi dấu → theo máy chủ; không đổi → giữ dấu trên máy (vừa bấm chưa gửi tới, gửi lỗi, câu trả lời cũ). KHÔNG thay bằng cách chép đè `donePhones` từ máy chủ. Test `tools/test-assign-2may.js`.
+- Dấu gửi lỗi vẫn chỉ nằm trên máy đó (không tự gửi lại; người bấm đã được báo lỗi).
 - Xoá đợt chia không trả lại "CS chăm sóc" đã gán lúc chia.
