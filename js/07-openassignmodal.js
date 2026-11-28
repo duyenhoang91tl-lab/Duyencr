@@ -1111,7 +1111,7 @@ function renderAssignHistory() {
 
 // Xoa tren may chu TRUOC (dung dot theo id), thanh cong moi bo o may — neu bo truoc ma may chu loi thi lan keo sau dot lai hien ra.
 async function deleteAssignEntry(id) {
-  if (!confirm('Xóa lịch sử chia này?')) return;
+  if (!(await uiConfirm('Xóa lịch sử chia này?'))) return;
   if (gsUrl) {
     const res = await deleteAssignOnGS_([id]);
     if (!res.ok) { toast('⚠ Chưa xoá được: ' + res.error); return; }

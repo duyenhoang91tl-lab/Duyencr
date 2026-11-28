@@ -180,8 +180,8 @@ function exportCSV() {
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`OME_KH_${_ymd(new Date())}.csv`; a.click();
 }
 
-function clearData() {
-  if(!confirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)')) return;
+async function clearData() {
+  if(!(await uiConfirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)'))) return;
   customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; currentCS='all';
   document.getElementById('data-view').style.display='none';
   document.getElementById('empty-view').style.display='flex';
@@ -370,11 +370,11 @@ function _dueReminders(){
 // schedules[] cục bộ VÀ các ô hẹn nhanh trong careData dùng chung — schedGoi/SP/CS/Hen).
 // Khác với "Tắt hết" (chỉ ẩn tạm trong ngày, mai lại hiện) — hành động này xóa hẳn, đồng bộ
 // lên GAS luôn để các trình duyệt/tài khoản khác cũng không còn thấy lại.
-function deleteAllOverdueReminders(){
+async function deleteAllOverdueReminders(){
   var today = _remDateStr();
   var overdue = _dueReminders().filter(function(rm){ return rm.date < today; });
   if (!overdue.length){ toast('Không có nhắc hẹn quá hạn nào.'); return; }
-  if (!confirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.')) return;
+  if (!(await uiConfirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.'))) return;
 
   var careChanged = {};
   var daoDelSet = loadLS('ome_dao_deleted') || {};
