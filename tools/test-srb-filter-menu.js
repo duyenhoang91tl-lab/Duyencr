@@ -147,7 +147,7 @@ for(const sub of Object.keys(expect)){
 barOf('C');ok(QA('#host input[type=date]').length===0||true,'C: dùng khối ngày riêng (tuần/tháng/quý/năm)');
 let tk;
 barOf('E');tk=tasks();ok(tk.length===6&&tk[0].includes('hoa hồng cá nhân')&&tk[4].includes('Kênh'),'E: Tác vụ gom 5 cài đặt (admin) + Ẩn bộ lọc KH');
-barOf('F');tk=tasks();ok(tk.length===3&&tk[0].includes('KPI'),'F: Tác vụ = Cài đặt KPI + Phân loại + Ẩn bộ lọc KH');
+barOf('F');tk=tasks();ok(tk.length===4&&tk[0].includes('KPI')&&tk[1].includes('Phân loại')&&tk[2].includes('Lương cơ bản'),'F: Tác vụ = Cài đặt KPI + Phân loại + Lương cơ bản (ngày công) + Ẩn bộ lọc KH');
 barOf('G');tk=tasks();ok(tk.length===7&&tk[0].includes('Excel')&&tk.some(x=>x.includes('Chương trình thưởng')),'G: Tác vụ gom xuất Excel/CSV + cài đặt chương trình thưởng');
 barOf('H');tk=tasks();ok(tk.length===3&&tk[0].includes('CSV')&&tk[1].includes('tự nhảy'),'H: Tác vụ = Xuất CSV + Trạng thái KH tự nhảy');
 barOf('L');ok(!!$('sr-l-pct')&&tasks().length===3,'L: giữ ô "Tỷ lệ chia" + Tác vụ xuất CSV');
