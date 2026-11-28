@@ -283,7 +283,7 @@ async function renderPancakeTab(){
 function _pkRenderAll(){
   var wrap = document.getElementById('pancake-wrap');
   if (!wrap) return;
-  var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
+  var isAdmin = currentUser.role === 'admin';   // tai khoan test chi xem: khong hien nut/o sua khop ten Pancake
   var html = '';
 
   html += '<div class="dash-section-title">📥 Nhập báo cáo Pancake hàng ngày</div>';

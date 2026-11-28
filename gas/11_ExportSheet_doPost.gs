@@ -335,7 +335,7 @@ function doPostCore_(e) {
     if (action === 'leadAssign')          return leadAssign_(data);
     if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
-    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done, data.ids);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──

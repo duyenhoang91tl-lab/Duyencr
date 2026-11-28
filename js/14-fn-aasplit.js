@@ -1268,7 +1268,7 @@ function _applyAuthIdentity(acct){
   currentUser = { name: primaryName, names: (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer') ? [] : namesArr, role: _roleBaseOf(acct.role || 'cs'), roleKey: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
   // Doi sale Online/Van phong duoc XEM THEM khach/don cua nhom Sale "Quay" + phong CSKH (2026-10-29): may chu tra user.viewNames (_usersForClient_ full).
   // _inUserScope cong cac ten nay vao pham vi; vai tro admin/viewer khong gioi han nen bo qua.
-  currentUser.viewNames = (acct.role==='admin' || acct.role==='demo' || _roleBaseOf(acct.role)==='viewer' || !Array.isArray(acct.viewNames)) ? [] : acct.viewNames.filter(function(n){ return n && currentUser.names.indexOf(n) === -1; });
+  currentUser.viewNames = (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer' || !Array.isArray(acct.viewNames)) ? [] : acct.viewNames.filter(function(n){ return n && currentUser.names.indexOf(n) === -1; });
   // Truong nhom bi gioi han thang (2026-11-26): _inUserScope (js/08) doc currentUser.viewMonths. Don POS chi tai san 90 ngay (js/88) -> tai them cho du thang cu nhat.
   currentUser.viewMonths = (currentUser.role === 'leader' && Array.isArray(acct.viewMonths)) ? acct.viewMonths.slice() : [];
   if (currentUser.viewMonths.length && typeof posOrdersEnsureDays_ === 'function') {
@@ -1277,10 +1277,7 @@ function _applyAuthIdentity(acct){
   }
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
-    // Tai khoan test (2026-11-27): xem DAY DU cac tab du lieu + bao cao nhung CHI XEM; danh sach khach/don/lead da bi may chu loc theo cac sale duoc chon (xem
-    // _demoSessionGet_ trong gas_v13.js), moi thao tac ghi bi may chu tu choi. Khong cap cac tab may chu khong phuc vu cho tai khoan test (chat, cong viec, thu vien,
-    // Zalo AI, nhat ky, up du lieu) de khong hien man hinh loi. Quyen nay co dinh o client; may chu moi la noi chan that.
-    currentUser.perms = ['overview','tab-kh','tab-schedule','tab-overdue','tab-mydata','dashboard','team','salesreport','pancake','kpipancake','mktchecklist','dailybrief'];
+    // Tai khoan test (27/11): xem du tab nhu tai khoan thuong (tab theo perms/vai tro), du lieu khach loc theo sale da chon (server + js/08); body.demo-mode an nut quan tri/Google Sheets, server chan moi thao tac ghi.
     document.body.classList.add('demo-mode');
     // Xoa cache CSKH-Duyen/don cua phien truoc tren cung trinh duyet + bo du lieu dang giu trong bo nho: test chi duoc thay 5 dong tu may chu.
     try { cskhData = {}; cskhMeta = { found: null, total: 0, noPhone: 0 }; ['ome_cskh_duyen', 'ome_cskh_duyen_meta'].forEach(function(k){ localStorage.removeItem(k); }); } catch(eC){}

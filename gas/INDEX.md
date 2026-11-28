@@ -64,7 +64,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
-- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `_viewMonthsNorm_`, `_leadMonths_`, `_leadOwnNames_`, `_leadTeam_`, `_ymOfOrderDate_`, `_phoneHasOrderInMonths_`, `_leadMonthFilterSet_`, `_leadUser_`, `_leadNameResolver_`, `_leadOwnKeys_`, `leadAssignInfo_`, `leadAssign_`, `deleteAssign_`, `saveAssignHistoryGuarded_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
+- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `_viewMonthsNorm_`, `_leadMonths_`, `_leadOwnNames_`, `_leadTeam_`, `_ymOfOrderDate_`, `_phoneHasOrderInMonths_`, `_leadMonthFilterSet_`, `_leadUser_`, `_leadNameResolver_`, `_leadOwnKeys_`, `leadAssignInfo_`, `leadAssign_`, `_assignDeletedIds_`, `_rememberAssignDeleted_`, `deleteAssign_`, `saveAssignHistoryGuarded_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
 - Hằng/biến: `LEAD_ASSIGN_MAX_`, `_PW_SALT_`, `_PW_SALT_OLD_`
 
 ## 15_ProductSheets_Drive.gs
@@ -148,6 +148,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
 
 ## 35_CrmOrder.gs
-- Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`
-- Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`
+- Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`
+- Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`
 

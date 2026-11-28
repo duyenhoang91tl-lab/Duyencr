@@ -3526,7 +3526,7 @@ function doGetCore_(e) {
       var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
       var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
       if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); var csKeyA_ = {}; Object.keys(csSetA_).forEach(function(k) { csKeyA_[_scopeNameKey_(k)] = 1; }); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)] || csKeyA_[_scopeNameKey_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
-      return jsonOut_({ assignHistory: allAssignH_ });
+      return jsonOut_({ assignHistory: allAssignH_, deletedIds: _assignDeletedIds_() });   // deletedIds: may khac go ban cu cua dot admin da xoa
     }
     if (action === 'tasks') {
       var tasksOut_ = readTasks_(ss.getSheetByName(SH_TASK));
@@ -8686,7 +8686,7 @@ function doPostCore_(e) {
     if (action === 'leadAssign')          return leadAssign_(data);
     if (action === 'deleteAssign')        return deleteAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
-    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done, data.ids);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
@@ -11371,6 +11371,7 @@ function assignRowsOf_(h) {
 
 function saveAssignEntry_(entry) {
   if (!entry || !entry.id) return jsonOut_({ error: 'no entry.id' });
+  if (_assignDeletedIds_().indexOf(String(entry.id)) !== -1) return jsonOut_({ ok: true, skipped: 'deleted' });   // may khac con giu dot admin da xoa -> khong cho song lai
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   var last = sh.getLastRow(); var found = [];
   if (last >= 2) {
@@ -11395,24 +11396,31 @@ function saveAssignEntry_(entry) {
 // dong cua (cac) dot chia bi doi qua saveAssignEntry_ (an toan hon saveAssignHistory_ — khong xoa
 // trang roi ghi lai CA sheet, tranh dam vao CS khac dang luu cung luc). Dung LockService vi 1 CS co
 // the tich lien tuc nhieu SDT gan nhau (2 request ghi cung 1 dot chia de dam vao nhau neu khong khoa).
-function toggleAssignDone_(csName, phone, done) {
+function toggleAssignDone_(csName, phone, done, ids) {
   csName = String(csName || '').trim();
   phone = String(phone || '').trim();
   if (!csName || !phone) return jsonOut_({ error: 'Thiếu csName hoặc phone.' });
+  // Web gui kem `ids` (cac dot vua tich) -> chi dong vao dung cac dot do. Pancake AI khong gui ids -> tim theo ten CS nhu cu.
+  var idMap = null;
+  if (Array.isArray(ids) && ids.length) { idMap = {}; ids.forEach(function (id) { idMap[String(id)] = 1; }); }
+  var key = normPhone_(phone) || phone;   // sheet co the luu SDT mat so 0 / dang 84
+  var same = function (x) { return (normPhone_(x) || String(x)) === key; };
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return jsonOut_({ error: 'Đang có thao tác khác ghi dữ liệu chia, thử lại sau vài giây.' });
   try {
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
     var history = readAssign_(sh);
     var touched = [];
-    var csSetT = _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
+    var csSetT = idMap ? null : _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
     for (var i = 0; i < history.length; i++) {
       var h = history[i];
-      if (!csSetT[_normTxt_(h.csName)] || (h.phones || []).indexOf(phone) === -1) continue;
+      if (idMap ? !idMap[h.id] : !csSetT[_normTxt_(h.csName)]) continue;
+      var mine = (h.phones || []).filter(same);
+      if (!mine.length) continue;
       h.donePhones = h.donePhones || [];
-      var idx = h.donePhones.indexOf(phone);
-      if (done && idx === -1) { h.donePhones.push(phone); touched.push(h); }
-      else if (!done && idx !== -1) { h.donePhones.splice(idx, 1); touched.push(h); }
+      var has = h.donePhones.some(same);
+      if (done && !has) { h.donePhones.push(mine[0]); touched.push(h); }
+      else if (!done && has) { h.donePhones = h.donePhones.filter(function (x) { return !same(x); }); touched.push(h); }
     }
     for (var k = 0; k < touched.length; k++) saveAssignEntry_(touched[k]); // ghi tung dot bi doi, giu nguyen cac dot khac
     return jsonOut_({ ok: true, changed: touched.length });
@@ -11427,6 +11435,8 @@ function saveAssignHistory_(history) {
   // DUNG MA TRAN TRUOC, chi clearContents() khi da san sang ghi — truoc day clear xong moi stringify, neu setValues loi
   // (o > 50.000 ky tu) thi sheet bi xoa trang va MAT lich su chia tren server.
   var matrix = [ASSIGN_HEADERS];
+  var gone = _assignDeletedIds_();
+  history = history.filter(function (h) { return !h || gone.indexOf(String(h.id)) === -1; });   // dot da xoa khong duoc ghi lai
   for (var i = 0; i < history.length; i++) {
     var rs = assignRowsOf_(history[i]);
     for (var r = 0; r < rs.length; r++) matrix.push(rs[r]);
@@ -11590,6 +11600,16 @@ function leadAssign_(data) {
 // donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
 // 2026-11-27: xoa DUNG cac dot chia theo id. NGUYEN NHAN GOC: web xoa 1 dot bang cach ghi de CA sheet AssignData bang ban tren may admin (saveAssignHistory),
 // ban nay khong co dot Truong nhom vua chia lai / dot chia tu dong moi va giu tien do "da xong" cu -> mat du lieu cua nguoi khac. Quyen giong saveAssignHistory.
+// NHO cac dot chia da xoa (Script Properties 'assignDeletedIds', giu ~300 id gan nhat vi 1 gia tri toi da 9KB).
+// NGUYEN NHAN GOC: may khac van giu dot da xoa trong trinh duyet; may chu khong nho gi nen ho ghi lai la dot "song lai".
+function _assignDeletedIds_() {
+  try { var a = JSON.parse(PropertiesService.getScriptProperties().getProperty('assignDeletedIds') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function _rememberAssignDeleted_(ids) {
+  var list = _assignDeletedIds_().filter(function (id) { return ids.indexOf(id) === -1; }).concat(ids);
+  while (list.length > 300 || JSON.stringify(list).length > 8500) list.shift();   // bo id cu nhat
+  PropertiesService.getScriptProperties().setProperty('assignDeletedIds', JSON.stringify(list));
+}
 function deleteAssign_(data) {
   var u = (data && data.token) ? _sessUser_(data.token) : null;
   if (u && _roleBase_(u.role) !== 'admin') return jsonOut_({ error: 'Chi admin duoc xoa dot chia.', code: 'FORBIDDEN' });
@@ -11599,6 +11619,7 @@ function deleteAssign_(data) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
   try {
+    _rememberAssignDeleted_(Object.keys(ids));   // ghi nho TRUOC khi xoa dong
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), last = sh.getLastRow(), rows = [];
     if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { if (ids[String(r[0])]) rows.push(i + 2); });
     if (rows.length && sh.getMaxRows() - rows.length < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);   // Sheets khong cho xoa het cac dong duoi tieu de
@@ -20170,7 +20191,7 @@ function _tkdRun_(opts) {
     if (e) { le.row = e.row; ledUpd.push(le); } else ledNew.push(le);
   }
   // don mo coi: da tru nhung khoa khong con trong sheet (don bi sua / xoa khoi Pos)
-  Object.keys(led.map).forEach(function (k) { var x = led.map[k]; if (x.status === 'da_tru' && !seenKeys[k] && rep.orphans.length < 100) rep.orphans.push({ key: k, ngay: x.ngay, sdt: x.sdt }); });
+  Object.keys(led.map).forEach(function (k) { var x = led.map[k]; if (x.status === 'da_tru' && !seenKeys[k] && k.indexOf('CRM|') !== 0 && rep.orphans   /* khoa don CRM (4c) khong phai don POS mat khoi sheet */.length < 100) rep.orphans.push({ key: k, ngay: x.ngay, sdt: x.sdt }); });
   if (opts.apply) {
     Object.keys(dirty).forEach(function (rw) { L.sh.getRange(Number(rw), 1, 1, TONKHO_HEADERS.length).setValues([_tonkhoItemToRow_(dirty[rw])]); });
     ledUpd.forEach(function (x) { led.sh.getRange(x.row, 1, 1, TKD_HEADERS.length).setValues([_tkdLedgerRow_(x)]); });
@@ -23958,7 +23979,7 @@ var CRM_ORDER_HEADERS_ = ['orderId', 'refKey', 'createdAt', 'createdBy', 'status
   'statusAt', 'statusBy', 'statusNote',
   'pointsUsed', 'pointsDiscount'];   // 2 cột cuối thêm ở bước 4b (điểm tích luỹ đã dùng + số tiền giảm tương ứng)   // 3 cột cuối thêm ở bước 4a (đổi trạng thái/huỷ); getSheet_ tự bổ sung tiêu đề cho sheet cũ
 var CRM_ORDER_GET_ACTIONS_ = { crmOrders: 1 };
-var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1, crmOrderStatus: 1 };
+var CRM_ORDER_POST_ACTIONS_ = { crmOrderSave: 1, crmOrderStatus: 1, crmOrderStockRetry: 1 };
 // Đổi trạng thái / huỷ đơn (bước 4a). Chỉ cho đi theo đường hợp lệ; 'Hủy' và 'Hoàn' là trạng thái CUỐI (không mở lại — muốn bán tiếp thì lên đơn mới).
 // Hủy = đơn chưa giao thành công; Hoàn = hàng đã/đang giao nhưng khách trả lại. Hủy/Hoàn BẮT BUỘC có lý do (để tra cứu về sau).
 var CRM_ORDER_FLOW_ = { 'Mới': ['Đã xác nhận', 'Hủy'], 'Đã xác nhận': ['Đang giao', 'Hủy'], 'Đang giao': ['Đã giao', 'Hoàn', 'Hủy'], 'Đã giao': ['Hoàn'], 'Hủy': [], 'Hoàn': [] };
@@ -24077,6 +24098,7 @@ function _crmCanSee_(sc, o) {
 }
 function crmOrderDoPost_(action, d) {
   if (action === 'crmOrderStatus') return crmOrderStatusDoPost_(d);
+  if (action === 'crmOrderStockRetry') return crmOrderStockRetryDoPost_(d);
   try {
     var a = _khoAuth_(d); if (a.err) return a.err;
     var n = _crmOrderNormalize_(d && d.order); if (n.error) return jsonOut_({ ok: false, error: n.error });
@@ -24111,6 +24133,102 @@ function crmOrderDoPost_(action, d) {
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
 }
+// ── BƯỚC 4c: TRỪ / CỘNG TRẢ KHO THEO TRẠNG THÁI ĐƠN CRM ───────────────────────────────────────────────────────
+// Dùng lại hạ tầng kho của đơn POS (gas/24_TonKho.gs): sheet TonKho/TonKhoLog, KhoCombo, KhoCauHinh, sổ cái TonKhoTruDon (khoá đơn CRM = 'CRM|<mã đơn>' để KHÔNG trùng khoá đơn POS).
+// Quy tắc (cùng luật docs/KHO-TRU-TON.md): đơn → "Đã xác nhận" thì TRỪ kho; → "Hủy"/"Hoàn" thì CỘNG TRẢ đúng số đã trừ. Chỉ chạy khi KhoCauHinh.mode = 'on' (mặc định TẮT → không đụng kho).
+// Mã SP lấy từ cột `code` của từng dòng đơn; dòng thiếu mã / combo chưa khai báo / mã nằm nhiều kho chưa đặt ưu tiên → GIỮ cả đơn (ghi sổ 'cho_duyet', KHÔNG trừ, KHÔNG chặn đổi trạng thái).
+// Mã không thuộc kho nào (dịch vụ, quà…) → bỏ qua. Không để tồn âm: trừ tối đa bằng tồn, phần thiếu báo trong `shortage`. Mỗi đơn trừ đúng 1 lần (sổ cái). Cộng trả luôn chạy dù mode đã tắt (hàng đã trừ thì phải trả).
+var CRM_STOCK_PREFIX_ = 'CRM|';
+function _crmStockKey_(orderId) { return CRM_STOCK_PREFIX_ + String(orderId); }
+// Hàm thuần: items đơn → { plan:[{khoId,code,qty}], hold:[lý do], unknown:[mã không thuộc kho] }.
+function _crmStockPlan_(items, combosMap, byCode, known, priority, khoName) {
+  var hold = [], plan = [], unknown = [];
+  (items || []).forEach(function (it, i) {
+    var code = _tonkhoCode_(it && it.code), q = _khoNum_(it && it.qty), label = 'Dong ' + (i + 1) + (it && it.name ? ' (' + String(it.name).slice(0, 40) + ')' : '');
+    if (!code) { hold.push(label + ' chua co ma SP'); return; }
+    if (isNaN(q) || q <= 0) { hold.push(label + ': SL khong hop le'); return; }
+    if (q > TKD_MAX_QTY_) { hold.push(label + ': SL bat thuong ' + q); return; }
+    var cb = combosMap[code.toUpperCase()], lines;
+    if (cb) lines = cb.components.map(function (c) { return { code: c.code, qty: Math.round(c.qty * q * 1000) / 1000 }; });
+    else if (_tkdLooksCombo_(code, it && it.name) && !known[code.toUpperCase()]) { hold.push('Combo chua khai bao: ' + code); return; }
+    else lines = [{ code: code, qty: q }];
+    lines.forEach(function (ln) {
+      var pick = _tkdPickKho_(ln.code.toUpperCase(), byCode, priority);
+      if (pick.none) unknown.push(ln.code);
+      else if (pick.multi) hold.push('Ma ' + ln.code + ' co o nhieu kho (' + pick.multi.map(function (id) { return khoName[id] || id; }).join(', ') + ') — dat thu tu uu tien');
+      else plan.push({ khoId: pick.khoId, code: ln.code, qty: ln.qty });
+    });
+  });
+  return { plan: plan, hold: hold, unknown: unknown };
+}
+function _crmStockLedgerWrite_(led, e) {
+  if (e.row) led.sh.getRange(e.row, 1, 1, TKD_HEADERS.length).setValues([_tkdLedgerRow_(e)]);
+  else led.sh.getRange(led.sh.getLastRow() + 1, 1, 1, TKD_HEADERS.length).setValues([_tkdLedgerRow_(e)]);
+}
+// Trừ kho cho 1 đơn (gọi TRONG _khoWithLock_). Trả { status:'off'|'already'|'held'|'no_stock'|'deducted', ... }.
+function _crmStockApply_(o, who) {
+  // KHÔNG tạo sheet khi kho chưa từng bật: chỉ đọc cấu hình nếu sheet KhoCauHinh đã tồn tại (getSheet_ sẽ tự tạo).
+  if (!getCrmSS_().getSheetByName(SH_KHOCFG) || _tkdCfg_().mode !== 'on') return { status: 'off' };
+  var cfg = _tkdCfg_(), key = _crmStockKey_(o.orderId), led = _tkdLedger_(), e = led.map[key];
+  if (e && e.status === 'da_tru') return { status: 'already', lines: (e.applied || []).length };
+  var khoName = {}, activeId = {};
+  readKho_().filter(function (k) { return k.active; }).forEach(function (k) { khoName[k.id] = k.name; activeId[k.id] = true; });
+  var combosMap = {}; readKhoCombo_().forEach(function (c) { if (c.active) combosMap[c.code.toUpperCase()] = c; });
+  var L = _tonkhoLoad_(), byCode = {}, known = {};
+  L.items.forEach(function (it) { if (!activeId[it.khoId]) return; var cu = _tonkhoCode_(it.maHang).toUpperCase(); known[cu] = true; (byCode[cu] = byCode[cu] || []).push(it.khoId); });
+  var p = _crmStockPlan_(o.items, combosMap, byCode, known, cfg.priority, khoName);
+  var ngay = _vnYmd_(new Date(Number(o.createdAt) || Date.now()));
+  var le = { key: key, ngay: ngay, sdt: String(o.phone || ''), trangThai: 'Đã xác nhận', applied: [], problems: '', note: 'Don CRM ' + o.orderId, row: e ? e.row : 0 };
+  if (p.hold.length) {
+    le.status = 'cho_duyet'; le.problems = p.hold.join(' | ');
+    if (!e || e.status !== 'cho_duyet' || e.problems !== le.problems) _crmStockLedgerWrite_(led, le);
+    return { status: 'held', reasons: p.hold };
+  }
+  if (!p.plan.length) return { status: 'no_stock', unknown: p.unknown };
+  var now = _khoNowIso_(), logs = [], dirty = {}, shortLines = [], applied = [];
+  p.plan.forEach(function (pl) {
+    var it = L.items[L.idx[_tonkhoKey_(pl.khoId, pl.code)]], take = Math.min(it.ton, pl.qty), miss = Math.round((pl.qty - take) * 1000) / 1000, before = it.ton;
+    it.ton = Math.round((it.ton - take) * 1000) / 1000; it.ver += 1; it.updatedAt = now; it.updatedBy = who || TKD_SYSTEM_USER_; dirty[it.row] = it;
+    applied.push({ khoId: it.khoId, maHang: it.maHang, qty: take });
+    if (miss > 0) shortLines.push(it.maHang + ' thieu ' + miss);
+    if (take > 0) logs.push({ khoId: it.khoId, maHang: it.maHang, tenHang: it.tenHang, user: who || TKD_SYSTEM_USER_, loai: 'tru_don', before: before, after: it.ton, delta: -take, lyDo: 'Don CRM ' + o.orderId + (miss > 0 ? ' (thieu ' + miss + ')' : ''), ref: key });
+  });
+  Object.keys(dirty).forEach(function (rw) { L.sh.getRange(Number(rw), 1, 1, TONKHO_HEADERS.length).setValues([_tonkhoItemToRow_(dirty[rw])]); });
+  le.status = 'da_tru'; le.applied = applied; le.shortage = shortLines.join('; ');
+  _crmStockLedgerWrite_(led, le); _tonkhoLog_(logs);
+  return { status: 'deducted', lines: applied.length, shortage: shortLines, unknown: p.unknown };
+}
+// Cộng trả kho khi Hủy/Hoàn (gọi TRONG _khoWithLock_). Chỉ khi sổ cái ghi 'da_tru'; trả { status:'none'|'returned', lines }.
+function _crmStockReverse_(o, toStatus, who) {
+  if (!getCrmSS_().getSheetByName(SH_TKD)) return { status: 'none' };   // chưa từng trừ kho đơn nào → không có gì để trả (và không tạo sheet)
+  var key = _crmStockKey_(o.orderId), led = _tkdLedger_(), e = led.map[key];
+  if (!e || e.status !== 'da_tru') return { status: 'none' };
+  var L = _tonkhoLoad_(), now = _khoNowIso_(), logs = [], dirty = {};
+  e.applied.forEach(function (a) {
+    var pos = L.idx[_tonkhoKey_(a.khoId, a.maHang)]; if (pos === undefined) return;
+    var it = L.items[pos], before = it.ton; it.ton = Math.round((it.ton + a.qty) * 1000) / 1000; it.ver += 1; it.updatedAt = now; it.updatedBy = who || TKD_SYSTEM_USER_; dirty[it.row] = it;
+    logs.push({ khoId: it.khoId, maHang: it.maHang, tenHang: it.tenHang, user: who || TKD_SYSTEM_USER_, loai: 'hoan_don', before: before, after: it.ton, delta: a.qty, lyDo: 'Don CRM ' + o.orderId + ' ' + toStatus, ref: key });
+  });
+  Object.keys(dirty).forEach(function (rw) { L.sh.getRange(Number(rw), 1, 1, TONKHO_HEADERS.length).setValues([_tonkhoItemToRow_(dirty[rw])]); });
+  e.status = 'da_hoan'; e.trangThai = toStatus; e.note = 'Hoan do don CRM ' + toStatus;
+  _crmStockLedgerWrite_(led, e); _tonkhoLog_(logs);
+  return { status: 'returned', lines: e.applied.length };
+}
+// POST crmOrderStockRetry {token, orderId}: ADMIN chạy lại trừ kho cho đơn đang ở Đã xác nhận/Đang giao/Đã giao mà trước đó bị GIỮ (thiếu mã, combo chưa khai báo…) hoặc lúc đó kho đang tắt.
+function crmOrderStockRetryDoPost_(d) {
+  try {
+    var a = _khoAuth_(d); if (a.err) return a.err;
+    if (_roleBase_(a.user.role) !== 'admin') return jsonOut_({ ok: false, error: 'Chi admin duoc chay lai tru kho.' });
+    var id = _crmStr_(d && d.orderId, 40); if (!id) return jsonOut_({ ok: false, error: 'Thieu ma don.' });
+    return _khoWithLock_(function () {
+      var all = _crmReadAll_(), o = null;
+      for (var i = 0; i < all.length; i++) if (String(all[i].orderId) === id) { o = all[i]; break; }
+      if (!o) return jsonOut_({ ok: false, error: 'Khong tim thay don ' + id + '.' });
+      if (['Đã xác nhận', 'Đang giao', 'Đã giao'].indexOf(String(o.status)) < 0) return jsonOut_({ ok: false, error: 'Chi chay lai khi don dang o Da xac nhan / Dang giao / Da giao (hien: ' + o.status + ').' });
+      return jsonOut_({ ok: true, stock: _crmStockApply_(o, String(a.user.username || a.user.name || '')) });
+    });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi chay lai tru kho: ' + (err && err.message || err) }); }
+}
 // POST crmOrderStatus {token, orderId, status, note?}: admin đổi mọi đơn; tài khoản khác chỉ đơn mình tạo. Ghi statusAt/statusBy/statusNote (lý do huỷ ở statusNote).
 function crmOrderStatusDoPost_(d) {
   try {
@@ -24131,12 +24249,18 @@ function crmOrderStatusDoPost_(d) {
         var ur = _loyaltyUndoApply_({ phone: o.phone, key: _crmRedeemKey_(o.phone, o.orderId), note: (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId }, who);
         if (ur.ok) refunded = ur.undone.points; else if (ur.code !== 'DUPLICATE' && ur.code !== 'NOTFOUND') return jsonOut_({ ok: false, error: 'Khong hoan duoc diem, don giu nguyen trang thai: ' + ur.error });
       }
+      // Bước 4c: Đã xác nhận → trừ kho; Hủy/Hoàn → cộng trả kho đã trừ. Lỗi thật (sheet kho hỏng) thì DỪNG, trạng thái giữ nguyên; kho tắt/đơn bị giữ KHÔNG chặn đổi trạng thái (xem `stock` trong kết quả).
+      var stock = null;
+      try {
+        if (to === 'Đã xác nhận') stock = _crmStockApply_(o, who);
+        else if (to === 'Hủy' || to === 'Hoàn') stock = _crmStockReverse_(o, to, who);
+      } catch (eSt) { return jsonOut_({ ok: false, error: 'Loi kho, don giu nguyen trang thai: ' + (eSt && eSt.message || eSt) }); }
       var now = Date.now(), sh = getSheet_(SH_CRM_ORDER_, CRM_ORDER_HEADERS_);
       var col = function (h) { return CRM_ORDER_HEADERS_.indexOf(h) + 1; };
       var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
       set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
       o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
-      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, order: o });
+      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, stock: stock, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
 }
