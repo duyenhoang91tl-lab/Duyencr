@@ -38,7 +38,7 @@
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat','tab-media','plib'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
-    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','topsp','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
+    { k:'rp',  t:'📊 Báo cáo',              ids:['dailybrief','dashboard','salesreport','topsp','pancake','kpipancake','mktchecklist','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist','act:leadassign','act:leadreport'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:pancakemap','act:ordersale','act:splitextra','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },

@@ -134,6 +134,12 @@
 - ĐÃ SỬA (js/07): `_advAssignOrderDays_` (ymList + ngày POS qua `posFilterView_` js/90), `_advAssignEnsurePos_` (khoảng ngày xa cửa sổ POS → tự tải thêm 1 lần/số ngày rồi vẽ lại), `_advAssign._diag` + dòng "(loại thêm: N ngoài nguồn đã chọn, M không có đơn trong khoảng ngày)" cạnh "Bộ lọc hiện tại" để thấy ngay vì sao khách bị loại. Test `node tools/test-assign-date-pos.js` (6 ca) + test-assign-* xanh.
 - ⚠ CHƯA CHẮC 100%: nếu sau khi sửa vẫn ra ít, nhìn dòng "(loại thêm: …)": "ngoài nguồn" nhiều → bỏ chọn bớt nguồn (đang chỉ chọn "Dữ liệu đơn"); "không có đơn trong khoảng ngày" nhiều → khách chỉ có ngày đơn ngoài tháng 5. Ngoài ra "Đã chia: 5" nghĩa là 5 khách đó đã từng được chia (chọn ưu tiên "Chưa chia lần nào" sẽ ra 0).
 - ➡️ VIỆC KẾ TIẾP: Duyên Ctrl+F5, mở lại Chia data, chọn tháng 5, gửi ảnh dòng "Bộ lọc hiện tại" (kèm "loại thêm") nếu vẫn lệch.
+## 2026-11-28 (phiên Claude — SẮP XẾP KHOA HỌC CÁC BÁO CÁO) — XONG, ĐÃ PUSH
+- Nguyên nhân: menu Báo cáo xếp phẳng theo thứ tự thêm vào (Doanh số, Pancake, KPI, Checklist, Ngày) và ô chọn báo cáo con liệt kê A→N theo thứ tự chữ cái lẫn lộn (C, D rồi E, F, G rồi H, I, K, L, M, N), khó tìm theo mục đích dùng.
+- ✅ Đã sửa (chỉ đổi thứ tự/nhóm hiển thị, KHÔNG đổi mã A–N, tên, cấu hình `reportsConfig`, phân quyền): `js/06` `_SR_DEFAULT_ITEMS_` + `_SR_GROUPS_`; `js/11` `_srSubSelectHtml_` dùng optgroup: 📈 Doanh số (A,B,N,C,D) / 💰 Hoa hồng·KPI·Thưởng (E,F,G) / 🗂 Chia data (H,I,M) / 🧾 Đối soát & chốt kỳ (K,L) / ⚙ Quản trị (J, chỉ admin); mã mới chưa xếp nhóm tự vào "Khác". `js/14` menu 📊 Báo cáo: Hằng ngày (Báo cáo ngày) / Doanh số / Marketing (Pancake, KPI Pancake, Checklist MKT) có tiêu đề nhóm không bấm được. `js/29` thanh bên nhóm Báo cáo: Hằng ngày → Doanh số → Marketing → Chăm sóc theo mốc → AI tóm tắt.
+- Test: node -c 4 file OK; mô phỏng Node `_srSubSelectHtml_`: đủ 13 báo cáo + J cho admin, người thường không thấy báo cáo đã ẩn, mã mới vào "Khác". Đã tăng `?v=` (20261128c) cho 4 file trong index.html.
+- Không đổi gas_v13.js: không cần deploy GAS. Cần tải lại trang (Ctrl+F5), không cần reload extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem thử menu + ô chọn báo cáo trên giao diện thật, nếu muốn đổi tên nhóm hoặc đổi báo cáo nào sang nhóm khác thì sửa `_SR_GROUPS_` ở js/06 và `grp` ở js/14.
 
 > **GỌN 2026-11-26:** các mục cũ hơn đã chuyển nguyên văn sang `docs/handoff-archive/` (mục lục: `docs/handoff-archive/README.md`; tìm: `grep -rn "từ khoá" HANDOFF.md docs/handoff-archive/`). Mục mới thêm Ở TRÊN CÙNG; khi file quá ~20 mục thì chuyển bớt mục cũ xuống kho, KHÔNG xoá chữ nào.
 
