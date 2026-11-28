@@ -1,7 +1,7 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
-- ✅ ĐÃ XONG: B1 nới ngân sách; B2 js/99-f-crm-order-pos-tags.js (chưa nạp).
+- ✅ ĐÃ XONG: B1 nới ngân sách; B2 module; sinh lại css/99-dark-auto.css cho màu thẻ mới (chế độ tối).
 - 🔧 ĐANG LÀM: B3 nạp module trong index.html.
 - ➡️ BƯỚC KẾ TIẾP: B4 test.
 
