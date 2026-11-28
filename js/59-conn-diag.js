@@ -31,6 +31,7 @@ var _gsNetLog = [];
 // đều đi Worker và không thử lại khi Worker lỗi. Nay: GET đọc-dữ-liệu qua Worker mà gặp 5xx/404/lỗi mạng → gọi lại đúng request đó THẲNG Apps Script; thành công thì
 // các request sau trong phiên này đi thẳng luôn (KHÔNG ghi nhớ: Worker sống lại thì lần mở sau tự dùng lại). Không thử lại POST và các action ghi (tránh ghi 2 lần).
 var _wkFellBack = false;
+var _wkLastFb = null;   // {t, act, why, hdr, body}: LÝ DO Worker bị bỏ (28/11/2026). NGUYÊN NHÂN GỐC cần ghi: log chỉ giữ 12 request gần nhất nên khi phiên đã lùi về Apps Script, request Worker lỗi đã trôi mất → không biết Worker hỏng vì gì (520/1102/404?).
 function _wkShouldFallback_(url, o, st) {
   try {
     if (typeof WORKER_URL === 'undefined' || typeof GAS_URL_DIRECT === 'undefined' || !GAS_URL_DIRECT || gsUrl !== WORKER_URL || url.indexOf(WORKER_URL) !== 0) return false;
@@ -41,6 +42,12 @@ function _wkShouldFallback_(url, o, st) {
   } catch (e) { return false; }
 }
 function _wkRetryDirect_(f, self, url, o, rec, why, origRes, origErr) {
+  try {
+    _wkLastFb = { t: Date.now(), act: (url.match(/[?&]action=([A-Za-z0-9_]+)/) || [])[1] || '?', why: why, hdr: '', body: '' };
+    if (origRes) { try { _wkLastFb.hdr = origRes.headers.get('x-crm-cache') || ''; } catch (eh) {} try { var cl = origRes.clone(); cl.text().then(function (t) { if (_wkLastFb) _wkLastFb.body = String(t || '').slice(0, 140).replace(/\s+/g, ' '); }, function () {}); } catch (ec) {} }
+    if (origErr) _wkLastFb.body = String((origErr && origErr.message) || origErr).slice(0, 140);
+    try { sessionStorage.setItem('ome_wk_fb', JSON.stringify(_wkLastFb)); } catch (es) {}
+  } catch (e0) {}
   var direct = GAS_URL_DIRECT + url.slice(WORKER_URL.length);
   if (!_wkFellBack) gsUrl = GAS_URL_DIRECT;   // đổi cả phiên để request sau khỏi qua Worker lỗi; chỉ khi thử lại thành công mới giữ (xem dưới)
   var prevUrl = WORKER_URL;
@@ -69,6 +76,10 @@ function _cdState() {
   L.push('Đăng nhập: ' + (tok ? 'có token phiên' + (exp ? ' (hết hạn ' + new Date(exp).toLocaleString('vi-VN') + (exp < Date.now() ? ' — ĐÃ HẾT HẠN' : '') + ')' : '') : 'KHÔNG có token') + ' · tài khoản=' + (acc ? ((acc.username || '?') + '/' + (acc.role || '?')) : 'chưa'));
   try { L.push('Dữ liệu trong bộ nhớ: allCustomers=' + (allCustomers || []).length + ' · customerMap=' + Object.keys(customerMap || {}).length + ' · cskhData=' + (Array.isArray(cskhData) ? cskhData.length : Object.keys(cskhData || {}).length)); } catch (e) { L.push('Dữ liệu trong bộ nhớ: (không đọc được: ' + e.message + ')'); }
   try { L.push('Đồng bộ: số lần lỗi liên tiếp=' + _autoSyncFailCount + ' · careSince=' + (_careSince || '(chưa có → sẽ kéo FULL)') + ' · cskhFail=' + _cskhFailCount); } catch (e) {}
+  try {
+    var fbr = _wkLastFb || JSON.parse(sessionStorage.getItem('ome_wk_fb') || 'null');
+    if (fbr) L.push('Worker từng bị bỏ lúc ' + new Date(fbr.t).toTimeString().slice(0, 8) + ': action=' + fbr.act + ' · ' + fbr.why + (fbr.hdr ? ' · x-crm-cache=' + fbr.hdr : '') + (fbr.body ? ' · nội dung: ' + fbr.body : ''));
+  } catch (e) {}
   var b = document.getElementById('sync-err-banner'); if (b) L.push('Thanh báo lỗi đồng bộ: ' + b.innerText.replace(/\s+/g, ' ').slice(0, 220));
   L.push('Request gần nhất:\n' + _cdFmtLog());
   return L.join('\n');
@@ -91,6 +102,13 @@ async function _cdRun(deep, pre) {
   var direct = (typeof GAS_URL_DIRECT !== 'undefined') ? GAS_URL_DIRECT : '', viaWorker = (typeof WORKER_URL !== 'undefined' && gsUrl === WORKER_URL);
   // 0) ping: Apps Script trả lời ngay, KHÔNG mở Sheet → đo độ trễ thuần. Đọc kết quả: ping≈count ⇒ chậm do nền tảng Apps Script (cần Worker đọc thẳng Supabase); ping << count ⇒ chậm do mở/đọc Sheet (có thể tối ưu trong GAS).
   var t0p = await _cdTest('0) ping (Apps Script, không mở Sheet) qua ' + (viaWorker ? 'Worker' : 'máy chủ hiện tại'), gsUrl + sep + 'action=ping&_=' + Date.now(), { timeout: 20000 }); out.push(t0p.line); flush();
+  // W) Worker sống không + có cache không (kể cả khi phiên này đang gọi thẳng Apps Script): ping qua Worker, rồi priceCatalogFlat 2 lần (lần 2 phải là HIT, vài chục ms).
+  var tw0 = null, tw1 = null, tw2 = null;
+  if (typeof WORKER_URL !== 'undefined' && WORKER_URL) {
+    tw0 = await _cdTest('W0) ping qua WORKER', WORKER_URL + '?action=ping&_=' + Date.now(), { timeout: 20000 }); out.push(tw0.line); flush();
+    tw1 = await _cdTest('W1) priceCatalogFlat qua WORKER lần 1', WORKER_URL + '?action=priceCatalogFlat', { timeout: 45000 }); out.push(tw1.line); flush();
+    tw2 = await _cdTest('W2) priceCatalogFlat qua WORKER lần 2 (phải HIT)', WORKER_URL + '?action=priceCatalogFlat', { timeout: 45000 }); out.push(tw2.line); flush();
+  }
   var t1 = await _cdTest('1) count qua ' + (viaWorker ? 'Worker' : 'máy chủ hiện tại'), gsUrl + sep + 'action=count&_=' + Date.now(), { timeout: 20000 }); out.push(t1.line); flush();
   var t2 = null;
   if (direct && gsUrl !== direct) { t2 = await _cdTest('2) count gọi THẲNG Apps Script', direct + '?action=count&src=web&_=' + Date.now(), { timeout: 30000 }); out.push(t2.line); flush(); }
@@ -108,6 +126,8 @@ async function _cdRun(deep, pre) {
   if (/KHÔNG có token/.test(out[0])) tips.push('Chưa có token đăng nhập trên máy này → đăng nhập lại.');
   if (/ĐÃ HẾT HẠN/.test(out[0])) tips.push('Phiên đăng nhập đã hết hạn → đăng nhập lại.');
   if (t1.ok && t3.ok && /allCustomers=0/.test(out[0])) tips.push('Máy chủ trả dữ liệu bình thường nhưng bộ nhớ trang vẫn 0 khách → lỗi xử lý phía trang (gửi nguyên báo cáo này cho mình).');
+  if (tw0 && !tw0.ok) tips.push('Worker KHÔNG trả lời ping → Worker đang hỏng/hết hạn mức; CRM sẽ lùi về Apps Script (chậm). Xem dòng "Worker từng bị bỏ" ở trên để biết lỗi gì.');
+  if (tw0 && tw0.ok && tw2 && !/cache=(HIT|SWR)/i.test(tw2.line)) tips.push('Worker sống nhưng priceCatalogFlat lần 2 KHÔNG phải HIT → Worker không giữ được cache (thường do phản hồi quá lớn/CPU Worker vượt hạn mức gói free); gửi mình dòng W1/W2.');
   if (!tips.length) tips.push('Các phép đo đều OK.');
   tips.forEach(function (t) { out.push('• ' + t); }); flush();
   return out.join('\n');
