@@ -367,6 +367,25 @@ function _coCmbLines(c){
   return { lines: lines, freeShip: !!c.freeship, ship: Math.max(0, Math.round(Number(c.ship) || 0)), warn: warn };
 }
 // Combo chưa lưu đơn giá từng món (món có giá ≤ 0) → tra giá POS gần nhất (GAS posPrice) để chia đúng tỉ lệ; không tra được thì giữ nguyên (cách cũ: cả giá combo vào món đầu).
+// Đọc món từ chuỗi itemsText của sheet COMBO (cùng định dạng GAS _comboParseItems_: [SL x ]Tên | Chất liệu | Size | SL | Vàng | Đơn giá | quà).
+// Dùng khi GAS đang deploy là bản CŨ nên mảng items không kèm đơn giá (tab 🎁 Combo vẫn thấy giá vì tự đọc itemsText).
+function _coCmbParseText(text){
+  var out = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach(function(line){
+    line = String(line).trim(); if (!line) return;
+    var qty = 1, m = line.match(/^(\d{1,3})\s*[xX×]\s*(.+)$/); if (m){ qty = parseInt(m[1], 10); line = m[2]; }
+    var p = line.split('|').map(function(x){ return String(x).trim(); }); if (!p[0]) return;
+    if (p.length >= 4 && /^\d{1,3}$/.test(p[3])) qty = parseInt(p[3], 10); if (qty < 1) qty = 1;
+    var vg = String(p[4] || '').match(/^(\d{1,2})\s*k$/i);
+    out.push({ name: p[0], chatLieu: p[1] || '', size: p[2] || '', qty: qty, vang: vg ? parseInt(vg[1], 10) + 'k' : '', price: p[5] ? parseInt(String(p[5]).replace(/[^\d]/g, ''), 10) || 0 : 0, gift: /^(1|true|qua|quà)$/i.test(String(p[6] || '').trim()) });
+  });
+  return out;
+}
+function _coCmbWithText(c){
+  if (!c || !c.itemsText || (c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; })) return c;
+  var t = _coCmbParseText(c.itemsText);
+  return t.some(function(it){ return !it.gift && it.price > 0; }) ? Object.assign({}, c, { items: t }) : c;
+}
 async function _coCmbFillPrices(c){
   var its = ((c && c.items) || []).map(function(it){ return Object.assign({}, it); }), idx = [];
   its.forEach(function(it, k){ if (!it.gift && !(Number(it.price) > 0)) idx.push(k); });
@@ -380,6 +399,7 @@ async function _coCmbFillPrices(c){
 }
 async function _coCmbAdd(i){
   var c = _coCmbVisible()[i]; if (!c) return;
+  c = _coCmbWithText(c);
   if ((c.items || []).some(function(it){ return !it.gift && !(Number(it.price) > 0); })){ _coCmb.msg = 'Đang tra giá từng món…'; _coCmbResRender(); c = await _coCmbFillPrices(c); }
   var r = _coCmbLines(c);
   if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món (hoặc báo để deploy lại GAS) rồi thêm lại.';

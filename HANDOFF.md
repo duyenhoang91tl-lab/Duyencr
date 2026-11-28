@@ -7,6 +7,11 @@
 - 🔧 Đang làm: không.
 - ➡️ Kế tiếp: Duyên Ctrl+F5, đăng nhập tài khoản test thử.
 - ⚠ Cho phiên MINI GAME T11: sau commit f518294 còn 2 test đỏ — `test-team-daily-revenue.js` (chưa nạp hàm `_tbTierFor_`) và `test-team-bonus-ui.js` (chỉ số cột lệch do thêm cột "Mini game T11"). Phiên này không sửa.
+## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO VẪN BÁO "CHƯA CÓ ĐƠN GIÁ TỪNG MÓN" DÙ TAB COMBO ĐÃ CÓ GIÁ) — XONG, ĐÃ PUSH (bước 2, js/99-d-crm-order.js)
+- Duyên đã điền đơn giá từng món ở tab 🎁 Combo (380000×2, 1550000, 990000) nhưng ➕ Tạo đơn vẫn báo thiếu giá.
+- NGUYÊN NHÂN GỐC: tab Combo tự đọc giá từ chuỗi `itemsText` (`_cbParseItems`), còn Tạo đơn chỉ dùng mảng `items` do GAS `comboList` trả về. GAS đang deploy là bản CŨ (chưa parse cột đơn giá, cũng chưa có `posPrice`) nên `items` không kèm giá → màn Tạo đơn thấy giá 0.
+- ✅ ĐÃ SỬA: `_coCmbParseText` + `_coCmbWithText` — nếu `items` không món nào có giá mà `itemsText` có giá thì đọc giá từ `itemsText` (cùng định dạng `_comboParseItems_`). Test CB7 (items không giá, itemsText có giá → 3.300.000, không cảnh báo). Các test crm-order/combo khác PASS. index.html ?v=20261128f. Không đổi gas_v13.js.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 thử lại. Vẫn nên deploy lại GAS bản mới nhất (Apps Script → dán gas_v13.js → Deploy → Manage deployments → New version) để giá/ship/CTKM combo và `posPrice` chạy đúng; gọi action `count` kiểm `ver`.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
