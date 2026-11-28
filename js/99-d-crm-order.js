@@ -5,6 +5,7 @@
 //  Công thức (khớp server _crmOrderNormalize_): dòng = SL×giá − giảm dòng (%|đ, ≤ thành tiền); thuế dòng = làm tròn(dòng × thuế% do người lên đơn TỰ NHẬP, 0–100) CỘNG vào cần thu;
 //  đơn = Σdòng + Σthuế − giảm đơn (%|đ) + phí ship (0 nếu miễn) + phụ thu; còn thiếu = max(0, cần thu − đã chuyển khoản).
 //  Sản phẩm: GAS priceCatalogFlat (bảng giá DANH_MUC, giá NGHÌN đồng → ×1000 nếu <100000). Khách: tự điền theo SĐT (dữ liệu đã có trên máy, nếu chưa thì GAS lookup).
+//  Mã SP từng dòng (bước 4c-2): gợi ý từ đơn POS gần nhất, sửa tay được; thiếu mã → cảnh báo (khi trừ kho server sẽ GIỮ đơn).
 //  Chống bấm Lưu 2 lần: refKey sinh 1 lần/đơn, GIỮ NGUYÊN khi lỗi/thử lại, chỉ đổi sau khi lưu thành công (server trả duplicate:true nếu trùng).
 //  Dùng điểm tích luỹ (bước 4b-2): ô "🎖️ Dùng điểm" (số dư từ GAS loyaltyGet theo SĐT khách; 1 điểm = pointValue đ, TRỪ THẲNG vào cần thu). Gửi `pointsUse` Ở CẤP NGOÀI order (server tự tính + từ chối nếu quá mức, code POINTS). Quá mức → báo lỗi, KHÔNG âm thầm cắt.
 //  F2 = Lưu (khi đang ở tab này). Danh sách đơn đã tạo = bước 3/4. Gỡ: xoá file này + thẻ <script> trong index.html + (không còn gì khác).
@@ -165,11 +166,14 @@ function _coPickAdd(i){
   var nm = String(x.t || x.m || ''), nt = [x.c, x.s, x.mau].filter(function(v){ return v && String(v).trim(); }).join(' · ');
   for (var k = 0; k < _co.items.length; k++){ var e = _co.items[k]; if (e.name === nm && e.note === nt){ e.qty = Math.floor(_coNum(e.qty)) + 1; _coPick.q = ''; _coRender(); return; } }
   _coPick.q = '';
-  _coAddItem({ name: nm, note: nt, price: _coKToVnd(x.p) });
+  _coAddItem({ name: nm, note: nt, price: _coKToVnd(x.p), posQ: { t: String(x.t || ''), m: String(x.m || ''), c: String(x.c || ''), s: String(x.s || '') } });
+  return _coCodeAsk([_co.items[_co.items.length - 1]]);
 }
 function _coDelItem(i){ _co.items.splice(i, 1); _coRender(); }
 function _coItemSet(i, k, v){
   var it = _co.items[i]; if (!it) return;
+  if (k === 'code'){ it.code = String(v).trim(); it.codeSrc = it.code ? 'tay' : ''; it.codeHint = null; it.codeState = ''; _coCodeRender(i); _coSummary(); return; }
+  if ((k === 'name' || k === 'note') && it[k] !== v){ if (it.codeSrc === 'pos'){ it.code = ''; it.codeSrc = ''; } it.codeHint = null; it.codeState = ''; it.posQ = null; it[k] = v; _coCodeRender(i); _coSummary(); return; }   // đổi tên/mô tả → mã tự điền không còn chắc đúng
   if (k === 'qty' || k === 'price' || k === 'discValue' || k === 'taxPct') it[k] = _coNum(v); else it[k] = v;
   _coSummary();
 }
@@ -177,6 +181,62 @@ function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discT
 function _coSet(k, v){ _co[k] = v; _coSummary(); }
 function _coSetNum(k, v){ _co[k] = _coNum(v); _coSummary(); }
 function _coSetBool(k, v){ _co[k] = !!v; _coSummary(); }
+// ── Mã SP từng dòng (bước 4c-2): kho trừ theo MÃ, thiếu mã → đơn bị GIỮ. Gợi ý từ đơn POS gần nhất (GAS posPrice, như tab Combo).
+// Chỉ TỰ ĐIỀN khi dòng lấy từ bảng giá/combo (có posQ) VÀ tên trên đơn POS chứa đủ chất liệu; còn lại chỉ GỢI Ý, người lên đơn bấm "Dùng mã" (tránh trừ nhầm kho).
+function _coCodeQ(it){
+  var q = it.posQ, o = q ? { t: q.t || it.name, m: q.m || '', c: q.c || '', s: q.s || '' } : { t: it.name, m: '', c: '', s: '' };
+  return { t: String(o.t || '').trim(), m: String(o.m || '').trim(), c: String(o.c || '').trim(), s: String(o.s || '').trim() };
+}
+function _coCodeSafe(it, r){   // hàm thuần: có được tự điền mã không
+  if (!it || !it.posQ || !r || !r.found || !String(r.code || '').trim()) return false;
+  var hay = _coWords(r.name), toks = _coWords(it.posQ.c || '').trim().split(' ').filter(Boolean);
+  return toks.every(function(t){ return hay.indexOf(' ' + t + ' ') >= 0; });
+}
+function _coMissingCodes(items){ return (items || []).filter(function(it){ return !String(it.code || '').trim(); }).length; }
+async function _coCodeAsk(list){
+  if (typeof gsUrl === 'undefined' || !gsUrl) return;
+  var need = (list || []).filter(function(it){ return it && !String(it.code || '').trim() && String(it.name || '').trim() && !it.codeState; }).slice(0, 40);
+  if (!need.length) return;
+  var q = need.map(_coCodeQ), sig = need.map(function(it){ return it.name + '|' + it.note; });
+  need.forEach(function(it){ it.codeState = 'load'; _coCodeRender(_co.items.indexOf(it)); });
+  var res = null;
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=posPrice&q=' + encodeURIComponent(JSON.stringify(q)), { redirect:'follow' }), d = await r.json();
+    if (d && d.ok && Array.isArray(d.results)) res = d.results;
+  } catch (e) {}
+  need.forEach(function(it, j){
+    if (it.codeState !== 'load' || it.name + '|' + it.note !== sig[j]) return;   // dòng đã sửa trong lúc chờ → bỏ kết quả cũ
+    var x = res && res[j], code = x && x.found ? String(x.code || '').trim() : '';
+    it.codeState = res ? 'done' : 'err';
+    if (code && !String(it.code || '').trim()){
+      it.codeHint = { code: code, name: String(x.name || ''), date: String(x.date || '') };
+      if (_coCodeSafe(it, x)){ it.code = code; it.codeSrc = 'pos'; }
+    }
+    _coCodeRender(_co.items.indexOf(it));
+  });
+  _coCodeWarn();
+}
+function _coCodeUse(i){ var it = _co.items[i]; if (!it || !it.codeHint) return; it.code = it.codeHint.code; it.codeSrc = 'pos'; _coCodeRender(i); _coSummary(); }
+function _coCodeRetry(i){ var it = _co.items[i]; if (!it) return; it.codeState = ''; it.codeHint = null; return _coCodeAsk([it]); }
+function _coCodeHintHtml(it, i){
+  var h = it.codeHint, from = h ? 'đơn POS' + (h.date ? ' ' + _coEsc(_coYmdVn(h.date) || h.date) : '') + (h.name ? ': ' + _coEsc(h.name) : '') : '';
+  var link = function(t, f){ return ' <button type="button" class="btn sm" style="padding:1px 8px" onclick="' + f + '">' + t + '</button>'; };
+  if (it.codeState === 'load') return '<span style="color:var(--muted)">Đang tìm mã…</span>';
+  if (String(it.code || '').trim()) return it.codeSrc === 'pos' && h ? '<span style="color:var(--muted)">Tự điền từ ' + from + ' — kiểm tra đúng mẫu</span>' : '';
+  if (h) return '<span style="color:#b45309">Gợi ý <b>' + _coEsc(h.code) + '</b> (' + from + ')</span>' + link('Dùng mã', '_coCodeUse(' + i + ')');
+  var why = it.codeState === 'err' ? 'Không tra được mã.' : it.codeState === 'done' ? 'Không tìm thấy mã trên đơn POS.' : 'Chưa có mã.';
+  return '<span style="color:#b45309">' + why + '</span>' + (String(it.name || '').trim() ? link('Tìm mã', '_coCodeRetry(' + i + ')') : '');
+}
+function _coCodeRender(i){
+  var it = _co.items[i]; if (!it) return;
+  var inp = document.getElementById('co-code-' + i); if (inp && document.activeElement !== inp) inp.value = it.code || '';
+  var box = document.getElementById('co-code-hint-' + i); if (box) box.innerHTML = _coCodeHintHtml(it, i);
+}
+function _coCodeWarn(){
+  var box = document.getElementById('co-code-warn'); if (!box) return;
+  var n = _coMissingCodes(_co.items);
+  box.innerHTML = n ? '<div style="font-size:12px;color:#b45309;border:1px solid #e0a95a;border-radius:8px;padding:6px 8px;margin-bottom:6px">⚠ ' + n + ' dòng chưa có mã SP — vẫn lưu được đơn, nhưng khi trừ kho đơn sẽ bị <b>GIỮ</b> (không trừ).</div>' : '';
+}
 // ── Địa chỉ nhận hàng: MỚI (từ 01/07/2025: 34 tỉnh → phường/xã, KHÔNG còn quận/huyện) hoặc CŨ (63 tỉnh → quận/huyện → phường/xã) ──
 // Danh mục ở data/vn-address-{new,old}.json (sinh bởi tools/gen-vn-address.js), tải lười khi mở màn / khi tích địa chỉ cũ; tải lỗi → quay về ô gõ tay như trước.
 // Backend KHÔNG đổi: đơn vẫn lưu chữ vào province/district/ward ('district' rỗng khi địa chỉ mới). Ô <select> được js/99-e-select-search.js tự thêm khung gõ tìm không dấu.
@@ -381,6 +441,7 @@ function _coPromoApply(){
   ev.gifts.forEach(function(g){ _co.items.push({ code:'', name:g.name, note:'Quà tặng CTKM', qty:g.qty, price:0, discType:'amt', discValue:0, taxPct:0, promoGift:true }); });
   _co.promoApplied = { names: ev.applied.map(function(x){ return x.name; }), discountOn: on };
   _coRender();
+  return _coCodeAsk(_co.items.filter(function(it){ return it.promoGift; }));
 }
 function _coPromoClear(){
   var a = _co.promoApplied; if (!a) return;
@@ -451,7 +512,7 @@ function _coCmbLines(c){
   paid.forEach(function(it){ list += Math.max(0, Number(it.price) || 0) * Math.max(1, Math.floor(Number(it.qty) || 1)); });
   // Giá món nhập theo NGHÌN đồng (1550 = 1.550.000đ, giống ô Giá bán DANH_MUC) trong khi giá combo là đồng đầy đủ → nhân 1000, nếu không sẽ chia ra vài trăm đồng.
   if (list > 0 && list < 100000 && fin >= 100000){ paid = paid.map(function(it){ return Object.assign({}, it, { price: (Number(it.price) || 0) * 1000 }); }); list *= 1000; }
-  var mk = function(it, price, extra){ return Object.assign({ code:'', name:String(it.name || ''), note:[it.chatLieu, it.size, it.vang].filter(function(v){ return v && String(v).trim(); }).join(' · '), qty:Math.max(1, Math.floor(Number(it.qty) || 1)), price:price, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }, extra || {}); };
+  var mk = function(it, price, extra){ return Object.assign({ code:'', posQ:{ t:String(it.name || ''), c:String(it.chatLieu || ''), s:String(it.size || '') }, name:String(it.name || ''), note:[it.chatLieu, it.size, it.vang].filter(function(v){ return v && String(v).trim(); }).join(' · '), qty:Math.max(1, Math.floor(Number(it.qty) || 1)), price:price, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }, extra || {}); };
   var lines = [];
   if (list > 0){
     if (fin > list) warn = 'Giá combo cao hơn tổng giá niêm yết các món — đã giữ giá niêm yết, kiểm tra lại giá.';
@@ -520,6 +581,7 @@ async function _coCmbAdd(i){
   if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
   _coCmb.msg = r.warn || ('✓ Đã thêm combo "' + (c.name || c.code) + '" vào đơn.');
   _coRender();
+  return _coCodeAsk(r.lines);
 }
 function _coCmbRender(){
   var box = document.getElementById('co-cmb'); if (!box) return;
@@ -583,8 +645,9 @@ function _coDiscInput(v){ _co.promoApplied = null; _co.discValue = _coNum(v); _c
 function _coItemRow(it, i){
   var pct = it.discType === 'pct';
   return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">' +
-    '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input value="' + _coEsc(it.name) + '" placeholder="Tên sản phẩm" oninput="_coItemSet(' + i + ',\'name\',this.value)" style="' + _coInp + ';font-weight:700">' +
+    '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input value="' + _coEsc(it.name) + '" placeholder="Tên sản phẩm" oninput="_coItemSet(' + i + ',\'name\',this.value)" onchange="_coCodeAsk([_co.items[' + i + ']])" style="' + _coInp + ';font-weight:700">' +
     '<button class="btn sm" title="Xoá dòng" onclick="_coDelItem(' + i + ')">🗑</button></div>' +
+    '<div style="display:flex;gap:6px 8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><input id="co-code-' + i + '" value="' + _coEsc(it.code) + '" placeholder="Mã SP" aria-label="Mã SP" autocomplete="off" oninput="_coItemSet(' + i + ',\'code\',this.value)" style="' + _coInp + ';width:150px;flex:none"><span id="co-code-hint-' + i + '" style="font-size:11px;flex:1 1 180px">' + _coCodeHintHtml(it, i) + '</span></div>' +
     (it.comboName ? '<div style="font-size:11px;color:#b5305a;margin:-2px 0 4px">🎁 Combo: ' + _coEsc(it.comboName) + ' — giá đã chia theo giá combo</div>' : '') + '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;align-items:end">' +
       '<label style="font-size:11px;color:var(--muted)">Số lượng<input type="number" min="1" value="' + _coEsc(it.qty) + '" oninput="_coItemSet(' + i + ',\'qty\',this.value)" style="' + _coInp + '"></label>' +
@@ -602,7 +665,7 @@ function _coSummaryHtml(c){
     '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true) + _coEarnRow(c.total);
 }
 function _coSummary(){   // cập nhật số tiền KHÔNG dựng lại form (giữ nguyên ô đang gõ)
-  _coPromoSync();
+  _coPromoSync(); _coCodeWarn();
   var c = _coCalc(_coNow()), box = document.getElementById('co-sum'); if (box) box.innerHTML = _coSummaryHtml(c);
   c.lines.forEach(function(l, i){ var el = document.getElementById('co-line-' + i); if (el) el.textContent = _coVnd(l.amount); });
   _coPromoResRender();
@@ -623,7 +686,7 @@ function _coRender(keepFocus){
       '<div style="font-size:13px;color:var(--muted);margin-bottom:10px">' + _coEsc(s.custName || '') + ' · ' + _coEsc(s.phone) + ' · ' + (s.itemCount || 0) + ' dòng / ' + (s.qty || 0) + ' sp</div>' +
       '<div style="font-size:13px">Cần thu <b>' + _coVnd(s.total) + '</b> · Còn thiếu <b style="color:' + (s.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(s.due) + '</b></div>' +
       (s.pointsUsed > 0 ? '<div style="font-size:12px;margin-top:4px">🎖️ Đã dùng <b>' + s.pointsUsed + '</b> điểm (−' + _coVnd(s.pointsDiscount) + ')</div>' : '') + _coEarnSavedHtml() +
-      '<div style="font-size:11px;color:var(--muted);margin:10px 0">Đơn nằm ở sheet "Đơn CRM" (đang chạy thử — chưa đẩy sang Pancake POS / DT Tổng / trừ kho).</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin:10px 0">Đơn nằm ở sheet "Đơn CRM" (đang chạy thử — chưa đẩy sang Pancake POS / DT Tổng; kho chỉ trừ khi admin đã bật trừ kho và đơn chuyển "Đã xác nhận").</div>' +
       '<button class="btn primary" onclick="_coNew()">➕ Tạo đơn mới</button></div>';
     return;
   }
@@ -638,7 +701,7 @@ function _coRender(keepFocus){
     '<input id="co-pick-q" type="text" placeholder="🔍 Tìm sản phẩm trong bảng giá (không cần dấu)…" value="' + _coEsc(_coPick.q) + '" oninput="_coPickQ(this.value)" onfocus="_coCatLoad()" style="' + _coInp + ';margin-bottom:6px">' +
     '<div id="co-pick-res"></div><div id="co-cmb" style="margin-bottom:6px"></div>' +
     '<div id="co-items">' + (_co.items.length ? _co.items.map(_coItemRow).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px;border:1px dashed var(--border);border-radius:8px;text-align:center">Chưa có sản phẩm — tìm ở trên và bấm vào sản phẩm để thêm.</div>') + '</div>' +
-    '<button class="btn sm" onclick="_coAddItem()">＋ Thêm dòng tay</button>' +
+    '<div id="co-code-warn"></div><button class="btn sm" onclick="_coAddItem()">＋ Thêm dòng tay</button>' +
     '<div style="display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:14px 0 2px"><span style="font-size:14px;font-weight:700">📦 Nhận hàng</span>' +
     '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="co-addr-old"' + (_co.addrOld ? ' checked' : '') + ' onchange="_coAddrToggle(this.checked)"> Dùng địa chỉ cũ (có Quận/Huyện — trước 01/07/2025)</label></div>' +
     '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + (_co.addrOld ? 'Địa chỉ CŨ: Tỉnh/Thành → Quận/Huyện → Phường/Xã (63 tỉnh).' : 'Địa chỉ MỚI (từ 01/07/2025): Tỉnh/Thành → Phường/Xã, không còn Quận/Huyện (34 tỉnh).') + ' Bấm vào ô rồi gõ để tìm.</div>' +

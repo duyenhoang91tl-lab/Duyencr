@@ -2,9 +2,9 @@
 
 ## 2026-11-28 (phiên Claude — 4c-2: MÃ SP Ở TẠO ĐƠN + KẾT QUẢ TRỪ KHO) — ĐANG LÀM (phiên này đã NHẬN, phiên khác đừng làm trùng)
 - ĐỀ BÀI Duyên (28/11 21:01): "Làm tiếp mấy việc đang dang dở đi". Phiên này KHÔNG đụng Đơn các kênh (js/100-*, đang có phiên khác làm B4→B8).
-- ✅ Đã xong: (chưa)
-- 🔧 Đang làm: `js/99-d-crm-order.js` — ô Mã SP mỗi dòng đơn (tự gợi ý từ đơn POS, sửa tay được).
-- ➡️ Kế tiếp: `js/99-d-crm-orders.js` hiện kết quả kho + nút "Chạy lại trừ kho" → test → xét 7c chốt kỳ hoa hồng.
+- ✅ Đã xong (a): `js/99-d-crm-order.js` mỗi dòng đơn có ô **Mã SP**. Dòng lấy từ bảng giá/combo: hỏi `posPrice`, TỰ ĐIỀN chỉ khi tên trên đơn POS chứa đủ chất liệu (có ghi lấy từ đơn nào); còn lại chỉ GỢI Ý + nút "Dùng mã"; sửa tay được; sửa tên/mô tả → bỏ mã tự điền; thiếu mã → cảnh báo "kho sẽ GIỮ đơn" (không chặn lưu). Test `tools/test-crm-order-code.js` + thử trình duyệt desktop/mobile.
+- 🔧 Đang làm (b): `js/99-d-crm-orders.js` hiện kết quả kho sau khi đổi trạng thái + nút "🔁 Chạy lại trừ kho" (admin).
+- ➡️ Kế tiếp: kiểm tra tổng → xét 7c chốt kỳ hoa hồng. KHÔNG tự bật `KhoCauHinh.mode=on` (Duyên bật sau khi thử).
 
 ## 2026-11-28 (phiên Claude — 11b TICKET: SỔ TICKET + ACTION) — BƯỚC 1/2 XONG (GAS: CẦN DEPLOY, workflow tự deploy); BƯỚC 2/2 (giao diện) đang làm
 - Duyên chọn làm 11b (28/11 20:45). Chưa chốt "ai được giao" → làm CẤU HÌNH: Settings `ticketConfig.owners[loại]` ([0] = người được giao, cả danh sách = người được BÁO khi trễ); chưa điền thì giao cho CHÍNH người tạo (không ai bị bỏ sót).
