@@ -15,6 +15,7 @@ Danh sách khách/đơn/lead **chỉ gồm khách của đúng (các) sale đư�
 - Action tổng hợp / bảng giá (không lọc theo SĐT được): cắt dòng chi tiết còn tối đa 5 dòng mỗi nguồn và che SĐT (`_demoClip_`).
 - POST: máy chủ từ chối mọi thao tác ghi (kể cả khi chỉ gửi token phiên); trình duyệt chặn sớm và báo "chỉ xem" (`js/51-demo-guard.js`).
 - Trình duyệt: `js/08 _inUserScope` lọc khách theo sale được chọn; `body.demo-mode` ẩn nút quản trị / Google Sheets / mã GAS; tab hiện theo phân quyền như tài khoản thường; các nút sửa chỉ dành cho admin không hiện.
+- **Màn bị ẩn với tài khoản test** (từ 2026-11-28, `_DEMO_HIDDEN_TABS_` ở `js/05`): Zalo AI, Chat, Thư viện, Chat nội bộ, Công việc, Bảng đơn theo giai đoạn, Thư viện sản phẩm, Đơn CRM, Up dữ liệu — máy chủ không trả dữ liệu cho các màn này (Up dữ liệu chỉ để ghi). Cấp quyền riêng cho tài khoản cũng không mở được. Muốn mở lại 1 màn: mở action đọc (có lọc theo sale) ở GAS rồi bỏ id khỏi danh sách.
 - `getSetting` không trả các key `api*`, `geminiKey`, `gasSource*`, `adminKey`, `demoToken`.
 - Đổi `demoToken` (xoá dòng đó trong Settings) làm khoá `demoToken` cũ hết dùng được; muốn chặn hẳn 1 người thì khoá/đổi mật khẩu tài khoản của họ.
 - Test: `tools/test-demo-scope.js` (máy chủ), `tools/test-demo-scope-ui.js`, `tools/test-demo-scope-web.js` (trình duyệt).
@@ -22,7 +23,6 @@ Danh sách khách/đơn/lead **chỉ gồm khách của đúng (các) sale đư�
 ## Giới hạn cần biết
 - **Báo cáo tổng hợp (A, B, C, F, G, Pancake, KPI…) vẫn là số TOÀN CÔNG TY**, không lọc theo sale đã chọn; giao diện báo cáo (`_srIsAdmin`, js/10) còn coi tài khoản test như admin (nút ghi vẫn bị máy chủ từ chối). Báo cáo tính ở trình duyệt (E, H) chỉ tính trên dữ liệu máy chủ trả cho tài khoản test nên không đầy đủ.
 - Đơn POS (`donDaily`, `donPhones`) chưa mở cho tài khoản test (chưa lọc theo SĐT được).
-- Tab/tính năng mà máy chủ không phục vụ cho tài khoản test (chat, công việc, thư viện, Zalo AI…) nếu hiện ra sẽ báo không được phép.
 - Người cố tình bỏ token phiên và chỉ gửi `demoToken` sẽ đi đường cũ (số cắt dòng của cả công ty, SĐT che). Request không có token nào thì xử lý như người chưa đăng nhập (tuỳ chế độ chặn xác thực, xem `docs/SECURITY-PLAN.md`).
 - Cloudflare Worker cache chung `donPhones`/`staffOverview` theo token hợp lệ — cần sửa ở Worker nếu muốn kín.
 - Đổi vai trò một tài khoản sang test có thể mất tới 60 giây mới bị chặn ghi (cache).

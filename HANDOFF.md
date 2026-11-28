@@ -3,9 +3,9 @@
 ## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "ok áp dụng nhé" (phương án 1: ẩn với tài khoản test các màn máy chủ không phục vụ).
 - NGUYÊN NHÂN GỐC: tài khoản test mặc định thấy mọi màn, nhưng máy chủ không mở dữ liệu cho một số màn nên bấm vào chỉ gặp "không được phép".
-- ✅ Đã xong: (1) `js/05` ẩn 9 màn với role demo; (2) `js/07` không còn hiện khung "Apps Script bản cũ" khi máy chủ từ chối quyền; (3) test trong `tools/test-demo-scope-web.js`.
-- 🔧 Đang làm: `docs/TAI-KHOAN-TEST.md`.
-- ➡️ Kế tiếp: chạy toàn bộ test + thử trình duyệt rồi chốt.
+- ✅ Đã xong: (1) `js/05` ẩn 9 màn với role demo; (2) `js/07` không còn hiện khung "Apps Script bản cũ" khi máy chủ từ chối quyền; (3) test; (4) `docs/TAI-KHOAN-TEST.md`.
+- 🔧 Đang làm: chạy toàn bộ test + thử trình duyệt.
+- ➡️ Kế tiếp: chốt.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
