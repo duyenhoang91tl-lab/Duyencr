@@ -1743,14 +1743,19 @@ function renderMyDataTab() {
       }
       const ns = nextSched ? nextSched(p) : null;
       const schedHtml = ns ? `<span style="font-size:10px;color:${isOverdue(ns)?'var(--red)':'#2563eb'}">📅 ${schedTypeLabel(ns.type)} · ${fmtDate(ns.date)}</span>` : '';
-      return `<div class="my-data-row" style="flex-wrap:wrap;gap:4px">
-        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} data-cs="${esc(csName)}" onchange="toggleMyDataDone('${p}',this.dataset.cs,this.checked)">
-        <div style="flex:1;min-width:0" class="${isDone?'my-data-done':''}">
-          <div style="font-weight:500;display:flex;align-items:center;gap:6px">${c ? esc(c.name) : p}${lastActHtml}</div>
-          <div style="font-size:11px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
+      // Nut co CHU thay cho o tich nho: nguoi moi nhin la biet bam gi (goi, xem, danh dau xong); du to de bam tren dien thoai.
+      const btnCss = 'min-height:38px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;text-decoration:none;white-space:nowrap';
+      return `<div class="my-data-row" style="flex-wrap:wrap;gap:8px;padding:10px 0">
+        <div style="flex:1;min-width:200px;cursor:pointer" class="${isDone?'my-data-done':''}" onclick="openDp('${p}')">
+          <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${c ? esc(c.name) : p}${lastActHtml}</div>
+          <div style="font-size:12px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
           <div style="font-size:10px;color:var(--hint);display:flex;gap:8px;flex-wrap:wrap">${esc(batchLabels)}${schedHtml?'&nbsp;·&nbsp;'+schedHtml:''}</div>
         </div>
-        <button class="btn sm" onclick="openDp('${p}')" style="flex-shrink:0">Chi tiết</button>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+          <a class="btn" href="tel:${p}" style="${btnCss}">📞 Gọi</a>
+          <button type="button" class="btn" onclick="openDp('${p}')" style="${btnCss}">Xem khách</button>
+          <button type="button" class="btn my-data-donebtn" data-cs="${esc(csName)}" aria-pressed="${isDone}" onclick="toggleMyDataDone('${p}',this.dataset.cs,${!isDone})" style="${btnCss};min-width:104px;font-weight:600${isDone?'':';background:#15803d;border-color:#15803d;color:#fff'}">${isDone?'↩ Chưa xong':'✓ Xong'}</button>
+        </div>
       </div>`;
     }).join('');
   }
