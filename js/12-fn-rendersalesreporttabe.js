@@ -571,6 +571,7 @@ function _srRenderF_(d){
     var _fMyNamesLc = _fMyNames.map(function(n){ return String(n).trim().toLowerCase(); });
     rows = rows.filter(function(r){ return _fMyNamesLc.indexOf(String(r.name).trim().toLowerCase())!==-1; });
   }
+  rows = _srKpiMergeCommit_(rows);   // 8b-3: cam kết ĐÃ DUYỆT của tháng thắng Commit riêng cố định (server tính effective)
   function _fTierStatusLabel_(tier){
     if (!tier) return '';
     return (tier==='TV') ? '🔰 Đang thử việc' : '✅ Chính thức';
@@ -612,6 +613,7 @@ function _srRenderF_(d){
     '</div>';
 
   html += selfBanner;
+  html += _srKpiCommitCardHtml_(rows);
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(fTotalRevenue)+'</div><div class="kpi-label"><b>'+(_fSelfView?'Doanh thu của bạn':'Tổng doanh thu')+'</b></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(fTotalTarget)+'</div><div class="kpi-label">'+(_fSelfView?'KPI mục tiêu':'Tổng KPI mục tiêu')+'</div></div>'+
@@ -1762,3 +1764,80 @@ async function _bpSeedProbationTemplate_(){
   toast('✓ Đã tạo 5 chương trình mẫu — nhớ đặt "Ngày bắt đầu" cho từng Sale thử việc ở Quản lý tài khoản.');
 }
 
+
+
+// ═════════════════════════════════════════════════════════════════
+//  CAM KẾT KPI (mục 8b-3): CS tự nhập cam kết tháng (triệu đồng) → quản lý duyệt/từ chối → cột Commit của báo cáo F dùng số ĐÃ DUYỆT.
+//  Backend 8b-2: GET kpiCommitList {period} · POST kpiCommitSubmit {period, amount, sale?} · POST kpiCommitDecide {period, sale, decision, note?}.
+//  Quyền do SERVER quyết định (sale chỉ thấy/gửi cho mình; admin/leader duyệt, không tự duyệt mình) — client chỉ ẩn/hiện nút theo canApprove.
+//  Gộp trong file này (không thêm script). Gỡ = xoá khối này + 2 dòng gọi trong _srRenderF_.
+// ═════════════════════════════════════════════════════════════════
+var _kcState = { period:'', data:null, loading:false, err:'', seq:0 };
+function _kcTok_(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
+function _kcFold_(x){ return String(x == null ? '' : x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').trim().toLowerCase(); }
+function _kcPeriod_(){
+  var f = String((typeof _srState !== 'undefined' && _srState.fDateFrom) || '');
+  if (/^\d{4}-\d{2}/.test(f)) return f.slice(0, 7);
+  var d = new Date(Date.now() + 7*3600*1000); return d.toISOString().slice(0, 7);
+}
+function _srKpiMergeCommit_(rows){
+  var data = _kcState.data; if (!data || !data.ok || _kcState.period !== _kcPeriod_()) return rows;
+  var eff = {}; (data.rows||[]).forEach(function(c){ if (c.effective && c.effective.commit > 0) eff[_kcFold_(c.sale)] = c.effective.commit; });
+  return rows.map(function(r){
+    var c = eff[_kcFold_(r.name)]; if (!c) return r;
+    var o = Object.assign({}, r); o.commit = c; o.pctCommit = (Number(r.revenue)||0) >= 0 ? Math.round((Number(r.revenue)||0)/c*1000)/10 : null; return o;
+  });
+}
+async function _kcLoad_(force){
+  var per = _kcPeriod_();
+  if (!gsUrl || (!force && (_kcState.loading || (_kcState.period === per && _kcState.data)))) return;
+  var seq = ++_kcState.seq; _kcState.loading = true; _kcState.period = per; _kcState.err = '';
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=kpiCommitList&period=' + encodeURIComponent(per) + '&token=' + encodeURIComponent(_kcTok_()), { redirect:'follow' });
+    var j = await r.json(); if (seq !== _kcState.seq) return;
+    if (j && j.ok) _kcState.data = j; else { _kcState.data = null; _kcState.err = (j && j.error) || 'Không tải được cam kết'; }
+  } catch(e){ if (seq === _kcState.seq){ _kcState.data = null; _kcState.err = 'Backend chưa có tính năng cam kết (cần deploy GAS) hoặc mất mạng'; } }
+  if (seq === _kcState.seq){ _kcState.loading = false; if (typeof renderSalesReportTab === 'function' && _srState.sub === 'F') renderSalesReportTab(); }
+}
+async function _kcPost_(body){
+  body.token = _kcTok_(); body.period = _kcPeriod_();
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify(body) }), j = await r.json();
+    if (!j || !j.ok){ toast('❌ ' + ((j && j.error) || 'Không lưu được')); return false; }
+    return true;
+  } catch(e){ toast('❌ Lỗi: ' + e.message); return false; }
+}
+async function _kcSubmit_(sale){
+  var inp = document.getElementById('kc-amt'), nm = document.getElementById('kc-name'), mil = Number(String(inp && inp.value || '').replace(',', '.'));
+  if (!(mil > 0)){ toast('Nhập số tiền cam kết (triệu đồng), lớn hơn 0'); return; }
+  var who = sale || (nm && nm.value) || '';
+  if (await _kcPost_({ action:'kpiCommitSubmit', amount: Math.round(mil * 1000000), sale: who })){ toast('✓ Đã lưu cam kết'); await _kcLoad_(true); if (typeof _srLoad === 'function') _srLoad(); }
+}
+async function _kcDecide_(sale, decision){
+  var note = ''; if (decision === 'reject'){ note = prompt('Lý do từ chối (tuỳ chọn):', '') || ''; }
+  if (await _kcPost_({ action:'kpiCommitDecide', sale: sale, decision: decision, note: note })){ toast(decision === 'approve' ? '✓ Đã duyệt' : '✓ Đã từ chối'); await _kcLoad_(true); if (typeof _srLoad === 'function') _srLoad(); }
+}
+function _srKpiCommitCardHtml_(rows){
+  if (typeof gsUrl === 'undefined' || !gsUrl) return '';
+  var per = _kcPeriod_();
+  if (_kcState.period !== per || (!_kcState.data && !_kcState.err && !_kcState.loading)) setTimeout(function(){ _kcLoad_(); }, 0);
+  var d = (_kcState.period === per) ? _kcState.data : null, head = '<b>🤝 Cam kết KPI tháng ' + esc(per.slice(5) + '/' + per.slice(0, 4)) + '</b>';
+  var box = 'padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:10px;font-size:12.5px';
+  if (!d) return '<div style="' + box + '">' + head + ' <span style="color:var(--muted)">' + (_kcState.err ? esc(_kcState.err) : 'đang tải…') + '</span></div>';
+  var lab = { none:'Chưa cam kết', pending:'⏳ Chờ duyệt', approved:'✅ Đã duyệt', rejected:'❌ Bị từ chối' }, mil = function(n){ return (Math.round((Number(n)||0)/100000)/10).toLocaleString('vi-VN') + ' tr'; };
+  var list = (d.rows||[]).map(function(c){
+    var pend = (c.status === 'pending') ? ' <span style="color:var(--muted)">(đề nghị ' + mil(c.amount) + (c.approvedAmount ? ', đang áp dụng ' + mil(c.approvedAmount) : '') + ')</span>' : '';
+    var shown = c.status === 'pending' ? '' : ' ' + mil(c.status === 'approved' ? c.approvedAmount : c.amount);
+    var btns = (d.canApprove && c.status === 'pending')
+      ? ' <button class="save-btn" style="padding:2px 8px;font-size:11px" data-s="' + esc(c.sale) + '" onclick="_kcDecide_(this.dataset.s,\'approve\')">Duyệt</button> <button style="padding:2px 8px;font-size:11px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer" data-s="' + esc(c.sale) + '" onclick="_kcDecide_(this.dataset.s,\'reject\')">Từ chối</button>' : '';
+    return '<div style="padding:3px 0;border-top:1px solid var(--border)"><b>' + esc(c.sale) + '</b>:' + shown + pend + ' · ' + (lab[c.status] || esc(c.status)) + btns + '</div>';
+  }).join('');
+  var mine = (d.myNames||[])[0] || '', own = (d.rows||[]).filter(function(c){ return _kcFold_(c.sale) === _kcFold_(mine); })[0];
+  var names = (rows||[]).map(function(r){ return '<option value="' + esc(r.name) + '">'; }).join('');
+  var form = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">' +
+    (d.canApprove ? '<input id="kc-name" list="kc-names" placeholder="Sale (để trống = mình)" class="form-input" style="width:170px"><datalist id="kc-names">' + names + '</datalist>' : '') +
+    '<input id="kc-amt" type="number" min="0" step="0.5" class="form-input" style="width:130px" placeholder="Cam kết (triệu)" value="' + (own && own.amount ? esc(String(own.amount / 1000000)) : '') + '">' +
+    '<button class="save-btn" style="padding:4px 12px" onclick="_kcSubmit_()">' + (d.canApprove ? 'Lưu' : 'Gửi cam kết') + '</button></div>';
+  return '<div style="' + box + '">' + head + (d.requireApproval ? '' : ' <span style="color:var(--muted)">(có hiệu lực ngay)</span>') + (d.canApprove && d.pending ? ' <span style="color:#9a3412">· ' + d.pending + ' chờ duyệt</span>' : '') +
+    (list ? '<div style="margin-top:6px">' + list + '</div>' : '') + form + '</div>';
+}
