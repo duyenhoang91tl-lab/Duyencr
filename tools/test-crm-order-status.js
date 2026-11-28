@@ -59,7 +59,7 @@ ok(!st('', 'Hủy', 'x').ok && /ma don/.test(st('', 'Hủy', 'x').error), 'thi�
 ok(!st('CRM999999-0001', 'Hủy', 'x').ok && /Khong tim thay/.test(st('CRM999999-0001', 'Hủy', 'x').error), 'mã đơn không tồn tại');
 tokenUser = null; ok(st(A, 'Hủy', 'x').code === 'AUTH', 'chưa đăng nhập bị chặn');
 // 6) chỉ đúng sheet "Đơn CRM" bị đụng; số dòng không đổi; đơn cũ thiếu 3 cột cuối (sheet tạo trước bước 4a) vẫn đổi được
-ok(Object.keys(sheets).join('|') === 'Đơn CRM' && rowsOf('Đơn CRM').length === 3, 'không tạo sheet khác, không thêm dòng');
+ok(Object.keys(sheets).join('|') === 'Đơn CRM|LoyaltyPoints' && rowsOf('Đơn CRM').length === 3, 'không tạo sheet khác (chỉ thêm sổ điểm do đơn CRM tích điểm), không thêm dòng đơn');
 tokenUser = { role: 'admin', username: 'boss' };
 sheets['Đơn CRM'].rows.forEach((row, i) => { if (i > 0) row.length = 39; });   // mô phỏng sheet cũ 39 cột
 ok(list().ok && st(B, 'Hủy').unchanged === true, 'đọc sheet cũ 39 cột không lỗi');

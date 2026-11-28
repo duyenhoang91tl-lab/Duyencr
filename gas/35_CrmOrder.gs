@@ -143,7 +143,11 @@ function crmOrderDoPost_(action, d) {
     var n = _crmOrderNormalize_(d && d.order); if (n.error) return jsonOut_({ ok: false, error: n.error });
     return _khoWithLock_(function () {
       var all = _crmReadAll_(), refKey = _crmStr_(d.refKey, 80);
-      if (refKey) for (var i = 0; i < all.length; i++) if (String(all[i].refKey) === refKey) return jsonOut_({ ok: true, duplicate: true, order: all[i] });
+      if (refKey) for (var i = 0; i < all.length; i++) if (String(all[i].refKey) === refKey) {
+        var dup = all[i], de = { points: 0 };   // bấm Lưu lại (cùng refKey): trả đơn cũ; nếu lần trước ghi đơn xong mà tích điểm lỗi thì tích bù ở đây (khoá cố định nên không tích 2 lần)
+        try { if (String(dup.status) !== 'Hủy' && String(dup.status) !== 'Hoàn') de = _loyaltyCrmEarn_(dup, String(a.user.username || a.user.name || ''), dup.createdAt); } catch (eD) {}
+        return jsonOut_({ ok: true, duplicate: true, pointsEarned: de.points, pointsExpireOn: de.expiresOn || '', order: dup });
+      }
       var now = new Date(), who = String(a.user.username || a.user.name || ''), o = n.order;
       o.orderId = _crmNextOrderId_(_vnYmd_(now), all.map(function (x) { return String(x.orderId); }));
       o.refKey = refKey; o.createdAt = now.getTime(); o.createdBy = who; o.status = 'Mới';
@@ -168,7 +172,10 @@ function crmOrderDoPost_(action, d) {
         if (redeemKey) { try { _loyaltyUndoApply_({ phone: o.phone, key: redeemKey, note: 'ghi don loi, hoan diem' }, who); } catch (eU) {} }
         throw eW;
       }
-      return jsonOut_({ ok: true, duplicate: false, order: o });
+      // Tích điểm cho đơn (sau khi đơn đã ghi): lỗi chỉ báo `pointsEarnError`, KHÔNG làm hỏng đơn (bấm Lưu lại cùng refKey sẽ tích bù).
+      var earn = { points: 0 };
+      try { earn = _loyaltyCrmEarn_(o, who, o.createdAt); } catch (eE) { earn = { points: 0, error: String(eE && eE.message || eE) }; }
+      return jsonOut_({ ok: true, duplicate: false, pointsEarned: earn.points, pointsExpireOn: earn.expiresOn || '', pointsEarnError: earn.error || '', order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
 }
@@ -288,6 +295,11 @@ function crmOrderStatusDoPost_(d) {
         var ur = _loyaltyUndoApply_({ phone: o.phone, key: _crmRedeemKey_(o.phone, o.orderId), note: (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId }, who);
         if (ur.ok) refunded = ur.undone.points; else if (ur.code !== 'DUPLICATE' && ur.code !== 'NOTFOUND') return jsonOut_({ ok: false, error: 'Khong hoan duoc diem, don giu nguyen trang thai: ' + ur.error });
       }
+      // Hủy/Hoàn đơn đã TÍCH điểm → trừ lại đúng số điểm đã tích, không âm (xem _loyaltyCrmRevoke_). Lỗi thật thì dừng, trạng thái giữ nguyên; làm lại được (khoá cố định, không trừ 2 lần).
+      var revoke = { points: 0, earned: 0 };
+      if (to === 'Hủy' || to === 'Hoàn') {
+        try { revoke = _loyaltyCrmRevoke_(o, to, who); } catch (eR) { return jsonOut_({ ok: false, error: 'Khong tru duoc diem da tich, don giu nguyen trang thai: ' + (eR && eR.message || eR) }); }
+      }
       // Bước 4c: Đã xác nhận → trừ kho; Hủy/Hoàn → cộng trả kho đã trừ. Lỗi thật (sheet kho hỏng) thì DỪNG, trạng thái giữ nguyên; kho tắt/đơn bị giữ KHÔNG chặn đổi trạng thái (xem `stock` trong kết quả).
       var stock = null;
       try {
@@ -299,7 +311,7 @@ function crmOrderStatusDoPost_(d) {
       var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
       set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
       o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
-      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, stock: stock, order: o });
+      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, pointsRevoked: revoke.points, pointsRevokeCapped: !!revoke.capped, stock: stock, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
 }
