@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — CRM DỄ DÙNG, TIẾP THEO SAU 5/5 BƯỚC: 3 GỢI Ý CÒN LẠI) — BƯỚC 1/3 XONG (chỉ web, Ctrl+F5); ĐANG LÀM BƯỚC 2/3
+- ĐỀ BÀI Duyên: "trình bày CRM ai không biết dùng cũng dùng được, không thêm dòng chỉ dẫn; mình mới update giao diện mới rồi hãy làm tiếp". Làm tiếp 3 gợi ý phiên trước chưa làm: (1) trang trí che nút trên điện thoại, (2) gọn menu, (3) danh sách khách dạng thẻ trên điện thoại. KHÔNG thêm dòng hướng dẫn nào.
+- ✅ **BƯỚC 1/3 XONG (js/66 cánh đào + js/79 linh vật/vườn):** hai canvas vẽ đè lên nút ở đáy màn hình điện thoại (chúng `pointer-events:none` nên không chặn bấm, chỉ che mắt). Đây là hiệu ứng Duyên TỰ yêu cầu nên KHÔNG gỡ: `isOn()` đổi thành "chưa từng chọn → điện thoại (innerWidth ≤ 640) TẮT, máy tính BẬT như cũ; đã bấm bật ('1') / tắt ('0') thì theo lựa chọn". Nút ☰ → ⚙ Settings vẫn bật/tắt như cũ (nhãn tự đổi "Bật/Tắt"). Bump `?v=20261128a` cho js/66, js/79. Test: `tools/test-mascot-samoyed.js` (108, thêm 7 ca mặc định theo thiết bị; ca cũ ở bề rộng điện thoại đặt `ome_mascot:'1'`), `tools/test-sakura-phone-default.js` (6). Nút vườn hoa-bướm-ong (`ome_garden`) không đổi, tự theo linh vật.
+- [ ] **VIỆC KẾ TIẾP:** bước 2/3 gọn menu (js/29-sidenav + css/05-sidenav) — đọc cấu trúc menu hiện tại trước (đã có gom nhóm 'kh', 'st'...), chỉ gom/ẩn mục ít dùng, KHÔNG xoá chức năng. Bước 3/3 danh sách khách dạng thẻ trên điện thoại (bảng khách css/16, js/90). Duyên: Ctrl+F5, mở trên điện thoại kiểm tra không còn hoa/chó che nút (muốn thấy lại: ☰ → Settings → Bật).
+
 ## 2026-11-28 (phiên Claude — BÁO CÁO: THẺ KPI KÉO NGANG, SỐ TIỀN KHÔNG NGẮT DÒNG) — XONG (chỉ web CSS; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên: ở Báo cáo, ô doanh thu (vd 4.361.866.600₫, 2.300.834.167₫) bị ngắt thành 2 dòng; muốn kéo ngang ra.
 - NGUYÊN NHÂN GỐC (`css/17-reports-pro.css`): `.kpi-val{overflow-wrap:anywhere}` + lưới cột cố định `repeat(auto-fill,minmax(168px,1fr))` → số tiền 14 ký tự ở cỡ 21px rộng hơn ô 168px nên trình duyệt BẺ giữa chữ số. Tái hiện bằng Chromium: CSS cũ 1280px → 2 dòng, CSS mới → 1 dòng ở cả 1280px và 390px.
