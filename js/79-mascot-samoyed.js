@@ -15,7 +15,7 @@
 //  Ong thỉnh thoảng bay tới một bông hoa, ĐẬU 2.5–4.5 giây rồi bay tiếp; ong đang đậu không làm chó giật mình.
 //  Chuồn chuồn (17/11/2026): 3 con desktop / 2 con điện thoại, bay NHANH theo đường thẳng rồi LƠ LỬNG (hover) 0.5–1.3s rồi lao tiếp; 4 cánh trong suốt
 //  vỗ nhanh, thân dài nhiều màu. KHÔNG đậu hoa và KHÔNG làm chó giật mình (chỉ ong mới dọa chó). Chung nút vườn 'ome_garden'.
-//  Bật/tắt: ☰ → ⚙ Settings → "🐶 Tắt/Bật linh vật Samoyed" (mọi vai trò); lưu localStorage 'ome_mascot' ('0' = tắt, mặc định bật).
+//  Bật/tắt: ☰ → ⚙ Settings → "🐶 Tắt/Bật linh vật Samoyed" (mọi vai trò); lưu localStorage 'ome_mascot' ('0' = tắt, mặc định bật trên máy tính, TẮT trên điện thoại ≤640px nếu chưa chọn).
 //  Vườn (hoa + bướm + ong + chuồn chuồn) có nút RIÊNG "🌼 Tắt/Bật vườn hoa-bướm-ong" (localStorage 'ome_garden'): tắt vườn thì chỉ còn chó.
 //  (Tắt chó thì cả canvas ẩn — vườn nằm chung canvas nên cũng ẩn theo.)
 //  GỠ HẲN: xoá thẻ <script src="js/79-mascot-samoyed.js"> trong index.html + mục act:mascot ở js/29-sidenav.js
@@ -44,7 +44,9 @@
   var DPAL = [['#E53935', '#7F1D1D'], ['#1E88E5', '#0D3B7A'], ['#00ACC1', '#00505A'], ['#43A047', '#1B5E20'], ['#FB8C00', '#8A3B00']];
   var BCOL = BPAL.map(function(p){ return p[0]; });   // giữ BCOL: màu cánh trên (tương thích b.color)
 
-  function isOn(){ try { return localStorage.getItem(KEY) !== '0'; } catch(e){ return true; } }
+  function onPhone(){ try { return (window.innerWidth || document.documentElement.clientWidth || 9999) <= 640; } catch(e){ return false; } }
+  // Điện thoại (≤640px): hiệu ứng trang trí vẽ đè lên nút ở đáy màn hình → MẶC ĐỊNH TẮT nếu người dùng chưa từng chọn; đã bấm bật ('1') hoặc tắt ('0') thì theo lựa chọn đó. Máy tính giữ mặc định bật như cũ.
+  function isOn(){ try { var v = localStorage.getItem(KEY); return v === '1' ? true : v === '0' ? false : !onPhone(); } catch(e){ return !onPhone(); } }
   function gardenOn(){ try { return localStorage.getItem(GKEY) !== '0'; } catch(e){ return true; } }
   function reduced(){ try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; } }
   function rnd(a, b){ return a + Math.random() * (b - a); }

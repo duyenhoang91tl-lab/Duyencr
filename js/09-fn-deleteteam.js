@@ -808,9 +808,7 @@ function _pkRenderPreviewHtml(){
   html += '</tbody></table>';
   var _dl = (_pkState.parsedRows && _pkState.parsedRows.daily) || [];
   if (_pkState.parsedRows.some(function(r){ return r.dateTo; })){
-    html += '<div style="margin-top:8px;font-size:12px;color:var(--muted)">📅 File gộp nhiều ngày: '+(_dl.length
-      ? 'có số liệu <b>từng ngày</b> của '+_dl.length+' dòng Page-ngày (sheet By time) → tỷ lệ chốt xem được theo từng ngày; số theo nhân viên được rải theo đúng nhịp từng ngày đó.'
-      : 'không có số liệu từng ngày → CRM tính <b>gộp cả khoảng</b> và rải đều theo ngày khi xem tuần/ngày (đánh dấu ước tính).')+'</div>';
+    html += '<div style="margin-top:8px;font-size:12px;color:'+(_dl.length?'#0a7d3c':'#9a3412')+'">'+(_dl.length ? '✓ Có số liệu từng ngày' : '≈ Không có số từng ngày — chia đều')+'</div>';
   }
 
   if (_pkState.parsedUnmapped.length){

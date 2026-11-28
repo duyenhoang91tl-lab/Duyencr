@@ -553,11 +553,10 @@ function renderAssignCreate() {
     </div>
 
     ${!isTeamMode ? `
-    <div class="as-lbl">Lấy người nhận từ <span class="as-sub">(bấm để đổi nguồn — người đã chọn ở nguồn khác vẫn được giữ)</span>:</div>
+    <div class="as-lbl">Lấy người nhận từ:</div>
     <div class="assign-sort-row" style="margin-bottom:8px">
       ${[['all','👤 Tất cả CS'],['sale','🧑‍💼 Danh sách Sale'],['acct','🔑 Tài khoản đăng nhập CRM']].map(([k,l])=>`<div class="assign-sort-btn ${recvSrc===k?'active':''}" onclick="_advAssignSetRecvSrc('${k}')">${l} (${recvCnt[k]})</div>`).join('')}
     </div>
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều người${recvSrc==='acct'?'; chọn tài khoản = chia cho tên CS của tài khoản đó':''})</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
@@ -568,7 +567,7 @@ function renderAssignCreate() {
     </div>
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
       ${recvList.map(r => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(r.cs)?'selected':''}" data-cs="${esc(r.cs)}" onclick="_advAssignToggleCS(this.dataset.cs)" title="${esc(r.sub||r.label)}">${esc(r.label)}${r.sub?` <span style="opacity:.6;font-size:10px">${esc(r.sub)}</span>`:''}</div>`).join('')}
-      ${recvList.length===0?`<span style="color:var(--hint);font-size:12px">${recvSrc==='acct'?'Chưa có tài khoản đăng nhập nào đang hoạt động (vào "Quản lý tài khoản" để tạo).':(recvSrc==='sale'?'Chưa có Sale nào trong dữ liệu':'Chưa có CS trong hệ thống')}</span>`:''}
+      ${recvList.length===0?`<span style="color:var(--hint);font-size:12px">${recvSrc==='acct'?'Chưa có tài khoản nào':(recvSrc==='sale'?'Chưa có Sale nào trong dữ liệu':'Chưa có CS trong hệ thống')}</span>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:11px;color:var(--muted)">Thêm CS mới:</span>
@@ -578,18 +577,17 @@ function renderAssignCreate() {
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
     ` : `
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team / Phòng ban — chọn được nhiều, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
     <div class="as-lbl">Team trong "Quản lý Team" <span class="as-sub">(${teams.length})</span>:</div>
     <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
       ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
-      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — bấm "➕ Tạo nhanh Team" bên dưới (lấy luôn những người đang chọn ở chế độ CS riêng lẻ) hoặc vào tab "Quản lý Team".</span>':''}
+      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào</span>':''}
     </div>
-    <div style="margin-bottom:10px"><button type="button" class="btn sm" onclick="_advAssignQuickTeam()" title="Tạo Team mới ngay tại đây; thành viên = những người đang chọn ở 'CS riêng lẻ' (chọn trước rồi bấm). Chỉ Admin.">➕ Tạo nhanh Team${_advAssign.selectedCS.size>0?` từ ${_advAssign.selectedCS.size} người đang chọn`:''}</button></div>
-    <div class="as-lbl">Phòng ban Sale <span class="as-sub">(theo "Phòng ban" ở cài đặt — thành viên lấy từ file nhân sự)</span>:</div>
+    <div style="margin-bottom:10px"><button type="button" class="btn sm" onclick="_advAssignQuickTeam()">➕ Tạo nhanh Team${_advAssign.selectedCS.size>0?` từ ${_advAssign.selectedCS.size} người đang chọn`:''}</button></div>
+    <div class="as-lbl">Phòng ban Sale:</div>
     <div class="assign-cs-list" id="assign-dept-chips" style="margin-bottom:8px">
       ${_asgDept.loading?'<span style="color:var(--hint);font-size:12px">Đang tải phòng ban…</span>':''}
       ${_asgDept.list.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">🏢 ${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
-      ${(!_asgDept.loading && _asgDept.list.length===0)?`<span style="color:var(--hint);font-size:12px">${_asgDept.err?('Không tải được phòng ban: '+esc(_asgDept.err)):'Chưa có phòng ban nào có thành viên (cài ở "Phòng ban").'} <a href="#" onclick="_assignLoadDeptTeams(true);renderAssignCreate();return false">↻ Tải lại</a></span>`:''}
+      ${(!_asgDept.loading && _asgDept.list.length===0)?`<span style="color:var(--hint);font-size:12px">${_asgDept.err?('Không tải được phòng ban: '+esc(_asgDept.err)):'Chưa có phòng ban nào'} <a href="#" onclick="_assignLoadDeptTeams(true);renderAssignCreate();return false">↻ Tải lại</a></span>`:''}
     </div>
     ${_advAssign.selectedTeams.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 Team</div>':''}
     `}

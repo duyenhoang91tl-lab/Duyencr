@@ -23974,6 +23974,131 @@ function _loyaltyUndo_(d, a) {
   return jsonOut_(_loyaltyUndoApply_(d, String(a.user.username || a.user.name || '')));
 }
 
+// ── Bước 9b: QUYỀN LỢI THEO THẺ (docx mục 9, Duyên chốt 27/11) — HÀM THUẦN, chưa nối đơn/UI ──
+// Thẻ VIP = khách mua từ LẦN THỨ 2 (đã có ≥ 1 đơn hợp lệ trước đó): giảm 5%. Thẻ SUPER VIP = lịch sử mua ≥ 50tr (đúng ngưỡng hạng Super VVip): giảm 10%.
+// Cả hai: miễn ship đơn từ 1tr, dưới 1tr không miễn ship. Hạng Ưu tiên/Vip theo doanh thu KHÔNG có quyền lợi riêng.
+// Mã "KHÔNG GIẢM" → 0%; mã "TỐI ĐA 5%" → min(mức thẻ, 5%) — dù có thẻ hay chương trình. So khớp theo TÊN sản phẩm (bỏ dấu, chữ thường; "charm" = "cham").
+// GIẢ ĐỊNH chưa Duyên xác nhận: miễn ship xét trên TỔNG TIỀN HÀNG TRƯỚC giảm; giảm làm tròn từng dòng về đồng. Mọi số/danh sách cấu hình được ở Settings 'loyaltyBenefits'.
+var LOYALTY_BENEFIT_DEFAULT_ = {
+  vipPct: 5, superPct: 10, superMin: 50000000, freeShipMin: 1000000, capPct: 5,
+  noDiscount: [
+    { all: ['cham', '24k'] }, { all: ['cham', 'bi vang', '10k'] }, { all: ['cham', '10k'], none: ['da', 'ngoc', 'khoi loc'] }, { all: ['vang', '18k'] }, { all: ['kim tien'] },
+    { all: ['day vang', '10k'] }, { all: ['nhan', 'thiet ke', '2 hang da'] }, { all: ['nhan ket noi'] }, { all: ['lac duc vang'] }, { all: ['nhan nam'] },
+    { all: ['day vang', 'deo co', 'nhu y nguyen'] }, { all: ['day vang', 'deo co', 'loc nhu y'] }, { all: ['day vang', 'deo co', 'tourmaline'] }
+  ],
+  // (docx có 2 danh sách chồng nhau: "charm 10k không gắn đá" = KHÔNG GIẢM, "charm vàng khởi lộc 10k" = TỐI ĐA 5% → mã cụ thể thắng, xem 'khoi loc' ở luật noDiscount)
+  cap5: [
+    { all: ['cam thach', 'type a'] }, { all: ['lac tay vang', 'nhu y nguyen'] }, { all: ['loc phuc tinh'] }, { all: ['dong dieu', 'da thong'] },
+    { all: ['ty huu', 'nam', 'boc vang'] }, { all: ['cham vang', 'khoi loc', '10k'] }
+  ]
+};
+function _loyNorm_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/charm/g, 'cham').replace(/\s+/g, ' ').trim();
+}
+function _loyRuleList_(arr, dflt) {
+  if (!Array.isArray(arr)) return dflt;
+  var out = arr.filter(function (r) { return r && Array.isArray(r.all) && r.all.length; }).map(function (r) {
+    return { all: r.all.map(_loyNorm_).filter(Boolean), none: Array.isArray(r.none) ? r.none.map(_loyNorm_).filter(Boolean) : [] };
+  }).filter(function (r) { return r.all.length; });
+  return out.length ? out : dflt;
+}
+function _loyaltyBenefitCfgNormalize_(raw) {
+  var o = raw; if (typeof raw === 'string') { try { o = JSON.parse(raw); } catch (e) { o = null; } }
+  o = (o && typeof o === 'object') ? o : {}; var d = LOYALTY_BENEFIT_DEFAULT_;
+  function num(v, dv, lo, hi) { v = Number(v); return (isFinite(v) && v >= lo && v <= hi) ? v : dv; }
+  return { vipPct: num(o.vipPct, d.vipPct, 0, 100), superPct: num(o.superPct, d.superPct, 0, 100), capPct: num(o.capPct, d.capPct, 0, 100),
+           superMin: num(o.superMin, d.superMin, 1, 1e13), freeShipMin: num(o.freeShipMin, d.freeShipMin, 0, 1e13),
+           noDiscount: _loyRuleList_(o.noDiscount, _loyRuleList_(d.noDiscount, [])), cap5: _loyRuleList_(o.cap5, _loyRuleList_(d.cap5, [])) };
+}
+// Điều kiện LOẠI TRỪ (none) so khớp theo TỪ NGUYÊN VẸN và sau khi bỏ cụm phủ định "không gắn/đính/có đá/ngọc" — nếu không, "không gắn đá" bị tính là CÓ đá
+// và chữ "dây" (day) bị tính là chứa "đá" (da). Điều kiện bắt buộc (all) vẫn so khớp theo cụm.
+function _loyRuleHit_(name, rules) {
+  var bare = name.replace(/khong (gan|dinh|co) (da|ngoc)( ?\/ ?(da|ngoc))?/g, ' ');
+  function word(k) { return new RegExp('(^|[^a-z0-9])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(bare); }
+  return rules.some(function (r) {
+    return r.all.every(function (k) { return name.indexOf(k) >= 0; }) && !(r.none || []).some(word);
+  });
+}
+// Cấp thẻ của khách khi lên đơn: priorValidOrders = số đơn hợp lệ ĐÃ CÓ trước đơn này; cumulative = doanh thu cộng dồn (đơn hợp lệ).
+function _loyaltyBenefitLevel_(priorValidOrders, cumulative, cfg) {
+  cfg = _loyaltyBenefitCfgNormalize_(cfg);
+  if (Number(cumulative) >= cfg.superMin) return 'super';
+  return Number(priorValidOrders) >= 1 ? 'vip' : 'none';
+}
+// items: [{name, qty, price}]. Trả từng dòng (pct áp dụng + lý do), tổng giảm, tiền hàng sau giảm, có miễn ship không.
+function _loyaltyBenefitApply_(items, level, cfg) {
+  cfg = _loyaltyBenefitCfgNormalize_(cfg);
+  var base = level === 'super' ? cfg.superPct : level === 'vip' ? cfg.vipPct : 0, lines = [], subtotal = 0, discount = 0;
+  (items || []).forEach(function (it) {
+    var qty = Math.max(0, Number(it && it.qty) || 0), price = Math.max(0, Number(it && it.price) || 0), total = Math.round(qty * price), nm = _loyNorm_(it && it.name), pct = base, why = base ? 'full' : 'none';
+    if (base && _loyRuleHit_(nm, cfg.noDiscount)) { pct = 0; why = 'excluded'; }
+    else if (base && _loyRuleHit_(nm, cfg.cap5) && base > cfg.capPct) { pct = cfg.capPct; why = 'cap'; }
+    var d = Math.round(total * pct / 100); subtotal += total; discount += d;
+    lines.push({ name: String((it && it.name) || ''), lineTotal: total, pct: pct, discount: d, rule: why });
+  });
+  return { level: level, lines: lines, subtotal: subtotal, discount: discount, afterDiscount: subtotal - discount,
+           freeShip: level !== 'none' && subtotal >= cfg.freeShipMin && subtotal > 0 };
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+//  TICKET: HẠN XỬ LÝ + HẠN TRẢ LỜI TIN (mục 11, docs/CRM-11-HANG-MUC-TRANG-THAI.md) — bước 11a: HÀM THUẦN, chưa có sheet/UI.
+//  Quy tắc chốt (Duyên 2026-11-27): hạn ticket = lúc tạo + thời hạn theo loại (khiếu nại/hỗ trợ 24 giờ; đổi trả/đánh bóng 72 giờ;
+//  bảo hành/kiểm định 7 ngày), tính GIỜ THỰC. Hạn trả lời tin: tin nhắn trong 08:00–17:00 → 30 phút; từ 17:00 trở đi (ca tối đến 21:00 vẫn trực
+//  online) → 2 giờ tính từ lúc khách nhắn (giờ thực: 20:00 → 22:00). Cả tuần T2–CN. Trễ hạn → báo trưởng phòng bộ phận liên quan.
+//  Giờ Việt Nam (UTC+7, không đổi giờ mùa hè). Mọi số cấu hình được (Settings 'ticketConfig'); chưa chốt NGƯỜI ĐƯỢC GIAO theo loại → để trống.
+// ════════════════════════════════════════════════════════════════════════════════════════
+var TICKET_SECTION_ = 1;
+var TICKET_VN_OFFSET_MS_ = 7 * 3600000;
+var TICKET_TYPES_ = { khieu_nai: 'Khiếu nại', ho_tro: 'Hỗ trợ', doi_tra: 'Đổi trả', danh_bong: 'Đánh bóng', bao_hanh: 'Bảo hành', kiem_dinh: 'Kiểm định' };
+var TICKET_DEFAULT_ = {
+  dueHours: { khieu_nai: 24, ho_tro: 24, doi_tra: 72, danh_bong: 72, bao_hanh: 168, kiem_dinh: 168 },
+  officeStart: '08:00', officeEnd: '17:00', inHoursMinutes: 30, offHoursMinutes: 120,
+  officeDays: [0, 1, 2, 3, 4, 5, 6],   // 0 = Chủ nhật … 6 = Thứ bảy (docx: Thứ Hai đến Chủ nhật)
+  owners: {}                            // loại → [tên/chức danh được giao + trưởng phòng được báo khi trễ] — CHƯA chốt, Duyên điền
+};
+function _ticketHm_(v, dflt) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim()); if (!m || +m[1] > 24 || +m[2] > 59) return dflt; return String(m[1]).padStart(2, '0') + ':' + m[2]; }
+function _ticketMin_(hm) { var p = hm.split(':'); return (+p[0]) * 60 + (+p[1]); }
+// raw = object hoặc chuỗi JSON; trường sai/thiếu → mặc định từng trường (không ném lỗi).
+function _ticketCfgNormalize_(raw) {
+  var o = raw; if (typeof raw === 'string') { try { o = JSON.parse(raw); } catch (e) { o = null; } }
+  o = (o && typeof o === 'object') ? o : {};
+  var d = TICKET_DEFAULT_, out = { dueHours: {}, owners: {} };
+  Object.keys(d.dueHours).forEach(function (k) { var h = Number((o.dueHours || {})[k]); out.dueHours[k] = (isFinite(h) && h > 0) ? h : d.dueHours[k]; });
+  out.officeStart = _ticketHm_(o.officeStart, d.officeStart); out.officeEnd = _ticketHm_(o.officeEnd, d.officeEnd);
+  if (_ticketMin_(out.officeEnd) <= _ticketMin_(out.officeStart)) { out.officeStart = d.officeStart; out.officeEnd = d.officeEnd; }
+  var im = Number(o.inHoursMinutes), om = Number(o.offHoursMinutes);
+  out.inHoursMinutes = (isFinite(im) && im > 0) ? im : d.inHoursMinutes; out.offHoursMinutes = (isFinite(om) && om > 0) ? om : d.offHoursMinutes;
+  var days = Array.isArray(o.officeDays) ? o.officeDays.map(Number).filter(function (x) { return x >= 0 && x <= 6 && x === Math.floor(x); }) : [];
+  out.officeDays = days.length ? days : d.officeDays.slice();
+  Object.keys(o.owners || {}).forEach(function (k) { if (Array.isArray(o.owners[k])) out.owners[k] = o.owners[k].map(String).filter(Boolean); });
+  return out;
+}
+// Hạn xử lý ticket (ms) = lúc tạo + thời hạn của loại (giờ thực). Loại lạ/ngày lỗi → null.
+function _ticketDueMs_(createdMs, type, cfg) {
+  cfg = _ticketCfgNormalize_(cfg); var t = Number(createdMs), h = cfg.dueHours[String(type || '')];
+  return (isFinite(t) && t > 0 && h) ? t + h * 3600000 : null;
+}
+// Tin nhắn lúc msgMs có nằm trong giờ làm việc (giờ VN, đúng ngày làm việc) không.
+function _ticketInOfficeHours_(msgMs, cfg) {
+  cfg = _ticketCfgNormalize_(cfg); var d = new Date(Number(msgMs) + TICKET_VN_OFFSET_MS_);
+  var mins = d.getUTCHours() * 60 + d.getUTCMinutes();
+  return cfg.officeDays.indexOf(d.getUTCDay()) >= 0 && mins >= _ticketMin_(cfg.officeStart) && mins < _ticketMin_(cfg.officeEnd);
+}
+// Hạn trả lời tin (ms): trong giờ → +30 phút; ngoài giờ (từ 17:00, trước 08:00, hoặc ngày không làm việc) → +2 giờ, đều tính từ lúc khách nhắn.
+function _ticketReplyDueMs_(msgMs, cfg) {
+  cfg = _ticketCfgNormalize_(cfg); var t = Number(msgMs); if (!isFinite(t) || t <= 0) return null;
+  return t + (_ticketInOfficeHours_(t, cfg) ? cfg.inHoursMinutes : cfg.offHoursMinutes) * 60000;
+}
+// Trạng thái so với hạn: doneMs (lúc xử lý xong/đã trả lời) hoặc 0 nếu chưa. Trễ → needEscalate = cần báo trưởng phòng.
+function _ticketStatus_(dueMs, nowMs, doneMs) {
+  if (!dueMs) return { state: 'unknown', overdueMinutes: 0, remainingMinutes: 0, needEscalate: false };
+  var end = Number(doneMs) > 0 ? Number(doneMs) : Number(nowMs), diff = Math.round((end - dueMs) / 60000);
+  if (Number(doneMs) > 0) return { state: diff > 0 ? 'done_late' : 'done_ontime', overdueMinutes: Math.max(0, diff), remainingMinutes: 0, needEscalate: false };
+  return diff > 0 ? { state: 'overdue', overdueMinutes: diff, remainingMinutes: 0, needEscalate: true } : { state: 'open', overdueMinutes: 0, remainingMinutes: -diff, needEscalate: false };
+}
+// Người được giao/được báo khi trễ theo loại (cấu hình; chưa chốt → []).
+function _ticketOwners_(type, cfg) { return (_ticketCfgNormalize_(cfg).owners[String(type || '')] || []).slice(); }
+
 // ═══════════════════════════════════════════════════════════════
 //  ĐƠN CRM (bước 1, backend): CRM tự LÊN ĐƠN theo màn "Tạo đơn" của Pancake POS (clip 27/11/2026) và ghi vào sheet RIÊNG "Đơn CRM"
 //  trong file CRM. KHÔNG ghi DT Tổng / OrderData / Pos (saveOrders vẫn TẮT có chủ ý — Duyên đang TEST tính năng này nên tách sheet riêng).
