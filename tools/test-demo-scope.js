@@ -56,12 +56,13 @@ const get = (action, token, extra) => { coreCalls = []; const p = Object.assign(
 // doGet/doPost can cac ham cong khac: gia lap "khong lam gi" de di den nhanh cua minh
 Object.assign(ctx, {
   _adminKeyOk_: () => false, _isSensitiveSettingKey_: () => false, _demoTokenOk_: () => false, _ntlReport_: () => ({}),
-  PLIB_GET_ACTIONS_: {}, MLIB_GET_ACTIONS_: {}, KHD_GET_ACTIONS_: {}, LOYALTY_GET_ACTIONS_: {}, CRM_ORDER_GET_ACTIONS_: {}, TEAMBONUS_GET_ACTIONS_: {}, SPLIT_GET_ACTIONS_: {}, CHAT_GET_ACTIONS_: {},
   _ntlNote_() {}, _enforceCheck_: () => null, _featureGate_: () => null, _ownerGate_: () => null, _scopeGate_: () => null, _scopeListServe_: () => null,
   _cfgGate_: () => null, _usersWriteAuth_: () => ({ ok: true }), _isSensitiveWriteKey_: () => false, _AUDIT_TOKEN_: '',
   demoLogin_: () => jsonOut_({}), webLogin_: () => jsonOut_({}), _secEq_: (a, b) => a === b,
   doPostCore_: () => { postCore = true; return jsonOut_({ ok: true, wrote: true }); }
 });
+// Moi bang action GET theo tinh nang (X_GET_ACTIONS_) ma doGet tham chieu deu gia lap rong: them tinh nang moi khong lam do khung test nay.
+(fn('doGet').match(/\b[A-Z0-9_]+_GET_ACTIONS_\b/g) || []).forEach(n => { if (ctx[n] === undefined) ctx[n] = {}; });
 let postCore = false;
 const post = body => { postCore = false; const r = ctx.doPost({ postData: { contents: JSON.stringify(body) } }); return JSON.parse(r.getContent()); };
 
@@ -101,7 +102,7 @@ coreFixture.cskhDuyenLite = { ok: true, rows: [{ phone: '0911000001' }, { phone:
 r = get('cskhDuyenLite', tokOf('tester'));
 ok(r.rows.length === 1 && r.total === 1 && r.noPhone === 0 && r.noPhoneSample.length === 0, 'cskhDuyenLite: total=so dong da loc, khong lo noPhoneSample');
 // 6) Action khong cho phep: ma GAS, tac vu, hop thu, thao luan...
-['getGasSource', 'ntlReport', 'tasks', 'saveSingle', 'dedupeCare', 'runFollowUpScan', 'audit', 'pkChatInbox', 'getSettings', 'donDaily', 'donPhones', 'staffOverview', 'profileGet', 'notifications'].forEach(a => {
+['getGasSource', 'ntlReport', 'tasks', 'saveSingle', 'dedupeCare', 'runFollowUpScan', 'audit', 'pkChatInbox', 'getSettings', 'donDaily', 'donPhones', 'staffOverview', 'profileGet', 'notifications', 'kpiCommitList'].forEach(a => {
   coreCalls = [];
   const x = get(a, tokOf('tester'));
   ok(!!x.error && coreCalls.length === 0, 'GET ' + a + ': bi chan (' + (x.code || 'can adminKey') + ') va KHONG chay xu ly');
