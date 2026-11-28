@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — WEB CHƯA HIỆN DẤU "ĐÃ XONG" TÍCH Ở PANCAKE AI CHO ĐỢT ĐÃ TẢI VỀ)
+- ĐỀ BÀI Duyên: "làm mục khác không liên quan phiên kia". Chọn lỗi đã báo ở mục "ĐỢT CHIA ĐÃ XOÁ…": web chưa tự hiện dấu tích Pancake cho đợt đã tải. Không đụng menu / thẻ khách / báo cáo / Tạo đơn.
+- ✅ **ĐÃ XONG:** Web cập nhật dấu "đã xong" cho đợt đã có trên máy (js/07 `_assignMergeDone_`, ?v=20261128g), có test.
+- 🔧 **ĐANG LÀM:** Bước 2/2: ghi tài liệu docs/crm-kb/16 + chạy lại kiểm tra.
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên Ctrl+F5 rồi thử: tích ở Pancake, chờ ~15 giây khi đang đồng bộ, xem Data của tôi trên web.
+
 ## 2026-11-27 (phiên Claude) — ZALO AI Ô TÌM GIÁ: GOM SIZE + SỬA CỘT GIÁ/TÊN CÓ DẤU (song song Pancake, quy tắc 08-extension-parity) — XONG (đã push; reload extension Zalo AI, manifest 2026.11.27.1; KHÔNG cần deploy GAS)
 - **Việc:** Duyên bảo "Tiếp" sau khi mình hỏi "làm luôn cho Zalo AI không?" → làm phần song song cho Zalo của bước gom thẻ giá Pancake (`4eb62db`). Kiểm `origin/main` trước: không phiên nào đụng `extension-zalo` → không trùng.
 - **NGUYÊN NHÂN GỐC (Zalo):** `renderPriceRowsZai_` (a) nhận cột giá bằng `/gia|price/i` TRỰC TIẾP trên tiêu đề CÓ DẤU ("Giá thường") → KHÔNG BAO GIỜ khớp → giá hiện lẫn trong các trường khác, là số NGHÌN thô ("6350"); (b) mỗi dòng sheet 1 thẻ lặp đủ Nhóm/Tên/Chất liệu. Zalo là bản đơn giản cũ, KHÔNG phải bản dẫn xuất cơ học của Pancake (không có cột tên/size/chất liệu, không bỏ STT/Khoá, không theo Loại đá).
