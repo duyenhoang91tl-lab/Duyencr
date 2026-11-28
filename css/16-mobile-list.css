@@ -74,3 +74,17 @@
   html body #main-table th.col-lastpos{font-size:10px;}
   html body #main-table th.col-lastpos .th-inner{white-space:normal;flex-wrap:wrap;gap:2px;}
 }
+
+/* ═══ THẺ KHÁCH TRÊN ĐIỆN THOẠI (Duyên 2026-11-28: "danh sách khách dạng thẻ" cho người mới dùng) ═══
+   NGUYÊN NHÂN GỐC: dòng bảng 58px chỉ vừa tên + SĐT, còn CS/tình trạng/nút gọi nằm ngoài màn hình (phải vuốt ngang), người mới không biết có.
+   CÁCH SỬA (chỉ ≤640px): giữ NGUYÊN bảng cuộn ảo + mọi cột (vuốt ngang vẫn thấy hết), nhưng dòng thành "thẻ" cao 88px: cột tên rộng ~2/3 màn hình, thêm dòng thứ 3
+   "CS + 📞 Gọi + 💬 Zalo" (js/02 _cardLineHtml_). Chiều cao 88px PHẢI khớp JS: js/06 _vtRowH_() dùng cùng @media (max-width:640px). Máy tính: .cm-line ẩn, bảng không đổi. */
+.cm-line{display:none;}
+@media (max-width:640px){
+  html body #main-table tbody tr:not(.vspacer){height:88px;}
+  html body #main-table th.col-name,html body #main-table td.col-name{width:262px;min-width:262px;max-width:262px;}
+  html body #main-table td.col-name .cm-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
+  html body #main-table td.col-name .cm-cs{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);}
+  html body #main-table td.col-name .cm-btn{flex:0 0 auto;padding:3px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;}
+  html body #main-table td.col-name .cm-btn:active{background:var(--border);}
+}
