@@ -300,11 +300,11 @@ function _inUserScope(c){
   if (!myNames.length) return false;
   // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
   var _vn = currentUser.viewNames;
-  if (_vn && _vn.length && (currentUser.role === 'cs' || currentUser.role === 'manager')){
+  if (_vn && _vn.length && (currentUser.role === 'cs' || currentUser.role === 'manager') && currentUser.role !== 'demo'){
     if (currentUser._scopeNamesSrc !== _vn || currentUser._scopeNamesBase !== myNames){ currentUser._scopeNamesAll = myNames.concat(_vn); currentUser._scopeNamesSrc = _vn; currentUser._scopeNamesBase = myNames; }
     myNames = currentUser._scopeNamesAll;
   }
-  if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
+  if (currentUser.role === 'cs' || currentUser.role === 'manager' || currentUser.role === 'demo'){   // demo (tai khoan test, 2026-11-27): pham vi = CHI cac sale duoc chon, nhu CS (truoc day roi xuong 'return true' cuoi ham => thay het danh sach). manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
     // (order-level seller, o.cs) — thêm chiều này để hỗ trợ đơn "chia nhiều sale": mỗi sale trong
