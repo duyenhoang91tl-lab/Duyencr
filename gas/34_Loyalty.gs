@@ -77,7 +77,7 @@ var LOYALTY_HEADERS_ = ['key', 'phone', 'type', 'orderId', 'date', 'points', 'am
 var SH_LOYALTY_TIER_ = 'LoyaltyTier';
 var LOYALTY_TIER_HEADERS_ = ['key', 'phone', 'date', 'orderId', 'from', 'to', 'cumulative', 'at'];
 var LOYALTY_GET_ACTIONS_ = { loyaltyGet: 1 };
-var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1 };
+var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1, loyaltyBenefitQuote: 1 };
 function _loyaltyCfg_() { var c = null; try { c = getSetting_('loyaltyConfig'); } catch (e) {} return _loyaltyCfgNormalize_(c); }
 function _loyaltyYmdCell_(v) { if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : _vnYmd_(v); return String(v || '').slice(0, 10); }
 function _loyaltyOrdersOfPhone_(phone, rows) {
@@ -153,6 +153,7 @@ function loyaltyDoGet_(action, p) {
 function loyaltyDoPost_(action, d) {
   try {
     var a = _khoAuth_(d); if (a.err) return a.err;
+    if (action === 'loyaltyBenefitQuote') return loyaltyBenefitQuote_(d);
     if (action === 'loyaltyUndo') return _khoWithLock_(function () { return _loyaltyUndo_(d, a); });
     return _khoWithLock_(function () {
       var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
@@ -256,5 +257,30 @@ function _loyaltyBenefitApply_(items, level, cfg) {
   });
   return { level: level, lines: lines, subtotal: subtotal, discount: discount, afterDiscount: subtotal - discount,
            freeShip: level !== 'none' && subtotal >= cfg.freeShipMin && subtotal > 0 };
+}
+
+// ── Bước 9c-1: BÁO GIÁ QUYỀN LỢI THẺ cho màn Tạo đơn (POST loyaltyBenefitQuote) — CHỈ ĐỌC, không ghi gì ──
+// Màn Tạo đơn gọi action này theo SĐT + danh sách sản phẩm, rồi TỰ ĐIỀN giảm % từng dòng + ô Miễn ship. crmOrderSave KHÔNG đổi (vẫn tin số sale nhập như trước).
+// Lịch sử xét thẻ = đơn POS hợp lệ (không Hủy/Hoàn) + đơn CRM đã xác nhận / đang giao / đã giao của chính SĐT đó (đơn CRM 'Mới' chưa tính vì có thể bị hủy).
+var LOYALTY_CRM_VALID_STATUS_ = ['Đã xác nhận', 'Đang giao', 'Đã giao'];
+function _loyaltyBenefitCfg_() { var c = null; try { c = getSetting_('loyaltyBenefits'); } catch (e) {} return _loyaltyBenefitCfgNormalize_(c); }
+function _loyaltyHistoryOf_(phone, posRows, crmRows) {
+  var ph = normPhone_(String(phone || '')), cnt = 0, cum = 0;
+  _loyaltyOrdersOfPhone_(ph, posRows).forEach(function (o) { if (!o.refunded) { cnt++; cum += o.value; } });
+  (crmRows || []).forEach(function (o) {
+    if (normPhone_(String(o.phone || '')) !== ph || LOYALTY_CRM_VALID_STATUS_.indexOf(String(o.status)) < 0) return;
+    var t = Number(o.total) || 0; if (t > 0) { cnt++; cum += t; }
+  });
+  return { orders: cnt, cumulative: cum };
+}
+var LOYALTY_LEVEL_LABEL_ = { none: 'Chưa có thẻ', vip: 'Thẻ VIP (mua lại)', super: 'Thẻ Super VIP' };
+function loyaltyBenefitQuote_(d) {
+  try {
+    var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
+    var items = (d && d.items) || []; if (!items.length || items.length > 200) return jsonOut_({ ok: false, error: 'Danh sach san pham khong hop le.' });
+    var cfg = _loyaltyBenefitCfg_(), h = _loyaltyHistoryOf_(ph, readDonChiTiet_(), _crmReadAll_()), level = _loyaltyBenefitLevel_(h.orders, h.cumulative, cfg);
+    var r = _loyaltyBenefitApply_(items, level, cfg);
+    return jsonOut_({ ok: true, level: level, label: LOYALTY_LEVEL_LABEL_[level], history: h, lines: r.lines, subtotal: r.subtotal, discount: r.discount, afterDiscount: r.afterDiscount, freeShip: r.freeShip, freeShipMin: cfg.freeShipMin });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi bao gia quyen loi the: ' + (err && err.message || err) }); }
 }
 

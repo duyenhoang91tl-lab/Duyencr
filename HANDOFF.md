@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — 11 HẠNG MỤC CRM, MỤC 9: BÁO GIÁ QUYỀN LỢI THẺ CHO MÀN TẠO ĐƠN) — BƯỚC 9c-1 XONG (GAS, CẦN DEPLOY); 9c-2 (web) CHƯA LÀM
+- Cách nối ÍT RỦI RO: server chỉ BÁO GIÁ, màn Tạo đơn tự điền; `crmOrderSave`/`gas/35_CrmOrder.gs` (của phiên khác) KHÔNG đổi, nên không lo giảm 2 lần hay lệch cách tính tiền.
+- ✅ POST `loyaltyBenefitQuote {phone, items:[{name,qty,price}]}` (mọi tài khoản đăng nhập, CHỈ ĐỌC — test khẳng định không ghi sổ điểm): trả `level` (none/vip/super) + `label`, `history {orders, cumulative}`, từng dòng `{pct, discount, rule: full|cap|excluded|none}`, `discount`, `afterDiscount`, `freeShip`, `freeShipMin`. Lịch sử xét thẻ = đơn POS hợp lệ (không Hủy/Hoàn) + đơn CRM **Đã xác nhận / Đang giao / Đã giao** của SĐT (đơn CRM 'Mới' CHƯA tính vì có thể bị hủy; Hoàn/Hủy không tính). Ví dụ test: POS 30tr + CRM 20tr = 50tr → SUPER giảm 10%.
+- 🧪 `tools/test-loyalty-sheet.js` thêm 11 kiểm (khách mới, 1 đơn POS → VIP, POS hoàn không tính, CRM mới/đã giao/hoàn/hủy, ngưỡng 50tr gộp POS+CRM, thiếu SĐT, chưa đăng nhập, chỉ đọc). Thử cho đơn CRM 'Mới' được tính ⇒ test đỏ đúng chỗ. test-loyalty/-benefit/-crm-order/-entrypoints/-ticket-sla vẫn xanh; `split-gas --check` OK 36 file.
+- ⏳ **DUYÊN CẦN LÀM:** deploy GAS (Actions `deploy-gas` xanh) — chưa có giao diện nên chưa thấy gì trên web.
+- [ ] **VIỆC KẾ TIẾP (9c-2, web):** file mới `js/99-e-crm-card-benefit.js` (KHÔNG sửa js/99-d-crm-order.js của phiên khác ngoài việc gọi API công khai `_co`): trong màn ➕ Tạo đơn, khi có SĐT + sản phẩm → gọi `loyaltyBenefitQuote`, hiện 1 dòng ngắn "Thẻ VIP: giảm 5% · miễn ship" + nút "Áp dụng" điền `discType:'pct'/discValue` từng dòng và tick Miễn ship. LƯU Ý Duyên đã dặn CRM KHÔNG thêm các dòng chỉ dẫn dài → nhãn ngắn thôi. Sau đó hiện thẻ ở khối "Hạng & điểm" (hồ sơ khách). Rồi 7b hoa hồng chốt kỳ 1–5 + trừ đơn hoàn kỳ sau; 8b KPI tự cam kết.
+
 ## 2026-11-28 (phiên Claude — TỔNG QUAN: TÊN NGUỒN KHÁCH / GIAI ĐOẠN BỊ CẮT) — XONG BƯỚC 1/1 (web `js/42`)
 - ĐỀ BÀI Duyên: "ô cột thì ngắn lại, tên dài ra để nhìn được tên mục biểu đồ 'Nguồn khách (đơn Pos)' trong tổng quan; các ô khác cũng nên làm tương tự".
 - NGUYÊN NHÂN GỐC: `_hsBars` (js/42) cho cột tên cố định 120px + nowrap/ellipsis (cắt "Facebook / Phạm…"), thanh cột `flex:1` chiếm hết chỗ còn lại, ô số liệu 92px nên "489 đơn" bị rớt dòng.
