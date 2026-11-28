@@ -160,6 +160,33 @@ function _pkKpiApplyQuickFilter(key){
   _pkLoadKpiReport();
 }
 
+// Phạm vi PHÒNG KINH DOANH (đội Online + Văn phòng) cho "Tỷ lệ chốt chung" của tab Báo cáo KPI Pancake (Duyên yêu cầu 2026-11-21).
+// NGUYÊN NHÂN GỐC: server (GAS) tính tyLeChotChung = Σ đơn ÷ Σ tương tác của MỌI Page, nên tương tác của người ngoài phòng KD
+// (Public API, Duyen Hoang, Kieu Ngoc...) nằm trong mẫu số mà đơn của họ gần như 0 → kéo tỷ lệ chung xuống. Commit 20ba546 chỉ lọc ở Báo cáo A/B.
+// Cách làm: tách bySale (đã có tongTT + donHangForRate từng Sale) thành trong/ngoài phòng KD, tỷ lệ chung = Σ đơn KD ÷ Σ tương tác KD.
+// Người ngoài KD VẪN HIỆN (bảng Theo Sale, nhóm riêng) nhưng không cộng vào tỷ lệ chung. Chưa phân loại ai ở cả 2 nguồn → không lọc (tránh ra trống).
+// Nguồn phân loại: Phân loại Sale theo mốc ngày (_saleChannelOn_ tại ngày cuối kỳ xem), dự phòng nhóm S/O của SaleDirectory (nhom Văn phòng/Online).
+function _pkKdInScope_(row, ymd){
+  if (row && typeof row.kd === 'boolean') return row.kd;   // 2026-11-26: ưu tiên cờ của server (GAS buildKpiReport_ → _srKdMark_), CÙNG nguồn Báo cáo A/B: Online + Văn phòng + Thử việc + Phòng ban Sale, khớp theo NGƯỜI
+  var ch = (typeof _saleChannelOn_ === 'function') ? _saleChannelOn_(row && row.name, ymd || '') : '';
+  if (ch) return ch === 'online' || ch === 'offline' || ch === 'probation';
+  var nh = String((row && row.nhom) || '');
+  return nh === 'Văn phòng' || nh === 'Online' || nh === 'Thử việc';
+}
+function _pkKdSplit_(rows, ymd){
+  rows = rows || [];
+  var anyClassified = rows.some(function(r){ return _pkKdInScope_(r, ymd); });
+  if (!anyClassified) return { kd: rows, out: [], scoped: false };
+  var kd = [], out = [];
+  rows.forEach(function(r){ (_pkKdInScope_(r, ymd) ? kd : out).push(r); });
+  return { kd: kd, out: out, scoped: true };
+}
+function _pkRateOf_(rows){
+  var tt = 0, don = 0;
+  (rows || []).forEach(function(r){ tt += Number(r.tongTT) || 0; don += Number(r.donHangForRate) || 0; });
+  return { tongTT: tt, don: don, rate: tt ? Math.round(don / tt * 1000) / 10 : 0 };
+}
+
 function _pkRenderKpiPancake(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
@@ -216,7 +243,7 @@ function _pkRenderKpiPancake(){
     html += _warnBox('kpi-unmapped-sales', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedSales.length+' tên Nhân viên Pancake chưa khớp Sale CRM (nên đơn/doanh thu của họ đang tính = 0): '+
       rep.unmappedSales.map(function(n){ return esc(n); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
+      ' — vào ☰ Cài đặt team → "🔗 Khớp tên Pancake" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
   }
 
   if (rep.unmappedPages && rep.unmappedPages.length){
@@ -228,12 +255,18 @@ function _pkRenderKpiPancake(){
 
   // ── Tổng quan: tách khối "Kết quả bán hàng" nổi bật (chụp gửi sếp) khỏi khối phễu tương tác ──
   var kpiTbDon = rep.totalDonHang ? Math.round(rep.totalDoanhThu/rep.totalDonHang) : 0;
+  var kdSplit_ = _pkKdSplit_(_pkApplyColFilters(rep.bySale || [], 'sale', _PK_COL_GETTERS.sale), rep.to);
+  var kdAll_ = _pkKdSplit_(rep.bySale || [], rep.to);   // tỷ lệ chung KHÔNG phụ thuộc bộ lọc cột của bảng
+  var kdRate_ = kdAll_.scoped ? _pkRateOf_(kdAll_.kd) : null;
   html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng</div>';
   html += '<div class="kpi-grid" style="margin-bottom:14px">'+
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_pkN(rep.totalDonHang)+'</div><div class="kpi-label"><b>Đơn hàng</b> (DT TỔNG)</div></div>'+
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_dfmtV(rep.totalDoanhThu)+'</div><div class="kpi-label"><b>Doanh thu</b></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_dfmtV(kpiTbDon)+'</div><div class="kpi-label">Trung bình đơn</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ chốt chung</div></div>'+
+    (kdRate_
+      ? '<div class="kpi-card" style="border:1.5px solid #0e7490"><div class="kpi-val" style="color:#0e7490">'+kdRate_.rate+'%</div><div class="kpi-label"><b>Tỷ lệ chốt chung — phòng KD</b> ('+_pkN(kdRate_.don)+' đơn ÷ '+_pkN(kdRate_.tongTT)+' tương tác, chỉ Online + Văn phòng)</div></div>'+
+        '<div class="kpi-card"><div class="kpi-val" style="color:var(--muted)">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ gộp mọi người (cả ngoài phòng KD) — chỉ tham khảo</div></div>'
+      : '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ chốt chung</div></div>')+
   '</div>';
   html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💬 Phễu tương tác Pancake</div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
@@ -333,8 +366,8 @@ function _pkRenderKpiPancake(){
   if (!saleRowsF.length){
     html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">'+(rep.bySale.length?'Không có dòng nào khớp bộ lọc cột đang chọn.':'Chưa có dữ liệu.')+'</td></tr>';
   } else {
-    saleRowsF.forEach(function(s){
-      html += '<tr>'+
+    var saleRowHtml_ = function(s, dim){
+      return '<tr'+(dim?' style="opacity:.75"':'')+'>'+
         '<td style="color:var(--muted);font-size:11px">'+esc(s.maSale||'—')+'</td>'+
         '<td>'+esc(s.name)+(s.mapped?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp tên</span>')+'</td>'+
         '<td>'+(s.nhom ? esc(s.nhom) : '<span style="color:#9a3412;font-size:11px">ngoài danh sách</span>')+'</td>'+
@@ -345,7 +378,26 @@ function _pkRenderKpiPancake(){
         '<td style="text-align:right">'+(s.trungBinhDon?_dfmtV(s.trungBinhDon):'—')+'</td>'+
         '<td style="text-align:right;font-weight:700">'+s.tyLeChot+'%</td>'+
         '</tr>';
-    });
+    };
+    if (!kdSplit_.scoped){
+      saleRowsF.forEach(function(s){ html += saleRowHtml_(s, false); });
+    } else {
+      var sumRowHtml_ = function(label, rows){
+        var tt = 0, sdt = 0, dh = 0, dt = 0, don = 0;
+        rows.forEach(function(r){ tt += Number(r.tongTT)||0; sdt += Number(r.sdtMangVe)||0; dh += Number(r.donHang)||0; dt += Number(r.doanhThu)||0; don += Number(r.donHangForRate)||0; });
+        return '<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--surface2)"><td></td><td>'+label+'</td><td></td>'+
+          '<td style="text-align:right">'+_pkN(tt)+'</td><td style="text-align:right">'+_pkN(sdt)+'</td><td style="text-align:right">'+_pkN(dh)+'</td>'+
+          '<td style="text-align:right">'+_dfmtV(dt)+'</td><td style="text-align:right">'+(dh?_dfmtV(Math.round(dt/dh)):'—')+'</td>'+
+          '<td style="text-align:right">'+(tt ? Math.round(don/tt*1000)/10 : 0)+'%</td></tr>';
+      };
+      kdSplit_.kd.forEach(function(s){ html += saleRowHtml_(s, false); });
+      if (kdSplit_.kd.length) html += sumRowHtml_('Tổng phòng KD (Online + Văn phòng) — tính vào tỷ lệ chung', kdSplit_.kd);
+      if (kdSplit_.out.length){
+        html += '<tr><td colspan="9" style="padding:10px 6px 4px;font-size:11.5px;font-weight:700;color:#9a3412">Ngoài phòng KD — chỉ hiển thị, KHÔNG tính vào tỷ lệ chốt chung</td></tr>';
+        kdSplit_.out.forEach(function(s){ html += saleRowHtml_(s, true); });
+        html += sumRowHtml_('Tổng ngoài phòng KD', kdSplit_.out);
+      }
+    }
   }
   html += '</tbody></table></div>';
 
@@ -1274,7 +1326,7 @@ function _srCachePut_(key, txt){
   if (ks.length > _SR_CACHE_MAX_) { ks.sort(function(a, b){ return _srCache_[a].t - _srCache_[b].t; }); while (ks.length > _SR_CACHE_MAX_) delete _srCache_[ks.shift()]; }
 }
 // Lay TEXT (co cache/dung chung). Tra {txt} khi co du lieu, {err} khi loi mang/HTTP (loi duoc ghi vao lastFetchError boi _srFetch).
-async function _srFetchText_(url, cacheKey, useCache){
+async function _srFetchText_(url, cacheKey, useCache, timeoutMs){
   if (useCache && cacheKey) {
     var hit = _srCache_[cacheKey];
     if (hit && Date.now() - hit.t < _SR_CACHE_TTL_) return { txt: hit.txt, cached: true };
@@ -1282,7 +1334,7 @@ async function _srFetchText_(url, cacheKey, useCache){
   if (cacheKey && _srInflight_[cacheKey]) return _srInflight_[cacheKey];
   var job = (async function(){
     var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
+    var timer = ac ? setTimeout(function(){ ac.abort(); }, timeoutMs > 0 ? timeoutMs : 55000) : null;
     try {
       var r = await fetch(url, { redirect:'follow', signal: ac ? ac.signal : undefined });
       if (timer) clearTimeout(timer);
@@ -1296,7 +1348,8 @@ async function _srFetchText_(url, cacheKey, useCache){
   if (cacheKey) { _srInflight_[cacheKey] = job; var clr = function(){ if (_srInflight_[cacheKey] === job) delete _srInflight_[cacheKey]; }; job.then(clr, clr); }
   return job;
 }
-async function _srFetch(action, params, useCache){
+// timeoutMs (tuy chon): bao cao NANG (G goi salesReportB keo them 30 ngay Pos) can cho lau hon mac dinh 55s; GAS toi da 6 phut va CACHE ket qua 120s nen cho them la dung.
+async function _srFetch(action, params, useCache, timeoutMs){
   if (!gsUrl) return null;
   _srState.lastFetchError = '';
   var sep = gsUrl.includes('?') ? '&' : '?';
@@ -1305,7 +1358,7 @@ async function _srFetch(action, params, useCache){
   var cacheable = !!_SR_CACHE_ACTIONS_[action] && !(params && params.fresh);
   var cacheKey = cacheable ? url : '';
   try{
-    var got = await _srFetchText_(url, cacheKey, useCache === true && cacheable);
+    var got = await _srFetchText_(url, cacheKey, useCache === true && cacheable, timeoutMs);
     if (got.netErr) throw got.netErr;
     if (got.httpErr) {
       _srState.lastFetchError = 'Server trả về lỗi HTTP ' + got.httpErr + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
@@ -1334,7 +1387,7 @@ async function _srFetch(action, params, useCache){
     }
   } catch(e) {
     _srState.lastFetchError = (e && e.name === 'AbortError')
-      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
+      ? 'Yêu cầu quá ' + Math.round((timeoutMs > 0 ? timeoutMs : 55000) / 1000) + ' giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
       : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
     return null;
   }

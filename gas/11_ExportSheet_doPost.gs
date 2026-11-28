@@ -251,6 +251,7 @@ function doPostCore_(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var action = data.action;
+    if (PLIB_POST_ACTIONS_[action] === 1) return plibDoPost_(action, data);   // thu vien san pham
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
@@ -294,6 +295,10 @@ function doPostCore_(e) {
     if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
     if (action === 'tonKhoImport')        return tonKhoImport_(data);
     if (action === 'khoComboSave')        return khoComboSave_(data);
+    if (action === 'comboSave')           return comboSave_(data);
+    if (action === 'comboDelete')         return comboDelete_(data);
+    if (action === 'ctkmComboSave')       return ctkmComboSave_(data);
+    if (action === 'ctkmComboDelete')     return ctkmComboDelete_(data);
     if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
     if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
     if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);
@@ -303,9 +308,10 @@ function doPostCore_(e) {
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
     if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting, _impWho_(data.token));
+    if (action === 'importBaseSource')    return doImportBaseSource_(data.items, data.dryRun, _impWho_(data.token));   // 2026-11-21: cap nhat Kenh ban (cot M) cua Base tu bao cao nguon, khop ma don/ma bo dem
     if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
-    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows, data.daily);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
     if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
@@ -313,6 +319,7 @@ function doPostCore_(e) {
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     if (action === 'saveSaleGroups')      return saveSaleGroups_(data.groups);
+    if (action === 'saveTopSpExclude')    return saveTopSpExclude_(data.list);   // 2026-11-21: danh sach san pham KHONG dua vao Top san pham ban
     if (action === 'closePosMonth')       return jsonOut_(closePosMonth_(data.month, data.force));
     // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
     // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
@@ -321,7 +328,8 @@ function doPostCore_(e) {
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
-    if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
+    if (action === 'saveAssignHistory')   return saveAssignHistoryGuarded_(data);
+    if (action === 'leadAssign')          return leadAssign_(data);
     // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
     if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);

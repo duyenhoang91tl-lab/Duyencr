@@ -41,7 +41,7 @@
       try {
         if (typeof allCustomers === 'undefined' || !allCustomers || !allCustomers.length || !G.posOrdersByPhone || typeof buildCustomers !== 'function') return;
         var idx = {};
-        for (var i = 0; i < allCustomers.length; i++) idx[allCustomers[i].phone] = 1;
+        for (var i = 0; i < allCustomers.length; i++) if (!allCustomers[i].assignOnly) idx[allCustomers[i].phone] = 1;   // khach tam do chia data (js/100): don POS ve thi dung lai de lay ten
         if (Object.keys(posOnlyPhones_(G.posOrdersByPhone, function (ph) { return !!idx[ph]; })).length) buildCustomers();
       } catch (e) { try { console.warn('posCustomers:', e); } catch (e2) {} }
     });

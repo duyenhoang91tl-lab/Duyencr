@@ -41,7 +41,9 @@ r = e.run("priceAsk_('Giá RUBY vòng tay phong thủy')");
 ok(r.found && /3\.100/.test(r.text) && /không có giá riêng cho RUBY/.test(r.text), 'RUBY: bien the khong co gia RUBY thi noi ro');
 r = e.run("priceAsk_('nhẫn bạc trơn bao nhiêu tiền')"); ok(r.found && /450/.test(r.text) && !/Vòng tay/.test(r.text), 'tra dung san pham khac');
 // khong khop du -> goi y ten; khong co gi -> mang rong
-r = e.run("priceAsk_('giá nhẫn')"); ok(r.ok && !r.found && r.suggestions.length === 1 && r.suggestions[0] === 'Nhẫn Bạc Trơn', 'chi 1 tu khoa: khong bao gia vo doan, goi y ten: ' + JSON.stringify(r));
+// Duyen 18/11/2026 DOI THIET KE: hoi gia chi 1 tu ("điếu") phai ra SP nhu "hạt đồng điếu" (truoc day chi goi y ten) — nhung KHONG bia: tu khong co trong bang van found:false
+r = e.run("priceAsk_('giá nhẫn')"); ok(r.ok && r.found && /450/.test(r.text) && /Nhẫn Bạc Trơn/.test(r.text) && !/Vòng tay|Dây chuyền/.test(r.text), 'chi 1 tu khoa khop ro 1 SP: bao gia SP do: ' + JSON.stringify(r));
+r = e.run("priceAsk_('giá xe')"); ok(r.ok && !r.found, 'chi 1 tu khong co trong bang: khong bia gia');
 r = e.run("priceAsk_('giá xe máy')"); ok(r.ok && !r.found && r.suggestions.length === 0, 'khong co san pham: khong goi y bua');
 r = e.run("priceAsk_('   ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
 r = e.run("priceAsk_('" + 'x'.repeat(500) + "')"); ok(r.ok, 'q dai bi cat 200 ky tu, khong loi');
@@ -68,9 +70,10 @@ r = e.run("priceQa_('giá nhẫn bạc trơn')");
 ok(r.ok && r.found && r.text === 'Nhẫn Bạc Trơn size 12 giá 450.000đ ạ.' && r.provider === 'Groq' && /450/.test(r.base) && !r.aiError && aiCalls === 1, 'tim thay -> AI tra loi van ngan: ' + JSON.stringify(r));
 ok(/toi da 3 cau/.test(e.sys) && /BANG GIA CHINH THUC/.test(e.sys) && /450/.test(e.sys) && /KHONG bia gia/.test(e.sys) && !/SAN PHAM:|QUY TRINH CSKH|MAU TIN NHAN/.test(e.sys) && e.msg === 'giá nhẫn bạc trơn', 'prompt rieng: van ngan + bang gia that + cam bia; KHONG keo kien thuc/FAQ cua luong tra loi khach');
 aiCalls = 0; r = e.run("priceQa_('giá xe máy')"); ok(r.ok && !r.found && r.suggestions.length === 0 && aiCalls === 0, 'khong co san pham -> KHONG goi AI (khong ton token, khong co hoi bia)');
-aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && !r.found && r.suggestions[0] === 'Nhẫn Bạc Trơn' && aiCalls === 0, 'chi 1 tu khoa -> goi y ten, khong goi AI');
+aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && r.found && aiCalls === 1 && /450/.test(e.sys) && /Nhẫn Bạc Trơn/.test(e.sys), 'chi 1 tu khoa khop SP -> AI tra loi tu bang gia that (prompt co SP do)');
+aiCalls = 0; r = e.run("priceQa_('giá xe')"); ok(r.ok && !r.found && aiCalls === 0, 'chi 1 tu khong co trong bang -> KHONG goi AI');
 aiMode = 'err'; r = e.run("priceQa_('giá nhẫn bạc trơn')");
-ok(r.ok && r.found && /450/.test(r.text) && /nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
+ok(r.ok && r.found && /450\.000đ/.test(r.text) && !/nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC (da quy ra DONG, 21/11: truoc day hien so nghin tho) thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
 aiMode = 'throw'; r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(r.ok && r.found && /450/.test(r.text) && /mat mang/.test(r.aiError), 'AI nem loi -> van tra gia chinh xac');
 r = e.run("priceQa_('  ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
 e = makeEnv({ cat: [] }); r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(!r.ok && /rong|chua doc/.test(r.error), 'bang gia rong -> bao ro');
@@ -90,7 +93,7 @@ const cctx = { module: { exports: {} }, console, AbortController, setTimeout, cl
   document: { getElementById: el, documentElement: { classList: { contains: () => true } }, querySelectorAll: () => [] }, gsUrl: 'https://script.example/exec',
   fetch: (u, o) => { fetches.push({ u, o }); return fetchImpl(u, o); } };
 vm.createContext(cctx);
-vm.runInContext(fs.readFileSync(path.join(root, 'js/33-pro-profile.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8') + '\nthis.X={proPriceIntent_,proPriceRequest_,proPriceFormat_,proIntent_,proAiSend_,_proDock};', cctx);
+vm.runInContext(fs.readFileSync(path.join(root, 'js/33-pro-profile.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'js/38-pro-dock.js'), 'utf8') + '\nthis.X={proComboImages_,proPriceIntent_,proPriceRequest_,proPriceFormat_,proIntent_,proAiSend_,_proDock};', cctx);
 const X = cctx.X;
 for (const q of ['giá vòng tay phong thủy', 'Bảng giá nhẫn', 'nhẫn này bao nhiêu tiền', 'đơn giá dây chuyền', 'GIÁ?', 'nhiêu tiền vậy']) ok(X.proPriceIntent_(q), 'nhan ra cau hoi gia: ' + q);
 for (const q of ['tóm tắt khách này', 'doanh số kỳ này', 'nên làm gì tiếp', 'ai cần hỗ trợ nhất', 'giao hàng khi nào']) ok(!X.proPriceIntent_(q), 'KHONG phai cau hoi gia: ' + q);
@@ -122,10 +125,52 @@ ok(X.proIntent_('sales', 'tóm tắt doanh số') === 'summary' && X.proIntent_(
   ok(fetches.length === 0 && /Chưa mở khách/.test(log[0].text), 'cau hoi KHACH binh thuong khong bi cuop sang tra gia');
   log = await ask('sales', 'doanh số kỳ này');
   ok(fetches.length === 0, 'cau hoi doanh so khong bi cuop sang tra gia');
+  // ── 2026-11-18 (Duyên: gõ "mặt di lặc" ở tab Doanh số → "chưa hiểu câu này"): câu giống TÊN SẢN PHẨM mà tab không hiểu → thử tra bảng giá dù KHÔNG có chữ "giá" ──
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: TRANG SỨC MẶT CỔ DI LẶC (MẪU V)\n- Giá thường: 14.550' }) });
+  log = await ask('sales', 'mặt di lặc');
+  ok(fetches.length === 1 && /action=priceAsk/.test(fetches[0].u) && log.length === 2 && log[0].text === 'mặt di lặc' && /DI LẶC/.test(log[1].text) && !/chưa hiểu/.test(JSON.stringify(log)) && !D.busy && el('pro-ai-q').value === '', 'Doanh so + "mặt di lặc" (khong chu "giá"): tra bang gia, KHONG bao chua hieu');
+  log = await ask('customer', 'mặt di lặc'); ok(fetches.length === 1 && /DI LẶC/.test(log[1].text), 'Khach (chua mo khach) + "mặt di lặc": cung tra bang gia');
+  log = await ask('leads', 'mặt di lặc'); ok(fetches.length === 1 && /DI LẶC/.test(log[1].text), 'Khach nong + "mặt di lặc": cung tra bang gia');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: false, text: '', suggestions: [] }) });
+  log = await ask('leads', 'bla bla bla xyz');
+  ok(fetches.length === 1 && log.length === 2 && log[0].role === 'user' && /chưa hiểu/.test(log[1].text) && !D.busy, 'khong co SP khop: tra 1 lan roi van bao "chua hieu" cu, khong nhan doi tin hoi');
+  log = await ask('leads', 'nhẫn'); ok(fetches.length === 0, '1 tu: khong tra gia (tranh goi GAS vo ich)');
+  log = await ask('leads', '0912 345 678'); ok(fetches.length === 0, 'so dien thoai: khong tra gia');
+  log = await ask('sales', 'ai cần hỗ trợ nhất'); ok(fetches.length === 0, 'cau doanh so da hieu: khong bi cuop sang tra gia');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Giá bán: 450', unit: 'nghin' }) });
+  // ── 2026-11-18: ẢNH COMBO trong Trợ lý AI khi tra giá ──
+  const CBI = { name: 'Combo <Di Lặc>', code: 'CB9', priceVnd: 1990000, items: [{ name: 'Mặt Di Lặc', qty: 1 }], images: ['https://drive.google.com/thumbnail?id=ABCDEFGHIJKL&sz=w600', 'https://cdn.example.com/b.jpg', 'javascript:alert(1)'] };
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: Mặt Di Lặc\n- Giá thường: 14.550', unit: 'nghin', combos: [CBI, { name: 'Không ảnh', items: [] }] }) });
+  log = await ask('price', 'mặt di lặc');
+  ok(log[1].images && log[1].images.length === 2 && log[1].images[0].name === 'Combo <Di Lặc>' && log[1].images[1].url === 'https://cdn.example.com/b.jpg', 'tra giá: tin bot mang ảnh combo (bỏ link không phải http)');
+  const htmlLog = el('pro-ai-log').innerHTML;
+  ok(htmlLog.includes('<img src="https://drive.google.com/thumbnail?id=ABCDEFGHIJKL&amp;sz=w600"') && htmlLog.includes('Combo &lt;Di Lặc&gt;') && !htmlLog.includes('<Di Lặc>') && !htmlLog.includes('javascript:'), 'hiện dải ảnh + tên combo dưới ảnh, escape HTML, không có link javascript:');
+  log = await ask('sales', 'mặt di lặc');
+  ok(log[1].images && log[1].images.length === 2, 'tab khác (tra giá dự phòng) cũng hiện ảnh combo');
+  fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Giá bán: 450', unit: 'nghin', combos: [] }) });
+  log = await ask('price', 'giá nhẫn'); ok(Array.isArray(log[1].images) && log[1].images.length === 0 && !el('pro-ai-log').innerHTML.includes('pro-ai-imgs'), 'không có combo: không vẽ khung ảnh');
   log = await ask('customer', 'gia han thanh toan');   // co tu "gia" nhung la Y DINH khach? khong — proIntent_ customer ''
   ok(fetches.length === 1, 'tu "gia" ma khong y dinh khac -> tra gia (da biet: chi thay cho cau tro ly "chua hieu")');
   fetchImpl = async () => ({ json: async () => ({ ok: false, error: 'Bang gia (DANH_MUC) dang rong' }) });
   log = await ask('price', 'giá a'); ok(/^⚠ Bang gia/.test(log[1].text) && !D.busy, 'loi backend hien ⚠, khong ket busy');
   D.mode = 'price'; D.log = []; D.busy = true; fetches.length = 0; el('pro-ai-q').value = 'giá x'; await X.proAiSend_(); ok(fetches.length === 0, 'dang ban: khong gui trung');
-  console.log('ALL PRICE-ASK TESTS PASSED');
+  // ── Duyen 17/11/2026: "Lắc cỏ 4 lá" / "Lắc cỏ bốn lá tám bi vàng" khong ra SP du bang gia co "TRANG SỨC LẮC CÓ 4 LÁ" (bang gia that, dong 217-251) ──
+{
+  const R = (ten, cl, ks, g) => ({ 'Nhóm': 'LẮC', 'Tên thương mại': ten, 'Tên sản phẩm': ten, 'Chất liệu': cl, 'Kiểu/Size': ks, 'Giá thường': g });
+  const cat4 = [
+    R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', 'MẢNH', '8.050'), R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', '8 BI VÀNG/ 4 VIÊN ĐÁ', '8.650'), R('TRANG SỨC LẮC CÓ 4 LÁ', 'CÓ CUỐNG', 'XOẮN (NHẢ HẠNH PHÚC)', '9.650'),
+    R('TRANG SỨC LẮC HỒ LY BABY 8 BI VÀNG/ 4 VIÊN ĐÁ', '', '8 BI VÀNG/ 4 VIÊN ĐÁ', '9.950'), R('TRANG SỨC LẮC TỲ HƯU THIÊN LỘC 8 BI VÀNG / 4 VIÊN ĐÁ', 'VÀNG 10K', '8 BI VÀNG/ 4 VIÊN ĐÁ', '9.250'),
+    R('TRANG SỨC LẮC NGỌC TAM HỶ', 'VÀNG 10K', 'LAM THỦY', '9.150'), R('TRANG SỨC LẮC TÚI TIỀN', 'VÀNG 10K', 'MẢNH', '7.550'),
+  ];
+  const e4 = makeEnv({ cat: cat4 });
+  let q = e4.run("priceAsk_('Lắc cỏ 4 lá')");
+  ok(q.ok && q.found && /LẮC CÓ 4 LÁ/.test(q.text) && /8\.650/.test(q.text) && /8\.050/.test(q.text) && !/HỒ LY|NGỌC TAM HỶ|TÚI TIỀN/.test(q.text), '"Lắc cỏ 4 lá" -> dung SP CÓ 4 LÁ, du 3 bien the, khong lan SP khac: ' + JSON.stringify(q).slice(0, 200));
+  q = e4.run("priceAsk_('Lắc cỏ bốn lá tám bi vàng bao nhiêu tiền')");
+  ok(q.found && /LẮC CÓ 4 LÁ/.test(q.text) && /8\.650/.test(q.text) && !/NGỌC TAM HỶ|HỒ LY/.test(q.text), '"bốn lá tám bi vàng": so chu -> so, ra CÓ 4 LÁ (khong ra Hồ Ly/Tam Hỷ): ' + JSON.stringify(q).slice(0, 200));
+  q = e4.run("priceAsk_('giá lắc tỳ hưu thiên lộc')"); ok(q.found && /TỲ HƯU THIÊN LỘC/.test(q.text) && /9\.250/.test(q.text), 'cau hoi cu (ten dai) van ra dung');
+  q = e4.run("priceAsk_('giá lắc')"); ok(q.ok && !q.found, 'chi 1 tu "lac": khong bao gia vo doan');
+  q = e4.run("priceAsk_('lắc ngọc tam hỷ')"); ok(q.found && /NGỌC TAM HỶ/.test(q.text) && /9\.150/.test(q.text), '"tam" khong dau van la Tam Hy (khong bi doi thanh 8)');
+  ok(e4.run("_priceNumWords_('Lắc cỏ BỐN lá, tám bi và mười viên; hai năm')") === 'lắc cỏ 4 lá, 8 bi và 10 viên; hai 5', '_priceNumWords_ chi doi bon/tam/muoi/nam... co dau, khong dung hai/ba');
+}
+console.log('ALL PRICE-ASK TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });

@@ -135,11 +135,36 @@
   let CUSTOM_FIELDS = [];
 
   // ── BUILD PANEL ──
+  // Icon AI = MẶT BÉ CHÓ SAMOYED — copy từ CRM (js/38-pro-dock.js proCatIconSvg_) qua Pancake AI (pkCatSvg_), theo yêu cầu Duyên 18/11/2026
+  // ("đổi icon AI giống CRM"). Trước đó Zalo AI dùng emoji 🤖. Vẽ SVG thuần, không cần file ảnh; blink=false → không chớp mắt.
+  function zaiCatSvg_(px, blink){
+    var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffd6cf', CX = 32, CY = 35;
+    var puffs = [[CX,CY,20.5]];
+    for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
+    function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
+    function eye(cx, tilt){
+      var b = blink ? '<animate attributeName="ry" values="3.6;3.6;0.5;3.6;3.6" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+      return '<ellipse cx="'+cx+'" cy="32.5" rx="3.1" ry="3.6" fill="#2b2420" transform="rotate('+tilt+' '+cx+' 32.5)">'+b+'</ellipse>'
+        + '<circle cx="'+(cx+1.1)+'" cy="31.2" r="1.2" fill="#fff"/>';
+    }
+    function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.2" stroke-linejoin="round"/>'; }
+    var ears = ear('12,27 16,13.5 27,18', '16,22 17,17 21.6,19') + ear('52,27 48,13.5 37,18', '48,22 47,17 42.4,19');
+    var muzzle = '<ellipse cx="32" cy="42" rx="9.5" ry="7" fill="#f6efe6"/>';
+    var nose = '<path d="M29.2 38.6 Q32 37.2 34.8 38.6 Q34 41.6 32 41.8 Q30 41.6 29.2 38.6Z" fill="#2b2420"/><circle cx="31" cy="38.9" r="0.7" fill="#fff" opacity=".7"/>';
+    var smile = '<path d="M32 41.8 L32 43.4 M32 43.4 Q29.6 46.6 26.2 43 M32 43.4 Q34.4 46.6 37.8 43" fill="none" stroke="#5a4a42" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    var tongue = '<path d="M29.8 45.4 Q32 52 34.2 45.4 Q32 46.6 29.8 45.4Z" fill="#ff8fa6" stroke="#e5637f" stroke-width=".8" stroke-linejoin="round"/><path d="M32 46.2 L32 49" stroke="#e5637f" stroke-width=".7" stroke-linecap="round"/>';
+    var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle class="zai-cat-ant" cx="32" cy="59.8" r="3" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="58.8" r="0.9" fill="#fff"/>';
+    return '<svg class="zai-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
+      + ears + circles(OUT, 1.2) + circles(FUR, 0)
+      + '<ellipse cx="14.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/><ellipse cx="49.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/>'
+      + muzzle + eye(23, -8) + eye(41, 8) + nose + smile + tongue + collar + '</svg>';
+  }
+
   function buildPanel() {
     if (document.getElementById('ome-zai-panel')) return;
 
     const toggle = document.createElement('button');
-    toggle.id = 'ome-zai-toggle'; toggle.title = 'Duyên AI'; toggle.textContent = '🤖 AI';
+    toggle.id = 'ome-zai-toggle'; toggle.title = 'Duyên AI'; toggle.innerHTML = zaiCatSvg_(34, false);
     toggle.addEventListener('click', togglePanel);
     document.body.appendChild(toggle);
 
@@ -149,7 +174,7 @@
     // Header
     const hdr = document.createElement('div');
     hdr.className = 'zai-hdr';
-    hdr.innerHTML = `<div style="flex:1"><div class="zai-hdr-title">🤖 Duyên AI <span style="font-size:9px;font-weight:600;opacity:.85">Ver 14.06.12.7.26</span></div><div class="zai-hdr-sub">Tra cứu & gợi ý phản hồi khách</div></div>`;
+    hdr.innerHTML = `<div style="flex:1"><div class="zai-hdr-title" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:24px;height:24px;align-items:center">${zaiCatSvg_(24, false)}</span>Duyên AI <span style="font-size:9px;font-weight:600;opacity:.85">Ver 14.06.12.7.26</span></div><div class="zai-hdr-sub">Tra cứu & gợi ý phản hồi khách</div></div>`;
     const cfgBtn = document.createElement('button');
     cfgBtn.className = 'zai-cfg-btn'; cfgBtn.id = 'zai-cfg-toggle'; cfgBtn.title = 'Cài đặt'; cfgBtn.textContent = '⚙';
     hdr.appendChild(cfgBtn); panel.appendChild(hdr);
@@ -202,6 +227,9 @@
     csBarHint.id = 'zai-cs-bar-hint';
     csBarHint.style.cssText = 'font-size:10px;color:#15803d;';
     csRow.appendChild(csBarHint);
+    // Nút "🤖 Hỏi AI" nằm ở hàng CS (Duyên yêu cầu 18/11/2026 — giống Pancake AI: luôn hiện cạnh ô CS). Khối giá của Zalo luôn hiện nên không cần mở mục.
+    addEl(csRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
+      title:'Hỏi AI về giá — gõ câu hỏi ở ô Tra cứu giá (vd: giá nhẫn bạc trơn size 12) rồi bấm; trả lời văn ngắn, giá lấy từ bảng giá', textContent:'🤖 Hỏi AI', style:'flex:none;white-space:nowrap;'});
     csBar.appendChild(csRow);
     const nzRow = document.createElement('div');
     nzRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:5px;border-top:1px solid #bbf7d0;padding-top:5px;';
@@ -367,8 +395,6 @@
     addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size...',
       style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
-    addEl(priceRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
-      title:'Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)', textContent:'🤖 Hỏi AI'});
     addEl(priceSearchMode, 'div', {id:'zai-price-ai', style:'display:none;'});
     addEl(priceSearchMode, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
     const priceBuilderMode = addEl(priceWrap, 'div', {id:'zai-price-builder-mode', style:'display:none;'});
@@ -1634,7 +1660,7 @@
   const ZAI_API_ERR = 'Lỗi API';
   function _zaiApiErr_(tag, raw) {
     raw = String(raw || '');
-    if (/GAS_NO_FLAT|GAS_NO_CTKM|Chưa cài đặt URL|Chưa chọn CS|Thiếu link ảnh/i.test(raw)) return { ok: false, error: raw };
+    if (/GAS_NO_FLAT|GAS_NO_CTKM|GAS_NO_COMBO|Chưa cài đặt URL|Chưa chọn CS|Thiếu link ảnh/i.test(raw)) return { ok: false, error: raw };
     try { console.warn('[Zalo AI] ' + ZAI_API_ERR + ' —', tag, raw); } catch (_) {}
     return { ok: false, error: ZAI_API_ERR, errorRaw: raw };
   }
@@ -1656,12 +1682,15 @@
       let url;
       if (type === 'GET_PRICE_FLAT') url = GAS_URL + sep + 'action=priceCatalogFlat';
       else if (type === 'GET_CTKM') url = GAS_URL + sep + 'action=ctkmCatalog';
+      else if (type === 'GET_COMBOS') url = GAS_URL + sep + 'action=comboList';
       else { const q = p?.q || ''; url = GAS_URL + sep + 'action=priceSearch' + (q ? '&q=' + encodeURIComponent(q) : ''); }
       const res = await fetch(url, { redirect: 'follow' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       if (type === 'GET_PRICE_FLAT') { if (!Array.isArray(data.items)) throw new Error('GAS_NO_FLAT'); return { ok: true, data: { items: data.items } }; }
       if (type === 'GET_CTKM') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_CTKM'); return { ok: true, data: { rows: data.rows } }; }
+      // GAS ban cu chua co comboList tra {} (khong co rows) -> bao rieng GAS_NO_COMBO de client an khoi combo, khong bao loi om
+      if (type === 'GET_COMBOS') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_COMBO'); return { ok: true, data: { rows: data.rows } }; }
       return { ok: true, data: { rows: data.rows || [], total: data.total || 0 } };
     } catch (e) { return _zaiApiErr_(type, e && e.message || e); }
   }
@@ -1695,6 +1724,7 @@
     });
   }
     const ZAI_CTKM_TTL_MS = 15 * 60 * 1000;
+  const ZAI_COMBO_TTL_MS = 5 * 60 * 1000;   // combo doi gia/han thuong xuyen hon CTKM -> cache ngan (y het Pancake pkCombos)
 
   const _zaiBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
@@ -1722,6 +1752,10 @@
   let _zaiCtkmRows = null;
 
   let _zaiCtkmLoading = false;
+
+  let _zaiComboRows = null;      // null = chua tai; [] = khong co / GAS cu (an khoi)
+
+  let _zaiComboLoading = false;
 
   let _zaiBld = _zaiBldBlank_();
 
@@ -1755,9 +1789,11 @@
         <div class="zai-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
           <input type="text" id="zaib-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
         <div id="zaib-msg" class="zai-price-loading" style="display:none"></div>
+        <div id="zaib-combo"></div>
         <div id="zaib-dyn"></div>`;
       host.querySelector('#zaib-q').addEventListener('input', (e) => {
         _zaiBld = Object.assign(_zaiBldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        renderBuilderCombosZai_();
         if (_zaiFlatMode === 'live') {
           clearTimeout(_zaiLiveTimer);
           _zaiLiveTimer = setTimeout(() => _zaiLiveSearch_(_zaiBld.q), 350);
@@ -1769,7 +1805,72 @@
     }
     if (_zaiFlatItems === null && !_zaiFlatLoading) loadFlatZai_();
     if (_zaiCtkmRows === null && !_zaiCtkmLoading) loadCtkmZai_();
+    if (_zaiComboRows === null && !_zaiComboLoading) loadCombosZai_();
+    renderBuilderCombosZai_();
     renderBuilderDynZai_();
+  }
+
+  // ── COMBO CÓ SẴN (sheet COMBO, GAS comboList) — y hệt Pancake AI (quy tắc song song): tải combo ĐANG ÁP DỤNG, lọc theo ô gõ tên, "+ Thêm combo" → thêm cả bộ vào giỏ ──
+  function loadCombosZai_() {
+    if (_zaiComboLoading || _zaiComboRows !== null) return;
+    _zaiComboLoading = true;
+    chrome.storage.local.get(['zaiCombos'], (res) => {
+      const c = res && res.zaiCombos;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < ZAI_COMBO_TTL_MS) {
+        _zaiComboRows = c.rows; _zaiComboLoading = false; renderBuilderCombosZai_(); return;
+      }
+      _zaiBldCall_('GET_COMBOS').then((resp) => {
+        _zaiComboLoading = false;
+        // GAS cũ / chưa có sheet / lỗi mạng → coi như KHÔNG có combo (ẩn khối), không chặn luồng lên đơn.
+        _zaiComboRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows.filter((r) => r && r.usable) : [];
+        if (_zaiComboRows.length) { try { chrome.storage.local.set({ zaiCombos: { ts: Date.now(), rows: _zaiComboRows } }); } catch (e) {} }
+        renderBuilderCombosZai_();
+      });
+    });
+  }
+  const _zaiComboVndOf_ = (c) => Number(c.priceVnd) || 0;
+  const _zaiFmtVnd_ = (n) => (Number(n) || 0).toLocaleString('vi-VN') + 'đ';
+  function _zaiComboMatches_(rows, q) {
+    const words = _zaiItemFold_(q).split(' ').filter(Boolean);
+    if (!words.length) return rows;
+    return rows.filter((c) => {
+      const h = _zaiItemFold_([c.code, c.name, c.keywords, c.itemsText].join(' '));
+      return words.every((w) => h.indexOf(w) !== -1);
+    });
+  }
+  function renderBuilderCombosZai_() {
+    const host = document.getElementById('zaib-combo');
+    if (!host) return;
+    if (!Array.isArray(_zaiComboRows) || !_zaiComboRows.length) { host.innerHTML = ''; return; }
+    const hits = _zaiComboMatches_(_zaiComboRows, _zaiBld.q);
+    const MAX = 5;
+    let html = `<div class="zai-builder-ctkm-box"><div class="zai-builder-ctkm-title">🎁 Combo có sẵn (${hits.length}/${_zaiComboRows.length} đang áp dụng${_zaiItemFold_(_zaiBld.q) ? ' — khớp "' + escAttrZai_(_zaiBld.q) + '"' : ''}):</div>`;
+    if (!hits.length) html += '<div class="zai-builder-ctkm-row">Không có combo nào khớp từ khoá.</div>';
+    hits.slice(0, MAX).forEach((c) => {
+      const items = (c.items || []).map((it) => (Number(it.qty) > 1 ? it.qty + ' x ' : '') + it.name + [it.chatLieu, it.size].filter(Boolean).map((v) => ' · ' + v).join('')).join('; ');
+      html += `<div class="zai-builder-ctkm-row"><b>${escAttrZai_(c.name)}</b> — ${escAttrZai_(_zaiFmtVnd_(_zaiComboVndOf_(c)))}${c.statusLabel ? ' · ' + escAttrZai_(c.statusLabel) : ''}<br>${escAttrZai_(items)}${c.note ? '<br><i>' + escAttrZai_(c.note) + '</i>' : ''}<br>` +
+        `<input type="number" min="1" value="1" class="zaib-combo-qty" data-code="${escAttrZai_(c.code)}" style="width:52px" title="Số bộ combo" /> ` +
+        `<button type="button" class="zai-price-addbtn zaib-combo-add" data-code="${escAttrZai_(c.code)}">+ Thêm combo</button></div>`;
+    });
+    if (hits.length > MAX) html += `<div class="zai-builder-ctkm-row">…còn ${hits.length - MAX} combo nữa — gõ thêm ở ô tìm để lọc.</div>`;
+    html += '</div>';
+    host.innerHTML = html;
+    host.querySelectorAll('.zaib-combo-add').forEach((btn) => btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      const combo = _zaiComboRows.find((x) => String(x.code) === code);
+      if (!combo) return;
+      const qEl = Array.from(host.querySelectorAll('.zaib-combo-qty')).find((el) => el.getAttribute('data-code') === code);
+      addComboToCartZai_(combo, Math.max(1, Math.floor(Number(qEl && qEl.value) || 1)));
+    }));
+  }
+  // Thêm cả combo vào giỏ: 1 dòng TIÊU ĐỀ mang GIÁ COMBO (× số bộ) + mỗi món 1 dòng giá 0đ (SL = SL món × số bộ) → tổng đơn = đúng giá combo,
+  // vẫn đủ món để CS chọn chất liệu/size/màu từng món như bình thường.
+  function addComboToCartZai_(combo, qty) {
+    const items = Array.isArray(combo.items) ? combo.items : [];
+    if (!items.length || !(_zaiComboVndOf_(combo) > 0)) { _zaiCartStatus_('⚠ Combo "' + (combo.name || '') + '" thiếu món hoặc giá — kiểm tra sheet COMBO.'); return; }
+    addToCartZai_({ name: '🎁 Combo ' + combo.name + (combo.code ? ' (' + combo.code + ')' : ''), note: 'Gồm ' + items.length + ' món ở các dòng dưới (giá đã tính vào dòng này)', price: _zaiComboVndOf_(combo), qty });
+    items.forEach((it) => addToCartZai_({ name: it.name, note: 'Thuộc combo ' + combo.name, price: 0, chatLieu: it.chatLieu || '', size: it.size || '', qty: Math.max(1, Number(it.qty) || 1) * qty }));
+    _zaiCartStatus_('✅ Đã thêm combo "' + combo.name + '" (' + items.length + ' món) vào đơn.');
   }
 
   function loadFlatZai_() {
@@ -2028,6 +2129,7 @@
       _zaiBld = _zaiBldBlank_();
       const q = document.getElementById('zaib-q'); if (q) q.value = '';
       if (_zaiFlatMode === 'live') _zaiFlatItems = [];
+      renderBuilderCombosZai_();   // ô gõ vừa xoá trắng → danh sách combo về đủ
       renderBuilderDynZai_();
     });
   }
@@ -2754,7 +2856,12 @@
     box.style.display = '';
     const note = (t, cls) => '<div class="' + (cls || 'zai-price-ai-txt') + '">' + escHtml(t) + '</div>';
     if (!GAS_URL) { box.innerHTML = note('Chưa cài đặt URL GAS. Nhấn ⚙.'); return; }
-    if (!q) { box.innerHTML = note('Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).'); return; }
+    if (!q) {
+      box.innerHTML = note('Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).');
+      // Nút ở hàng CS (trên cùng) còn ô hỏi nằm thấp hơn trong panel → cuộn tới + đặt con trỏ vào ô hỏi.
+      const qi = document.getElementById('zai-price-q'); if (qi) { try { qi.scrollIntoView({block:'center'}); qi.focus(); } catch (e) {} }
+      return;
+    }
     const seq = ++_zaiPriceAiSeq;
     box.innerHTML = note('🤖 Đang hỏi AI…');
     let d;

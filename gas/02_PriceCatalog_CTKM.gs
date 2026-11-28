@@ -393,7 +393,22 @@ function _priceAllPrices_(row, stoneFilter) {
   return defaultPrices;
 }
 
-function _priceVariantsForPrompt_(userMsg) {
+// Doi SO VIET CHU CO DAU -> chu so ("cỏ bốn lá" -> "cỏ 4 lá", "tám bi" -> "8 bi") TRUOC khi bo dau, vi bang gia ghi so ("CÓ 4 LÁ", "8 BI VÀNG").
+// Chi doi dang CO DAU (bốn/năm/sáu/bảy/tám/chín/mười/một): dang khong dau de nham ("tam" = Tam Hy, "ba", "hai", "nam") nen giu nguyen.
+function _priceNumWords_(s) {
+  var map = { 'một': '1', 'bốn': '4', 'năm': '5', 'sáu': '6', 'bảy': '7', 'tám': '8', 'chín': '9', 'mười': '10' };
+  return String(s == null ? '' : s).normalize('NFC').toLowerCase().replace(/(^|[^\p{L}])(một|bốn|năm|sáu|bảy|tám|chín|mười)(?=[^\p{L}]|$)/gu, function (m, pre, w) { return pre + map[w]; });
+}
+// NGUYEN NHAN GOC (Duyen 17/11: hoi "Lắc cỏ 4 lá" / "Lắc cỏ bốn lá tám bi vàng" khong ra SP du bang gia co "TRANG SỨC LẮC CÓ 4 LÁ"): bo loc cu bo MOI tu < 3 ky tu ("cỏ","lá","4","bi") va
+// coi "co","la" la tu dung → chi con "lac" → khong du 2 tu khop → khong tim ra; con "tám" khop nham "TAM HỶ". Nay: doi so chu → so, giu tu ngan/so (khop NGUYEN TU), cong diem cum tu lien tiep (bigram/trigram).
+var _PRICE_NOISE_ = ['khach','hoi','gia','bao','nhieu','tien','san','pham','cho','minh','ban','em','anh','chi','oi','the','nao','duoc','khong','voi','nay','mua','can','van','tra','loi','giup','xin','vui','long','cac','hang','shop'];
+function _priceWordHit_(blob, w) { return w.length >= 3 && !/^\d+$/.test(w) ? blob.indexOf(w) !== -1 : (' ' + blob + ' ').indexOf(' ' + w + ' ') !== -1; }
+
+// opts.allowSingle (CHI cac duong HOI GIA chu dong: priceAsk/priceQa/crmAsk withPrices): cho phep cau hoi chi co 1 TU co nghia (>= 3 ky tu, khong phai so) khop ten SP,
+// NHUNG chi khi tu do khop RO (<= 3 san pham khac ten); tu chung nhieu SP (vd "lac") van tra '' -> goi y ten.
+// NGUYEN NHAN GOC (Duyen 18/11/2026: tim "điếu" khong ra, "hạt đồng điếu" lai ra): nguong hit >= 2 (chong bao gia nham) khien cau 1 tu khong bao gio dat -> rot xuong "goi y".
+// KHONG bat cho _buildAISystemPrompt_ (AI chat khach): tin nhan 1 tu cua khach ("vang", "ok") khong duoc keo bang gia vao prompt.
+function _priceVariantsForPrompt_(userMsg, opts) {
   var rows;
   try {
     var cache = CacheService.getScriptCache();
@@ -409,14 +424,18 @@ function _priceVariantsForPrompt_(userMsg) {
   // Loai da khach/sale nhac toi (tu tin nhan, ngu canh, hoac o tick "Loai da" ben Pancake AI
   // extension gui kem duoi dang "Loại đá khách hỏi: SAPHIA/RUBY" trong [KH]) — QUYET DINH
   // cot gia nao duoc dua vao bang duoi day (xem _priceAllPrices_).
-  var stripped = _stripVN_(userMsg);
+  var stripped = _stripVN_(_priceNumWords_(userMsg));
   var stoneFilter = '';
   if (stripped.indexOf('saphia') !== -1) stoneFilter = 'SAPHIA';
   else if (stripped.indexOf('ruby') !== -1) stoneFilter = 'RUBY';
 
-  var toks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-    .filter(function (w) { return w.length >= 3 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
+  var allToks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  var toks = allToks.filter(function (w) { return _PRICE_NOISE_.indexOf(w) === -1; });   // giu ca tu ngan (co, la, bi) va so (4, 8) — khop NGUYEN TU, xem _priceWordHit_
   if (!toks.length) return '';
+  var single = !!(opts && opts.allowSingle) && toks.length === 1 && toks[0].length >= 3 && !/^\d+$/.test(toks[0]);
+  // NGUYEN NHAN GOC (Duyen 18/11/2026: tim "ngu dieu" khong ra "CHARM NGU DIEU MINI MIX", phai go "ngu dieu mini" moi ra): maxNames = 3 cat cung 3 SP dau theo thu tu sheet,
+  // nen khi >3 SP cung diem (deu chua "ngu dieu") cac SP sau bi rot. Duong HOI GIA chu dong (allowSingle) la CS dang tra cuu → cho toi 12 SP; AI chat khach van 3 de prompt gon.
+  var minHit = single ? 1 : 2, maxNames = (opts && opts.allowSingle) ? 12 : 3, extraNames = 0;
 
   // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
   var scored = [];
@@ -427,28 +446,50 @@ function _priceVariantsForPrompt_(userMsg) {
       var nk = _stripVN_(k);
       if (nk.indexOf('ten') !== -1 || nk.indexOf('nhom') !== -1) nameBlob += ' ' + r[k];
     }
-    nameBlob = _stripVN_(nameBlob);
+    nameBlob = _stripVN_(nameBlob).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
     if (!nameBlob.trim()) continue;
     var hit = 0;
-    for (var t = 0; t < toks.length; t++) if (nameBlob.indexOf(toks[t]) !== -1) hit++;
-    if (hit >= 2) scored.push({ row: r, hit: hit, name: nameBlob });
+    for (var t = 0; t < toks.length; t++) if (_priceWordHit_(nameBlob, toks[t])) hit++;
+    if (hit >= minHit) {
+      // cong diem CUM TU LIEN TIEP trong cau hoi (2..4 tu) xuat hien nguyen cum trong ten SP: "lac co 4 la" khop "LAC CO 4 LA" hon "LAC ... 8 BI VANG"
+      var bonus = 0, padded = ' ' + nameBlob + ' ';
+      for (var n = 2; n <= 4; n++) for (var s0 = 0; s0 + n <= allToks.length; s0++) {
+        var ph = allToks.slice(s0, s0 + n);
+        if (ph.some(function (w) { return _PRICE_NOISE_.indexOf(w) !== -1; })) continue;
+        if (padded.indexOf(' ' + ph.join(' ') + ' ') !== -1) bonus += n;
+      }
+      scored.push({ row: r, hit: hit + bonus, name: nameBlob });
+    }
   }
   if (!scored.length) return '';
   scored.sort(function (a, b) { return b.hit - a.hit; });
   var bestHit = scored[0].hit;
+  // 1 TU chi bao gia khi khop RO (<= maxNames san pham khac ten): tu CHUNG nhieu SP ("lac", "vong", "nhan" trong bang nhieu loai) van tra goi y de nhan vien chon, khong bao gia vo doan 3 SP bat ky.
+  if (single) {
+    var distinctNames = {}, nDistinct = 0;
+    for (var d0 = 0; d0 < scored.length; d0++) {
+      var fd = _priceFieldPick_(scored[d0].row, ['ten san pham', 'ten thuong mai']);
+      var kd = _stripVN_(fd && fd.val ? fd.val : scored[d0].name);
+      if (kd && !distinctNames[kd]) { distinctNames[kd] = 1; nDistinct++; }
+    }
+    if (nDistinct > 3) return '';   // 1 tu chung (> 3 SP) van chi goi y chip nhu cu — chi gioi han LIET KE o tren moi nang len 12
+  }
 
   // Lay cac dong diem cao nhat, roi gom theo TEN SAN PHAM chuan hoa de keo ve DU cac bien the
   var topNames = {};
-  for (var s = 0; s < scored.length && Object.keys(topNames).length < 3; s++) {
+  for (var s = 0; s < scored.length; s++) {
     if (scored[s].hit < bestHit) break;
     var f = _priceFieldPick_(scored[s].row, ['ten san pham', 'ten thuong mai']);
-    if (f && f.val) topNames[_stripVN_(f.val)] = String(f.val).trim();
+    if (!f || !f.val) continue;
+    var kf = _stripVN_(f.val);
+    if (topNames[kf]) continue;
+    if (Object.keys(topNames).length < maxNames) topNames[kf] = String(f.val).trim(); else extraNames++;
   }
   if (!Object.keys(topNames).length) return '';
 
   var blocks = [];
   for (var nk2 in topNames) {
-    var variants = [];
+    var variants = [], vobjs = [];
     for (var j = 0; j < rows.length && variants.length < 15; j++) {
       var rr = rows[j];
       var fn = _priceFieldPick_(rr, ['ten san pham', 'ten thuong mai']);
@@ -458,13 +499,16 @@ function _priceVariantsForPrompt_(userMsg) {
       var sz = _priceFieldPick_(rr, ['kieu', 'size']);
       var prices = _priceAllPrices_(rr, stoneFilter);
       if (!prices.length) continue;
+      vobjs.push({ mat: (mat && mat.val) ? String(mat.val) : '', size: (sz && sz.val) ? String(sz.val) : '', prices: prices.slice() });
       variants.push('- Chất liệu: ' + ((mat && mat.val) ? mat.val : '(không ghi)') +
                     ' | Kiểu/Size: ' + ((sz && sz.val) ? sz.val : '(mặc định)') +
                     ' | ' + prices.join(' · '));
     }
-    if (variants.length) blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n'));
+    if (variants.length) { blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n')); if (opts && opts.out) opts.out.push({ name: topNames[nk2], variants: vobjs }); }
   }
   if (!blocks.length) return '';
+  if (opts && opts.out) opts.out.extra = extraNames;
+  if (extraNames > 0) blocks.push('(Còn ' + extraNames + ' sản phẩm khác cũng khớp — gõ thêm từ để thu hẹp, vd tên đầy đủ.)');
   return blocks.join('\n\n');
 }
 
@@ -561,6 +605,406 @@ function readCTKMCatalog_() {
   // duoc TRUOC TIEN, khong phai luot qua ca dong het han moi den dong con dung.
   rows.sort(function(a, b) { return (a.__ctkmExpired ? 1 : 0) - (b.__ctkmExpired ? 1 : 0); });
   return rows;
+}
+
+// ─── COMBO CO SAN (sheet "COMBO" cung file PRICE_SS_ID) ─────────────────────────────────────
+// Yeu cau Duyen 17/11/2026: tao combo co san de tra cuu trong CRM (Tro ly AI "Gia san pham",
+// tab Combo, Pancake AI "Soan don"). KHAC "khoCombo" (tru ton kho) va AIContext 'combo_template' (mau tin nhan).
+// CS sua thang tren Google Sheets HOAC admin sua trong CRM (comboSave/comboDelete) — cung 1 sheet.
+// Cot "San pham": MOI DONG 1 mon, dang "Ten | Chat lieu | Size | SL" (chi Ten bat buoc; SL mac dinh 1;
+// cung nhan "2 x Ten" o dau dong).
+var COMBO_SHEET_NAME = 'COMBO';
+var COMBO_HEADERS = ['Mã combo', 'Tên combo', 'Sản phẩm', 'Giá combo', 'Điều kiện / Ghi chú', 'Từ ngày', 'Đến ngày', 'Từ khóa', 'Hoạt động', 'Ảnh', 'Ship (đ)', 'Freeship', 'CTKM combo'];   // cột 11-13 thêm 18/11/2026: phí ship, freeship (TRUE/FALSE), mã CTKM combo đã tích (cách nhau dấu phẩy)
+var _COMBO_STOP_ = ['combo', 'bo', 'gia', 'bao', 'nhieu', 'cho', 'toi', 'minh', 'hoi', 'xin', 'la', 'cua', 'nao', 'co', 'khong', 'the', 'nhe', 'a', 'va', 'tien', 'vnd', 'dong'];
+
+function _comboParseItems_(text) {
+  var out = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
+    line = String(line).trim();
+    if (!line) return;
+    var qty = 1;
+    var m = line.match(/^(\d{1,3})\s*[xX×]\s*(.+)$/);
+    if (m) { qty = parseInt(m[1], 10); line = m[2]; }
+    var p = line.split('|').map(function (s) { return String(s).trim(); });
+    if (!p[0]) return;
+    if (p.length >= 4 && /^\d{1,3}$/.test(p[3])) qty = parseInt(p[3], 10);
+    if (qty < 1) qty = 1;
+    var vang = String(p[4] || '').match(/^(\d{1,2})\s*k$/i); vang = vang && [10, 14, 18, 24].indexOf(parseInt(vang[1], 10)) >= 0 ? parseInt(vang[1], 10) + 'k' : '';
+    var gia = p[5] ? parseInt(String(p[5]).replace(/[^\d]/g, ''), 10) || 0 : 0;
+    out.push({ name: p[0], chatLieu: p[1] || '', size: p[2] || '', qty: qty, vang: vang, price: gia, gift: /^(1|true|qua|quà)$/i.test(String(p[6] || '').trim()) });
+  });
+  return out;
+}
+function _comboItemsToText_(items) {
+  return (items || []).map(function (it) {
+    var n = String(it && it.name || '').trim();
+    if (!n) return '';
+    var q = parseInt(it.qty, 10); if (!(q >= 1)) q = 1;
+    var base = n + ' | ' + String(it.chatLieu || '').trim() + ' | ' + String(it.size || '').trim() + ' | ' + q;
+    var vg = /^(10|14|18|24)k$/i.test(String(it.vang || '').trim()) ? String(it.vang).trim().toLowerCase() : '', gia = Math.max(0, Math.round(Number(it.price) || 0));
+    // Dong cu (khong vang/gia/qua) giu NGUYEN 4 truong → Pancake/Zalo/tro ly AI cu doc nhu truoc; co them thi ghi 7 truong: ... | SL | Vang | Don gia (dong) | qua
+    return (vg || gia || it.gift) ? base + ' | ' + vg + ' | ' + (gia || '') + ' | ' + (it.gift ? 'qua' : '') : base;
+  }).filter(function (s) { return s; }).join('\n');
+}
+function _comboPriceNum_(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  var d = String(v == null ? '' : v).replace(/[^\d]/g, '');
+  return d ? parseInt(d, 10) : 0;
+}
+// Gia nhap giong cot Gia ban DANH_MUC (nghin dong: 1.299 = 1.299.000d); so >= 100000 coi la dong day du.
+function _comboVnd_(n) { return n > 0 && n < 100000 ? n * 1000 : n; }
+// ANH COMBO (Duyen 2026-11-18): cot 10 'Anh' = 1-4 link anh, moi link 1 dong (hoac cach nhau dau phay/cham phay). Dang nhan: link Drive (/file/d/ID, ?id=ID, uc?export=view&id=ID) hoac link anh http(s) truc tiep.
+// Link Drive doi sang drive.google.com/thumbnail?id=ID&sz=w600 (cung dang CRM da dung de xem truoc anh; file phai chia se 'bat ky ai co link' — anh tai tu CRM len da tu bat). Link thu muc Drive KHONG dung duoc (khong biet anh nao).
+function _comboImageUrls_(text, max) {
+  max = max || 6;   // anh combo toi da 6 (truoc 4), anh qua cua CTKM toi da 2 (truyen max=2)
+  var out = [];
+  String(text == null ? '' : text).split(/[\r\n,;]+/).forEach(function (u) {
+    u = String(u).trim();
+    if (!u || out.length >= max) return;
+    var m = u.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || u.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m) { out.push('https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w600'); return; }
+    if (/^https?:\/\/\S+$/i.test(u) && !/\/folders\//.test(u)) out.push(u);
+  });
+  return out;
+}
+function _comboImageIds_(text) {   // id file Drive trong o Anh (de bat chia se khi luu)
+  var ids = [];
+  String(text == null ? '' : text).split(/[\r\n,;]+/).forEach(function (u) {
+    var m = String(u).match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || String(u).match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m && ids.indexOf(m[1]) < 0) ids.push(m[1]);
+  });
+  return ids;
+}
+function _comboRow_(r, todayYmd, ctkmMap) {
+  var sd = _ctkmParseDate_(r[5]), ed = _ctkmParseDate_(r[6]);
+  var active = !(r[8] === false || String(r[8]).trim().toLowerCase() === 'false' || String(r[8]).trim() === '0' || _stripVN_(r[8]) === 'khong' || _stripVN_(r[8]) === 'tat');
+  var expired = ed ? (_vnYmd_(ed) < todayYmd) : false;
+  var upcoming = (!expired && sd) ? (_vnYmd_(sd) > todayYmd) : false;
+  var label = '';
+  if (!active) label = '⛔ Đã tắt';
+  else if (expired) label = '❌ Đã hết hạn (kết thúc ' + _ctkmFmtDateVN_(ed) + ')';
+  else if (upcoming) label = '⏳ Chưa bắt đầu (từ ' + _ctkmFmtDateVN_(sd) + ')';
+  else if (ed) label = '✅ Còn áp dụng (đến ' + _ctkmFmtDateVN_(ed) + ')';
+  else label = '✅ Đang áp dụng';
+  var itemsText = String(r[2] == null ? '' : r[2]);
+  var o = {
+    code: String(r[0] == null ? '' : r[0]).trim(), name: String(r[1] == null ? '' : r[1]).trim(),
+    items: _comboParseItems_(itemsText), itemsText: itemsText,
+    price: _comboPriceNum_(r[3]), priceVnd: _comboVnd_(_comboPriceNum_(r[3])), priceText: String(r[3] == null ? '' : r[3]).trim(),
+    note: String(r[4] == null ? '' : r[4]), start: sd ? _vnYmd_(sd) : '', end: ed ? _vnYmd_(ed) : '',
+    keywords: String(r[7] == null ? '' : r[7]), active: active, expired: expired, upcoming: upcoming,
+    imagesText: String(r[9] == null ? '' : r[9]), images: _comboImageUrls_(r[9]),
+    usable: active && !expired && !upcoming, statusLabel: label
+  };
+  return _comboPricing_(o, r, ctkmMap);
+}
+// Ship / freeship / CTKM combo da tich → tinh: giam (tong cac CTKM 'giam'), gia sau giam, tong (+ship), qua tang. Gia combo (priceVnd) = gia truoc giam (thuong = tong gia niem yet cac dong, admin bam 'Dung tong').
+function _comboBool_(v) { return v === true || /^(true|1|x|co|có|yes)$/i.test(String(v == null ? '' : v).trim()); }
+function _comboCodes_(v) {
+  var out = [];
+  (Array.isArray(v) ? v : String(v == null ? '' : v).split(/[,;\s]+/)).forEach(function (x) { x = String(x).trim().toUpperCase(); if (x && out.indexOf(x) < 0 && out.length < 10) out.push(x); });
+  return out;
+}
+function _comboPricing_(o, r, ctkmMap) {
+  o.ship = _comboPriceNum_(r[10]); o.freeship = _comboBool_(r[11]); o.ctkmCodes = _comboCodes_(r[12]);
+  o.ctkms = []; o.gifts = []; o.discount = 0;
+  o.ctkmCodes.forEach(function (code) {
+    var c = ctkmMap && ctkmMap[code]; if (!c || !c.active) return;
+    o.ctkms.push(c);
+    if (c.type === 'giam') o.discount += c.amount; else o.gifts.push({ code: c.code, name: c.name, gift: c.gift, images: c.images });
+  });
+  o.listTotal = 0; o.items.forEach(function (it) { if (!it.gift) o.listTotal += (it.price || 0) * (it.qty || 1); });
+  o.finalPrice = Math.max(0, o.priceVnd - o.discount);
+  o.total = o.finalPrice + (o.freeship ? 0 : o.ship);
+  return o;
+}
+function _comboSheet_(create) {
+  var ss = SpreadsheetApp.openById(PRICE_SS_ID), sh = ss.getSheetByName(COMBO_SHEET_NAME);
+  if (!sh && create) {
+    sh = ss.insertSheet(COMBO_SHEET_NAME);
+    sh.getRange(1, 1, 1, COMBO_HEADERS.length).setValues([COMBO_HEADERS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  // Sheet COMBO cu chi co 9 cot: them cot 'Anh' (cot 10) + tieu de, neu khong getRange(…,10 cot) se loi.
+  if (sh) {
+    try {
+      var need = COMBO_HEADERS.length;
+      if (typeof sh.getMaxColumns === 'function' && sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
+      for (var hc = 10; hc <= need; hc++) if (!String(sh.getRange(1, hc, 1, 1).getValues()[0][0] || '').trim()) sh.getRange(1, hc, 1, 1).setValues([[COMBO_HEADERS[hc - 1]]]);   // cot 10..13 co the thieu tren sheet cu
+    } catch (e) {}
+  }
+  return sh;
+}
+// Doc toan bo combo (cot theo VI TRI co dinh = COMBO_HEADERS). Sheet chua co -> tu tao (CS thay ngay de dien).
+function readComboCatalog_() {
+  var sh = _comboSheet_(true);
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, COMBO_HEADERS.length).getValues();
+  var today = _vnYmd_(new Date()), rows = [], cmap = readCtkmComboMap_();
+  vals.forEach(function (r, i) {
+    if (!String(r[0] || '').trim() && !String(r[1] || '').trim()) return;
+    var o = _comboRow_(r, today, cmap); o.row = i + 2;
+    rows.push(o);
+  });
+  rows.sort(function (a, b) { return (a.usable ? 0 : 1) - (b.usable ? 0 : 1); });
+  return rows;
+}
+function _comboTokens_(q) {
+  var s = _stripVN_(_priceNumWords_(q)).replace(/[^a-z0-9\s]/g, ' ');
+  return s.split(/\s+/).filter(function (t) { return t && _COMBO_STOP_.indexOf(t) === -1; });
+}
+// Khop khong dau + doi chu so (bon->4). Moi tu khoa phai trung (ten/ma/tu khoa/san pham/ghi chu); diem cao len truoc.
+// loose=true (hoi gia trong cau dai): chi can khop ~70% tu khoa, de 'lac co bon la tam bi vang' van ra combo.
+function searchCombos_(rows, q, loose) {
+  var toks = _comboTokens_(q);
+  var need = loose ? Math.max(1, Math.ceil(toks.length * 0.7)) : toks.length;
+  if (!toks.length) return rows.slice();
+  var out = [];
+  rows.forEach(function (r) {
+    var head = ' ' + _stripVN_(_priceNumWords_(r.name + ' ' + r.code + ' ' + r.keywords)) + ' ';
+    var body = ' ' + _stripVN_(_priceNumWords_(r.itemsText + ' ' + r.note)) + ' ';
+    var score = 0, hits = 0;
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i];
+      if (head.indexOf(t) !== -1) { score += 3; hits++; } else if (body.indexOf(t) !== -1) { score += 1; hits++; } else if (!loose) return;
+    }
+    if (hits < need) return;
+    out.push({ r: r, s: score + (r.usable ? 0.5 : 0) });
+  });
+  out.sort(function (a, b) { return b.s - a.s; });
+  return out.map(function (x) { return x.r; });
+}
+function comboList_(q) {
+  try {
+    var rows = readComboCatalog_();
+    var m = q ? searchCombos_(rows, q) : rows;
+    return { ok: true, total: rows.length, count: m.length, rows: m.slice(0, 50) };
+  } catch (err) { return { ok: false, error: 'Khong doc duoc sheet COMBO: ' + (err && err.message || err) }; }
+}
+// ── GIA NIEM YET THEO POS cho form tao combo (Duyen 2026-11-18): chon SP tu bang gia, gia niem yet = DON GIA (cot T "Đơn giá") cua don POS GAN NHAT co SP do. ──
+// KHAC _donListPriceTotal_ (chi tra TONG): o day can don gia TUNG san pham de gan vao tung dong combo. Khong doan: so gia phai khop so luong (hoac 1 gia + 1 so luong), sai thi bo dong.
+var POS_PRICE_MAX_ROWS_ = 8000;   // chi quet N dong CUOI sheet "dữ liệu đơn" (don gan nhat nam duoi cung) cho nhanh
+function _donListPriceParts_(rawDonGia, soLuong) {
+  var prices;
+  if (typeof rawDonGia === 'number') prices = [rawDonGia];
+  else {
+    var str = String(rawDonGia == null ? '' : rawDonGia).trim();
+    if (!str) return null;
+    var q0 = String(soLuong == null ? '' : soLuong).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    var parts = str.split(/[;\n\r|]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (parts.length === 1 && q0.length > 1 && str.indexOf(',') !== -1 && !/^\d{1,3}(,\d{3})+$/.test(str)) parts = str.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    prices = parts.map(_donMoneyToken_);
+  }
+  var qs = String(soLuong == null ? '' : soLuong).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!qs.length) qs = ['1'];
+  if (prices.length !== qs.length) return null;
+  for (var i = 0; i < prices.length; i++) if (!isFinite(prices[i]) || prices[i] < 0) return null;
+  return prices;
+}
+// vals = cac dong A:T cua sheet (cu -> moi, nhu getValues). Tra [{n: ten SP tren don, c: ma SP, p: don gia dong, d: 'yyyy-MM-dd'}] — moi (ten + ma) CHI giu don CO NGAY MOI NHAT (ngang ngay thi dong sau thang). Bo don Huy/Hoan.
+function _posLastPricesFromRows_(vals) {
+  var best = {}, lastYmd = '';
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i], ymd = '', raw = r[1];
+    if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw)) ymd = _vnYmd_(raw);
+    else if (raw !== '' && raw != null) { var pd = parseVNDate_(raw); ymd = pd ? _vnYmd_(pd) : ''; }
+    if (ymd) lastYmd = ymd; else ymd = lastYmd;   // dong thieu ngay ke thua ngay dong tren (giong _donConvertRows_)
+    if (!ymd) continue;
+    if (_donHasExcludedStatus_(r[14] ? String(r[14]).trim() : '')) continue;
+    var names = splitMulti_(r[8] ? String(r[8]) : '', ','), codes = splitMulti_(r[9] ? String(r[9]) : '', ';');
+    var prices = _donListPriceParts_(r[19], r[10]);
+    if (!prices || !names.length || names.length !== prices.length) continue;   // lech so luong (ten SP co dau phay...) -> khong doan
+    for (var k = 0; k < names.length; k++) {
+      var nm = String(names[k] || '').trim(); if (!nm || !(prices[k] > 0)) continue;
+      var code = codes.length === names.length ? String(codes[k] || '').trim() : '';
+      var key = _stripVN_(nm) + '|' + code.toLowerCase(), cur = best[key];
+      if (!cur || ymd >= cur.d) best[key] = { n: nm, c: code, p: Math.round(prices[k]), d: ymd };
+    }
+  }
+  return Object.keys(best).map(function (k) { return best[k]; });
+}
+function readPosLastPrices_() {
+  var cached = _cacheGetBig_('pos_last_price_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var sh = getDTSS_().getSheetByName(DON_CHITIET_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow(); if (last < 2) return [];
+  var first = Math.max(2, last - POS_PRICE_MAX_ROWS_ + 1);
+  var vals = sh.getRange(first, 1, last - first + 1, Math.min(Math.max(DON_CHITIET_WIDTH, DON_COL_DONGIA + 1), sh.getMaxColumns())).getValues();
+  var out = _posLastPricesFromRows_(vals);
+  try { _cachePutBig_('pos_last_price_v1', JSON.stringify(out), 600); } catch (e) {}
+  return out;
+}
+function _posWordsOf_(s) { return ' ' + _stripVN_(String(s == null ? '' : s)).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+function _posTokens_(s) { return _posWordsOf_(s).trim().split(' ').filter(Boolean); }
+function _posAllHit_(hay, toks) { if (!toks.length) return false; for (var i = 0; i < toks.length; i++) if (hay.indexOf(' ' + toks[i] + ' ') < 0) return false; return true; }
+// 1 query {t: ten SP, m: ten thuong mai (tuy chon), c: chat lieu, s: size}. Ten (t HOAC m) phai khop HET tu; size (neu co) cung phai khop HET (gia moi size khac nhau, khong tra gia size khac);
+// chat lieu chi cong diem (tren don thuong viet tat: "NG BICH"). Nhieu dong khop → diem cao nhat, bang diem → don moi nhat.
+function _posMatchOne_(list, q) {
+  var tT = _posTokens_(q && q.t), tM = _posTokens_(q && q.m), tC = _posTokens_(q && q.c), tS = _posTokens_(q && q.s);
+  if (!tT.length && !tM.length) return { found: false };
+  var best = null, bs = -1;
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i], hay = _posWordsOf_(e.n + ' ' + (e.c || ''));
+    if (!(_posAllHit_(hay, tT) || _posAllHit_(hay, tM))) continue;
+    if (tS.length && !_posAllHit_(hay, tS)) continue;
+    var sc = 0; tC.forEach(function (t) { if (hay.indexOf(' ' + t + ' ') >= 0) sc++; });
+    sc = tC.length ? sc / tC.length : 0.5;
+    if (sc > bs || (sc === bs && best && e.d > best.d)) { best = e; bs = sc; }
+  }
+  return best ? { found: true, name: best.n, code: best.c, price: best.p, date: best.d } : { found: false };
+}
+// Action GET posPrice&q=<JSON mang [{t,m,c,s}] toi da 40>. Tra { ok, results:[{found,name,code,price(dong),date}] } SONG SONG voi q.
+function posPrice_(qJson) {
+  try {
+    var qs; try { qs = JSON.parse(String(qJson || '[]')); } catch (e) { return { ok: false, error: 'q phai la JSON mang [{t,m,c,s}]' }; }
+    if (!Array.isArray(qs)) return { ok: false, error: 'q phai la JSON mang [{t,m,c,s}]' };
+    var list = readPosLastPrices_();
+    return { ok: true, results: qs.slice(0, 40).map(function (q) { return _posMatchOne_(list, q); }) };
+  } catch (err) { return { ok: false, error: 'Khong doc duoc gia POS: ' + (err && err.message || err) }; }
+}
+// Gia tri luu o cot Anh: mang c.images (hoac chuoi c.imagesText) -> moi link 1 dong, bo dong rong, toi da 4. Link khong hop le (khong phai http/Drive) bi bo.
+function _comboImageUrlsRaw_(c, max) {
+  max = max || 6;
+  var src = Array.isArray(c.images) ? c.images.join('\n') : String(c.imagesText || '');
+  var keep = [];
+  src.split(/[\r\n,;]+/).forEach(function (u) {
+    u = String(u).trim();
+    if (u && keep.length < max && _comboImageUrls_(u).length) keep.push(u);
+  });
+  return keep.join('\n');
+}
+function _comboNormSave_(c) {
+  c = c || {};
+  var name = String(c.name || '').trim();
+  if (!name) return { error: 'Thieu ten combo.' };
+  var items = Array.isArray(c.items) ? c.items : _comboParseItems_(c.itemsText);
+  var text = _comboItemsToText_(items);
+  if (!text) return { error: 'Combo can it nhat 1 san pham.' };
+  var price = _comboPriceNum_(c.price != null ? c.price : c.priceText);
+  if (!(price > 0)) return { error: 'Thieu gia combo (so > 0).' };
+  var sd = c.start ? _ctkmParseDate_(c.start) : null, ed = c.end ? _ctkmParseDate_(c.end) : null;
+  if (c.start && !sd) return { error: 'Ngay bat dau khong hop le.' };
+  if (c.end && !ed) return { error: 'Ngay ket thuc khong hop le.' };
+  if (sd && ed && _vnYmd_(ed) < _vnYmd_(sd)) return { error: 'Ngay ket thuc truoc ngay bat dau.' };
+  return { rec: [String(c.code || '').trim(), name, text, c.priceText ? String(c.priceText).trim() : price, String(c.note || ''),
+    sd ? _vnYmd_(sd) : '', ed ? _vnYmd_(ed) : '', String(c.keywords || ''), c.active === false ? false : true,
+    _comboImageUrlsRaw_(c), Math.max(0, Math.round(_comboPriceNum_(c.ship))) || '', c.freeship === true || _comboBool_(c.freeship), _comboCodes_(c.ctkmCodes != null ? c.ctkmCodes : c.ctkm).join(',')] };
+}
+function comboSave_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc them/sua combo.', code: 'FORBIDDEN' });
+  var n = _comboNormSave_(data && data.combo); if (n.error) return jsonOut_({ error: n.error });
+  return _khoWithLock_(function () {
+    var sh = _comboSheet_(true), last = sh.getLastRow(), row = 0, rec = n.rec, code = rec[0];
+    if (!code) { code = 'CB' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyMMddHHmmss'); rec[0] = code; }
+    if (last >= 2) {
+      var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code.toUpperCase()) { row = j + 2; break; }
+    }
+    var tgt = row || (last + 1);
+    sh.getRange(tgt, 1, 1, COMBO_HEADERS.length).setValues([rec]);
+    _comboImageIds_(rec[9]).forEach(function (id) {   // de CRM/Tro ly AI hien anh: chia se 'bat ky ai co link' (khong duoc quyen thi bo qua)
+      try { DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    });
+    return jsonOut_({ ok: true, code: code, created: !row });
+  });
+}
+function comboDelete_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc xoa combo.', code: 'FORBIDDEN' });
+  var code = String(data && data.code || '').trim();
+  if (!code) return jsonOut_({ error: 'Thieu ma combo.' });
+  return _khoWithLock_(function () {
+    var sh = _comboSheet_(false), last = sh ? sh.getLastRow() : 0;
+    if (last < 2) return jsonOut_({ error: 'Khong tim thay combo.' });
+    var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code.toUpperCase()) { sh.deleteRow(j + 2); return jsonOut_({ ok: true }); }
+    return jsonOut_({ error: 'Khong tim thay combo.' });
+  });
+}
+
+// ── CTKM COMBO tao san (Duyen 2026-11-18): admin tao truoc cac CTKM (giam tien / tang qua kem toi da 2 anh qua), khi tao combo chi viec TICH. Sheet 'CTKM_COMBO' (tu tao). Khac sheet 'CTKM' (van ban tu do, chi de doc). ──
+var CTKMCB_SHEET_NAME = 'CTKM_COMBO';
+var CTKMCB_HEADERS = ['Mã', 'Tên CTKM', 'Loại', 'Giảm (đ)', 'Quà tặng', 'Ảnh quà', 'Hoạt động'];   // Loại: giam | qua
+function _ctkmcbSheet_(create) {
+  var ss = SpreadsheetApp.openById(PRICE_SS_ID), sh = ss.getSheetByName(CTKMCB_SHEET_NAME);
+  if (!sh && create) {
+    sh = ss.insertSheet(CTKMCB_SHEET_NAME);
+    sh.getRange(1, 1, 1, CTKMCB_HEADERS.length).setValues([CTKMCB_HEADERS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _ctkmcbAmount_(v) { var n = _comboPriceNum_(v); return n > 0 && n < 1000 ? n * 1000 : n; }   // 200 = 200k; tu 1000 tro len la dong day du
+function _ctkmcbRow_(r) {
+  var type = _stripVN_(r[2]) === 'qua' ? 'qua' : 'giam';
+  var active = !(r[6] === false || String(r[6]).trim().toLowerCase() === 'false' || String(r[6]).trim() === '0' || _stripVN_(r[6]) === 'khong' || _stripVN_(r[6]) === 'tat');
+  return { code: String(r[0] == null ? '' : r[0]).trim().toUpperCase(), name: String(r[1] == null ? '' : r[1]).trim(), type: type,
+    amount: type === 'giam' ? _ctkmcbAmount_(r[3]) : 0, gift: String(r[4] == null ? '' : r[4]).trim(),
+    imagesText: String(r[5] == null ? '' : r[5]), images: _comboImageUrls_(r[5], 2), active: active };
+}
+function readCtkmComboList_() {
+  var sh = _ctkmcbSheet_(false); if (!sh) return [];
+  var last = sh.getLastRow(); if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, CTKMCB_HEADERS.length).getValues().filter(function (r) { return String(r[0] || '').trim(); }).map(_ctkmcbRow_);
+}
+function readCtkmComboMap_() { var m = {}; try { readCtkmComboList_().forEach(function (c) { m[c.code] = c; }); } catch (e) {} return m; }
+function ctkmComboSave_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc them/sua CTKM combo.', code: 'FORBIDDEN' });
+  var c = (data && data.ctkm) || {}, name = String(c.name || '').trim();
+  if (!name) return jsonOut_({ error: 'Thieu ten CTKM.' });
+  var type = _stripVN_(c.type) === 'qua' ? 'qua' : 'giam', amount = type === 'giam' ? _ctkmcbAmount_(c.amount) : 0, gift = String(c.gift || '').trim();
+  var imgs = type === 'qua' ? _comboImageUrlsRaw_(c, 2) : '';
+  if (type === 'giam' && !(amount > 0)) return jsonOut_({ error: 'CTKM giam tien can so tien giam > 0.' });
+  if (type === 'qua' && !gift && !imgs) return jsonOut_({ error: 'CTKM tang qua can ten qua hoac anh qua.' });
+  return _khoWithLock_(function () {
+    var sh = _ctkmcbSheet_(true), last = sh.getLastRow(), row = 0, code = String(c.code || '').trim().toUpperCase();
+    if (!code) code = 'KM' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyMMddHHmmss');
+    if (last >= 2) { var codes = sh.getRange(2, 1, last - 1, 1).getValues(); for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code) { row = j + 2; break; } }
+    var rec = [code, name, type, amount || '', gift, imgs, c.active === false ? false : true];
+    sh.getRange(row || (last + 1), 1, 1, CTKMCB_HEADERS.length).setValues([rec]);
+    _comboImageIds_(imgs).forEach(function (id) { try { DriveApp.getFileById(id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {} });
+    return jsonOut_({ ok: true, code: code, created: !row });
+  });
+}
+function ctkmComboDelete_(data) {
+  var a = _khoAuth_(data); if (a.err) return a.err;
+  if (a.user.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc xoa CTKM combo.', code: 'FORBIDDEN' });
+  var code = String(data && data.code || '').trim().toUpperCase(); if (!code) return jsonOut_({ error: 'Thieu ma CTKM.' });
+  return _khoWithLock_(function () {
+    var sh = _ctkmcbSheet_(false), last = sh ? sh.getLastRow() : 0; if (last < 2) return jsonOut_({ error: 'Khong tim thay CTKM.' });
+    var codes = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (var j = 0; j < codes.length; j++) if (String(codes[j][0]).trim().toUpperCase() === code) { sh.deleteRow(j + 2); return jsonOut_({ ok: true }); }
+    return jsonOut_({ error: 'Khong tim thay CTKM.' });
+  });
+}
+// ── CHU HIEN THI COMBO theo mau moi (Duyen 2026-11-18). Dung cho tro ly AI / copy. ──
+function _comboMoney_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+function _comboK_(n) { n = Math.round(Number(n) || 0); return n % 1000 === 0 ? (n / 1000) + 'k' : _comboMoney_(n); }
+function _comboNghin_(n) { n = Math.round(Number(n) || 0); return n % 1000 === 0 ? String(n / 1000).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : _comboMoney_(n); }
+function _comboLineName_(it) {   // vang chen NGAY SAU ten, truoc duoi 'SIZE n' neu ten da co (vd 'CHARM BI MAU SO 10 SIZE 3' → '... 10 10k SIZE 3')
+  var name = String(it.name || '').trim(), vang = it.vang ? String(it.vang) : '';
+  if (vang) { var m = name.match(/^(.*?)(\s+size\s*\S+)$/i); name = m ? m[1] + ' ' + vang + m[2] : name + ' ' + vang; }
+  var cl = String(it.chatLieu || '').trim(), sz = String(it.size || '').trim();
+  if (/mặc định|mac dinh/i.test(cl)) cl = ''; if (/mặc định|mac dinh/i.test(sz)) sz = '';
+  var tail = [cl, sz].filter(function (x) { return x && name.toLowerCase().indexOf(x.toLowerCase()) < 0; }).join(' · ');
+  return tail ? name + ' · ' + tail : name;
+}
+function _comboFormatText_(c) {
+  var L = ['🎁 ' + c.name + (c.code ? ' (' + c.code + ')' : '')];
+  L.push('Giá combo: ' + _comboMoney_(c.priceVnd) + (c.discount > 0 ? ' giảm ' + _comboK_(c.discount) + ' còn ' + _comboMoney_(c.finalPrice) : ''));
+  (c.items || []).forEach(function (it) {
+    var q = it.qty || 1, n = _comboLineName_(it);
+    if (it.gift) { L.push('- 🎁 ' + n + (q > 1 ? ' × ' + q : '') + ' (quà tặng)'); return; }
+    L.push('- ' + n + (it.price > 0 ? ' ' + (q > 1 ? _comboNghin_(it.price) + ' × ' + q + ' = ' + _comboNghin_(it.price * q) : _comboNghin_(it.price)) : (q > 1 ? ' × ' + q : '')));
+  });
+  (c.gifts || []).forEach(function (g) { L.push('- 🎁 Quà tặng: ' + (g.gift || g.name)); });
+  if (c.freeship) L.push('- Freeship tổng: ' + _comboMoney_(c.total));
+  else if (c.ship > 0) L.push('- ' + _comboK_(c.ship) + ' ship tổng: ' + _comboMoney_(c.total));
+  return L.join('\n');
 }
 
 // Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)

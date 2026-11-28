@@ -190,9 +190,18 @@ function _splitBhCodes_(codes) {
 //   { status:'ok', total, shares:[{name,frac}], codes, baseRows:n }  — da ghep xong
 //   { status:'gocBiLoai', codes }                                    — moi don goc Base deu Huy/Hoan -> bo don Pos
 //   { status:'khongKhop'|'trungDonGoc', codes, missing:[...] }       — co ma nhung KHONG ghep duoc (fallback Pos)
+//   { status:'ngChuaCapNhat', codes, missing:[...] }                 — moi ma thieu deu la ma NG (kenh nguon) chua cap nhat tren Base -> fallback Pos (The nhan vien), KHONG tinh la loi
 // QUY TAC (Duyen chot 2026-10-21): doanh thu don ghep = TUNG DON GOC Base chia deu cho nguoi tham gia don goc do (nhu cu) + PHAN CON LAI cua don Pos
 // (gia Pos - tong cac don goc, neu > 1.000d) tinh cho sale ghi tren the Pos NEU CO THE (chia deu giua cac sale tren the). Khong co the -> phan du khong tinh (giu nhu cu:
 // total = tong don goc). Phan du am (Pos < tong goc) khong dieu chinh. posVal/theNames = gia tri Pos va ten sale tren the Pos cua don (tuy chon; bo qua = hanh vi cu).
+// Dong Pos 'anh em' (cung SDT + cung bo ma) CHI duoc cong vao so Pos cua don da ghep khi lam GAN tong Base hon; nguoc lai la dong lap -> ghi boQua. Tra true neu da cong. (xem nhanh trungDonGoc o ghepPosPhuByKey)
+function _posSiblingAdd_(h, v) {
+  var cur = (Number(h.pos) || 0) + (Number(h.phu) || 0), base = Number(h.base) || 0;
+  v = Number(v) || 0;
+  if (Math.abs(base - (cur + v)) < Math.abs(base - cur)) { h.phu += v; h.rows++; return true; }
+  h.boQua = (h.boQua || 0) + 1; h.boQuaGia = (h.boQuaGia || 0) + v;
+  return false;
+}
 function _resolveGhepDon_(codes, idx, usedBaseRows, posVal, theNames) {
   if (!codes || !codes.length) return null;
   var picked = [], missing = [], seenRow = {};
@@ -205,7 +214,13 @@ function _resolveGhepDon_(codes, idx, usedBaseRows, posVal, theNames) {
     }
   }
   // Co ma khong tim thay don goc: KHONG ghep 1 phan (se thieu doanh thu) — chia theo Pos va canh bao de kiem tra tay.
-  if (missing.length) return { status: 'khongKhop', codes: codes, missing: missing };
+  // 2026-11-25 (Duyen): ma "NG..." = don KENH NGUON (Base xuat rieng "bao cao kenh nguon"). Neu Duyen CHUA cap nhat bao cao do len Base thi ma NG khong co tren Base
+  // -> day KHONG phai loi ghep: don van tinh theo The Pos (nhan vien tren the) nhu binh thuong (cung ket qua nhu 'khongKhop' — caller roi ve effRow = dong Pos), chi KHONG bao "khong khop".
+  // Chi ap khi TAT CA ma thieu deu la ma NG; thieu them 1 ma thuong -> van 'khongKhop' nhu cu.
+  if (missing.length) {
+    var ngOnlyMissing = missing.every(function(c) { return /^NG\d/.test(String(c || '').replace(/\s+/g, '').toUpperCase()); });   // chuan hoa tai cho (giong _normCounterCode_) de ham van chay doc lap trong test
+    return { status: ngOnlyMissing ? 'ngChuaCapNhat' : 'khongKhop', codes: codes, missing: missing };
+  }
   for (var u = 0; u < picked.length; u++) {
     if (usedBaseRows[picked[u].rowIndex]) return { status: 'trungDonGoc', codes: codes, missing: [] };
   }
@@ -710,7 +725,7 @@ function buildSalesReportB_(filters) {
   // tham). Them 2 bo dem rieng (count) KHONG bi gioi han, tang moi lan bat ke mang vi du co con
   // cho hay khong — dung 2 bo dem nay moi la so that de hien thi/canh bao, 2 mang [] chi de liet
   // ke VI DU (toi da 30 dong) phia sau.
-  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, gocBiLoaiList: [], khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
+  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, gocBiLoaiList: [], khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0, ngChuaCapNhat: [], ngChuaCapNhatCount: 0 };
   var hiddenB_ = _donHiddenChecker_();
   var ovrSaleMap_ = _orderSaleOvrMap_();
   var matched = [];
@@ -736,7 +751,7 @@ function buildSalesReportB_(filters) {
         var candSales = gh.shares.map(function(x) { return x.name; });
         _donSaleNamesFromThe_(rowP.theSale).forEach(function(nm) { if (candSales.indexOf(nm) === -1) candSales.push(nm); });
         var bonusList = _resolveBonusSale_(gh.creators, candSales, aliasMemoB_);
-        var ppKey = normPhone_(rowP.soDienThoai) + '|' + codesByRow[pj].map(_normCounterCode_).sort().join('|'), ppHolder = { phu: 0, rows: 0 };
+        var ppKey = normPhone_(rowP.soDienThoai) + '|' + codesByRow[pj].map(_normCounterCode_).sort().join('|'), ppHolder = { phu: 0, rows: 0, pos: Number(rowP.giaTriSauGiam) || 0, base: Number(gh.total) || 0, boQua: 0, boQuaGia: 0 };   // pos/base: de chi cong dong anh em khi LAM GAN Base hon (xem nhanh trungDonGoc)
         ghepPosPhuByKey[ppKey] = ppHolder;
         effRow = Object.assign({}, rowP, { giaTriPos: rowP.giaTriSauGiam, giaTriSauGiam: gh.total, ghepShares: gh.shares, ghepCodes: gh.codes,
           ghepCreators: gh.creators || [], ghepScale: gh.scale || undefined, ghepDu: gh.remainder || undefined, ghepDuSale: (gh.remainderSales && gh.remainderSales.length) ? gh.remainderSales.join(',') : undefined, ghepBase: gh.baseOrders || [], baseNgayTao: gh.baseNgayTao || '', ghepPosPhu: ppHolder, bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
@@ -747,6 +762,7 @@ function buildSalesReportB_(filters) {
       } else {
         var wInfo = { ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, ghiChu: String(rowP.ghiChu || '').substring(0, 120), maCoDon: gh.codes, maKhongTim: gh.missing };
         if (gh.status === 'khongKhop') { ghepStats.khongKhopCount++; if (ghepStats.khongKhop.length < 30) ghepStats.khongKhop.push(wInfo); }
+        else if (gh.status === 'ngChuaCapNhat') { ghepStats.ngChuaCapNhatCount++; if (ghepStats.ngChuaCapNhat.length < 30) ghepStats.ngChuaCapNhat.push(wInfo); }   // 2026-11-25: don ma NG chua co tren Base -> giu effRow = dong Pos (tinh theo The nhan vien), chi dem rieng, khong coi la loi
         else {
           ghepStats.trungDonGocCount++;
           // NGUYEN NHAN GOC (2026-11-13, don #M47323 ghi chu "62T11 + 79T11/2026": Pos 13.973.000 = 8.123.000 + 5.850.000 = dung tong 2 don Base, nhung bao cao check nguoc van bao lech 5.850.000):
@@ -754,7 +770,14 @@ function buildSalesReportB_(filters) {
           // Bao cao check nguoc so Pos cua RIENG dong 1 voi TONG Base nen luon lech dung bang dong con lai. Nay cong gia tri cac dong 'anh em' (cung SDT + cung bo ma) vao ghepPosPhu cua don da ghep CHI de so sanh o bao cao check nguoc;
           // KHONG doi cach tinh doanh thu (dong anh em van di theo nhanh Pos nhu cu).
           var sibH = ghepPosPhuByKey[normPhone_(rowP.soDienThoai) + '|' + codesByRow[pj].map(_normCounterCode_).sort().join('|')];
-          if (sibH) { sibH.phu += Number(rowP.giaTriSauGiam) || 0; sibH.rows++; wInfo.giaPos = Number(rowP.giaTriSauGiam) || 0; wInfo.gopVaoDonGhep = true; }
+          // NGUYEN NHAN GOC (2026-11-18, bang check nguoc Base Duyen gui: 4 don 'gom 2 dong Pos' co Pos = DUNG GAP DOI Base: 33.450.000 vs 16.725.000, 27.834.000 vs 13.917.000, 20.404.000 vs 10.202.000, 16.200.000 vs 8.100.000 -> Chenh am bang ca don):
+          // quy tac cong dong anh em o tren cong MU QUANG, ke ca khi dong 1 DA bang Base roi (dong 2 chi la ban sao/lap lai cua cung don Pos) nen so Pos bi nhan doi va bao lech gia. Nay CHI cong dong anh em khi no LAM GAN tong Base hon
+          // (|Base - (Pos + phu + dong nay)| < |Base - (Pos + phu)|; vd #M47323: 8.123.000 lech 5.850.000 -> + 5.850.000 = khop => cong). Dong khong lam gan hon thi KHONG cong, chi ghi boQua/boQuaGia de bao cao hien 'bo qua N dong Pos trung'.
+          if (sibH) {
+            var sibV = Number(rowP.giaTriSauGiam) || 0;
+            wInfo.giaPos = sibV;
+            if (_posSiblingAdd_(sibH, sibV)) wInfo.gopVaoDonGhep = true; else wInfo.boQuaTrung = true;
+          }
           if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo);
         }
       }
@@ -1011,12 +1034,12 @@ function buildSalesReportB_(filters) {
     totalGiaTri: totalGiaTri,
     totalCod: totalCod,
     products: productArr,
-    bySale: bySaleArr,
+    bySale: _srKdMark_(bySaleArr, filters),
     bySaleDay: filters.withDaily ? bySaleDay : undefined,
     byTeamSale: byTeamSaleArr,
     byNguon: byNguonArr,
     byMkt: byMktArrB,
-    saleCloseRate: closeSectionsB_.saleCloseRate,
+    saleCloseRate: _srKdMark_(closeSectionsB_.saleCloseRate, filters),
     saleCloseRateFrom: closeSectionsB_.closeFrom,
     saleCloseRateExcluded: closeSectionsB_.closeExcluded || null,
     kenhCloseRate: closeSectionsB_.kenhCloseRate,
@@ -1044,6 +1067,8 @@ function buildSalesReportB_(filters) {
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,
         giaTriPosPhu: (m.ghepPosPhu && m.ghepPosPhu.phu) ? m.ghepPosPhu.phu : undefined,   // tong gia tri cac dong Pos 'anh em' (cung SDT + bo ma, don Pos tach nhieu dong) — chi de bao cao check nguoc Base so Pos = giaTriPos + giaTriPosPhu
         posPhuRows: (m.ghepPosPhu && m.ghepPosPhu.rows) ? m.ghepPosPhu.rows : undefined,
+        posBoQuaRows: (m.ghepPosPhu && m.ghepPosPhu.boQua) ? m.ghepPosPhu.boQua : undefined,   // so dong Pos 'anh em' KHONG cong (khong lam gan Base hon = nghi dong lap)
+        posBoQuaGia: (m.ghepPosPhu && m.ghepPosPhu.boQua) ? m.ghepPosPhu.boQuaGia : undefined,
         saleShares: m.ghepShares ? _cn.shares(m.ghepShares) : undefined,
         ghepBase: m.ghepBase || undefined, // tung don goc Base da khop (dong, ma, ngay, nguoiTao, saleBan, trangThai, giaTri, tinh) — cho Excel check nguoc Base
         saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70

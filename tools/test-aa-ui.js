@@ -4,7 +4,7 @@ const rd=f=>fs.readFileSync(path.join(__dirname,'..','js',f),'utf8');
 const ex=(src,name)=>{const i=src.indexOf('function '+name+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]==='{')d++;else if(src[k]==='}'){d--;if(!d)return src.slice(i,k+1);}}};
 let ok=0,fail=0;const t=(n,v)=>{console.log((v?'OK  ':'FAIL')+' '+n);v?ok++:fail++;};
 const ctx={esc:s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))};vm.createContext(ctx);
-vm.runInContext(ex(rd('14-fn-aasplit.js'),'_aaStatusHtml')+'\n'+ex(rd('03-fn-refreshopendptab.js'),'_csPickList_')+';this.st=_aaStatusHtml;this.pick=_csPickList_;',ctx);
+vm.runInContext(ex(rd('14-fn-aasplit.js'),'_aaStatusHtml')+'\n'+ex(rd('03-fn-refreshopendptab.js'),'_csPickList_')+'\n'+ex(rd('03-fn-refreshopendptab.js'),'_csAccountNames_')+';this.st=_aaStatusHtml;this.pick=_csPickList_;this.acc=_csAccountNames_;',ctx);
 // --- trang thai ---
 t('chua tung chay: bao ro',/Chưa có lần chạy/.test(ctx.st({})));
 let h=ctx.st({lastRun:'2026-10-14',lastBy:'server',lastResult:{date:'2026-10-14',total:0,people:0,short:[{name:'A'}],warn:['Khong chia duoc ca nao: khong KH nao co ngay don trong khoang <x>']}});
@@ -20,6 +20,12 @@ const cust=[{orders:[{cs:'Lan'},{cs:' Hoa '},{cs:''}]},{orders:[{cs:'Lan'}]},{or
 const teams=[{leader:'Minh',members:['Minh','Tuan','']},{leader:'',members:['Lan','Zed']}];
 t('admin: CS trong don + moi thanh vien/truong nhom Team (khong trung, bo rong, sap xep)',JSON.stringify(ctx.pick(cust,teams,true))===JSON.stringify(['Hoa','Lan','Minh','Tuan','Zed']));
 t('khong phai admin: giu hanh vi cu (chi CS trong don)',JSON.stringify(ctx.pick(cust,teams,false))===JSON.stringify(['Hoa','Lan']));
+t('CS moi co tai khoan CRM, chua co don: van chon duoc (khong can la admin)',JSON.stringify(ctx.pick(cust,teams,false,['Bao Ngoc','Lan']))===JSON.stringify(['Bao Ngoc','Hoa','Lan']));
+ctx.accounts=[{role:'cs',name:'Bao Ngoc',username:'ngoc01'},{role:'cs',names:['Thu Ha','TH'],username:'ha'},{role:'cs',name:'Khoa',active:false},{role:'viewer',name:'Xem'},{role:'cs',name:'0987'}];
+ctx._roleBaseOf=r=>r;ctx.currentUser={name:'Moi',role:'cs'};
+t('_csAccountNames_: tai khoan active, khong viewer, khong ten toan so, kem nguoi dang dang nhap',JSON.stringify(ctx.acc().sort())===JSON.stringify(['Bao Ngoc','Moi','Thu Ha']));
+ctx.currentUser={name:'Admin',role:'admin'};
+t('_csAccountNames_: admin dang nhap KHONG bi them ten \"Admin\" vao danh sach CS',ctx.acc().indexOf('Admin')<0);
 t('khong co du lieu -> mang rong, khong loi',ctx.pick(null,null,true).length===0&&ctx.pick([{}],[{}],true).length===0);
 // ===== BO CUC MOI (jsdom nap dung js/14): thu tu khoi, thu gon, tom tat, phieu loc =====
 const {JSDOM}=require('jsdom');

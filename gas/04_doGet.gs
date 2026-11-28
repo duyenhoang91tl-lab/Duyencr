@@ -9,6 +9,7 @@ function doGet(e) {
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
     return _demoClip_(doGetCore_(e), action);
   }
+  if (PLIB_GET_ACTIONS_[action] === 1) return plibDoGet_(action, p);   // thu vien san pham (thu muc anh theo SP/combo): tu kiem token
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
   if (TEAMBONUS_GET_ACTIONS_[action] === 1) return teamBonusDoGet_(action, p);   // thuong phat doi Sale Online/Van phong (Bao cao B): token -> phan quyen
@@ -190,6 +191,10 @@ function doGetCore_(e) {
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
+    if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
+    if (action === 'posPrice') return jsonOut_(posPrice_(e && e.parameter ? e.parameter.q : ''));   // don gia niem yet cua don POS GAN NHAT theo tung SP (form tao combo, js/93)
+    if (action === 'ctkmComboList') return jsonOut_({ ok: true, rows: readCtkmComboList_() });   // CTKM combo tao san (sheet CTKM_COMBO)
+    if (action === 'comboImage') return jsonOut_(comboImage_(e && e.parameter ? e.parameter.id : ''));   // byte anh combo (extension dan vao o chat)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
@@ -383,6 +388,7 @@ function doGetCore_(e) {
       return jsonOut_(resCs);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    if (action === 'topProducts') { try { return jsonOut_(buildTopProducts_(e.parameter || {})); } catch (errTp) { return jsonOut_({ ok: false, error: 'Loi Top san pham: ' + (errTp && errTp.message || errTp) }); } }   // 2026-11-21
     // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
     if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {
@@ -413,6 +419,8 @@ function doGetCore_(e) {
       return jsonOut_(buildCareLeadReport_(fD));
     }
 
+    if (action === 'leadAssignInfo') return leadAssignInfo_(e);   // Truong nhom: team + data duoc chia + tien do nhan vien (can token)
+
     // SUA 2026-10-08: them loc tuy chon theo ?csName= — dung cho Pancake AI (muc "Data duoc chia",
     // xem renderAssignTab_ trong pancake-content.js) de CHI tai ve cac dot chia CUA DUNG 1 CS thay
     // vi toan bo assignHistory (co the rat nang khi nhieu CS/nhieu dot chia cong lai). Khong truyen
@@ -420,7 +428,7 @@ function doGetCore_(e) {
     if (action === 'assign') {
       var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
       var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
-      if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
+      if (csFilterA_) { var csSetA_ = _saleFilterNameSet_([csFilterA_]); var csKeyA_ = {}; Object.keys(csSetA_).forEach(function(k) { csKeyA_[_scopeNameKey_(k)] = 1; }); allAssignH_ = allAssignH_.filter(function(h) { return csSetA_[_normTxt_(h.csName)] || csKeyA_[_scopeNameKey_(h.csName)]; }); }   // KHOP SALE: cac dot chia ghi bang ten khac cua cung 1 CS van ra
       return jsonOut_({ assignHistory: allAssignH_ });
     }
     if (action === 'tasks') {
@@ -454,6 +462,8 @@ function doGetCore_(e) {
     if (action === 'importBatches') return jsonOut_(_impWho_(e && e.parameter && e.parameter.token) ? importBatchesList_() : { error: 'Cần đăng nhập.', code: 'AUTH' });   // OWNER_ONLY_ACTIONS_ da chan nguoi khong phai chu so huu o doGet
     if (action === 'chatViolations') return jsonOut_(cvList_((e && e.parameter) || {}));   // giam sat chat: CHI admin (cvList_ tu kiem)
     if (action === 'profileGet')    return jsonOut_(profileGet_((e && e.parameter) || {}));
+    if (action === 'staffNamesList') return jsonOut_(staffNamesList_((e && e.parameter) || {}));
+    if (action === 'profileNameOptions') return jsonOut_(profileNameOptions_((e && e.parameter) || {}));
     if (action === 'staffOverview') return jsonOut_(staffOverview_((e && e.parameter) || {}));
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
@@ -535,6 +545,8 @@ function doGetCore_(e) {
       return jsonOut_(findDuplicateOrders_(fdoPhone));
     }
     if (action === 'dedupeCare') return dedupeCare_();
+    // ── R5d buoc 1: KHACH TRUNG (CHI DOC) — nhom cac dong CareData cung SDT chuan hoa (0912.../+84912.../84912.../thieu so 0). KHONG sua/xoa gi, KHONG dung toi don hang ──
+    if (action === 'findDuplicateCustomers') return jsonOut_(findDuplicateCustomers_());
     // ── LUU TRU DON CU: xem truoc (dry-run) so dong se chuyen. Can adminKey. &months=6..12 &which=base|pos|both ──
     if (action === 'archivePreview') {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });

@@ -14,4 +14,5 @@ const svg = ctx.f(24, true);
 t('svg hợp lệ', svg.startsWith('<svg') && svg.endsWith('</svg>') && svg.includes('width="24"'));
 t('có chớp mắt khi blink', svg.includes('<animate') && !ctx.f(24, false).includes('<animate'));
 t('không còn class pro-', !svg.includes('pro-cat'));
+t('là mặt Samoyed như CRM: có lưỡi + thẻ tên vàng pk-cat-ant, KHÔNG còn ăng-ten', svg.includes('#ff8fa6') && svg.includes('class="pk-cat-ant"') && !svg.includes('y2="8.6"'));
 console.log(ok + '/' + (ok + bad)); process.exit(bad ? 1 : 0);

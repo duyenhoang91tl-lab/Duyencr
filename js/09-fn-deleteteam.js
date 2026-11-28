@@ -42,9 +42,11 @@ function _vnNorm(x){ return String(x||'').toLowerCase().normalize('NFD').replace
 function _teamComboMatches(teamId, q){
   var t = teams.find(function(x){ return x.id===teamId; }); if(!t) return {matches:[], canNew:false, q:''};
   var inTeam = {}; [t.leader].concat(t.members||[]).forEach(function(m){ if(m) inTeam[m]=1; });
-  var all = _allCSNames();
+  var all = _teamCandidateNames();
   var nq = _vnNorm(q);
-  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n).indexOf(nq)!==-1); });
+  var matches = all.filter(function(n){ return !inTeam[n] && (!nq || _vnNorm(n+' '+(typeof _staffSearchText==='function'?_staffSearchText(n):'')).indexOf(nq)!==-1); });
+  // 1 người nhiều tên (cùng hồ sơ/tài khoản) chỉ hiện 1 dòng — chọn dòng nào addTeamMember cũng thêm đủ các tên cùng người
+  try { matches = _groupNamesByPerson(matches).map(function(g){ return g.primary; }); } catch (eG) {}
   var raw = String(q||'').trim();
   var exists = all.some(function(n){ return _vnNorm(n)===nq; });   // đã có (kể cả đã là thành viên) → không đề nghị tạo mới
   return {matches:matches, canNew: !!raw && !exists, q: raw};
@@ -54,7 +56,7 @@ function _teamComboShow(inp){
   var tid = inp.getAttribute('data-team');
   var r = _teamComboMatches(tid, inp.value);
   var h = r.matches.map(function(n,i){
-    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+'</div>';
+    return '<div class="team-combo-item'+(i===0?' hi':'')+'" data-name="'+esc(n)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,false)">'+esc(n)+(function(){ var d = (typeof _staffDisplayOf==='function') ? _staffDisplayOf(n) : ''; return d && d.toLowerCase()!==String(n).toLowerCase() ? ' <span style="color:var(--muted);font-size:11px">· '+esc(d)+'</span>' : ''; })()+'</div>';
   }).join('');
   if (r.canNew) h += '<div class="team-combo-item team-combo-new'+(!r.matches.length?' hi':'')+'" data-name="'+esc(r.q)+'" onmousedown="event.preventDefault();_teamComboPick(\''+tid+'\',this.dataset.name,true)">＋ Thêm mới “'+esc(r.q)+'”</div>';
   if (!h) h = '<div class="team-combo-empty">Không còn nhân viên nào để thêm</div>';
@@ -144,7 +146,9 @@ async function _pkLoadNameMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap', { redirect:'follow' });
+    // `_t` = chống cache Worker: pancakeNameMap được Worker cache 60s (+SWR tới 240s) và Worker KHÔNG xoá cache khi có POST lưu
+    // → F5 ngay sau khi bấm Lưu nhận lại bản CŨ (nhìn như "chưa lưu"). Khoá cache gồm mọi tham số nên thêm `_t` luôn đi thẳng tới GAS.
+    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.nameMap = d.map || {};
     _pkState.serverNames = d.allNames || [];
@@ -159,7 +163,8 @@ async function _pkLoadPageMap(){
   if (!gsUrl) return;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakePageMap', { redirect:'follow' });
+    // `_t` chống cache Worker (cùng lý do với pancakeNameMap: lưu xong F5 bị trả bản cũ trong 60-240s)
+    var r = await fetch(gsUrl + sep + 'action=pancakePageMap&_t=' + Date.now(), { redirect:'follow' });
     var d = await r.json();
     _pkState.pageMap = d.map || {};
     _pkState.serverPages = d.allPages || [];
@@ -303,11 +308,11 @@ function _pkRenderAll(){
     html += _pkRenderSdtPreviewHtml();
   }
 
-  html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
-    '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
-    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
-    _pkRenderMapTableHtml(isAdmin)+
-  '</details>';
+  // 20/11/2026: phần "Khớp tên Nhân viên Pancake ↔ Sale CRM" đã CHUYỂN sang ☰ Cài đặt team → "🔗 Khớp tên Pancake" (js/67-pancake-namemap-modal.js) — khớp nhân viên là cài đặt nhân sự, không thuộc báo cáo.
+  html += '<div style="margin-top:22px;padding:10px 12px;border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<span>🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM nay nằm ở <b>☰ Cài đặt team → “🔗 Khớp tên Pancake”</b>.</span>'+
+    (isAdmin ? '<button type="button" class="btn sm secondary" onclick="openPancakeNameMapModal()">Mở Khớp tên</button>' : '')+
+  '</div>';
 
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
@@ -668,60 +673,99 @@ function _pkExportTagReport(){
 }
 
 // ── Đọc file Excel (SheetJS đã có sẵn trong trang) ──
+// 2026-11-27: file Pancake "Thống kê tương tác" tải CẢ THÁNG (vd 01/08–31/08) có dòng "Thời gian tải về: 01/08/2026 00:00:00 - 31/08/2026 23:59:59".
+// Trước đây chỉ lấy NGÀY ĐẦU (01/08) làm ngày của cả file → toàn bộ số liệu cả tháng dồn vào 1/8, nên báo cáo tuần/ngày sai và
+// "tỷ lệ chốt chỉ tính trên ngày có dữ liệu Pancake" chỉ đếm đơn Base của đúng ngày 1/8 → TLC tháng 8 sai.
+// Nay: sheet "By user" giữ date = ngày đầu + dateTo = ngày cuối (rỗng nếu file 1 ngày) → server tự rải ra các ngày trong khoảng;
+// sheet "By time" (số liệu THEO NGÀY, cả Page, không tách nhân viên) được đọc thêm vào `daily` để rải cho đúng theo ngày thật.
+function _pkYmdAdd_(ymd, n){ var p = ymd.split('-'); var t = new Date(Date.UTC(+p[0], +p[1]-1, +p[2] + n)); return t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0'); }
+// aoa: mảng dòng của sheet. Trả { from:'YYYY-MM-DD', to:'YYYY-MM-DD' } hoặc null. to = from nếu file chỉ 1 ngày; mốc cuối 00:00:00 là mốc LOẠI TRỪ (01/09 00:00:00 → hết 31/08).
+function _pkHeaderRange_(aoa){
+  var re = /Thời gian tải về:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?(?:\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?)?/;
+  for (var i=0;i<Math.min(aoa.length,10);i++){
+    var m = String(aoa[i][0]||'').normalize('NFC').match(re);
+    if (!m) continue;
+    var pad = function(x){ return String(x).padStart(2,'0'); };
+    var from = m[3]+'-'+pad(m[2])+'-'+pad(m[1]), to = from;
+    if (m[7]){
+      to = m[9]+'-'+pad(m[8])+'-'+pad(m[7]);
+      var midnight = m[10] !== undefined && +m[10] === 0 && +m[11] === 0 && +(m[12]||0) === 0;
+      if (midnight && to > from) to = _pkYmdAdd_(to, -1);
+      if (to < from) to = from;
+    }
+    return { from: from, to: to };
+  }
+  return null;
+}
+// Ô cột "Thời gian" của sheet By time → 'YYYY-MM-DD' (chỉ nhận dạng ngày dd/mm/yyyy hoặc số ngày Excel; dạng giờ "06:00" của file 1 ngày → '').
+function _pkDayCell_(v){
+  if (typeof v === 'number' && v > 30000 && v < 80000){ var t = new Date(Math.round((v-25569)*86400000)); return t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0'); }
+  var m = String(v||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0') : '';
+}
+function _pkParseWorkbook_(wb){
+  var rows = [], daily = [], warnings = [];
+  var num = function(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; };
+  wb.SheetNames.forEach(function(sn){
+    var isUser = /By user$/i.test(sn), isTime = /By time$/i.test(sn);
+    if (!isUser && !isTime) return;
+    var pageIdMatch = sn.match(/^(\d+)/);
+    if (!pageIdMatch) { warnings.push('Không nhận diện được Page ID ở sheet "'+sn+'" — bỏ qua.'); return; }
+    var pageId = pageIdMatch[1];
+    var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+
+    var rg = _pkHeaderRange_(aoa);
+    if (!rg){ if (isUser) warnings.push('Không tìm thấy ngày báo cáo ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+    // Tên Page (dòng "<Tên Page> - <pageId>")
+    var pageName = sn;
+    for (var j=0;j<Math.min(aoa.length,10);j++){
+      var c0 = String(aoa[j][0]||'');
+      if (new RegExp('\\s-\\s*'+pageId+'\\s*$').test(c0)){ // không lấy nhầm dòng "Trang: ..." liệt kê cả 4 page
+        pageName = c0.replace(new RegExp('\\s*-\\s*'+pageId+'\\s*$'), '').trim();
+        break;
+      }
+    }
+
+    // Dòng sub-header (ô thứ 2 = 'KH cũ') → dòng dữ liệu bắt đầu sau đó
+    var headerRow = -1;
+    for (var k=0;k<aoa.length;k++){
+      if (String(aoa[k][1]||'').normalize('NFC').trim() === 'KH cũ'){ headerRow = k; break; } // không đòi ô đầu rỗng: ô "Nhân viên" được gộp 2 dòng nên có file lặp chữ ở dòng này
+    }
+    if (headerRow === -1){ if (isUser) warnings.push('Không nhận diện được dòng tiêu đề cột ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+    for (var r=headerRow+1; r<aoa.length; r++){
+      var row = aoa[r];
+      if (isUser){
+        var nhanVien = String(row[0]||'').trim();
+        if (!nhanVien || nhanVien === 'Tổng TT') continue; // bỏ dòng tổng cuối bảng
+        rows.push({
+          date: rg.from, dateTo: rg.to > rg.from ? rg.to : '', pageId: pageId, pageName: pageName, nhanVien: nhanVien,
+          khCu: num(row[1]), khMoi: num(row[2]), tongTT: num(row[3]),
+          tinNhan: num(row[4]), binhLuan: num(row[5]), hoiThoaiMoi: num(row[6]),
+          dhKhMoi: num(row[7]), dhKhCu: num(row[8]), tongDH: num(row[9])
+        });
+      } else {
+        var day = _pkDayCell_(row[0]);
+        if (!day || day < rg.from || day > rg.to) continue;   // chỉ nhận dòng NGÀY nằm trong khoảng của file
+        var d = { date: day, pageId: pageId, pageName: pageName,
+          khCu: num(row[1]), khMoi: num(row[2]), tongTT: num(row[3]), tinNhan: num(row[4]), binhLuan: num(row[5]), hoiThoaiMoi: num(row[6]),
+          dhKhMoi: num(row[7]), dhKhCu: num(row[8]), tongDH: num(row[9]) };
+        if (d.tongTT > 0 || d.tongDH > 0) daily.push(d);   // ngày trống không cần lưu
+      }
+    }
+  });
+  // By time chỉ có ý nghĩa khi đi kèm By user MỘT KHOẢNG nhiều ngày; file 1 ngày không có dòng ngày nên daily rỗng.
+  return { rows: rows, daily: daily, warnings: warnings };
+}
 function _pkParseFile(file){
   return new Promise(function(resolve, reject){
     var reader = new FileReader();
     reader.onload = function(ev){
       try {
-        var wb = XLSX.read(ev.target.result, {type:'array'});
-        var rows = [], warnings = [];
-        wb.SheetNames.forEach(function(sn){
-          if (!/By user$/i.test(sn)) return; // bỏ qua sheet "By time" (theo giờ, không theo nhân viên)
-          var pageIdMatch = sn.match(/^(\d+)/);
-          if (!pageIdMatch) { warnings.push('Không nhận diện được Page ID ở sheet "'+sn+'" — bỏ qua.'); return; }
-          var pageId = pageIdMatch[1];
-          var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
-
-          // Tìm dòng "Thời gian tải về: DD/MM/YYYY ..." để lấy ngày báo cáo
-          var date = '';
-          for (var i=0;i<Math.min(aoa.length,10);i++){
-            var cell = String(aoa[i][0]||'');
-            var m = cell.match(/Thời gian tải về:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-            if (m){ date = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); break; }
-          }
-          if (!date){ warnings.push('Không tìm thấy ngày báo cáo ở sheet "'+sn+'" — bỏ qua.'); return; }
-
-          // Tìm dòng tên Page (dòng "<Tên Page> - <pageId>")
-          var pageName = sn;
-          for (var j=0;j<Math.min(aoa.length,10);j++){
-            var c0 = String(aoa[j][0]||'');
-            if (new RegExp('\\s-\\s*'+pageId+'\\s*$').test(c0)){ // dòng "<Tên Page> - <pageId>" (không lấy nhầm dòng "Trang: ..." liệt kê cả 4 page)
-              pageName = c0.replace(new RegExp('\\s*-\\s*'+pageId+'\\s*$'), '').trim();
-              break;
-            }
-          }
-
-          // Tìm dòng sub-header (ô thứ 2 = 'KH cũ') để biết dòng dữ liệu bắt đầu từ đâu
-          var headerRow = -1;
-          for (var k=0;k<aoa.length;k++){
-            if (String(aoa[k][1]||'').normalize('NFC').trim() === 'KH cũ'){ headerRow = k; break; } // không đòi ô đầu rỗng: ô "Nhân viên" được gộp 2 dòng nên có file lặp chữ ở dòng này
-          }
-          if (headerRow === -1){ warnings.push('Không nhận diện được dòng tiêu đề cột ở sheet "'+sn+'" — bỏ qua.'); return; }
-
-          for (var r=headerRow+1; r<aoa.length; r++){
-            var row = aoa[r];
-            var nhanVien = String(row[0]||'').trim();
-            if (!nhanVien || nhanVien === 'Tổng TT') continue; // bỏ dòng tổng cuối bảng
-            var num = function(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; };
-            rows.push({
-              date: date, pageId: pageId, pageName: pageName, nhanVien: nhanVien,
-              khCu: num(row[1]), khMoi: num(row[2]), tongTT: num(row[3]),
-              tinNhan: num(row[4]), binhLuan: num(row[5]), hoiThoaiMoi: num(row[6]),
-              dhKhMoi: num(row[7]), dhKhCu: num(row[8]), tongDH: num(row[9])
-            });
-          }
-        });
-        resolve({ rows: rows, warnings: warnings });
+        var res = _pkParseWorkbook_(XLSX.read(ev.target.result, {type:'array'}));
+        res.rows.daily = res.daily;   // gắn theo mảng rows để mọi nơi chuyền it.rows / parsedRows (vd Up dữ liệu ở js/14) tự mang theo daily
+        resolve(res);
       } catch(err){ reject(err); }
     };
     reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
@@ -752,16 +796,22 @@ async function _pkOnFileSelected(input){
 function _pkRenderPreviewHtml(){
   var byDatePage = {};
   _pkState.parsedRows.forEach(function(r){
-    var k = r.date+'|'+r.pageName;
-    if (!byDatePage[k]) byDatePage[k] = { date:r.date, pageName:r.pageName, count:0, tongTT:0, tongDH:0 };
+    var k = r.date+'|'+(r.dateTo||'')+'|'+r.pageName;
+    if (!byDatePage[k]) byDatePage[k] = { date:r.date, dateTo:r.dateTo||'', pageName:r.pageName, count:0, tongTT:0, tongDH:0 };
     byDatePage[k].count++; byDatePage[k].tongTT+=r.tongTT; byDatePage[k].tongDH+=r.tongDH;
   });
   var html = '<div style="border:1px solid var(--border);border-radius:var(--rsm);padding:10px;margin-bottom:10px;background:var(--surface2)">';
   html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Page</th><th style="text-align:right">Số nhân viên</th><th style="text-align:right">Tổng tương tác</th><th style="text-align:right">Tổng ĐH</th></tr></thead><tbody>';
   Object.values(byDatePage).forEach(function(g){
-    html += '<tr><td>'+esc(g.date)+'</td><td>'+esc(g.pageName)+'</td><td style="text-align:right">'+g.count+'</td><td style="text-align:right">'+fmt(g.tongTT)+'</td><td style="text-align:right">'+fmt(g.tongDH)+'</td></tr>';
+    html += '<tr><td>'+esc(g.date)+(g.dateTo?' → '+esc(g.dateTo)+' <span style="font-size:10px;color:var(--muted)">(gộp '+(Math.round((Date.parse(g.dateTo)-Date.parse(g.date))/86400000)+1)+' ngày)</span>':'')+'</td><td>'+esc(g.pageName)+'</td><td style="text-align:right">'+g.count+'</td><td style="text-align:right">'+fmt(g.tongTT)+'</td><td style="text-align:right">'+fmt(g.tongDH)+'</td></tr>';
   });
   html += '</tbody></table>';
+  var _dl = (_pkState.parsedRows && _pkState.parsedRows.daily) || [];
+  if (_pkState.parsedRows.some(function(r){ return r.dateTo; })){
+    html += '<div style="margin-top:8px;font-size:12px;color:var(--muted)">📅 File gộp nhiều ngày: '+(_dl.length
+      ? 'có số liệu <b>từng ngày</b> của '+_dl.length+' dòng Page-ngày (sheet By time) → tỷ lệ chốt xem được theo từng ngày; số theo nhân viên được rải theo đúng nhịp từng ngày đó.'
+      : 'không có số liệu từng ngày → CRM tính <b>gộp cả khoảng</b> và rải đều theo ngày khi xem tuần/ngày (đánh dấu ước tính).')+'</div>';
+  }
 
   if (_pkState.parsedUnmapped.length){
     html += '<div style="margin-top:10px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px">';
@@ -782,7 +832,7 @@ async function _pkUploadToCRM(){
   if (!_pkState.parsedRows.length) return;
   _pkState.uploading = true; _pkRenderAll();
   try {
-    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeStats', rows:_pkState.parsedRows }) });
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeStats', rows:_pkState.parsedRows, daily:(_pkState.parsedRows.daily||[]) }) });
     var d = await res.json();
     if (d.error) throw new Error(d.error);
     toast('✓ Đã lưu '+d.written+' dòng lên CRM.');
@@ -1023,6 +1073,7 @@ async function _pkMapNameInline(pancakeName, saleName){
     toast('✓ Đã khớp "'+pancakeName+'" → "'+(shown||'(bỏ khớp)')+'"');
     _pkState.report = null; // ket qua bao cao cu co the da tinh sai ten -> yeu cau xem lai
     _pkRenderAll();
+    if (typeof _pnmRender === 'function') _pnmRender();   // cửa sổ Cài đặt team → Khớp tên Pancake (js/67) cập nhật ngay
   } catch(e){
     toast('❌ Lỗi khớp tên: ' + e.message);
   }

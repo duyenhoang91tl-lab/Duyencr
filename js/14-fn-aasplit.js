@@ -1269,6 +1269,12 @@ function _applyAuthIdentity(acct){
   // Doi sale Online/Van phong duoc XEM THEM khach/don cua nhom Sale "Quay" + phong CSKH (2026-10-29): may chu tra user.viewNames (_usersForClient_ full).
   // _inUserScope cong cac ten nay vao pham vi; vai tro admin/viewer khong gioi han nen bo qua.
   currentUser.viewNames = (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer' || !Array.isArray(acct.viewNames)) ? [] : acct.viewNames.filter(function(n){ return n && currentUser.names.indexOf(n) === -1; });
+  // Truong nhom bi gioi han thang (2026-11-26): _inUserScope (js/08) doc currentUser.viewMonths. Don POS chi tai san 90 ngay (js/88) -> tai them cho du thang cu nhat.
+  currentUser.viewMonths = (currentUser.role === 'leader' && Array.isArray(acct.viewMonths)) ? acct.viewMonths.slice() : [];
+  if (currentUser.viewMonths.length && typeof posOrdersEnsureDays_ === 'function') {
+    var _oldest = currentUser.viewMonths.slice().sort()[0];
+    try { posOrdersEnsureDays_(Math.ceil((Date.now() - new Date(_oldest + '-01T00:00:00').getTime()) / 86400000) + 1); } catch (eM) {}
+  }
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
     // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.

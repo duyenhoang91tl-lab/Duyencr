@@ -80,5 +80,37 @@ const run = (c) => { vm.runInContext('applyFilters()', c); return c.result; };
   ok(v.ymList.length === 2 && v.ymList[1].yr === 2026 && v.ymList[1].mo === 11, 'ymList them ngay POS 20/11 (khong trung 16/11)');
   ok([...v.csSet].sort().join() === 'a,b,c,e', 'csSet = Base trong khoang + POS trong khoang + careLeads (khong co d)');
   ok(vm.runInContext('posFilterView_', c)({ orders: [], ymList: [] }, [], 'x', 'y') === null, 'khong co don POS -> null');
+  // 10) LOI THAT 17/11 (doi soat: 8/9 khach, thieu C Trang): khach DA CO san trong CRM (khong co don Base ngay 16/11) + applyFilters co CACHE theo chu ky bo loc (khong gom POS).
+  //     Don POS ve sau khi danh sach da duoc dem -> phai xoa cache, neu khong khach cu khong hien.
+  {
+    const trang = { phone: '0387099422', name: 'C Trang', orders: [], ymList: [], csSet: new Set([B, 'thuyha88']) };
+    const mkc = () => {
+      const ctx = { console, Set, Date, Promise, Math, isFinite, parseInt, String, Array, Object, inv: 0, allCustomers: [trang], careLeads: {}, posOrders: undefined, posOrdersByPhone: undefined,
+        document: { getElementById: (id) => ({ 'ymf-date-from': { value: '2026-11-16' }, 'ymf-date-to': { value: '2026-11-30' } }[id] || null) },
+        posOrdersOnChange_: () => {} };
+      vm.createContext(ctx);
+      vm.runInContext(`var _cache = { sig: null, list: null }, result = null;
+        function _invalidateFilterCache(){ inv++; _cache.sig = null; _cache.list = null; }
+        function applyFilters(){ var sig = 'S'; if (_cache.sig === sig && _cache.list) { result = _cache.list; return; }
+          var f = document.getElementById('ymf-date-from').value, t = document.getElementById('ymf-date-to').value;
+          result = allCustomers.filter(function(c){ return c.ymList.some(function(o){ return o.ds && o.ds >= f && o.ds <= t; }) && c.csSet.has('${B}'); });
+          _cache.sig = sig; _cache.list = result; }`, ctx);
+      vm.runInContext(src, ctx);
+      return ctx;
+    };
+    const cc = mkc();
+    vm.runInContext('applyFilters()', cc);
+    ok(vm.runInContext('result', cc).length === 0 && cc.inv === 0, 'truoc khi co don POS: danh sach rong va duoc dem');
+    cc.posOrders = { loadedAt: 111, from: '2026-08-20', to: '2026-11-17', days: 90 };
+    cc.posOrdersByPhone = { '0387099422': [{ ds: '2026-11-16', name: 'C Trang', sales: [B, 'thuyha88'], rev: 2200000, shares: [] }] };
+    vm.runInContext('applyFilters()', cc);
+    ok(vm.runInContext('result', cc).map(x => x.name).join() === 'C Trang', 'don POS ve sau khi da dem -> xoa cache -> khach DA CO san (C Trang) HIEN');
+    ok(cc.inv === 1, 'xoa cache dung 1 lan khi du lieu POS doi (' + cc.inv + ')');
+    vm.runInContext('applyFilters()', cc); vm.runInContext('applyFilters()', cc);
+    ok(cc.inv === 1, 'goi lai nhieu lan khi POS khong doi -> KHONG xoa cache them (van dung duoc cache)');
+    cc.posOrders = { loadedAt: 222, from: '2026-05-01', to: '2026-11-17', days: 200 };   // tai them cua so rong hon
+    vm.runInContext('applyFilters()', cc);
+    ok(cc.inv === 2, 'cua so POS doi (tai them ngay) -> xoa cache lan nua');
+  }
   console.log(fails ? '\n' + fails + ' LOI' : '\nTAT CA DAT'); process.exit(fails ? 1 : 0);
 })();

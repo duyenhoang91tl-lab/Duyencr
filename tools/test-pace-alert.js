@@ -100,21 +100,39 @@ t(!/<img/.test(it[0].text) && /&lt;img/.test(it[0].text), 'tên sale được ES
   t(r.length === 0, 'xem tháng 10 nhưng nhận tin từ 9/11 → không báo (chưa làm trong kỳ đó)');
 }
 
-// ── 4) tỷ lệ chốt ──
-const ppl = [mk('A', 300e6, { tongTT: 100, tyLeChot: 10 }), mk('B', 300e6, { tongTT: 100, tyLeChot: 6 }), mk('C', 300e6, { tongTT: 200, tyLeChot: 9 })];
-t(near(P.paceTeamClose_(ppl), (10 * 100 + 6 * 100 + 9 * 200) / 400), 'TB team gia quyền theo số khách: (10·100+6·100+9·200)/400 = 8,5');
+// ── 4) tỷ lệ chốt: cảnh báo khi THẤP HƠN TB team HOẶC DƯỚI 1% (2 điều kiện độc lập, làm tròn 2 số) ──
+const cl = (n, r, tt) => mk(n, 300e6, { tongTT: tt == null ? 100 : tt, tyLeChot: r });
+const ppl = [cl('A', 1.6), cl('B', 1.2), cl('C', 1.02), cl('D', 0.95), cl('E', 0.6)];   // TB = 5,37/5 = 1,074 → 1,07
+t(near(P.paceTeamClose_(ppl), 1.074), 'TB team gia quyền theo số khách = 1,074 (gần 1,1% thực tế của Duyên)');
 it = P.paceAlertItems_(ppl, R, { today: TD });
-t(it.length === 1 && /8,5%/.test(it[0].text) && /B 6% \(−2,5 điểm\)/.test(plain(it[0].text)) && it[0].tone === 'bad', 'chỉ B (6% < 8,5% − 1) bị báo: "B 6% (−2,5 điểm)"');
-t(!/A 10%|C 9%/.test(plain(it[0].text)), 'A (trên TB) và C (thấp hơn 0,5 < 1 điểm) KHÔNG bị báo');
-const edge = [mk('A', 300e6, { tongTT: 100, tyLeChot: 10 }), mk('B', 300e6, { tongTT: 100, tyLeChot: 9 })];   // TB 9,5; B thấp hơn đúng 0,5
-t(P.paceAlertItems_(edge, R, { today: TD }).length === 0, 'thấp hơn 0,5 điểm (< 1) → không báo');
-const edge2 = [mk('A', 300e6, { tongTT: 100, tyLeChot: 10 }), mk('B', 300e6, { tongTT: 100, tyLeChot: 8 })];   // TB 9; B thấp hơn đúng 1
-t(P.paceAlertItems_(edge2, R, { today: TD }).length === 1, 'thấp hơn đúng 1 điểm → báo (≥ ngưỡng)');
-const small = [mk('A', 300e6, { tongTT: 100, tyLeChot: 10 }), mk('B', 300e6, { tongTT: 10, tyLeChot: 0 })];
-t(P.paceAlertItems_(small, R, { today: TD }).length === 0, 'sale < 30 khách tương tác (mẫu nhỏ) → không xét tỷ lệ chốt');
-t(P.paceAlertItems_([mk('A', 300e6, { tongTT: 100, tyLeChot: null })], R, { today: TD }).length === 0 && P.paceTeamClose_([mk('A', 1)]) === null, 'tyLeChot null / không ai có số → không báo, TB = null');
+const closeIt = it.filter(x => /Tỷ lệ chốt/.test(x.text));
+t(closeIt.length === 2 && /dưới 1%/.test(closeIt[0].text) && /thấp hơn trung bình team \(1,07%\)/.test(closeIt[1].text), 'có đúng 2 dòng: "dưới 1%" rồi "thấp hơn trung bình team (1,07%)"');
+t(closeIt[0].n === 2 && /E 0,60%, D 0,95%/.test(plain(closeIt[0].text)) && /TB team 1,07%/.test(plain(closeIt[0].text)), 'dưới 1%: E 0,60% và D 0,95% (thấp nhất trước, 2 chữ số)');
+t(closeIt[1].n === 1 && /C 1,02% \(−0,05 điểm\)/.test(plain(closeIt[1].text)), 'thấp hơn TB: C 1,02% (−0,05 điểm) — ví dụ Duyên "1,02"');
+t(!/A 1,60|B 1,20/.test(plain(closeIt.map(x => x.text).join(' '))), 'A, B (trên TB) KHÔNG bị báo');
+t(!/D 0,95%/.test(plain(closeIt[1].text)) && !/E 0,60%/.test(plain(closeIt[1].text)), 'người đã ở dòng "dưới 1%" KHÔNG lặp lại ở dòng "thấp hơn TB"');
+t(closeIt.every(x => x.tone === 'bad'), 'cả 2 dòng tone bad');
+// TB 1,1% (thực tế): 1,05 thấp hơn TB (cũ với luật "1 điểm" sẽ KHÔNG báo)
+const real = [cl('P', 1.5), cl('Q', 1.1), cl('R', 1.05), cl('S', 0.7)];                  // TB = 4,35/4 = 1,0875 → 1,09
+it = P.paceAlertItems_(real, R, { today: TD }).filter(x => /Tỷ lệ chốt/.test(x.text));
+t(it.length === 2 && /R 1,05% \(−0,04 điểm\)/.test(plain(it[1].text)) && /S 0,70%/.test(plain(it[0].text)), 'TB ~1,09%: R 1,05% (thấp hơn TB 0,04 điểm) vẫn bị báo — luật cũ "≥1 điểm" bỏ sót');
+// biên
+const edge1 = [cl('X', 1.0), cl('Y', 3.0)];                                                  // X đúng 1,00%: KHÔNG dưới 1%, nhưng thấp hơn TB 2,00
+it = P.paceAlertItems_(edge1, R, { today: TD }).filter(x => /Tỷ lệ chốt/.test(x.text));
+t(it.length === 1 && /thấp hơn trung bình/.test(it[0].text) && /X 1,00%/.test(plain(it[0].text)), 'đúng 1,00% không phải "dưới 1%" (chỉ thấp hơn TB) — hiển thị 1,00 đủ 2 số');
+const edge2 = [cl('X', 0.996), cl('Y', 0.996)];                                              // làm tròn 1,00 → không dưới 1%; bằng TB → không báo
+t(P.paceAlertItems_(edge2, R, { today: TD }).length === 0, '0,996 làm tròn 1,00 → không dưới 1%; bằng TB team → không báo');
+const edge3 = [cl('X', 0.994), cl('Y', 5)];
+it = P.paceAlertItems_(edge3, R, { today: TD }).filter(x => /Tỷ lệ chốt/.test(x.text));
+t(it.length === 1 && /dưới 1%/.test(it[0].text) && /X 0,99%/.test(plain(it[0].text)), '0,994 làm tròn 0,99 → dưới 1% → báo');
+t(P.paceAlertItems_([cl('X', 2), cl('Y', 2)], R, { today: TD }).length === 0, 'bằng TB team và trên 1% → không báo');
+t(P.paceAlertItems_([cl('X', 0)], R, { today: TD }).length === 1, 'chỉ 1 sale, tỷ lệ chốt 0% (<1%) → vẫn báo dưới 1%');
+// mẫu nhỏ / thiếu số
+t(P.paceAlertItems_([cl('A', 5), cl('B', 0, 10)], R, { today: TD }).length === 0, 'sale < 30 khách tương tác (mẫu nhỏ) → không xét tỷ lệ chốt');
+t(P.paceAlertItems_([cl('A', null)], R, { today: TD }).length === 0 && P.paceTeamClose_([mk('A', 1)]) === null, 'tyLeChot null / không ai có số → không báo, TB = null');
 // tỷ lệ chốt vẫn báo khi chưa đủ ngày tiến độ
-it = P.paceAlertItems_([mk('A', 0, { tongTT: 100, tyLeChot: 10 }), mk('B', 0, { tongTT: 100, tyLeChot: 5 })], R, { today: '2026-11-02' });
-t(it.length === 1 && /Tỷ lệ chốt/.test(it[0].text), 'mới 2 ngày: bỏ báo tiến độ nhưng vẫn báo tỷ lệ chốt');
+it = P.paceAlertItems_([mk('A', 0, { tongTT: 100, tyLeChot: 3 }), mk('B', 0, { tongTT: 100, tyLeChot: 0.5 })], R, { today: '2026-11-02' });
+t(it.length === 1 && /Tỷ lệ chốt dưới 1%/.test(it[0].text), 'mới 2 ngày: bỏ báo tiến độ nhưng vẫn báo tỷ lệ chốt');
+t(/<img/.test(P.paceAlertItems_([cl('<img src=x>', 0.1)], R, { today: TD })[0].text) === false, 'tên sale trong dòng tỷ lệ chốt được ESCAPE');
 
 console.log(fail ? '\n' + fail + ' LỖI' : '\nĐẠT HẾT'); process.exit(fail ? 1 : 0);

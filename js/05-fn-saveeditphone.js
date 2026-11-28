@@ -82,7 +82,7 @@ async function saveEditPhone(oldPhone) {
     await pushCareToGS(newPhone);
     // Xoá dòng cũ trên GS bằng cách push 1 dòng rỗng/marker
     try {
-      await fetch(gsUrl, {
+      var rOld_ = await fetch(gsUrl, {
         method: 'POST', redirect: 'follow',
         body: JSON.stringify({ action: 'saveSingle', row: {
           phone: oldPhone, status: '_deleted_', zalo:'', cs:'', note:'SĐT đã đổi → ' + newPhone,
@@ -90,7 +90,8 @@ async function saveEditPhone(oldPhone) {
           schedCS:'', schedCSNote:'', schedHen:'', schedHenNote:''
         }})
       });
-    } catch(e) {}
+      _writeCheck_('việc xoá SĐT cũ ' + oldPhone)(rOld_);
+    } catch(e) { _writeFail_('việc xoá SĐT cũ ' + oldPhone, e && e.message); }
     logAudit('phone', newPhone, oldPhone, newPhone);
     toast('✓ Đã đổi SĐT: ' + oldPhone + ' → ' + newPhone);
   } else {

@@ -24,6 +24,14 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Tính/đối chiếu THƯỞNG Sale (bảng chính thức / thử việc, mốc ≥, gộp NG-ghép, giá niêm yết Tourmaline, đơn Base) | `09-thuong-t10-cach-tinh-chuan.md` | `tools/bonus-t10/*`, `js/12` (`_computeBonusData_`), `gas_v13.js` (`buildCsStats_`) |
 
 | Danh sách KH khớp đơn POS (lọc ngày/CS theo đơn POS, khách chỉ có POS, DT 2 mục, thanh đối soát) | `05-sasum-reports-ui.md` mục "Tab Danh sách KH — khớp đơn POS" | `js/88`–`js/92`, `gas_v13.js` (`donDaily`, `donDayDiag`) |
+| Cập nhật Project knowledge "Crm" cho phần Danh sách KH khớp đơn POS (bản dán sẵn: bảng action, quy ước, cấu trúc js/86–92, bài học biến `let`) | `11-project-knowledge-pos.md` | — |
+| Combo có sẵn (sheet COMBO: action comboList/Save/Delete, tab 🎁 Combo, Trợ lý AI giá, Pancake Soạn đơn thêm combo vào giỏ, bẫy giá nghìn/đồng) | `12-combo-co-san.md` | `gas_v13.js`, `js/93-combo-tab.js`, `js/38-pro-dock.js`, `extension-pancake/*` |
+| Thư viện sản phẩm (menu Social: thư mục ảnh theo SP bảng giá + combo, tối đa 50 ảnh, action plibList/Upload/Delete/InfoSave/DriveScan/FolderImages/LinkSave; ảnh có sẵn trên Drive tự khớp tên) | `13-thu-vien-san-pham.md` | `gas_v13.js`, `js/94-plib-tab.js` |
+| Nhập báo cáo nguồn từ Base → cập nhật Kênh bán (cột M) DT TỔNG theo mã đơn / mã bộ đếm (thẻ "Nguồn đơn từ Base" ở Up dữ liệu, action importBaseSource) | `05-sasum-reports-ui.md` mục "Up dữ liệu › Nguồn đơn từ Base" (+ `07-reference-tables.md`) | `gas_v13.js` (`doImportBaseSource_`), `js/11-fn-srload.js` (`_impUploadBaseSrc`, `_impSrcCard_`) |
+| Top sản phẩm bán (menu Báo cáo: xếp hạng SP theo SỐ LƯỢNG, lọc ngày + nhiều team, danh sách SP loại trừ; action topProducts / saveTopSpExclude) | `14-top-san-pham-ban.md` | `gas_v13.js`, `js/95-top-sp-tab.js` |
+| Tốc độ tải & ổn định (số đo dung lượng, ngân sách CI, những thứ ĐÃ cân nhắc và không làm: bundle/defer/lazy-load/immutable) | `15-toc-do-va-on-dinh.md` | `tools/measure-load.js`, `.github/workflows/deploy-web.yml` |
+| Tài khoản Trưởng nhóm (Lead): nhận data, chia lại cho team, báo cáo nhân viên, giới hạn tháng xem (action leadAssignInfo / leadAssign, cột Users.viewMonths) | `16-tai-khoan-lead.md` | `gas_v13.js`, `js/96-lead-assign.js`, `js/08`, `js/14`, `js/15`, `js/29` |
+| Tìm lại lịch sử làm việc cũ (HANDOFF trước 26/11/2026 đã chuyển nguyên văn vào kho, chia 5 file, có mục lục + cách grep) | `docs/handoff-archive/README.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |

@@ -1102,6 +1102,7 @@ function _srbSubCfg_(){
   if (sub === 'A' || sub === 'B'){
     t('📊 Xuất Excel', 'exportSalesReport()');
     if (sub === 'B' && typeof _reconAllowed_ === 'function' && _reconAllowed_()) t('<b>📗 Excel đối soát (B+E+G+L+N) — 1 file</b>', 'exportReconAll_()', 'Tải 1 file Excel duy nhất gồm Báo cáo B, E, G, L, N cùng khoảng ngày + bộ lọc đang xem, có sheet "Mục lục" đối chiếu chéo các báo cáo');
+    if (sub === 'B' && typeof _srBxAllowed_ === 'function' && _srBxAllowed_()) t('<b>📤 Xuất doanh thu (cả team / từng sale)</b>', 'openBExportSale_()', 'Chọn team hoặc từng sale rồi tải file Excel doanh thu để các bạn tự đối chiếu — số khớp bảng "Theo Sale" đang xem', 'sr-export-bsale-btn');
     if (admin) t(sub === 'A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet', 'exportSalesReportToSheet()', sub === 'A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước', 'sr-export-sheet-btn');
     if (admin) t('👁 Ẩn/Hiện Page &amp; Sale', '_srToggleHiddenPanel()', 'Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung');
   } else if (sub === 'C'){

@@ -15,7 +15,7 @@ var DEPT_DEFAULT = [
   { key:'ketoan', label:'Kế toán' }, { key:'hr', label:'HR' }, { key:'media', label:'Media' }
 ];
 var DEPT_LIST = DEPT_DEFAULT.slice();   // cập nhật theo d.deptList mỗi lần tải Tổng quan (js/31) — form tài khoản Quản lý (js/15) dùng danh sách này
-var _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false };
+var _dp = { list: [], map: {}, q: '', f: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };
 var _DP_SECS = [['rooms', '🏢 Danh sách phòng'], ['teams', '👥 Gán theo team'], ['people', '🧑‍💼 Từng người']];
 
 // ── mạng: có hạn chờ, đọc JSON chặt chẽ (không nuốt lỗi) ──
@@ -52,7 +52,7 @@ async function openDeptSettings(){
   var ov = document.getElementById('dp-page');
   if (!ov){ ov = document.createElement('div'); ov.id = 'dp-page'; ov.className = 'rs-page'; document.body.appendChild(ov); }
   ov.classList.add('open'); document.body.classList.add('rs-open');
-  _dp = { list: [], map: {}, q: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false };
+  _dp = { list: [], map: {}, q: '', f: '', sec: 'rooms', dirty: false, err: '', ok: '', busy: false, csNames: null };   // csNames: tên Sale trong đơn, tính lười ở _dpNames
   ov.innerHTML = '<div class="rs-loading">Đang tải cấu hình phòng…</div>';
   if (!gsUrl){ _dpLoadFail('Chưa kết nối Google Apps Script (chưa có link GAS).'); return; }
   try {
@@ -60,6 +60,8 @@ async function openDeptSettings(){
     var base = (Array.isArray(dl) && dl.length) ? dl : ((typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.deptList && _ov.data.deptList.length) ? _ov.data.deptList : DEPT_DEFAULT);
     _dp.list = base.map(function(g){ return { key: g.key, label: g.label }; });
     _dp.map = (sd && typeof sd === 'object' && !Array.isArray(sd)) ? Object.assign({}, sd) : {};
+    // Tải Khớp tên Pancake (nếu chưa) để hiện tên gốc theo Pancake — không chặn mở trang, xong thì vẽ lại nếu trang còn mở
+    try { if (typeof _pkState !== 'undefined' && !_pkState.nameMapLoaded && typeof _pkLoadNameMap === 'function') Promise.resolve(_pkLoadNameMap()).then(function(){ var o = document.getElementById('dp-page'); if (o && o.classList.contains('open') && !_dp.busy) _dpRender(); }); } catch (e) {}
     _dpRender();
   } catch (e) { _dpLoadFail(e && e.message || String(e)); }
 }
@@ -90,7 +92,56 @@ function _dpOpts(sel, blank){
   return '<option value="">' + blank + '</option>' + _dp.list.filter(function(g){ return String(g.label || '').trim(); }).map(function(g){
     return '<option value="' + esc(g.key) + '"' + (sel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('');
 }
-function _dpCount(key){ return Object.keys(_dp.map).filter(function(n){ return _dp.map[n] === key; }).length; }
+// Người "chưa phân phòng" = chưa có phòng HOẶC phòng đã gán đã bị xóa/để trống tên (cùng cách đếm với thẻ số _dpStatsInner_ — hai chỗ phải khớp nhau).
+function _dpIsAssigned_(n){
+  var k = _dp.map[n]; if (!k) return false;
+  return _dp.list.some(function(g){ return g.key === k && String(g.label || '').trim(); });
+}
+// MỖI NGƯỜI = 1 DÒNG (Duyên 26/11: yennth + yenNTH2004 là 1 người nhưng hiện thành 2 dòng, đếm 2 người).
+// NGUYÊN NHÂN GỐC: _dpNames() chỉ gộp trùng khi 2 tên GIỐNG HỆT (khác hoa/thường), không dùng nhóm "cùng 1 người" mà hệ thống đã có sẵn
+// (tài khoản nhiều tên + "Khớp sale" salePersonTags — _groupNamesByPerson, js/08+js/50). Nay gom theo nhóm đó; tên chính (tên gốc) = tên chính của nhóm.
+function _dpGroups_(){
+  var names = _dpNames(), gs;
+  try { if (typeof _groupNamesByPerson === 'function') gs = _groupNamesByPerson(names); } catch (e) {}
+  if (!gs) gs = names.map(function(n){ return { names: [n], primary: n }; });
+  // TÊN GỐC = TÊN TRÊN PANCAKE (Duyên 26/11): hồ sơ chuẩn (js/97) → không có thì Khớp tên Pancake (js/15 _pkOrigNameOf_). Tên Pancake được thêm vào nhóm
+  // (không thêm dòng mới) nên gán phòng cũng ghi cho tên Pancake — báo cáo Pancake tra theo tên đó. Không có tên Pancake → giữ tên chính cũ.
+  var fixed = gs.map(function(g){
+    var pk = '';
+    try { pk = (typeof _staffPancakeOf === 'function' && _staffPancakeOf(g.names)) || (typeof _pkOrigNameOf_ === 'function' && _pkOrigNameOf_(g.names)) || ''; } catch (e) { pk = ''; }
+    if (!pk) return g;
+    var f = pk.toLowerCase();
+    return { names: [pk].concat(g.names.filter(function(n){ return String(n).trim().toLowerCase() !== f; })), primary: pk };
+  });
+  // Tên Pancake có thể đã nằm sẵn trong danh sách như 1 dòng riêng (đã từng được gán phòng) → gộp vào đúng người, không để 1 người thành 2 dòng
+  var out = [], at = {};
+  fixed.forEach(function(g){
+    var hit = -1;
+    g.names.some(function(n){ var k = String(n).trim().toLowerCase(); if (at[k] !== undefined){ hit = at[k]; return true; } return false; });
+    if (hit < 0){ out.push({ names: g.names.slice(), primary: g.primary }); hit = out.length - 1; }
+    else {
+      var cur = out[hit], have = {}; cur.names.forEach(function(n){ have[String(n).trim().toLowerCase()] = 1; });
+      g.names.forEach(function(n){ if (!have[String(n).trim().toLowerCase()]) cur.names.push(n); });
+    }
+    out[hit].names.forEach(function(n){ at[String(n).trim().toLowerCase()] = hit; });
+  });
+  return out;
+}
+function _dpGroupOf_(n){
+  var f = String(n || '').trim().toLowerCase(), gs = _dpGroups_();
+  for (var i = 0; i < gs.length; i++) if (gs[i].names.some(function(x){ return String(x).trim().toLowerCase() === f; })) return gs[i];
+  return { names: [n], primary: n };
+}
+// Phòng của 1 người: tên chính có phòng hợp lệ thì lấy, không thì tên phụ đầu tiên có phòng hợp lệ ('' = chưa phân phòng)
+function _dpRoomOfGroup_(g){
+  for (var i = 0; i < g.names.length; i++) if (_dpIsAssigned_(g.names[i])) return _dp.map[g.names[i]];
+  return '';
+}
+function _dpSetFilter(v){ _dp.f = v || ''; _dpPeopleList(); }
+function _dpCount(key){   // số NGƯỜI (không phải số tên) đang ở phòng này — cùng nhóm người với danh sách/thẻ số (tên Pancake gốc cũng gộp vào đúng người)
+  var c = 0; _dpGroups_().forEach(function(g){ if (_dpRoomOfGroup_(g) === key) c++; });
+  return c;
+}
 function _dpTeams(){
   var t = (typeof teams !== 'undefined' && Array.isArray(teams) && teams.length) ? teams : ((typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.teams) || []);
   return t.map(function(x){ return { name: x.name || '(chưa đặt tên)', members: Array.isArray(x.members) ? x.members : [] }; });
@@ -101,6 +152,11 @@ function _dpNames(){
   if (typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.people) src = src.concat(_ov.data.people.map(function(p){ return p.name; }));
   if (typeof accounts !== 'undefined' && Array.isArray(accounts)) accounts.forEach(function(a){
     var ns = Array.isArray(a.names) ? a.names : String(a.names || '').split(','); src = src.concat(ns); if (a.name) src.push(a.name); });
+  // NGUYÊN NHÂN GỐC lỗi "sale mới có ở Base + POS nhưng không tìm thấy trong cài đặt phòng" (Duyên 19/11, vd nguyetTTA1995): danh sách chỉ gom từ team / Tổng quan / tài khoản /
+  // người đã gán — sale mới chỉ xuất hiện trong ĐƠN (chưa có tài khoản, chưa vào team) nên không có tên nào để tìm. Thêm mọi tên Sale thấy trong đơn Base + POS + lịch sử gán
+  // (_allCSNames, js/08 — cùng nguồn với modal "Phân loại Sale"). Tính 1 lần mỗi lần mở trang (quét toàn bộ khách nặng, không quét lại mỗi phím gõ).
+  if (!_dp.csNames) { try { _dp.csNames = (typeof _allCSNames === 'function') ? _allCSNames() : []; } catch (e) { _dp.csNames = []; } }
+  src = src.concat(_dp.csNames);
   src = src.concat(Object.keys(_dp.map));
   src.forEach(function(n){ var k = String(n || '').trim().toLowerCase(); if (!k || seen[k]) return; seen[k] = true; out.push(String(n).trim()); });
   return out.sort(function(a, b){ return a.localeCompare(b, 'vi'); });
@@ -112,9 +168,9 @@ function _dpStatsInner_(){
     if (typeof uiStatGrid_ !== 'function') return '';
     var rooms = _dp.list.filter(function(g){ return String(g.label || '').trim(); });
     var ok = {}; rooms.forEach(function(g){ ok[g.key] = true; });
-    var names = _dpNames(), assigned = 0;
-    names.forEach(function(n){ if (_dp.map[n] && ok[_dp.map[n]]) assigned++; });
-    var left = names.length - assigned;
+    var gs = _dpGroups_(), assigned = 0;
+    gs.forEach(function(g){ if (_dpRoomOfGroup_(g)) assigned++; });   // mỗi NGƯỜI 1 lần (không đếm từng tên phụ)
+    var left = gs.length - assigned;
     return uiStatGrid_([
       { icon: '🏢', label: 'Số phòng', value: String(rooms.length), tone: 'brand' },
       { icon: '🧑‍💼', label: 'Đã gán phòng', value: String(assigned), tone: 'success' },
@@ -167,25 +223,46 @@ function _dpTeamsHtml(){
 }
 function _dpAssignTeam(i, key){
   var t = _dpTeams()[i]; if (!t || !key) return;
-  t.members.forEach(function(n){ _dp.map[n] = key; });
+  t.members.forEach(function(n){ _dpGroupOf_(n).names.forEach(function(x){ _dp.map[x] = key; }); });
   _dpMarkDirty(); _dp.ok = ''; toast('Đã gán ' + t.members.length + ' người của team "' + t.name + '" — nhớ bấm Lưu phòng');
 }
 function _dpPeopleHtml(){
   return '<h3>🧑‍💼 Từng người</h3>' +
     '<div class="dpg-bar"><input type="text" placeholder="🔍 Tìm tên…" value="' + esc(_dp.q || '') + '" oninput="_dp.q=this.value;_dpPeopleList()" class="dpg-in" style="min-width:140px">' +
     '<input type="text" id="dp-new-name" placeholder="+ Thêm người (kế toán, HR…)" class="dpg-in" style="min-width:150px">' +
+    '<select id="dp-filter" onchange="_dpSetFilter(this.value)" style="width:190px" title="Lọc danh sách theo phòng">' + _dpFilterOpts_() + '</select>' +
     '<select id="dp-new-room" style="width:150px">' + _dpOpts('', '— phòng —') + '</select><button class="btn sm" onclick="_dpAddPerson()">Thêm</button></div>' +
     '<div id="dp-people-list">' + _dpPeopleListHtml() + '</div>';
 }
 function _dpPeopleListHtml(){
-  var q = (_dp.q || '').toLowerCase();
-  var rows = _dpNames().filter(function(n){ return !q || n.toLowerCase().indexOf(q) !== -1; });
-  return '<div style="max-height:calc(var(--vh,1vh)*60);overflow:auto"><table class="dash-table"><thead><tr><th>Tên</th><th style="width:190px">Phòng</th></tr></thead><tbody>' +
-    rows.map(function(n){ return '<tr><td>' + esc(n) + '</td><td><select data-n="' + esc(n) + '" onchange="_dpSetPerson(this.dataset.n,this.value)" style="width:180px">' + _dpOpts(_dp.map[n] || '', '— chưa phân phòng —') + '</select></td></tr>'; }).join('') +
-    (rows.length ? '' : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
+  var q = (_dp.q || '').toLowerCase(), f = _dp.f || '';
+  var rows = _dpGroups_().filter(function(g){
+    if (q && !g.names.some(function(n){ return n.toLowerCase().indexOf(q) !== -1; })) return false;   // gõ tên nào trong nhóm cũng ra đúng người
+    var r = _dpRoomOfGroup_(g);
+    if (f === '_none') return !r;
+    if (f) return r === f;
+    return true;
+  });
+  var head = (f === '_none' ? '<div class=\"dpg-banner\" style=\"margin-bottom:8px\">Đang lọc <b>chưa phân phòng</b>: ' + rows.length + ' người. Chọn phòng ở cột bên phải — người vừa gán vẫn hiện đến khi bạn đổi bộ lọc (để khỏi nhảy dòng), nhớ bấm <b>💾 Lưu phòng</b>.</div>' : '');
+  return head + '<div style=\"max-height:calc(var(--vh,1vh)*60);overflow:auto\"><table class=\"dash-table\"><thead><tr><th>Tên</th><th style=\"width:190px\">Phòng</th></tr></thead><tbody>' +
+    rows.map(function(g){
+      var more = g.names.length > 1 ? ' <span style=\"font-size:11px;color:var(--muted)\" title=\"Cùng 1 người — chọn phòng sẽ áp cho tất cả tên này\">+ ' + g.names.slice(1).map(esc).join(', ') + '</span>' : '';
+      return '<tr><td>' + esc(g.primary) + more + '</td><td><select data-n=\"' + esc(g.primary) + '\" onchange=\"_dpSetPerson(this.dataset.n,this.value)\" style=\"width:180px\">' + _dpOpts(_dpRoomOfGroup_(g), '— chưa phân phòng —') + '</select></td></tr>'; }).join('') +
+    (rows.length ? '' : '<tr><td colspan=\"2\" style=\"text-align:center;color:var(--muted);padding:12px\">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
+}
+function _dpFilterOpts_(){
+  var gs = _dpGroups_(), none = gs.filter(function(g){ return !_dpRoomOfGroup_(g); }).length, f = _dp.f || '';
+  return '<option value=""' + (f === '' ? ' selected' : '') + '>Tất cả (' + gs.length + ')</option>' +
+    '<option value="_none"' + (f === '_none' ? ' selected' : '') + '>❓ Chưa phân phòng (' + none + ')</option>' +
+    _dp.list.filter(function(g){ return String(g.label || '').trim(); }).map(function(g){
+      return '<option value="' + esc(g.key) + '"' + (f === g.key ? ' selected' : '') + '>' + esc(g.label) + ' (' + _dpCount(g.key) + ')</option>'; }).join('');
 }
 function _dpPeopleList(){ var el = document.getElementById('dp-people-list'); if (el) el.innerHTML = _dpPeopleListHtml(); }
-function _dpSetPerson(n, key){ if (key) _dp.map[n] = key; else delete _dp.map[n]; _dpMarkDirty(); }
+function _dpSetPerson(n, key){
+  // Gán phòng cho NGƯỜI = ghi cho MỌI tên của người đó (báo cáo tra theo tên nào cũng ra đúng phòng); bỏ phòng thì xóa ở mọi tên.
+  _dpGroupOf_(n).names.forEach(function(x){ if (key) _dp.map[x] = key; else delete _dp.map[x]; });
+  _dpMarkDirty();
+}
 function _dpAddPerson(){
   var n = ((document.getElementById('dp-new-name') || {}).value || '').trim(), k = (document.getElementById('dp-new-room') || {}).value;
   if (!n || !k){ toast('Nhập tên và chọn phòng'); return; }

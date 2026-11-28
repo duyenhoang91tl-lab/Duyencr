@@ -278,30 +278,30 @@
     setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
-  // Mèo máy Anh lông dài (cùng linh vật với CRM THU HIỀN) — vẽ SVG thuần, không cần file ảnh.
-  // reduced-motion: tắt chớp mắt.
+  // Icon AI = MẶT BÉ CHÓ SAMOYED — COPY NGUYÊN từ CRM (js/38-pro-dock.js proCatIconSvg_) theo yêu cầu Duyên 18/11/2026
+  // ("đổi icon Pancake AI giống icon AI trên CRM"). Trước đó là mèo máy có ăng-ten. Tên hàm/class pk-cat giữ nguyên vì chỗ gọi + test đang dùng.
+  // Thẻ tên vàng ở vòng cổ mang class pk-cat-ant (bản CRM dùng pro-cat-ant). Vẽ SVG thuần, không cần file ảnh; reduced-motion: tắt chớp mắt.
   function pkCatSvg_(px, blink){
-    var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffc2cf', CX = 32, CY = 35;
+    var FUR = '#ffffff', OUT = '#cdbfae', EAR = '#ffd6cf', CX = 32, CY = 35;
     var puffs = [[CX,CY,20.5]];
     for (var i = 0; i < 16; i++){ var ang = i * Math.PI * 2 / 16; puffs.push([+(CX + 18.2*Math.cos(ang)).toFixed(2), +(CY + 16.4*Math.sin(ang)).toFixed(2), 5.6]); }
     function circles(fill, grow){ return puffs.map(function(c){ return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+(c[2]+grow)+'" fill="'+fill+'"/>'; }).join(''); }
-    function eye(cx){
-      var b = blink ? '<animate attributeName="ry" values="4.4;4.4;0.5;4.4;4.4" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
-      return '<ellipse cx="'+cx+'" cy="36" rx="4.1" ry="4.4" fill="#2b2420">'+b+'</ellipse>'
-        + '<circle cx="'+(cx+1.4)+'" cy="34.4" r="1.5" fill="#fff"/><circle cx="'+(cx-1.2)+'" cy="37.8" r="0.7" fill="#fff" opacity=".75"/>';
+    function eye(cx, tilt){
+      var b = blink ? '<animate attributeName="ry" values="3.6;3.6;0.5;3.6;3.6" keyTimes="0;0.9;0.93;0.96;1" dur="4.5s" repeatCount="indefinite"/>' : '';
+      return '<ellipse cx="'+cx+'" cy="32.5" rx="3.1" ry="3.6" fill="#2b2420" transform="rotate('+tilt+' '+cx+' 32.5)">'+b+'</ellipse>'
+        + '<circle cx="'+(cx+1.1)+'" cy="31.2" r="1.2" fill="#fff"/>';
     }
-    function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.4" stroke-linejoin="round"/>'; }
-    var ears = ear('10,26 13,10 26,16', '14.5,21 15.6,14.5 21,17.5') + ear('54,26 51,10 38,16', '49.5,21 48.4,14.5 43,17.5');
-    var whisk = '<g stroke="'+OUT+'" stroke-width="1" stroke-linecap="round"><path d="M16 45 L9.5 43.6M16 47.2 L9.5 48"/><path d="M48 45 L54.5 43.6M48 47.2 L54.5 48"/></g>';
-    var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="3" fill="#fff" stroke="#4fae9a" stroke-width="1"/><circle cx="32" cy="59.6" r="1.1" fill="#4fae9a"/>';
-    var antenna = '<line x1="32" y1="15" x2="32" y2="8.6" stroke="'+OUT+'" stroke-width="1.8" stroke-linecap="round"/><circle class="pk-cat-ant" cx="32" cy="6.6" r="3.2" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="5.6" r="0.9" fill="#fff"/>';
+    function ear(pts, inner){ return '<polygon points="'+pts+'" fill="'+OUT+'" stroke="'+OUT+'" stroke-width="6.4" stroke-linejoin="round"/><polygon points="'+pts+'" fill="'+FUR+'" stroke="'+FUR+'" stroke-width="4.4" stroke-linejoin="round"/><polygon points="'+inner+'" fill="'+EAR+'" stroke="'+EAR+'" stroke-width="2.2" stroke-linejoin="round"/>'; }
+    var ears = ear('12,27 16,13.5 27,18', '16,22 17,17 21.6,19') + ear('52,27 48,13.5 37,18', '48,22 47,17 42.4,19');
+    var muzzle = '<ellipse cx="32" cy="42" rx="9.5" ry="7" fill="#f6efe6"/>';
+    var nose = '<path d="M29.2 38.6 Q32 37.2 34.8 38.6 Q34 41.6 32 41.8 Q30 41.6 29.2 38.6Z" fill="#2b2420"/><circle cx="31" cy="38.9" r="0.7" fill="#fff" opacity=".7"/>';
+    var smile = '<path d="M32 41.8 L32 43.4 M32 43.4 Q29.6 46.6 26.2 43 M32 43.4 Q34.4 46.6 37.8 43" fill="none" stroke="#5a4a42" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    var tongue = '<path d="M29.8 45.4 Q32 52 34.2 45.4 Q32 46.6 29.8 45.4Z" fill="#ff8fa6" stroke="#e5637f" stroke-width=".8" stroke-linejoin="round"/><path d="M32 46.2 L32 49" stroke="#e5637f" stroke-width=".7" stroke-linecap="round"/>';
+    var collar = '<rect x="19" y="53.2" width="26" height="4.6" rx="2.3" fill="#7fd6c2" stroke="#4fae9a" stroke-width="1"/><circle class="pk-cat-ant" cx="32" cy="59.8" r="3" fill="#ffd54f" stroke="#e0a800" stroke-width="1"/><circle cx="31" cy="58.8" r="0.9" fill="#fff"/>';
     return '<svg class="pk-cat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="'+px+'" height="'+px+'" aria-hidden="true" focusable="false" style="display:block;margin:auto;pointer-events:none">'
-      + ears + circles(OUT, 1.2) + circles(FUR, 0) + antenna
-      + '<ellipse cx="15.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/><ellipse cx="48.5" cy="43" rx="4" ry="2.6" fill="#ff8fa6" opacity=".38"/>'
-      + eye(23) + eye(41)
-      + '<path d="M30.4 42.2 Q32 41 33.6 42.2 Q32.9 44 32 44.1 Q31.1 44 30.4 42.2Z" fill="#ff8fa0"/>'
-      + '<path d="M32 44.1 L32 45.4 M32 45.4 Q30.2 47.4 28 45.9 M32 45.4 Q33.8 47.4 36 45.9" fill="none" stroke="#7a655a" stroke-width="1.1" stroke-linecap="round"/>'
-      + whisk + collar + '</svg>';
+      + ears + circles(OUT, 1.2) + circles(FUR, 0)
+      + '<ellipse cx="14.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/><ellipse cx="49.5" cy="40" rx="4" ry="2.6" fill="#ff8fa6" opacity=".3"/>'
+      + muzzle + eye(23, -8) + eye(41, 8) + nose + smile + tongue + collar + '</svg>';
   }
   function pkCat_(px) {
     let rm = false; try { rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
@@ -425,6 +425,14 @@
       </div>
       <div id="pk-ai-body">
         <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
+        <div id="pk-ask-top">
+          <div id="pk-ask-row">
+            <span id="pk-ask-ico">${pkCat_(22)}</span>
+            <input type="text" id="pk-ask-q" autocomplete="off" spellcheck="false" placeholder="Hỏi AI về giá (vd: nhẫn bạc trơn size 12)…" />
+            <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — gõ câu hỏi rồi bấm (hoặc Enter); trả lời văn ngắn, giá lấy từ bảng giá">Hỏi AI</button>
+          </div>
+          <div id="pk-price-ai" style="display:none"></div>
+        </div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
           <div id="pk-cs-combo">
@@ -467,9 +475,7 @@
                 <div id="pk-price-row">
                   <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
                   <button id="pk-price-btn">Tìm</button>
-                  <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)">🤖 Hỏi AI</button>
                 </div>
-                <div id="pk-price-ai" style="display:none"></div>
                 <div id="pk-price-result"></div>
               </div>
               <div id="pk-price-builder-mode" style="display:none">
@@ -832,6 +838,9 @@
     panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
+    panelEl.querySelector("#pk-ask-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") askPriceAi_();
+    });
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
@@ -2914,11 +2923,36 @@
 
   // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
   let _priceAiSeq = 0;
+  // Gộp các dòng "- Chất liệu: X | Kiểu/Size: S | Giá: P" (danh sách giá gốc của backend) thành 1 dòng / chất liệu:
+  // "X → size 1: P1 · size 2: P2". NGUYÊN NHÂN: cùng 1 sản phẩm khác size bị lặp lại cả dòng nhiều lần, CS phải đọc 1 loạt dài.
+  // Văn tự do của AI (không có dòng đúng dạng này) giữ nguyên.
+  function compactPriceText_(text) {
+    const lines = String(text || '').split('\n');
+    const re = /^\s*-\s*Chất liệu:\s*(.*?)\s*\|\s*Kiểu\/Size:\s*(.*?)\s*\|\s*(.+?)\s*$/;
+    const out = []; let grp = null;
+    const flush = () => { if (grp) { out.push(...grp.order.map((m) => '• ' + m + ' → ' + grp.map[m].join(' · '))); grp = null; } };
+    for (const ln of lines) {
+      const m = re.exec(ln);
+      if (!m) { flush(); out.push(ln); continue; }
+      if (!grp) grp = { order: [], map: {} };
+      const mat = m[1] || '(không ghi)', size = m[2];
+      const parts = m[3].split(' · ');
+      const price = parts.length === 1 ? parts[0].replace(/^[^:]*:\s*/, '') : m[3];
+      const sz = /^\(mặc định\)$/i.test(size) ? '' : (/^\d+([.,]\d+)?$/.test(size) ? 'size ' + size : size);
+      if (!grp.map[mat]) { grp.map[mat] = []; grp.order.push(mat); }
+      grp.map[mat].push(sz ? sz + ': ' + price : price);
+    }
+    flush();
+    return out.join('\n');
+  }
+
   function askPriceAi_() {
-    const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
+    // Ô hỏi + khung trả lời nằm ĐẦU panel (luôn hiện) → không còn phải mở mục "Tra cứu bảng giá". Ô cũ #pk-price-q chỉ là dự phòng.
+    const qi = panelEl.querySelector('#pk-ask-q') || panelEl.querySelector('#pk-price-q');
+    const q = (qi.value || '').trim();
     const box = panelEl.querySelector('#pk-price-ai');
     box.style.display = '';
-    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; return; }
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; try { qi.focus(); } catch (e) {} return; }
     const seq = ++_priceAiSeq;
     box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
     safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
@@ -2930,15 +2964,16 @@
         box.innerHTML = '<div class="pk-price-ai-txt">Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).</div>' +
           (sg.length ? '<div class="pk-price-ai-sg">Có thể bạn muốn hỏi: ' + sg.map((x) => `<button type="button" class="pk-price-ai-chip" data-s="${escapeHtml(x)}">${escapeHtml(x)}</button>`).join(' ') + '</div>' : '');
         box.querySelectorAll('.pk-price-ai-chip').forEach((b) => b.addEventListener('click', () => {
-          panelEl.querySelector('#pk-price-q').value = b.getAttribute('data-s') || ''; askPriceAi_();
+          qi.value = b.getAttribute('data-s') || ''; askPriceAi_();
         }));
         return;
       }
-      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
+      const shown = compactPriceText_(d.text);
+      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(shown)}</div>` +
         `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
       const cp = box.querySelector('.pk-price-ai-copy');
       cp.addEventListener('click', () => {
-        try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
+        try { navigator.clipboard.writeText(shown).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
       });
     });
   }
@@ -3611,6 +3646,10 @@
   let _ctkmRows = null;       // null = chưa tải; [] = tải rồi nhưng rỗng/GAS cũ chưa hỗ trợ
   let _ctkmLoading = false;
   const PK_CTKM_TTL_MS = 15 * 60 * 1000;
+  // COMBO CO SAN (sheet COMBO, GAS comboList): null = chua tai; [] = rong/GAS cu chua co action (an khoi, khong bao loi).
+  let _comboRows = null;
+  let _comboLoading = false;
+  const PK_COMBO_TTL_MS = 5 * 60 * 1000;
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
@@ -3677,9 +3716,11 @@
         <div class="pk-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
           <input type="text" id="pkb-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
         <div id="pkb-msg" class="pk-price-loading" style="display:none"></div>
+        <div id="pkb-combo"></div>
         <div id="pkb-dyn"></div>`;
       host.querySelector('#pkb-q').addEventListener('input', (e) => {
         _bld = Object.assign(_bldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        renderBuilderCombos_();
         if (_flatMode === 'live') {
           clearTimeout(_liveTimer);
           _liveTimer = setTimeout(() => _liveSearch_(_bld.q), 350);
@@ -3691,7 +3732,139 @@
     }
     if (_flatItems === null && !_flatLoading) loadFlat_();
     if (_ctkmRows === null && !_ctkmLoading) loadCtkm_();
+    if (_comboRows === null && !_comboLoading) loadCombos_();
+    renderBuilderCombos_();
     renderBuilderDyn_();
+  }
+
+  // ── COMBO CÓ SẴN: tải combo ĐANG ÁP DỤNG, lọc theo ô gõ tên, bấm "+ Thêm combo" → thêm cả bộ vào giỏ ──
+  function loadCombos_() {
+    if (_comboLoading || _comboRows !== null) return;
+    _comboLoading = true;
+    chrome.storage.local.get(['pkCombos'], (res) => {
+      const c = res && res.pkCombos;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < PK_COMBO_TTL_MS) {
+        _comboRows = c.rows; _comboLoading = false; renderBuilderCombos_(); return;
+      }
+      safeSendMessage_({ type: 'GET_COMBOS' }, (resp) => {
+        _comboLoading = false;
+        // GAS cu / chua co sheet / loi mang → coi nhu KHONG co combo (an khoi), khong chan luong len don.
+        _comboRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows.filter((r) => r && r.usable) : [];
+        if (_comboRows.length) { try { chrome.storage.local.set({ pkCombos: { ts: Date.now(), rows: _comboRows } }); } catch (e) {} }
+        renderBuilderCombos_();
+      });
+    });
+  }
+  const _comboVndOf_ = (c) => Number(c.priceVnd) || 0;
+  const _fmtVnd_ = (n) => (Number(n) || 0).toLocaleString('vi-VN') + 'đ';
+  function _comboMatches_(rows, q) {
+    const words = _fold_(q).split(' ').filter(Boolean);
+    if (!words.length) return rows;
+    return rows.filter((c) => {
+      const h = _fold_([c.code, c.name, c.keywords, c.itemsText].join(' '));
+      return words.every((w) => h.indexOf(w) !== -1);
+    });
+  }
+  function renderBuilderCombos_() {
+    const host = panelEl && panelEl.querySelector('#pkb-combo');
+    if (!host) return;
+    if (!Array.isArray(_comboRows) || !_comboRows.length) { host.innerHTML = ''; return; }
+    const hits = _comboMatches_(_comboRows, _bld.q);
+    const MAX = 5;
+    let html = `<div class="pk-builder-ctkm-box"><div class="pk-builder-ctkm-title">🎁 Combo có sẵn (${hits.length}/${_comboRows.length} đang áp dụng${_fold_(_bld.q) ? ' — khớp "' + escapeHtml(_bld.q) + '"' : ''}):</div>`;
+    if (!hits.length) html += '<div class="pk-builder-ctkm-row">Không có combo nào khớp từ khoá.</div>';
+    hits.slice(0, MAX).forEach((c) => {
+      const items = (c.items || []).map((it) => (Number(it.qty) > 1 ? it.qty + ' x ' : '') + it.name + [it.chatLieu, it.size].filter(Boolean).map((v) => ' · ' + v).join('')).join('; ');
+      html += `<div class="pk-builder-ctkm-row"><b>${escapeHtml(c.name)}</b> — ${escapeHtml(_fmtVnd_(_comboVndOf_(c)))}${c.statusLabel ? ' · ' + escapeHtml(c.statusLabel) : ''}<br>${escapeHtml(items)}${c.note ? '<br><i>' + escapeHtml(c.note) + '</i>' : ''}<br>` +
+        `<input type="number" min="1" value="1" class="pkb-combo-qty" data-code="${escapeHtml(c.code)}" style="width:52px" title="Số bộ combo" /> ` +
+        `<button class="pk-price-addbtn pkb-combo-add" data-code="${escapeHtml(c.code)}">+ Thêm combo</button>` +
+        (_comboImgIds_(c).length ? ` <button class="pk-price-addbtn pkb-combo-send" data-code="${escapeHtml(c.code)}" title="Dán ảnh combo vào ô chat (giống viết tắt kèm ảnh) — CS kiểm tra rồi tự bấm Gửi">📷 Gửi ${_comboImgIds_(c).length} ảnh</button>` +
+          `<div class="pkb-combo-imgs">${_comboImgIds_(c).map((id) => `<span class="pkb-combo-img" data-id="${escapeHtml(id)}" title="Bấm để copy ảnh">⏳</span>`).join('')}</div>` : '') + '</div>';
+    });
+    if (hits.length > MAX) html += `<div class="pk-builder-ctkm-row">…còn ${hits.length - MAX} combo nữa — gõ thêm ở ô tìm để lọc.</div>`;
+    html += '</div>';
+    host.innerHTML = html;
+    host.querySelectorAll('.pkb-combo-add').forEach((btn) => btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      const combo = _comboRows.find((x) => String(x.code) === code);
+      if (!combo) return;
+      const qEl = Array.from(host.querySelectorAll('.pkb-combo-qty')).find((el) => el.getAttribute('data-code') === code);
+      addComboToCart_(combo, Math.max(1, Math.floor(Number(qEl && qEl.value) || 1)));
+    }));
+    host.querySelectorAll('.pkb-combo-send').forEach((btn) => btn.addEventListener('click', () => {
+      const combo = _comboRows.find((x) => String(x.code) === btn.getAttribute('data-code'));
+      if (combo) sendComboImages_(combo);
+    }));
+    host.querySelectorAll('.pkb-combo-img').forEach((sp) => {
+      const id = sp.getAttribute('data-id');
+      _getComboImageFile_(id).then((f) => {
+        if (!sp.isConnected) return;
+        const im = document.createElement('img'); im.src = URL.createObjectURL(f); im.alt = ''; im.draggable = false;
+        sp.textContent = ''; sp.appendChild(im);
+        sp.addEventListener('click', () => _copyComboImage_(f));
+      }, () => { if (sp.isConnected) sp.textContent = '⚠'; });
+    });
+  }
+  // ── ẢNH COMBO (giống viết tắt kèm ảnh): lấy byte qua background (GAS comboImage — chỉ ảnh thuộc combo đang áp dụng) → File → dán vào ô chat ──
+  // NGUYÊN NHÂN GỐC: ảnh combo chỉ là link Drive, trang Pancake không tải/dán được trực tiếp; viết tắt đã có cơ chế paste nên dùng lại cách đó.
+  const _comboImgCache_ = new Map();
+  function _comboImgIds_(c) {
+    const out = [];
+    (Array.isArray(c && c.images) ? c.images : []).forEach((u) => { const m = /[?&]id=([A-Za-z0-9_-]{15,})/.exec(String(u || '')); if (m && out.indexOf(m[1]) < 0) out.push(m[1]); });
+    return out.slice(0, 4);
+  }
+  function _getComboImageFile_(id) {
+    if (_comboImgCache_.has(id)) return Promise.resolve(_comboImgCache_.get(id));
+    return new Promise((resolve, reject) => {
+      safeSendMessage_({ type: 'GET_COMBO_IMAGE', id }, (resp) => {
+        if (!resp?.ok || !resp.data?.base64) { reject(new Error(resp?.error || PK_API_ERR)); return; }
+        try {
+          const bin = atob(resp.data.base64), u = new Uint8Array(bin.length);
+          for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+          const mime = resp.data.mimeType || 'image/jpeg', ext = ({ 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' })[mime] || 'jpg';
+          const f = new File([u], 'combo-' + id.slice(0, 6) + '.' + ext, { type: mime });
+          if (_comboImgCache_.size >= 30) _comboImgCache_.delete(_comboImgCache_.keys().next().value);
+          _comboImgCache_.set(id, f); resolve(f);
+        } catch (e) { reject(e); }
+      });
+    });
+  }
+  async function sendComboImages_(combo) {
+    const ids = _comboImgIds_(combo);
+    if (!ids.length) { setStatus('⚠ Combo chưa có ảnh Drive để gửi.'); return; }
+    const box = _slashGetChatBox_();
+    if (!box) { setStatus('⚠ Chưa thấy ô chat — mở cuộc chat (bấm vào ô soạn tin) rồi thử lại.'); return; }
+    setStatus('Đang lấy ' + ids.length + ' ảnh combo…');
+    const got = await Promise.all(ids.map((id) => _getComboImageFile_(id).then((f) => ({ f }), (e) => ({ err: String((e && e.message) || e) }))));
+    const files = got.filter((x) => x.f).map((x) => x.f), errs = got.filter((x) => x.err).map((x) => x.err);
+    if (!files.length) { setStatus('⚠ Không lấy được ảnh combo — ' + errs[0]); return; }
+    let done = false;
+    try {
+      const dt = new DataTransfer(); files.forEach((f) => dt.items.add(f));
+      box.focus();
+      box.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+      done = true;
+    } catch (e) {}
+    setStatus((done ? '✅ Đã dán ' + files.length + ' ảnh combo vào ô chat' : 'Không dán tự động được') + (errs.length ? ' · lỗi ' + errs.length + ' ảnh' : '') + ' — nếu ảnh chưa hiện: bấm vào ảnh nhỏ để copy rồi Ctrl+V. Kiểm tra rồi bấm Gửi.');
+  }
+  function _copyComboImage_(file) {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
+        c.toBlob((b) => { navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(() => setStatus('✅ Đã copy ảnh — Ctrl+V vào ô chat'), () => setStatus('⚠ Không copy được ảnh')); URL.revokeObjectURL(url); }, 'image/png');
+      } catch (e) { setStatus('⚠ Không copy được ảnh'); }
+    };
+    img.onerror = () => setStatus('⚠ Không đọc được ảnh'); img.src = url;
+  }
+  // Thêm cả combo vào giỏ: 1 dòng TIÊU ĐỀ mang GIÁ COMBO (× số bộ) + mỗi món 1 dòng giá 0đ (SL = SL món × số bộ),
+  // nên tổng đơn = đúng giá combo, vẫn đủ món để CS chọn chất liệu/size/màu từng món như bình thường.
+  function addComboToCart_(combo, qty) {
+    const items = Array.isArray(combo.items) ? combo.items : [];
+    if (!items.length || !(_comboVndOf_(combo) > 0)) { setStatus('⚠ Combo "' + (combo.name || '') + '" thiếu món hoặc giá — kiểm tra sheet COMBO.'); return; }
+    addToCart_({ name: '🎁 Combo ' + combo.name + (combo.code ? ' (' + combo.code + ')' : ''), note: 'Gồm ' + items.length + ' món ở các dòng dưới (giá đã tính vào dòng này)', price: _comboVndOf_(combo), qty });
+    items.forEach((it) => addToCart_({ name: it.name, note: 'Thuộc combo ' + combo.name, price: 0, chatLieu: it.chatLieu || '', size: it.size || '', qty: Math.max(1, Number(it.qty) || 1) * qty }));
+    setStatus('✅ Đã thêm combo "' + combo.name + '" (' + items.length + ' món) vào đơn.');
   }
 
   function loadFlat_() {
@@ -3957,6 +4130,7 @@
       _bld = _bldBlank_();
       const q = panelEl.querySelector('#pkb-q'); if (q) q.value = '';
       if (_flatMode === 'live') _flatItems = [];
+      renderBuilderCombos_();
       renderBuilderDyn_();
     });
   }

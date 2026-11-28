@@ -183,6 +183,9 @@ function buildKpiReport_(from, to, saleFilter) {
     r.maSale = rec ? rec.code : '';
     r.inDirectory = !!rec;
   });
+  // 2026-11-26: gan co kd:true/false (CUNG nguon voi Bao cao A/B: Online + Van phong + Thu viec + phong ban Sale, khop NGUOI) de tab KPI Pancake loc "phong kinh doanh"
+  // dung nhu A/B. NGUYEN NHAN GOC: client chi tra SALE_CHANNELS/nhom S-O nen ban moi (ngocNM thuoc phong ban Sale, hoac Thu viec) bi xep vao "ngoai phong KD".
+  _srKdMark_(bySale, { dateTo: to });
   bySale.sort(function(a, b) {
     // Thu tu nhom: Van phong (S) -> Online (O) -> ngoai danh sach, dung theo yeu cau; trong
     // tung nhom sap theo Ty le chot (tyLeChot) giam dan — Sale chot tot nhat len dau.
@@ -308,7 +311,10 @@ function saveUsers_(users) {
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
   var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
-  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; _oUM[String(x.username)] = _auditUserSig_(x); });
+  var oldMonths = {};
+  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; oldMonths[String(x.username || '').trim().toLowerCase()] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  // Web ban cu (chua Ctrl+F5) khong gui viewMonths -> giu gia tri dang luu, tranh xoa mat gioi han thang admin da cai.
+  users.forEach(function(x) { if (x) x.viewMonths = _viewMonthsNorm_(x.viewMonths === undefined ? oldMonths[String(x.username || '').trim().toLowerCase()] : x.viewMonths); });
   users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });
   var _uAudit = _auditDiffRows_('users', _oUM, _nUM);
   sh.clearContents();
@@ -324,7 +330,8 @@ function saveUsers_(users) {
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
-                 u.saleType||'', u.startDate||'', u.joinDate||'']);
+                 u.saleType||'', u.startDate||'', u.joinDate||'',
+                 (u.viewMonths && u.viewMonths.length) ? JSON.stringify(u.viewMonths) : '']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   _auditCfg_(_uAudit);
@@ -456,6 +463,180 @@ function saveAssignHistory_(history) {
   sh.clearContents();
   sh.getRange(1, 1, matrix.length, ASSIGN_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: history.length });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRUONG NHOM (LEAD): NHAN DATA — CHIA LAI CHO TEAM — XEM TIEN DO — GIOI HAN THANG (2026-11-26)
+//  Nguyen nhan goc: truoc day chi admin chia data; Truong nhom chi XEM data team (moi thang), khong chia lai duoc va admin khong
+//  gioi han duoc thang du lieu. Ngoai ra saveAssignHistory ghi de CA sheet AssignData voi bat ky tai khoan nao nen ban lich su cu
+//  tren may 1 nhan vien co the xoa mat dot chia moi.
+//  - Users.viewMonths (JSON ['2026-04',...]): chi ap cho vai tro goc leader. Rong = khong gioi han.
+//    Khach xem duoc = khach duoc chia cho CHINH Truong nhom (moi thang) + khach cua team co don trong cac thang do.
+//    KHONG ap cho cac bao cao doanh so (van theo pham vi team nhu cu).
+//  - GET leadAssignInfo&token: team, thanh vien, thang duoc xem, cac dot chia cua minh + thanh vien (ban moi nhat tren sheet).
+//  - POST leadAssign {token, label, entries:[{csName, phones}]}: chi chia SDT da duoc chia cho minh, chi cho thanh vien team minh.
+// ═══════════════════════════════════════════════════════════════
+var LEAD_ASSIGN_MAX_ = 20000;
+function _viewMonthsNorm_(a) {
+  if (!Array.isArray(a)) return [];
+  var seen = {}, out = [];
+  a.forEach(function (x) { x = String(x || '').trim(); if (/^\d{4}-(0[1-9]|1[0-2])$/.test(x) && !seen[x]) { seen[x] = 1; out.push(x); } });
+  return out.sort().slice(-36);
+}
+function _leadMonths_(user) {
+  if (!user || !user.viewMonths || !user.viewMonths.length) return [];
+  return _roleBase_(user.role) === 'leader' ? user.viewMonths : [];
+}
+// Ten cua chinh tai khoan: {ten chuan hoa: ten goc}
+function _leadOwnNames_(user) {
+  var o = {};
+  ((user.names && user.names.length) ? user.names : [user.name]).forEach(function (n) { n = String(n || '').trim(); if (n) o[_normTxt_(n)] = n; });
+  // + ten dang nhap (cung ly do voi _scopeAllowedNames_: client coi username la 1 ten cua tai khoan; data admin chia ghi theo ten dang nhap van phai thay)
+  [user.name, user.username].forEach(function (n) { n = String(n || '').trim(); if (n && !o[_normTxt_(n)]) o[_normTxt_(n)] = n; });
+  return o;
+}
+// Team minh lam truong (ten minh = teams.leader, hoac team trung user.team). members KHONG gom chinh minh.
+function _leadTeam_(user, teams) {
+  var own = _leadOwnNames_(user), teamNames = [], members = [], seen = {};
+  (teams || readTeams_(getCrmSS_().getSheetByName(SH_TEAM))).forEach(function (t) {
+    if (!(own[_normTxt_(t.leader || '')] || (user.team && String(t.name || '') === String(user.team)))) return;
+    teamNames.push(String(t.name || ''));
+    [t.leader].concat(t.members || []).forEach(function (m) {
+      m = String(m || '').trim(); var k = _normTxt_(m);
+      if (m && !own[k] && !seen[k]) { seen[k] = 1; members.push(m); }
+    });
+  });
+  return { own: own, teamNames: teamNames, members: members };
+}
+function _ymOfOrderDate_(s) {
+  var d = parseVNDate_(s);
+  if (!d) return '';
+  var p = _vnYmdParts_(d);
+  return p ? p.y + '-' + ('0' + p.mo).slice(-2) : '';
+}
+function _phoneHasOrderInMonths_(phone, months) {
+  var want = {}; months.forEach(function (m) { want[m] = 1; });
+  try { if (readOrdersByPhone_(phone).some(function (o) { return want[_ymOfOrderDate_(o.date)]; })) return true; } catch (e1) {}
+  try { if (findDonRowsByPhone_(phone).some(function (r) { return want[_ymOfOrderDate_(r.ngayTaoDon || r.date)]; })) return true; } catch (e2) {}
+  return false;
+}
+// Thu hep tap SDT cua team: giu SDT duoc chia cho chinh Truong nhom + SDT co don (DT tong hoac du lieu don) trong cac thang duoc cap.
+function _leadMonthFilterSet_(user, set, months) {
+  var want = {}, out = {}, ownK = _leadOwnKeys_(user);
+  months.forEach(function (m) { want[m] = 1; });
+  var ai = _scopeAssignIndex_();
+  Object.keys(ai).forEach(function (ph) { if (ai[ph].some(function (n) { return ownK[_normTxt_(n)] || ownK[_scopeNameKey_(n)]; })) out[ph] = 1; });
+  function add(ph, date) { var k = normPhone_(String(ph || '')); if (k && set[k] && !out[k] && want[_ymOfOrderDate_(date)]) out[k] = 1; }
+  try {
+    var oc = _cacheGetBig_('orders_v1'), ords = null;
+    if (oc) { try { ords = (JSON.parse(oc) || {}).orders; } catch (e0) {} }
+    (ords || readAllOrders_() || []).forEach(function (o) { if (o) add(o.phone, o.date); });
+  } catch (e1) { Logger.log('_leadMonthFilterSet_ orders: ' + e1); }
+  try { readDonChiTiet_().forEach(function (r) { add(r.soDienThoai, r.ngayTaoDon); }); } catch (e2) { Logger.log('_leadMonthFilterSet_ don: ' + e2); }
+  return out;
+}
+function _leadUser_(token) {
+  var u = _sessUser_(token);
+  if (!u) return { error: 'Phien dang nhap het han — dang nhap lai.', code: 'AUTH' };
+  if (_roleBase_(u.role) !== 'leader') return { error: 'Chi tai khoan Truong nhom moi dung duoc muc nay.', code: 'FORBIDDEN' };
+  return { user: u };
+}
+// Dot chia ghi ten khac cach viet (hoa/thuong, dau, khoang trang) hoac ten cung nguoi (the Khop sale / names tai khoan Sale) -> tra ve ten tuong ung trong `names`; khong khop -> ''.
+// Cung tieu chi voi pham vi xem (_scopeSameNameKeys_), neu khong thi Truong nhom thay khach o Danh sach KH ma man "Data cua team" lai trong. Khop dung ten duoc xet truoc.
+function _leadNameResolver_(names) {
+  var map = {}, groups = {};
+  function put(k, n) { if (k && !map[k]) map[k] = n; }
+  names.forEach(function (n) { put(_normTxt_(n), n); });
+  names.forEach(function (n) { put(_scopeNameKey_(n), n); });
+  try { groups = _userAliasGroups_(); } catch (e) { Logger.log('_leadNameResolver_: ' + e); }
+  names.forEach(function (n) { (groups[_normTxt_(n)] || []).forEach(function (x) { put(_normTxt_(x), n); put(_scopeNameKey_(x), n); }); });
+  return function (cs) { return map[_normTxt_(cs)] || map[_scopeNameKey_(cs)] || ''; };
+}
+// Ten cua chinh Truong nhom, moi cach viet -> tra theo _normTxt_ / _scopeNameKey_.
+function _leadOwnKeys_(user) {
+  var own = _leadOwnNames_(user), o = {};
+  Object.keys(own).forEach(function (k) { o[own[k]] = 1; });
+  return _scopeSameNameKeys_(o);
+}
+function leadAssignInfo_(e) {
+  var a = _leadUser_(e && e.parameter && e.parameter.token);
+  if (a.error) return jsonOut_(a);
+  var t = _leadTeam_(a.user);
+  var own = Object.keys(t.own).map(function (k) { return t.own[k]; });
+  var resolve = _leadNameResolver_(own.concat(t.members)), hist = [];
+  readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) {
+    var n = resolve(h.csName);
+    if (n) { h.csName = n; hist.push(h); }   // web so ten dot chia voi own/members -> tra ten da quy ve team
+  });
+  return jsonOut_({ ok: true, own: own, teams: t.teamNames, members: t.members, viewMonths: _leadMonths_(a.user), assignHistory: hist });
+}
+function leadAssign_(data) {
+  var a = _leadUser_(data && data.token);
+  if (a.error) return jsonOut_(a);
+  var req = (data && Array.isArray(data.entries)) ? data.entries : [];
+  if (!req.length) return jsonOut_({ error: 'Chua co data nao de chia.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    var t = _leadTeam_(a.user), memberByKey = {};
+    t.members.forEach(function (m) { memberByKey[_normTxt_(m)] = m; });
+    var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), pool = {};
+    var resolve = _leadNameResolver_(Object.keys(t.own).map(function (k) { return t.own[k]; }).concat(t.members));
+    readAssign_(sh).forEach(function (h) {
+      if (!t.own[_normTxt_(resolve(h.csName))]) return;
+      (h.phones || []).forEach(function (p) { var k = normPhone_(String(p)); if (k) pool[k] = String(p); });
+    });
+    var used = {}, entries = [], total = 0;
+    var date = Utilities.formatDate(new Date(), 'GMT', 'yyyy-MM-dd HH:mm');   // cung quy uoc UTC voi web (toISOString) de thu tu "moi nhat" dung
+    var who = String(a.user.name || a.user.username || '');
+    var label = String(data.label || '').trim().slice(0, 120);
+    for (var i = 0; i < req.length; i++) {
+      var name = memberByKey[_normTxt_((req[i] && req[i].csName) || '')];
+      if (!name) return jsonOut_({ error: 'Nguoi nhan "' + String((req[i] && req[i].csName) || '') + '" khong thuoc team cua ban.', code: 'FORBIDDEN' });
+      var phones = [];
+      var list = Array.isArray(req[i].phones) ? req[i].phones : [];
+      for (var j = 0; j < list.length; j++) {
+        var k = normPhone_(String(list[j]));
+        if (!k || !pool[k]) return jsonOut_({ error: 'Co SDT chua duoc chia cho ban nen khong chia lai duoc. Tai lai trang roi thu lai.', code: 'FORBIDDEN' });
+        if (!used[k]) { used[k] = 1; phones.push(pool[k]); }
+      }
+      if (!phones.length) continue;
+      total += phones.length;
+      if (total > LEAD_ASSIGN_MAX_) return jsonOut_({ error: 'Moi lan chia toi da ' + LEAD_ASSIGN_MAX_ + ' khach.' });
+      entries.push({ id: Date.now() + '_L' + i + Math.random().toString(36).slice(2, 6), date: date, csName: name, phones: phones,
+                     label: 'Lead ' + who + ': ' + (label || 'Chia ' + phones.length + ' KH'), donePhones: [] });
+    }
+    if (!entries.length) return jsonOut_({ error: 'Chua co data nao de chia.' });
+    var rows = [];
+    entries.forEach(function (en) { rows = rows.concat(assignRowsOf_(en)); });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, ASSIGN_HEADERS.length).setValues(rows);
+    return jsonOut_({ ok: true, entries: entries, total: total });
+  } finally {
+    lock.releaseLock();
+  }
+}
+// Ghi de ca sheet AssignData chi danh cho admin. Tai khoan khac (web ban cu gui ca lich su khi bam "xong"): chi cap nhat
+// donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
+function saveAssignHistoryGuarded_(data) {
+  var u = (data && data.token) ? _sessUser_(data.token) : null;
+  if (!u || u.role === 'admin') return saveAssignHistory_(data && data.history);
+  var own = _leadOwnNames_(u), incoming = {};
+  ((data && data.history) || []).forEach(function (h) { if (h && h.id && own[_normTxt_(h.csName)]) incoming[String(h.id)] = h; });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    var changed = 0;
+    readAssign_(getSheet_(SH_ASSIGN, ASSIGN_HEADERS)).forEach(function (h) {
+      var n = incoming[String(h.id)];
+      if (!n || !own[_normTxt_(h.csName)]) return;
+      var done = n.donePhones || [];
+      if (JSON.stringify(done.slice().sort()) === JSON.stringify((h.donePhones || []).slice().sort())) return;
+      h.donePhones = done; saveAssignEntry_(h); changed++;
+    });
+    return jsonOut_({ ok: true, written: changed, doneOnly: true });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
