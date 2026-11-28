@@ -143,7 +143,11 @@ function crmOrderDoPost_(action, d) {
     var n = _crmOrderNormalize_(d && d.order); if (n.error) return jsonOut_({ ok: false, error: n.error });
     return _khoWithLock_(function () {
       var all = _crmReadAll_(), refKey = _crmStr_(d.refKey, 80);
-      if (refKey) for (var i = 0; i < all.length; i++) if (String(all[i].refKey) === refKey) return jsonOut_({ ok: true, duplicate: true, order: all[i] });
+      if (refKey) for (var i = 0; i < all.length; i++) if (String(all[i].refKey) === refKey) {
+        var dup = all[i], de = { points: 0 };   // bấm Lưu lại (cùng refKey): trả đơn cũ; nếu lần trước ghi đơn xong mà tích điểm lỗi thì tích bù ở đây (khoá cố định nên không tích 2 lần)
+        try { if (String(dup.status) !== 'Hủy' && String(dup.status) !== 'Hoàn') de = _loyaltyCrmEarn_(dup, String(a.user.username || a.user.name || ''), dup.createdAt); } catch (eD) {}
+        return jsonOut_({ ok: true, duplicate: true, pointsEarned: de.points, pointsExpireOn: de.expiresOn || '', order: dup });
+      }
       var now = new Date(), who = String(a.user.username || a.user.name || ''), o = n.order;
       o.orderId = _crmNextOrderId_(_vnYmd_(now), all.map(function (x) { return String(x.orderId); }));
       o.refKey = refKey; o.createdAt = now.getTime(); o.createdBy = who; o.status = 'Mới';
@@ -168,7 +172,10 @@ function crmOrderDoPost_(action, d) {
         if (redeemKey) { try { _loyaltyUndoApply_({ phone: o.phone, key: redeemKey, note: 'ghi don loi, hoan diem' }, who); } catch (eU) {} }
         throw eW;
       }
-      return jsonOut_({ ok: true, duplicate: false, order: o });
+      // Tích điểm cho đơn (sau khi đơn đã ghi): lỗi chỉ báo `pointsEarnError`, KHÔNG làm hỏng đơn (bấm Lưu lại cùng refKey sẽ tích bù).
+      var earn = { points: 0 };
+      try { earn = _loyaltyCrmEarn_(o, who, o.createdAt); } catch (eE) { earn = { points: 0, error: String(eE && eE.message || eE) }; }
+      return jsonOut_({ ok: true, duplicate: false, pointsEarned: earn.points, pointsExpireOn: earn.expiresOn || '', pointsEarnError: earn.error || '', order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi luu don CRM: ' + (err && err.message || err) }); }
 }
@@ -288,6 +295,11 @@ function crmOrderStatusDoPost_(d) {
         var ur = _loyaltyUndoApply_({ phone: o.phone, key: _crmRedeemKey_(o.phone, o.orderId), note: (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId }, who);
         if (ur.ok) refunded = ur.undone.points; else if (ur.code !== 'DUPLICATE' && ur.code !== 'NOTFOUND') return jsonOut_({ ok: false, error: 'Khong hoan duoc diem, don giu nguyen trang thai: ' + ur.error });
       }
+      // Hủy/Hoàn đơn đã TÍCH điểm → trừ lại đúng số điểm đã tích, không âm (xem _loyaltyCrmRevoke_). Lỗi thật thì dừng, trạng thái giữ nguyên; làm lại được (khoá cố định, không trừ 2 lần).
+      var revoke = { points: 0, earned: 0 };
+      if (to === 'Hủy' || to === 'Hoàn') {
+        try { revoke = _loyaltyCrmRevoke_(o, to, who); } catch (eR) { return jsonOut_({ ok: false, error: 'Khong tru duoc diem da tich, don giu nguyen trang thai: ' + (eR && eR.message || eR) }); }
+      }
       // Bước 4c: Đã xác nhận → trừ kho; Hủy/Hoàn → cộng trả kho đã trừ. Lỗi thật (sheet kho hỏng) thì DỪNG, trạng thái giữ nguyên; kho tắt/đơn bị giữ KHÔNG chặn đổi trạng thái (xem `stock` trong kết quả).
       var stock = null;
       try {
@@ -299,7 +311,7 @@ function crmOrderStatusDoPost_(d) {
       var set = function (h, v) { var r = sh.getRange(idx + 2, col(h), 1, 1); if (r.setNumberFormat) r.setNumberFormat('@'); r.setValues([[v]]); };
       set('status', to); set('statusAt', now); set('statusBy', who); set('statusNote', note);
       o.status = to; o.statusAt = now; o.statusBy = who; o.statusNote = note;
-      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, stock: stock, order: o });
+      return jsonOut_({ ok: true, unchanged: false, pointsRefunded: refunded, pointsRevoked: revoke.points, pointsRevokeCapped: !!revoke.capped, stock: stock, order: o });
     });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doi trang thai don CRM: ' + (err && err.message || err) }); }
 }
@@ -319,3 +331,210 @@ function crmOrderDoGet_(action, p) {
     return jsonOut_({ ok: true, scope: sc.level, total: rows.length, orders: rows.slice(0, limit) });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doc don CRM: ' + (err && err.message || err) }); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  ĐỀ XUẤT SỬA MỤC VIẾT TẮT / MẪU TIN → ADMIN DUYỆT CHO CẢ TEAM (Duyên yêu cầu 2026-11-17)
+//  Bản sửa NỘI BỘ (cá nhân hoá) vẫn ở riêng từng máy (app Android). Muốn cả team dùng: bấm "Gửi đề xuất" → ghi 1 dòng vào sheet VietTatDeXuat
+//  + THÔNG BÁO cho MỌI admin đang hoạt động (cùng cách mẫu tin chờ duyệt: kind 'vtpropose' trong chuông CRM; extension Pancake AI / app đọc `vietTatProposals`).
+//  Admin duyệt → áp vào đích: mục 'tpl_<id>' (CRM · Mẫu tin) = cập nhật nội dung + viết tắt của MẪU TIN; mục VietTat chung = cập nhật abbr/keyword/options;
+//  không có đích = TẠO MỤC CHUNG MỚI. Từ chối kèm lý do; người đề xuất xem trạng thái qua `vietTatProposals` (app hiện "Đề xuất của tôi").
+//  Chỉ gửi được CHỮ (hình/ghi âm của mục chung giữ nguyên). Người gửi chưa đăng nhập (app) xác định bằng TÊN (by=) — vô hại vì phải qua admin duyệt; tối đa 20 đề xuất chờ/người.
+// ═══════════════════════════════════════════════════════════════
+var SH_VT_PROP = 'VietTatDeXuat';
+var VT_PROP_HEADERS = ['id', 'targetId', 'kind', 'nhom', 'abbr', 'keyword', 'options', 'proposer', 'via', 'baseUpdatedAt', 'createdAt', 'status', 'decidedBy', 'decidedAt', 'note'];
+var VT_PROP_MAX_PENDING = 20, VT_PROP_STATUS_ = { pending: 1, approved: 1, rejected: 1 };
+function _vpTarget_(raw) {   // 'crm_tpl_12' / 'tpl_12' -> {kind:'tpl', id:'12'}; 'crm_vt_ab' / 'vt_ab' -> {kind:'vt', id:'vt_ab'}; '' -> {kind:'new'}
+  var s = String(raw == null ? '' : raw).trim().replace(/^crm_/, '');
+  if (!s) return { kind: 'new', id: '' };
+  if (/^tpl_/.test(s)) return { kind: 'tpl', id: s.slice(4) };
+  return { kind: 'vt', id: s };
+}
+function _vpRead_() {
+  var sh = getCrmSS_().getSheetByName(SH_VT_PROP), out = [];
+  if (!sh || sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, VT_PROP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var r = v[i]; if (!r[0]) continue;
+    var opts = []; try { opts = JSON.parse(String(r[6] || '[]')) || []; } catch (e) { opts = []; }
+    var st = String(r[11] || 'pending').toLowerCase(); if (!VT_PROP_STATUS_[st]) st = 'pending';
+    out.push({ row: i + 2, id: String(r[0]), targetId: String(r[1] || ''), kind: String(r[2] || 'new'), nhom: String(r[3] || ''), abbr: String(r[4] || ''), keyword: String(r[5] || ''), options: opts,
+               proposer: String(r[7] || ''), via: String(r[8] || ''), baseUpdatedAt: String(r[9] || ''), createdAt: r[10] instanceof Date ? r[10].toISOString() : String(r[10] || ''), status: st,
+               decidedBy: String(r[12] || ''), decidedAt: r[13] instanceof Date ? r[13].toISOString() : String(r[13] || ''), note: String(r[14] || '') });
+  }
+  return out;
+}
+// Nội dung HIỆN TẠI của đích (để admin so sánh + phát hiện mục chung đã đổi sau khi đề xuất). null = không còn / không hợp lệ.
+function _vpTargetCur_(kind, id) {
+  try {
+    if (kind === 'tpl') {
+      var v = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS).getDataRange().getValues();
+      for (var i = 1; i < v.length; i++) if (String(v[i][0]) === String(id)) {
+        var o = _tplRowToObj_(v[i]);
+        return { row: i + 1, status: o.status, abbr: String(v[i][15] || ''), keyword: '', options: [o.content], updatedAt: String(o.updatedAt || '') };
+      }
+    } else if (kind === 'vt') {
+      var w = getSheet_(SH_VIETTAT, VIETTAT_HEADERS).getDataRange().getValues();
+      for (var j = 1; j < w.length; j++) if (String(w[j][0]) === String(id)) {
+        var op = []; try { op = JSON.parse(String(w[j][4] || '[]')) || []; } catch (e) { op = []; }
+        return { row: j + 1, owner: String(w[j][5] || ''), abbr: String(w[j][2] || ''), keyword: String(w[j][3] || ''), options: op, updatedAt: String(w[j][7] instanceof Date ? w[j][7].toISOString() : (w[j][7] || '')) };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+function _vpApprovers_(excludeName) {   // username của mọi admin đang hoạt động (trừ người đề xuất) — cùng quy tắc _tplNotifyPending_
+  var users = []; try { users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || []; } catch (e) {}
+  var me = String(excludeName || '').trim().toLowerCase(), to = [];
+  users.forEach(function (u) {
+    if (!u || u.active === false || MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) < 0) return;
+    if (me && [u.name, u.username].some(function (x) { return String(x || '').trim().toLowerCase() === me; })) return;
+    to.push(String(u.username));
+  });
+  return to;
+}
+function _vpIsAdminName_(name) {
+  var n = String(name || '').trim(); if (!n) return false;
+  try {
+    return (readUsers_(getCrmSS_().getSheetByName(SH_USER)) || []).some(function (u) {
+      return u && u.active !== false && MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) >= 0 && (_vtSame_(u.name, n) || _vtSame_(u.username, n));
+    });
+  } catch (e) { return false; }
+}
+function _vpNotifClear_(id) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_NOTIF); if (!sh || sh.getLastRow() < 2) return 0;
+    var v = sh.getDataRange().getValues(), now = new Date().toISOString(), n = 0;
+    for (var i = 1; i < v.length; i++) if (String(v[i][3]) === 'vtpropose' && String(v[i][5]) === String(id) && !v[i][9]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    return n;
+  } catch (e) { return 0; }
+}
+function _vpNotifyAdmins_(p) {
+  try {
+    var to = _vpApprovers_(p.proposer); if (!to.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString(), rows = [];
+    var what = p.kind === 'new' ? 'đề xuất mục viết tắt MỚI' : 'đề xuất sửa mục viết tắt';
+    var txt = ('📝 ' + (p.proposer || 'Nhân viên') + ' ' + what + ' "' + p.abbr + '" — chờ bạn duyệt cho cả team').slice(0, 160);
+    to.forEach(function (u, k) { rows.push(['nt_' + Date.now() + '_vp' + k + '_' + Math.floor(Math.random() * 1000), u, p.proposer || 'Nhân viên', 'vtpropose', 'vtpropose', p.id, '', txt, now, '']); });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }   // thông báo hỏng không được làm hỏng việc gửi đề xuất
+}
+function vietTatPropose_(d, caller) {
+  d = d || {}; caller = caller || { name: '' };
+  var who = String(caller.name || '').trim().slice(0, 60);
+  if (!who) return jsonOut_({ error: 'Thiếu tên người đề xuất (đăng nhập CRM hoặc nhập Tên CS trong app).', code: 'AUTH' });
+  var abbr = String(d.abbr || '').trim();
+  if (!abbr || /\s/.test(abbr) || abbr.length > 30) return jsonOut_({ error: 'Viết tắt phải là 1 từ (không có khoảng trắng, tối đa 30 ký tự).' });
+  var stripped = 0;
+  var options = (Array.isArray(d.options) ? d.options : []).map(function (x) { return String(x == null ? '' : x).trim(); })
+    .filter(function (x) { if (/^\[\[(img|aud):/i.test(x)) { stripped++; return false; } return !!x; })   // hình/ghi âm trên máy không gửi được: bỏ, mục chung giữ hình/ghi âm của nó
+    .map(function (x) { return x.slice(0, 4000); }).slice(0, 10);
+  if (!options.length) return jsonOut_({ error: 'Thiếu nội dung chữ để đề xuất.' });
+  var tg = _vpTarget_(d.targetId), cur = null;
+  if (tg.kind !== 'new') {
+    cur = _vpTargetCur_(tg.kind, tg.id);
+    if (!cur) return jsonOut_({ error: 'Không tìm thấy mục chung để sửa (có thể đã bị xoá trên CRM). Hãy bấm ☁ CRM để cập nhật rồi thử lại.' });
+    if (tg.kind === 'vt' && cur.owner) return jsonOut_({ error: 'Chỉ đề xuất được cho mục CHUNG của team (mục riêng của người khác thì không).' });
+    if (tg.kind === 'tpl' && cur.status !== 'approved') return jsonOut_({ error: 'Mẫu tin này chưa được duyệt nên chưa đề xuất sửa được.' });
+    if (tg.kind === 'tpl' && options.length > 1) return jsonOut_({ error: 'Mục "CRM · Mẫu tin" chỉ có 1 nội dung — hãy gộp lại thành 1 đoạn, hoặc lưu thành mục riêng của bạn.' });
+  }
+  var all = _vpRead_(), mineCnt = 0, dup = null;
+  all.forEach(function (p) {
+    if (p.status !== 'pending' || !_vtSame_(p.proposer, who)) return;
+    mineCnt++;
+    if (tg.kind !== 'new' ? (p.targetId === (tg.kind === 'tpl' ? 'tpl_' + tg.id : tg.id)) : (p.kind === 'new' && p.abbr.toLowerCase() === abbr.toLowerCase())) dup = p;
+  });
+  if (!dup && mineCnt >= VT_PROP_MAX_PENDING) return jsonOut_({ error: 'Bạn đang có ' + mineCnt + ' đề xuất chờ duyệt (tối đa ' + VT_PROP_MAX_PENDING + '). Chờ admin duyệt bớt rồi gửi tiếp.' });
+  var nhom = tg.kind === 'new' ? _vtNhom_(d.nhom) : '', keyword = String(d.keyword || '').trim().slice(0, 200), now = new Date().toISOString();
+  var base = String(d.baseUpdatedAt || (cur && cur.updatedAt) || '');
+  var sh = getSheet_(SH_VT_PROP, VT_PROP_HEADERS), id;
+  var targetStored = tg.kind === 'new' ? '' : (tg.kind === 'tpl' ? 'tpl_' + tg.id : tg.id);
+  var rowVals = function (pid) { return [pid, targetStored, tg.kind, nhom, abbr, keyword, JSON.stringify(options), who, String(caller.via || ''), base, now, 'pending', '', '', '']; };
+  if (dup) {   // gửi lại cho cùng mục: cập nhật đề xuất cũ (không nhân đôi), báo lại admin
+    id = dup.id; sh.getRange(dup.row, 1, 1, VT_PROP_HEADERS.length).setValues([rowVals(id)]); _vpNotifClear_(id);
+  } else {
+    id = 'vp_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    sh.getRange(sh.getLastRow() + 1, 1, 1, VT_PROP_HEADERS.length).setValues([rowVals(id)]);
+  }
+  var notified = _vpNotifyAdmins_({ id: id, kind: tg.kind, abbr: abbr, proposer: who });
+  return jsonOut_({ ok: true, id: id, status: 'pending', updatedExisting: !!dup, notified: notified, strippedMedia: stripped });
+}
+function _vpOwn_(who) {
+  return _vpRead_().filter(function (p) { return _vtSame_(p.proposer, who); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+}
+// Tóm tắt cho app/extension: đề xuất CỦA MÌNH (trạng thái) + số đề xuất chờ duyệt nếu người gọi là admin.
+function _vpSummaryFor_(caller) {
+  var who = String((caller && caller.name) || '').trim(), out = { own: [], adminPending: null };
+  if (who) out.own = _vpOwn_(who).slice(0, 30).map(function (p) { return { id: p.id, targetId: p.targetId, abbr: p.abbr, status: p.status, note: p.note, createdAt: p.createdAt, decidedAt: p.decidedAt }; });
+  if ((caller && caller.priv) || _vpIsAdminName_(who)) out.adminPending = _vpRead_().filter(function (p) { return p.status === 'pending'; }).length;
+  return out;
+}
+function vietTatProposalsList_(caller) {
+  caller = caller || { name: '', priv: false };
+  var all = _vpRead_();
+  if (caller.priv) {
+    var pend = all.filter(function (p) { return p.status === 'pending'; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    var done = all.filter(function (p) { return p.status !== 'pending'; }).sort(function (a, b) { return String(b.decidedAt || b.createdAt).localeCompare(String(a.decidedAt || a.createdAt)); }).slice(0, 30);
+    var items = pend.concat(done).map(function (p) {
+      var tg = p.kind === 'new' ? null : _vpTargetCur_(p.kind, p.kind === 'tpl' ? String(p.targetId).replace(/^tpl_/, '') : p.targetId);
+      return { id: p.id, targetId: p.targetId, kind: p.kind, nhom: p.nhom, abbr: p.abbr, keyword: p.keyword, options: p.options, proposer: p.proposer, via: p.via, createdAt: p.createdAt, status: p.status, decidedBy: p.decidedBy, decidedAt: p.decidedAt, note: p.note,
+               target: tg ? { abbr: tg.abbr, keyword: tg.keyword, options: tg.options, updatedAt: tg.updatedAt } : null, targetMissing: p.kind !== 'new' && !tg,
+               conflict: !!(tg && p.baseUpdatedAt && tg.updatedAt && String(tg.updatedAt) > String(p.baseUpdatedAt)) };
+    });
+    return { ok: true, admin: true, pending: pend.length, items: items };
+  }
+  var who = String(caller.name || '').trim();
+  if (!who) return { error: 'Cần đăng nhập CRM hoặc nhập tên CS.', code: 'AUTH' };
+  var own = _vpOwn_(who).slice(0, 50).map(function (p) { return { id: p.id, targetId: p.targetId, kind: p.kind, abbr: p.abbr, keyword: p.keyword, options: p.options, createdAt: p.createdAt, status: p.status, decidedBy: p.decidedBy, decidedAt: p.decidedAt, note: p.note }; });
+  return { ok: true, admin: false, pending: own.filter(function (p) { return p.status === 'pending'; }).length, items: own };
+}
+function vietTatDecide_(d, caller) {
+  if (!caller || !caller.priv) return jsonOut_({ error: 'Chỉ admin mới duyệt được đề xuất viết tắt.', code: 'FORBIDDEN' });
+  d = d || {};
+  var decision = String(d.decision || '').toLowerCase();
+  if (decision !== 'approve' && decision !== 'reject') return jsonOut_({ error: 'decision phải là approve hoặc reject' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return jsonOut_({ error: 'Hệ thống đang bận, thử lại sau vài giây.' });
+  try {
+    var p = _vpRead_().filter(function (x) { return x.id === String(d.id || ''); })[0];
+    if (!p) return jsonOut_({ error: 'Không tìm thấy đề xuất.' });
+    if (p.status !== 'pending') return jsonOut_({ error: 'Đề xuất này đã được xử lý (' + p.status + ').' });
+    var sh = getSheet_(SH_VT_PROP, VT_PROP_HEADERS), now = new Date(), applied = '';
+    if (decision === 'approve') {
+      var r = _vpApply_(p, caller);
+      if (r.error) return jsonOut_({ error: r.error });
+      applied = r.applied;
+    }
+    var st = decision === 'approve' ? 'approved' : 'rejected';
+    sh.getRange(p.row, 12, 1, 4).setValues([[st, caller.name, now.toISOString(), decision === 'reject' ? String(d.note || '').trim().slice(0, 300) : '']]);
+    _vpNotifClear_(p.id);   // đã xử lý (ở CRM hoặc Pancake AI) → thông báo của MỌI admin chuyển "đã đọc"
+    return jsonOut_({ ok: true, id: p.id, status: st, applied: applied });
+  } finally { try { lock.releaseLock(); } catch (e9) {} }
+}
+// Áp đề xuất đã duyệt vào đích. Trả {applied} hoặc {error}.
+function _vpApply_(p, decider) {
+  var now = new Date();
+  if (p.kind === 'tpl') {
+    var tid = String(p.targetId).replace(/^tpl_/, ''), cur = _vpTargetCur_('tpl', tid);
+    if (!cur) return { error: 'Mẫu tin gốc không còn — không thể áp đề xuất.' };
+    var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+    sh.getRange(cur.row, 3).setValue(String(p.options[0] || ''));            // content
+    sh.getRange(cur.row, 7).setValue(now);                                   // updatedAt
+    if (p.abbr) sh.getRange(cur.row, 16).setValue(p.abbr);                   // abbr
+    return { applied: 'tpl' };
+  }
+  if (p.kind === 'vt') {
+    var cv = _vpTargetCur_('vt', p.targetId);
+    if (!cv) return { error: 'Mục chung gốc không còn — không thể áp đề xuất.' };
+    var sv = getSheet_(SH_VIETTAT, VIETTAT_HEADERS);
+    sv.getRange(cv.row, 3, 1, 3).setValues([[p.abbr, p.keyword, JSON.stringify(p.options)]]);   // abbr, keyword, options
+    sv.getRange(cv.row, 8).setValue(now.toISOString());                                          // updatedAt
+    return { applied: 'vt' };
+  }
+  // mục MỚI → tạo mục chung
+  var res = saveVietTat_({ abbr: p.abbr, keyword: p.keyword, options: p.options, nhom: p.nhom, scope: 'team' }, { priv: true, name: decider.name, role: 'admin' });
+  var obj = null; try { obj = JSON.parse(res.getContent()); } catch (e) {}
+  if (!obj || obj.error) return { error: (obj && obj.error) || 'Không tạo được mục chung.' };
+  return { applied: 'new' };
+}
+

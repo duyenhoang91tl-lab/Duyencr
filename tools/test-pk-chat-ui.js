@@ -7,7 +7,7 @@ const t=(n,v)=>{console.log((v?'OK  ':'FAIL')+' '+n);v?ok++:fail++;};
 let respond={};
 w.eval('var gsUrl="https://gs.example/exec";');
 w.fetch=async(u,o)=>{log.push({u,o});const key=Object.keys(respond).find(k=>u.includes(k)||(o&&o.body&&o.body.includes(k)));const r=key?respond[key](u,o):{};return{json:async()=>r};};
-w.toast=m=>log.push({toast:m});w.confirm=()=>true;
+w.toast=m=>log.push({toast:m});w.confirm=()=>true; w.uiConfirm = async (...a) => w.confirm(...a);
 w.eval(code);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const $=id=>w.document.getElementById(id);

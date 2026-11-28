@@ -237,7 +237,7 @@ async function _tfPost(payload){
   return await r.json();
 }
 async function _tfAdvance(id, force){
-  if (force && !confirm('Ép chuyển công việc sang giai đoạn kế tiếp? Mọi yêu cầu duyệt đang chờ sẽ bị hủy.')) return;
+  if (force && !(await uiConfirm('Ép chuyển công việc sang giai đoạn kế tiếp? Mọi yêu cầu duyệt đang chờ sẽ bị hủy.'))) return;
   var btn = document.getElementById('tf-adv-btn'); if (btn){ btn.disabled = true; btn.textContent = 'Đang xử lý...'; }
   try{
     var note = (document.getElementById('tf-note') || {}).value || '';

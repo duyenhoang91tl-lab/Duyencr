@@ -50,6 +50,11 @@ for (const d of ['js', 'css']) fs.mkdirSync(path.join(out, d), { recursive: true
 for (const f of ['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
   if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(out, f));
 }
+// data/*.json (danh mục Tỉnh/Quận/Phường-Xã cũ + mới cho màn Tạo đơn, tải lười bằng fetch khi cần — KHÔNG nằm trong js/ nên không tính vào ngân sách trang): copy nguyên
+if (fs.existsSync(path.join(root, 'data'))) {
+  fs.mkdirSync(path.join(out, 'data'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(root, 'data'))) if (/\.json$/.test(f)) fs.copyFileSync(path.join(root, 'data', f), path.join(out, 'data', f));
+}
   fs.writeFileSync(path.join(out, '.assetsignore'), '');
   console.log('dist OK: js+css ' + (before / 1024 | 0) + ' KB -> ' + (after / 1024 | 0) + ' KB');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -8,7 +8,7 @@ const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeo
   gsUrl: 'https://x/exec', esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   document: { getElementById: id => id === 'xt-wrap-combo' ? wrap : null, activeElement: null },
   registerExtraTab: (id, label, fn) => { ctx._reg = { id, label, fn }; },
-  _authAccount: { role: 'admin' }, confirm: () => confirmAns, toast: m => toasts.push(m),
+  _authAccount: { role: 'admin' }, confirm: () => confirmAns, get uiConfirm() { return async (...a) => this.confirm(...a); }, toast: m => toasts.push(m),
   fetch: (url, o) => {
     if (/action=priceCatalogFlat/.test(url)){ catCalls.push(url); return Promise.resolve({ json: async () => catReply }); }
     if (/action=ctkmComboList/.test(url)){ kmCalls.push(url); return Promise.resolve({ json: async () => kmReply }); }
@@ -104,11 +104,11 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   // xóa
   reply = () => ({ ok: true, total: 1, rows: [C1] }); let p7 = run('_cbLoad()'); resolvers.shift()(); await p7;
   bodies.length = 0; confirmAns = false; await run('_cbDelete(0)'); ok(!bodies.length, 'Hủy xác nhận → không xóa');
-  confirmAns = true; reply = () => ({ ok: true }); const pd = run('_cbDelete(0)'); resolvers.shift()(); await pd;
+  confirmAns = true; reply = () => ({ ok: true }); const pd = run('_cbDelete(0)'); await new Promise(r => setTimeout(r, 15)); resolvers.shift()(); await pd;
   const b3 = JSON.parse(bodies[0]); ok(b3.action === 'comboDelete' && b3.code === 'CB1', 'body comboDelete: ' + bodies[0]);
   ok(toasts.some(m => m.includes('Đã xóa combo')), 'toast xóa');
   while (resolvers.length) resolvers.shift()();
-  reply = () => ({ error: 'Khong tim thay combo.' }); const pd2 = run('_cbDelete(0)'); resolvers.shift()(); await pd2;
+  reply = () => ({ error: 'Khong tim thay combo.' }); const pd2 = run('_cbDelete(0)'); await new Promise(r => setTimeout(r, 15)); resolvers.shift()(); await pd2;
   ok(wrap.innerHTML.includes('Khong tim thay combo.'), 'xóa lỗi hiện trên tab');
   // ── 2026-11-18: ẢNH COMBO ──
   const FID = '1AbCdEfGhIjKlMnOpQrStUv', linkEl = { value: '' };

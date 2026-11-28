@@ -7,7 +7,7 @@ const wrap = { innerHTML: '' }; const calls = []; let reg = null; let nextRes = 
 const sample = { ok: true, dateFrom: '2026-11-21', dateTo: '2026-11-21', totalProducts: 2, totalQty: 9, totalOrders: 4, excludedQty: 3, teams: ['Team A', 'Team B', '(chưa có Team)'],
   rows: [{ key: 'c:VB03', name: 'Vòng bạc', code: 'VB03', soLuong: 5, orders: 2 }, { key: 'c:NV01', name: 'Nhẫn <vàng>', code: 'NV01', soLuong: 4, orders: 2 }], exclude: [{ key: 'c:QT99', name: 'Quà tặng' }] };
 function mk(role) {
-  const ctx = { gsUrl: 'https://gas.test/exec', currentUser: { role }, localStorage: { getItem: () => 'TOK' }, confirm: () => true, console,
+  const ctx = { gsUrl: 'https://gas.test/exec', currentUser: { role }, localStorage: { getItem: () => 'TOK' }, confirm: () => true, get uiConfirm() { return async (...a) => this.confirm(...a); }, console,
     document: { getElementById: id => id === 'xt-wrap-topsp' ? wrap : null }, fmt: n => String(n), esc: s => String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     registerExtraTab: (id, label, fn) => { reg = { id, label, fn }; },
     fetch: async (url, o) => { calls.push({ url, body: o && o.body ? JSON.parse(o.body) : null }); return { json: async () => nextRes || sample }; } };

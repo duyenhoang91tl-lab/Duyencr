@@ -120,18 +120,27 @@ function switchTab(tab, el) {
 }
 
 // ── Thanh "Tổng quan & tác vụ" của tab Danh sách KH (xem css/01-base.css, khối .lov-bar) ──
-// Mở/đóng được nhớ trong localStorage 'ome_list_ov_open' ('1' mở, '0' đóng). Chưa chọn lần nào: màn hình hẹp (<=900px) thu gọn, màn rộng mở sẵn.
+// Mở/đóng được nhớ trong localStorage 'ome_list_ov_open' ('1' mở, '0' đóng). Chưa chọn lần nào: THU GỌN ở mọi màn hình (trước đây màn rộng mở sẵn → ~110px
+// đầu trang bị 6 ô thống kê chiếm, người mới không biết bắt đầu từ đâu; số liệu đó đã có ở trang Tổng quan). Ai đã chọn mở ('1') thì giữ nguyên.
+// Máy tính (>900px): thanh công cụ (sắp xếp, chiến dịch, Thêm KH, Xuất CSV) LUÔN hiện, chỉ 6 ô thống kê được thu gọn (css/16).
 function _lovIsOpen_() {
   var v = null; try { v = localStorage.getItem('ome_list_ov_open'); } catch (e) {}
-  if (v === '1') return true;
-  if (v === '0') return false;
-  return !(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+  return v === '1';
+}
+// Thanh "📋 Cột hiển thị" (15+ ô chọn cột): ẩn mặc định, mở bằng nút cạnh "Lọc nâng cao"; nhớ lựa chọn trong 'ome_list_cols_open' ('1' mở).
+function _colsIsOpen_() { try { return localStorage.getItem('ome_list_cols_open') === '1'; } catch (e) { return false; } }
+function toggleColBar() {
+  try { localStorage.setItem('ome_list_cols_open', _colsIsOpen_() ? '0' : '1'); } catch (e) {}
+  _lovSync_();
 }
 function _lovSync_() {
   var list = document.getElementById('tab-list');
   var onList = !!list && list.style.display !== 'none';
   document.body.classList.toggle('lov-on-list', onList);
   document.body.classList.toggle('lov-open', _lovIsOpen_());
+  var co = _colsIsOpen_();
+  document.body.classList.toggle('cols-open', co);
+  var cb = document.getElementById('col-toggle-btn'); if (cb) cb.textContent = '📋 Cột hiển thị ' + (co ? '▴' : '▾');
   _lovSum_();
 }
 function _lovSum_() {
@@ -180,8 +189,8 @@ function exportCSV() {
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`OME_KH_${_ymd(new Date())}.csv`; a.click();
 }
 
-function clearData() {
-  if(!confirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)')) return;
+async function clearData() {
+  if(!(await uiConfirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)'))) return;
   customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; currentCS='all';
   document.getElementById('data-view').style.display='none';
   document.getElementById('empty-view').style.display='flex';
@@ -370,11 +379,11 @@ function _dueReminders(){
 // schedules[] cục bộ VÀ các ô hẹn nhanh trong careData dùng chung — schedGoi/SP/CS/Hen).
 // Khác với "Tắt hết" (chỉ ẩn tạm trong ngày, mai lại hiện) — hành động này xóa hẳn, đồng bộ
 // lên GAS luôn để các trình duyệt/tài khoản khác cũng không còn thấy lại.
-function deleteAllOverdueReminders(){
+async function deleteAllOverdueReminders(){
   var today = _remDateStr();
   var overdue = _dueReminders().filter(function(rm){ return rm.date < today; });
   if (!overdue.length){ toast('Không có nhắc hẹn quá hạn nào.'); return; }
-  if (!confirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.')) return;
+  if (!(await uiConfirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.'))) return;
 
   var careChanged = {};
   var daoDelSet = loadLS('ome_dao_deleted') || {};
@@ -828,8 +837,14 @@ function _saveTabCustomize_(){
 // true = tài khoản đang đăng nhập được phép thấy tab id này. perms null/rỗng = KHÔNG giới
 // hạn (mặc định mọi tài khoản mới/cũ đều xem đủ như trước — Admin phải CHỦ ĐỘNG bật giới
 // hạn thì mới thu hẹp lại).
+// TAI KHOAN TEST (role demo): AN cac man ma may chu khong phuc vu cho tai khoan nay (action doc khong co trong DEMO_SESSION_GET_, hoac man chi de ghi) — Duyen chot 2026-11-28.
+// NGUYEN NHAN GOC: tai khoan test mac dinh thay moi man nen bam Zalo AI / Chat / Thu vien / Cong viec / Giai doan / Kho san pham / Don CRM chi gap "khong duoc phep".
+// Muon mo lai 1 man: mo action doc (co loc theo sale) o GAS truoc, roi bo id khoi danh sach nay.
+var _DEMO_HIDDEN_TABS_ = ['tab-zaloai', 'tab-chat', 'tab-media', 'tab-teamchat', 'tab-task', 'stageboard', 'plib', 'crmorders', 'uploaddata'];
+function _demoTabHidden_(id){ return !!(currentUser && currentUser.role === 'demo') && _DEMO_HIDDEN_TABS_.indexOf(id) !== -1; }
 function _tabAllowedForUser(id){
   if (!currentUser || currentUser.role === 'admin') return true;
+  if (_demoTabHidden_(id)) return false;   // thang ca perms rieng cua tai khoan: may chu khong tra du lieu nen cap quyen cung vo ich
   if (!currentUser.perms || !currentUser.perms.length) return (typeof _featAllowed === 'function') ? _featAllowed(id) : true;   // phân quyền theo vai trò + bộ phận (js/40-fn-rolesettings.js)
   return currentUser.perms.indexOf(id) !== -1;
 }
@@ -844,6 +859,14 @@ function _applyUserTabPermissions(){
     if (!el) return;
     if (_tabAllowedForUser(d.id)) { el.style.display = ''; }
     else { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; }
+  });
+  // Man phu (registerExtraTab) khong nam trong _PERM_TAB_DEFS: o day chi an theo luat tai khoan test, va tra lai khi doi sang tai khoan khac.
+  _DEMO_HIDDEN_TABS_.forEach(function(id){
+    if (_PERM_TAB_DEFS.some(function(d){ return d.id === id; })) return;
+    var el = document.querySelector('[data-bar-id="'+id+'"]');
+    if (!el) return;
+    if (_demoTabHidden_(id)) { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; el.setAttribute('data-demo-hid', '1'); }
+    else if (el.getAttribute('data-demo-hid')) { el.style.display = ''; el.removeAttribute('data-demo-hid'); }
   });
   // Nhóm "📊 Báo cáo ▾" gộp 4 tab con (salesreport/pancake/kpipancake/mktchecklist) — nếu cả 4
   // đều bị chặn thì ẩn luôn nút nhóm, tránh để lại 1 nút bấm ra menu rỗng gây khó hiểu.

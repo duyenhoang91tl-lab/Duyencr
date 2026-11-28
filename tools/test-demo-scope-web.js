@@ -34,5 +34,48 @@ ok(String(idn.currentUser.perms) === 'tab-kh', 'perms admin dat rieng cho tai kh
   ok(!/role\s*===?\s*'admin'\s*\|\|\s*[\w.]*role\s*===?\s*'demo'/.test(read(f)), f + ': demo khong duoc tinh la admin');
 });
 
-if (fails) { console.error(fails + ' FAIL'); process.exit(1); }
-console.log('ALL DEMO WEB SCOPE TESTS PASSED');
+// ── 3) An cac man may chu khong phuc vu (Duyen chot 2026-11-28) ──
+const s05 = read('05-fn-saveeditphone.js');
+const els = {};
+const mkEl = () => ({ style: { display: '' }, attrs: {}, classList: { contains: () => false }, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; }, removeAttribute(k) { delete this.attrs[k]; } });
+const tab = { currentUser: null, _PERM_TAB_DEFS: ['tab-kh', 'tab-zaloai', 'tab-chat', 'tab-media', 'tab-teamchat', 'tab-task', 'uploaddata', 'salesreport'].map((id) => ({ id })),
+  document: { querySelector: (q) => { const m = q.match(/data-bar-id="([^"]+)"/); return m ? (els[m[1]] || null) : null; } }, switchTab: () => {} };
+['tab-kh', 'tab-zaloai', 'tab-chat', 'tab-media', 'tab-teamchat', 'tab-task', 'uploaddata', 'salesreport', 'stageboard', 'plib', 'crmorders', 'combo'].forEach((id) => { els[id] = mkEl(); });
+vm.createContext(tab);
+const decl = s05.match(/\nvar _DEMO_HIDDEN_TABS_ = \[[^\]]*\];/);
+const one = s05.match(/\nfunction _demoTabHidden_\(id\)\{[^\n]*\}/);
+ok(!!decl && !!one, 'js/05 co danh sach man an cua tai khoan test');
+vm.runInContext(decl[0] + one[0] + '\n' + fn(s05, '_tabAllowedForUser') + fn(s05, '_applyUserTabPermissions'), tab);
+const HID = ['tab-zaloai', 'tab-chat', 'tab-media', 'tab-teamchat', 'tab-task', 'stageboard', 'plib', 'crmorders', 'uploaddata'];
+tab.currentUser = { role: 'demo', perms: null };
+tab._applyUserTabPermissions();
+ok(HID.every((id) => els[id].style.display === 'none'), 'demo: 9 man khong dung duoc deu bi an (ca man phu stageboard/plib/crmorders)');
+ok(['tab-kh', 'salesreport', 'combo'].every((id) => els[id].style.display !== 'none'), 'demo: Danh sach KH / Bao cao / Combo van hien');
+tab.currentUser = { role: 'demo', perms: ['tab-kh', 'tab-chat'] };
+ok(tab._tabAllowedForUser('tab-chat') === false && tab._tabAllowedForUser('tab-kh') === true, 'demo: cap quyen rieng cung khong mo duoc man may chu khong phuc vu');
+tab.currentUser = { role: 'cs', perms: null };
+tab._applyUserTabPermissions();
+ok(HID.every((id) => els[id].style.display !== 'none'), 'doi sang tai khoan thuong: cac man hien lai');
+tab.currentUser = { role: 'cs', perms: ['tab-kh'] }; els.stageboard.style.display = '';
+tab._applyUserTabPermissions();
+ok(els.stageboard.style.display === '' && els['tab-chat'].style.display === 'none', 'tai khoan thuong co phan quyen rieng: hanh vi nhu cu');
+// Neu may chu mo action doc cho 1 man dang an thi phai nghi lai danh sach
+const gas = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8');
+const lists = (gas.match(/var DEMO_ALLOWED_GET_ = \{[\s\S]*?\};/) || [''])[0] + (gas.match(/var DEMO_SESSION_EXTRA_GET_ = \[[\s\S]*?\];/) || [''])[0];
+const opened = ['vietTat', 'messageTemplates', 'pkChatInbox', 'mlibList', 'chatChannels', 'tasks', 'stageBoard', 'plibList', 'crmOrders'].filter((a) => new RegExp('\\b' + a + '\\b').test(lists));
+ok(lists.length > 100 && opened.length === 0, 'may chu van chua mo action doc cua cac man dang an (neu mo, bo id khoi _DEMO_HIDDEN_TABS_): ' + opened.join(','));
+// May chu tu choi quyen khong duoc hien khung "Apps Script ban cu"
+const s07 = read('07-openassignmodal.js');
+let banner = 0;
+const asg = { gsUrl: 'u', assignHistory: [], _assignBackendOK: true, console: { warn() {} }, toast: () => {}, showAssignBackendWarning: () => { banner++; }, fetch: async () => ({ json: async () => ({ error: 'x', code: 'FORBIDDEN' }) }) };
+vm.createContext(asg);
+const pull = s07.slice(s07.indexOf('\nasync function pullAssignHistory('), s07.indexOf('\n}\n', s07.indexOf('\nasync function pullAssignHistory(')) + 3);
+vm.runInContext(pull + fn(s07, '_checkAssignResp'), asg);
+(async () => {
+  await asg.pullAssignHistory(); asg._checkAssignResp('{"error":"x","code":"FORBIDDEN"}');
+  ok(banner === 0, 'may chu tu choi quyen: khong hien khung Copy Apps Script');
+  asg._checkAssignResp('{"error":"Unknown action"}');
+  ok(banner === 1, 'backend cu that su: van canh bao nhu truoc');
+  if (fails) { console.error(fails + ' FAIL'); process.exit(1); }
+  console.log('ALL DEMO WEB SCOPE TESTS PASSED');
+})();

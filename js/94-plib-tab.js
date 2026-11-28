@@ -153,7 +153,7 @@ async function _plUpload(files){
   _plRender();
 }
 async function _plDel(i){
-  var it = _pl.items[i]; if (!it || !confirm('Xóa ảnh này khỏi thư mục?')) return;
+  var it = _pl.items[i]; if (!it || !(await uiConfirm('Xóa ảnh này khỏi thư mục?'))) return;
   try {
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body:JSON.stringify({ action:'plibDelete', token:_plTok(), id:it.id }) }), d = await r.json();
     if (d && d.ok){ _pl.items.splice(i, 1); _pl.n = Math.max(0, _pl.n - 1); var c = _pl.counts[_pl.cur.key]; if (c){ c.n = _pl.n; if (!_pl.n) delete _pl.counts[_pl.cur.key]; } _pl.up = ''; }
@@ -245,7 +245,7 @@ function _plPickHtml(){
 function _plPickInput(v){ _pl.pickQ = v || ''; var el = document.getElementById('pl-pick-list'); if (el) el.innerHTML = _plPickListHtml(); }
 function _plLinkIdx(i){ var f = _pl.pickShown[i]; if (f) return _plLink(f.id); }
 function _plLinkRaw(){ return _plLink(_pl.pickQ); }
-async function _plUnlink(){ if (!confirm('Gỡ thư mục Drive đã gắn khỏi sản phẩm này? (Ảnh trên Drive không bị xóa.)')) return; await _plLink(''); }
+async function _plUnlink(){ if (!(await uiConfirm('Gỡ thư mục Drive đã gắn khỏi sản phẩm này? (Ảnh trên Drive không bị xóa.)'))) return; await _plLink(''); }
 async function _plLink(raw){
   if (_pl.linking || !_pl.cur) return;
   _pl.linking = true; _pl.srcMsg = '⏳ Đang lưu…'; _plRenderSrc();

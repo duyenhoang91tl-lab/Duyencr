@@ -207,10 +207,10 @@ function _dpRoomsHtml(){
 }
 function _dpRoomLabel(i, v){ if (_dp.list[i]){ _dp.list[i].label = v; _dpMarkDirty(); } }
 function _dpAddRoom(){ _dp.list.push({ key: 'd' + Date.now(), label: '' }); _dpMarkDirty(); _dpRender(); }
-function _dpDelRoom(i){
+async function _dpDelRoom(i){
   var g = _dp.list[i]; if (!g) return;
   var n = _dpCount(g.key);
-  if (n && !confirm('Phòng "' + g.label + '" đang có ' + n + ' người. Xóa phòng thì những người này thành "chưa phân phòng". Xóa?')) return;
+  if (n && !(await uiConfirm('Phòng "' + g.label + '" đang có ' + n + ' người. Xóa phòng thì những người này thành "chưa phân phòng". Xóa?'))) return;
   Object.keys(_dp.map).forEach(function(k){ if (_dp.map[k] === g.key) delete _dp.map[k]; });
   _dp.list.splice(i, 1); _dpMarkDirty(); _dpRender();
 }

@@ -937,16 +937,16 @@ function _dashSaveTemplate() {
   renderDashboard();
   toast('✓ Đã lưu mẫu "'+name+'"');
 }
-function _dashDeleteTemplate() {
+async function _dashDeleteTemplate() {
   if (_dashTemplates.length<=1){toast('Phải giữ ít nhất 1 mẫu');return;}
-  if(!confirm('Xóa mẫu "'+_dashTemplates[_dashActiveIdx].name+'"?')) return;
+  if(!(await uiConfirm('Xóa mẫu "'+_dashTemplates[_dashActiveIdx].name+'"?'))) return;
   _dashTemplates.splice(_dashActiveIdx,1);
   _dashActiveIdx=Math.max(0,_dashActiveIdx-1);
   _dashSave();
   renderDashboard();
 }
-function _dashResetTemplate() {
-  if(!confirm('Khôi phục mẫu về mặc định?')) return;
+async function _dashResetTemplate() {
+  if(!(await uiConfirm('Khôi phục mẫu về mặc định?'))) return;
   _dashTemplates[_dashActiveIdx].widgets=JSON.parse(JSON.stringify(_DEFAULT_DASH_WIDGETS));
   _dashSave();
   renderDashboard();

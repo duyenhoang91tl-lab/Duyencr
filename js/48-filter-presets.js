@@ -296,9 +296,9 @@
     p.extras = p.extras || {}; var ex = extrasOf(sub); if (Object.keys(ex).length) p.extras[sub] = ex; else delete p.extras[sub];
     if (saveAll(list)) { toastF('✓ Đã cập nhật mẫu “' + p.name + '”'); inject(); }
   }
-  function del(id){
+  async function del(id){
     var list = loadAll(), p = list.filter(function(x){ return x.id === id; })[0]; if (!p) return;
-    if (!confirm('Xoá mẫu “' + p.name + '” (khỏi MỌI báo cáo)?')) return;
+    if (!(await uiConfirm('Xoá mẫu “' + p.name + '” (khỏi MỌI báo cáo)?'))) return;
     if (saveAll(list.filter(function(x){ return x.id !== id; }))) { toastF('Đã xoá mẫu “' + p.name + '”'); inject(); }
   }
 
@@ -364,11 +364,11 @@
     renderCount();
   }
   function closeEditor(){ var ov = document.getElementById('fp-overlay'); if (ov) ov.classList.remove('open'); }
-  function saveEditor(){
+  async function saveEditor(){
     var sub = D.sub, c = CFG[sub], name = (D.name || '').trim();
     if (!name){ toastF('⚠ Hãy đặt tên cho mẫu.'); return; }
     var sales = Object.keys(D.sales);   // giữ cả tên không có trong báo cáo hiện tại (mẫu dùng chung nhiều báo cáo)
-    if (!sales.length && !confirm('Mẫu chưa chọn Sale nào — bấm mẫu sẽ KHÔNG giới hạn Sale. Vẫn lưu?')) return;
+    if (!sales.length && !(await uiConfirm('Mẫu chưa chọn Sale nào — bấm mẫu sẽ KHÔNG giới hạn Sale. Vẫn lưu?'))) return;
     var list = loadAll();
     if (nameTaken(name, D.editId)){ toastF('⚠ Đã có mẫu tên “' + name + '” — hãy đặt tên khác.'); return; }
     var p = D.editId ? list.filter(function(x){ return x.id === D.editId; })[0] : null;

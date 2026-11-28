@@ -692,7 +692,7 @@ function _aaResultTable(p, sh, haveLabel, missSuffix){
     p.entries.map(function(e){ var m = sh[e.name+'|'+(e.src||'pos')]; return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:var(--tn)">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td class="r">'+e.quota+'</td><td class="r"><b>'+e.phones.length+'</b></td><td style="color:var(--red)">'+(m?'thiếu '+m+missSuffix:'')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
 async function _aaRunNow(){
-  if (!confirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.')) return;
+  if (!(await uiConfirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.'))) return;
   var btn = document.getElementById('aa-run-btn'), old = btn ? btn.textContent : '';
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang chia...'; }
   var pv = document.getElementById('aa-preview'); if (pv) pv.innerHTML = '<div class="assign-section"><div style="font-size:13px">⏳ Đang chia, đợi chút...</div></div>';
@@ -1386,8 +1386,8 @@ async function doLogin(){
   _applyAuthIdentity(acct);
   if (typeof toast === 'function') toast('✓ Xin chào ' + (acct.name || acct.username) + ' (' + _roleLabel(acct.role) + ')');
 }
-function doLogout(){
-  if (!confirm('Đăng xuất khỏi tài khoản hiện tại?')) return;
+async function doLogout(){
+  if (!(await uiConfirm('Đăng xuất khỏi tài khoản hiện tại?'))) return;
   _authAccount = null;
   try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); sessionStorage.removeItem('ome_demo_clean'); }catch(e){}
   document.body.classList.remove('demo-mode');

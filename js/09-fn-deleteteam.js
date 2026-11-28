@@ -526,8 +526,8 @@ function _pkTagSetRange(which, val){
   }
   _pkRenderAll();
 }
-function _pkTagClear(){
-  if (!confirm('Xóa toàn bộ dữ liệu tag đã nạp trên trình duyệt này?')) return;
+async function _pkTagClear(){
+  if (!(await uiConfirm('Xóa toàn bộ dữ liệu tag đã nạp trên trình duyệt này?'))) return;
   _pkState.tagRows = []; _pkState.tagFrom = ''; _pkState.tagTo = '';
   try { localStorage.removeItem(_PK_TAG_LS); } catch(e){}
   _pkRenderAll();
