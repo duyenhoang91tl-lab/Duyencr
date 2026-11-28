@@ -117,9 +117,16 @@ async function _ovLoad(refresh){
     if (d.deptList && d.deptList.length && typeof DEPT_LIST !== 'undefined') DEPT_LIST = d.deptList;
     _ov.data = d; _ov.key = key; _ov.mem[key] = { t: Date.now(), d: d }; _ov.dept = ''; _ov.team = ''; _ovRender();
   } catch (e) {
-    var msg = e && e.name === 'AbortError' ? 'Quá thời gian chờ — thử lại hoặc chọn khoảng ngày ngắn hơn.' : String(e && e.message || e);
-    body.innerHTML = '<div style="color:var(--red)">Không tải được tổng quan: ' + esc(msg) + '<br><span style="color:var(--muted)">Nếu báo “Unknown action”: chưa deploy bản GAS mới (v13.24 trở lên).</span></div>';
+    // NGUYÊN NHÂN GỐC: người dùng thường thấy nguyên lỗi máy ("Cannot read properties…", "deploy bản GAS") và không có gì để bấm. Nay: câu thường + nút Thử lại; chi tiết kỹ thuật chỉ admin thấy.
+    body.innerHTML = _ovErrorHtml_(e, _ovIsAdmin());
   } finally { if (timer) clearTimeout(timer); _ov.busy = false; }
+}
+function _ovErrorHtml_(e, isAdmin){
+  var slow = !!e && e.name === 'AbortError', detail = String(e && e.message || e || '');
+  return '<div style="padding:18px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:12px">' +
+    '<div style="font-size:15px;font-weight:700;color:var(--text)">' + (slow ? 'Tải số liệu lâu quá. Hãy chọn khoảng ngày ngắn hơn hoặc thử lại.' : 'Chưa tải được số liệu.') + '</div>' +
+    '<button type="button" class="btn primary" style="margin-top:12px;min-height:40px;padding:0 20px;font-size:14px" onclick="_ovLoad(true)">↻ Thử lại</button>' +
+    (isAdmin && !slow ? '<div style="margin-top:10px;font-size:11.5px;color:var(--muted)">Chi tiết: ' + esc(detail) + (/unknown action/i.test(detail) ? ' (máy chủ GAS đang là bản cũ)' : '') + '</div>' : '') + '</div>';
 }
 function renderOverviewTab(){ _ovEnsurePanel(); try { hmRenderChips(); } catch(e){} if (_ov.data && _ov.key === ((document.getElementById('ov-from') || {}).value + '|' + (document.getElementById('ov-to') || {}).value)) _ovRender(); else _ovLoad(false); }
 
