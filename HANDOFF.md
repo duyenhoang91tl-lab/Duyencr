@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — KIỂM TRA & SỬA LỖI HIỆN HÀNH, tiếp) — ĐANG LÀM
+- ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành" → "tiếp". Chạy toàn bộ test trên main: 3 test đỏ do test chưa theo kịp 2 lần sắp lại menu/báo cáo (không phải lỗi chức năng). Tài khoản test bước 2/2 đã XONG (xem mục "TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN").
+- ✅ Đã xong: (1) `tools/test-mascot-samoyed.js` kiểm linh vật/vườn ở nhóm menu `ui` thay vì ⚙ Settings.
+- 🔧 Đang làm: 2 test thứ tự báo cáo (`test-report-n-pure.js`, `test-reports-config.js`).
+- ➡️ Kế tiếp: test web tài khoản test, cập nhật `docs/TAI-KHOAN-TEST.md`, chạy lại toàn bộ.
+
 ## 2026-11-28 (phiên Claude — MÀN TẠO ĐƠN: GIẢM GIÁ CHỌN đ / % + Ô ÁP DỤNG CTKM + CHỌN COMBO CÓ SẴN) — XONG CẢ 3/3 BƯỚC (web, js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: ở màn ➕ Tạo đơn, mục giảm giá phải chọn được giảm % hoặc giảm tiền; thêm ô áp dụng CTKM (có mục tạo combo có sẵn → chọn combo / áp CTKM có sẵn để áp luôn).
 - NGUYÊN NHÂN GỐC (bước 1): giảm giá đơn/dòng ĐÃ có kiểu đ|% nhưng là hộp `<select>` hẹp chỉ hiện chữ "đ" (thấy như chỉ có giảm tiền), không nói rõ nhập số tiền hay %. Logic tính tiền (`_coDisc`/`_coCalc`) và server `_crmOrderNormalize_` đã hỗ trợ pct từ trước → KHÔNG đổi công thức, KHÔNG đổi GAS.
@@ -126,11 +132,6 @@
 - 📋 `docs/CRM-11-HANG-MUC-TRANG-THAI.md` cập nhật: quy tắc chung ✅, mục 9 (dùng điểm trong đơn đã xong ở 4b).
 - [ ] **VIỆC KẾ TIẾP trong 11 hạng mục:** (4) mục 7: trừ hoa hồng kỳ sau khi đơn hoàn — làm được ngay nhưng CẦN Duyên chốt chu kỳ chốt/trả hoa hồng; (5) mục 8: KPI tự cam kết + duyệt (lưu ý phiên khác vừa đổi bậc Sale còn 2 bậc TV 100tr/CT 500tr — đọc mục "BẬC SALE CHỈ CÒN 2 BẬC" trước khi đụng KPI); (6) mục 9: quyền lợi theo hạng (chờ chốt); (7) mục 11: ticket/giờ làm việc (chờ chốt 17h hay 21h). Mục 1,2,5,6 chờ khoá/API bên ngoài; mục 4 chờ Duyên bật webhook.
 - ⏳ **Chờ Duyên chốt (đang chặn việc):** giờ làm việc 08:00–17:00 hay –21:00; chu kỳ trả hoa hồng; quyền lợi từng hạng (Vip "từ lần mua thứ 2" vs 30tr); giữ/bỏ hệ hạng theo số đơn; hết hạn điểm 31/12 đúng không.
-
-## 2026-11-27 (tối — TÀI KHOẢN TEST BƯỚC 2/2 WEB: LỌC THEO SALE ĐÃ CHỌN + XEM ĐỦ TAB) — ĐANG LÀM
-- ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành". Rà: 461 test (chỉ test-dist-equivalence đỏ khi dist/ cũ, build lại thì xanh), check-health, mở các tab trên Chromium (dữ liệu trống, chặn mạng): không thấy lỗi sập. Việc dở tìm được: bước 2/2 (web) của "Tài khoản test" bên dưới.
-- ✅ Đã xong: js/08 (lọc khách theo sale), js/14 (xem đủ tab), js/09, js/67, js/11, js/12 (Báo cáo F chỉ hiện sale được chọn).
-- 🔧 Đang làm: test tự động. ➡️ Kế tiếp: tài liệu + chốt.
 
 ## 2026-11-27 (phiên Claude — ĐỢT CHIA ĐÃ XOÁ CÒN Ở MÁY KHÁC + "ĐÃ XONG" TRÊN WEB ĐÈ DẤU TÍCH PANCAKE AI)
 - ĐỀ BÀI Duyên: "sửa tiếp 2 điểm đó" (2 hạn chế đã báo ở mục sửa 3 lỗi).
