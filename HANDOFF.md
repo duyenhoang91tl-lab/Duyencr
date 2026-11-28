@@ -1,10 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-28 (phiên Claude — KIỂM TRA & SỬA LỖI HIỆN HÀNH, tiếp) — ĐANG LÀM
-- ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành" → "tiếp". Chạy toàn bộ test trên main: 3 test đỏ do test chưa theo kịp 2 lần sắp lại menu/báo cáo (không phải lỗi chức năng). Tài khoản test bước 2/2 đã XONG (xem mục "TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN").
-- ✅ Đã xong: 3 test đỏ đã sửa; thêm `tools/test-demo-scope-web.js`; cập nhật `docs/TAI-KHOAN-TEST.md`; sinh lại `css/99-dark-auto.css` (thiếu màu mới của màn Tạo đơn ở chế độ tối).
-- 🔧 Đang làm: mở thử trên trình duyệt (tab, cửa sổ, tài khoản test bằng dữ liệu giả).
-- ➡️ Kế tiếp: chốt.
+## 2026-11-28 (phiên Claude — KIỂM TRA & SỬA LỖI HIỆN HÀNH) — XONG, ĐÃ PUSH
+- ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành" → "tiếp".
+- ✅ Đã xong: tài khoản test lọc theo sale + chỉ xem (cùng phiên khác, xem mục "TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN"); sửa 3 test đỏ do sắp lại menu/báo cáo (`test-mascot-samoyed`, `test-report-n-pure`, `test-reports-config`); thêm `tools/test-demo-scope-web.js`; cập nhật `docs/TAI-KHOAN-TEST.md`; sinh lại `css/99-dark-auto.css`.
+- 🧪 Chromium (chặn mạng, vai trò admin): mở 27 tab + 31 cửa sổ trên máy tính và điện thoại, không có lỗi JS/tràn ngang. Tài khoản test thử bằng máy chủ GIẢ: không POST nào lọt. CHƯA thử GAS thật; chưa xem được trạng thái GitHub Actions.
+- 🔧 Đang làm: không.
+- ➡️ Kế tiếp (CHỜ Duyên chốt): tài khoản test vẫn thấy các tab máy chủ không phục vụ — Zalo AI, Giai đoạn, Kho sản phẩm (plib), Đơn CRM hiện "không được phép"; Công việc, Thư viện, Chat cũng bị từ chối đọc dữ liệu. Chọn: (a) ẩn các tab này cho role demo, hay (b) mở quyền đọc ở GAS có lọc theo sale. Tuỳ chọn: lọc báo cáo tổng hợp theo sale cho tài khoản test; `js/61-sale-periods.js` mồ côi (đã có kế hoạch xoá ở mục khác).
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: Ô TIỀN HIỆN DẤU CHẤM NGĂN HÀNG NGHÌN) — XONG, ĐÃ PUSH
 - Yêu cầu Duyên: ở màn lên đơn, khi điền tiền hiện dấu `.` cho dễ nhìn (100000 → 100.000).
