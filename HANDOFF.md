@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — LÀM NỐT CÁC VIỆC DANG DỞ: CỘT BẢNG KH → ĐIỂM ĐƠN CRM → ĐƠN CÁC KÊNH B3-B8 → MÀN CAM KẾT KPI)
+- ĐỀ BÀI Duyên (28/11 20:11): "Làm tiếp các bước còn dang dở". 4 việc trên đã dừng >5 tiếng, phiên NÀY đang nhận — phiên khác ĐỪNG làm trùng.
+- ✅ **ĐÃ XONG:** (1/4) Danh sách KH mặc định 7 cột chính (người đã chỉnh cột giữ nguyên); bảng vừa khít khung khi ẩn cột. Chụp Chromium 1200px + 390px, test-list-cols-default. Cần Ctrl+F5.
+- 🔧 **ĐANG LÀM:** (2/4) Đơn CRM: hiện điểm tích/trừ trên web (js/99-d).
+- ➡️ **BƯỚC KẾ TIẾP:** Điểm đơn CRM → Đơn các kênh B3-B8 → màn cam kết KPI. Việc 'CRM đơn giản' bước 3 (rà Báo cáo/Chia data/Cài đặt) còn để sau.
+
 ## 2026-11-28 (phiên Claude — SỬA 4 TEST ĐỎ CÓ SẴN TRÊN MAIN)
 - ĐỀ BÀI Duyên: "Tiếp" → xử lý test-demo-scope, test-team-daily-revenue, test-team-bonus-ui, test-srb-filter-menu (mỗi file một bước, push ngay).
 - ✅ **ĐÃ XONG:** XONG cả 4/4 test đỏ (demo-scope, team-daily-revenue, team-bonus-ui, srb-filter-menu): đều là test cũ chưa theo tính năng mới, app không lỗi, chỉ sửa thư mục tools/. Chạy lại 499 file test + các bước kiểm của CI: xanh hết (test-crm-order-pos-tags cần playwright, chạy riêng bằng NODE_PATH mặc định: xanh).
