@@ -117,9 +117,15 @@ var PK_MAP_HEADERS = ['pancakeName','saleName'];
 // "Thong ke nhan vien" (user_statistics_multi_pages, sheet "<pageId> By staff") Pancake xuat.
 // Khoa duy nhat = date+pageId (nap lai file CUNG 1 ngay se GHI DE toan bo nhan vien cua page
 // do trong ngay do — giong het co che PK_STATS_HEADERS o tren).
+// 'dateTo' (cot cuoi, THEM SAU de khong lech chi so cac cot cu — getSheet_ tu bo sung header o cuoi): file "Thong ke nhan vien" tai GOP NHIEU NGAY (vd ca thang 8) ghi
+// 'date' = ngay DAU, 'dateTo' = ngay CUOI cua khoang; rong = file 1 ngay (nhu cu). Cac cho doc PancakeSdtStats se RAI dong gop ra tung ngay (_pkExpandMergedSdtRows_, buoc 3/3).
 var PK_SDT_STATS_HEADERS = ['date','pageId','pageName','nhanVien',
   'tinNhanTuBinhLuan','binhLuan','phienTLBinhLuan','tinNhan','phienTLTinNhan',
-  'sdtMangVe','soDonChot'];
+  'sdtMangVe','soDonChot','dateTo'];
+// PancakeSdtDaily: so lieu THEO NGAY THAT cua tung Page (sheet "By time" trong file "Thong ke nhan vien" gop nhieu ngay; khong tach nhan vien). 1 dong = 1 Page x 1 ngay,
+// khoa date+pageId -> nap lai ghi de. Dung de RAI dong gop SDT ra tung ngay dung trong so thay vi chia deu (buoc 3/3).
+var SH_PK_SDT_DAILY = 'PancakeSdtDaily';
+var PK_SDT_DAILY_HEADERS = ['date','pageId','pageName','tinNhanTuBinhLuan','binhLuan','phienTLBinhLuan','tinNhan','phienTLTinNhan','sdtMangVe','soDonChot'];
 // PK_PAGEMAP_HEADERS: khop 1-1 pageId Pancake -> gia tri "Kenh ban" chuan dang dung trong
 // DT TONG (cot M "kenhBan"), de ghep doanh thu/so don theo dung Page.
 var PK_PAGEMAP_HEADERS = ['pageId','pageName','kenhBan'];

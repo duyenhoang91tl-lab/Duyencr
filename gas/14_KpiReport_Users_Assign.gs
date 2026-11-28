@@ -311,8 +311,14 @@ function saveUsers_(users) {
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
   var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
-  var oldMonths = {};
-  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; oldMonths[String(x.username || '').trim().toLowerCase()] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  var oldMonths = {}, oldRec = {};
+  _oldUsers.forEach(function(x) { var k = String(x.username || '').trim().toLowerCase(); oldRec[k] = x; oldHash[k] = x.passHash || ''; oldMonths[k] = x.viewMonths || []; _oUM[String(x.username)] = _auditUserSig_(x); });
+  // 2026-11-27: truong client KHONG gui (undefined) -> giu gia tri dang luu. NGUYEN NHAN GOC: ghi lai ca sheet voi '' cho truong thieu, nen web ban cu (sua tai khoan lam roi
+  // 4 truong nay) hoac danh sach rut gon xoa mat quyen tab rieng / loai sale / ngay nhan tin / ngay vao. Muon XOA thi gui gia tri rong (perms: null, ngay: '') — web dang lam vay.
+  users.forEach(function(x) {
+    var old = x && oldRec[String(x.username || '').trim().toLowerCase()];
+    if (old) ['perms', 'saleType', 'startDate', 'joinDate'].forEach(function(f) { if (x[f] === undefined) x[f] = old[f]; });
+  });
   // Web ban cu (chua Ctrl+F5) khong gui viewMonths -> giu gia tri dang luu, tranh xoa mat gioi han thang admin da cai.
   users.forEach(function(x) { if (x) x.viewMonths = _viewMonthsNorm_(x.viewMonths === undefined ? oldMonths[String(x.username || '').trim().toLowerCase()] : x.viewMonths); });
   users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });
@@ -400,6 +406,7 @@ function assignRowsOf_(h) {
 
 function saveAssignEntry_(entry) {
   if (!entry || !entry.id) return jsonOut_({ error: 'no entry.id' });
+  if (_assignDeletedIds_().indexOf(String(entry.id)) !== -1) return jsonOut_({ ok: true, skipped: 'deleted' });   // may khac con giu dot admin da xoa -> khong cho song lai
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   var last = sh.getLastRow(); var found = [];
   if (last >= 2) {
@@ -424,24 +431,31 @@ function saveAssignEntry_(entry) {
 // dong cua (cac) dot chia bi doi qua saveAssignEntry_ (an toan hon saveAssignHistory_ — khong xoa
 // trang roi ghi lai CA sheet, tranh dam vao CS khac dang luu cung luc). Dung LockService vi 1 CS co
 // the tich lien tuc nhieu SDT gan nhau (2 request ghi cung 1 dot chia de dam vao nhau neu khong khoa).
-function toggleAssignDone_(csName, phone, done) {
+function toggleAssignDone_(csName, phone, done, ids) {
   csName = String(csName || '').trim();
   phone = String(phone || '').trim();
   if (!csName || !phone) return jsonOut_({ error: 'Thiếu csName hoặc phone.' });
+  // Web gui kem `ids` (cac dot vua tich) -> chi dong vao dung cac dot do. Pancake AI khong gui ids -> tim theo ten CS nhu cu.
+  var idMap = null;
+  if (Array.isArray(ids) && ids.length) { idMap = {}; ids.forEach(function (id) { idMap[String(id)] = 1; }); }
+  var key = normPhone_(phone) || phone;   // sheet co the luu SDT mat so 0 / dang 84
+  var same = function (x) { return (normPhone_(x) || String(x)) === key; };
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return jsonOut_({ error: 'Đang có thao tác khác ghi dữ liệu chia, thử lại sau vài giây.' });
   try {
     var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
     var history = readAssign_(sh);
     var touched = [];
-    var csSetT = _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
+    var csSetT = idMap ? null : _saleFilterNameSet_([csName]);   // KHOP SALE: dot chia ghi bang ten khac cua cung 1 CS van danh dau duoc
     for (var i = 0; i < history.length; i++) {
       var h = history[i];
-      if (!csSetT[_normTxt_(h.csName)] || (h.phones || []).indexOf(phone) === -1) continue;
+      if (idMap ? !idMap[h.id] : !csSetT[_normTxt_(h.csName)]) continue;
+      var mine = (h.phones || []).filter(same);
+      if (!mine.length) continue;
       h.donePhones = h.donePhones || [];
-      var idx = h.donePhones.indexOf(phone);
-      if (done && idx === -1) { h.donePhones.push(phone); touched.push(h); }
-      else if (!done && idx !== -1) { h.donePhones.splice(idx, 1); touched.push(h); }
+      var has = h.donePhones.some(same);
+      if (done && !has) { h.donePhones.push(mine[0]); touched.push(h); }
+      else if (!done && has) { h.donePhones = h.donePhones.filter(function (x) { return !same(x); }); touched.push(h); }
     }
     for (var k = 0; k < touched.length; k++) saveAssignEntry_(touched[k]); // ghi tung dot bi doi, giu nguyen cac dot khac
     return jsonOut_({ ok: true, changed: touched.length });
@@ -456,6 +470,8 @@ function saveAssignHistory_(history) {
   // DUNG MA TRAN TRUOC, chi clearContents() khi da san sang ghi — truoc day clear xong moi stringify, neu setValues loi
   // (o > 50.000 ky tu) thi sheet bi xoa trang va MAT lich su chia tren server.
   var matrix = [ASSIGN_HEADERS];
+  var gone = _assignDeletedIds_();
+  history = history.filter(function (h) { return !h || gone.indexOf(String(h.id)) === -1; });   // dot da xoa khong duoc ghi lai
   for (var i = 0; i < history.length; i++) {
     var rs = assignRowsOf_(history[i]);
     for (var r = 0; r < rs.length; r++) matrix.push(rs[r]);
@@ -617,9 +633,46 @@ function leadAssign_(data) {
 }
 // Ghi de ca sheet AssignData chi danh cho admin. Tai khoan khac (web ban cu gui ca lich su khi bam "xong"): chi cap nhat
 // donePhones cua cac dot chia dung ten minh, khong them/xoa dot nao. Khong co token: giu hanh vi cu.
+// 2026-11-27: xoa DUNG cac dot chia theo id. NGUYEN NHAN GOC: web xoa 1 dot bang cach ghi de CA sheet AssignData bang ban tren may admin (saveAssignHistory),
+// ban nay khong co dot Truong nhom vua chia lai / dot chia tu dong moi va giu tien do "da xong" cu -> mat du lieu cua nguoi khac. Quyen giong saveAssignHistory.
+// NHO cac dot chia da xoa (Script Properties 'assignDeletedIds', giu ~300 id gan nhat vi 1 gia tri toi da 9KB).
+// NGUYEN NHAN GOC: may khac van giu dot da xoa trong trinh duyet; may chu khong nho gi nen ho ghi lai la dot "song lai".
+function _assignDeletedIds_() {
+  try { var a = JSON.parse(PropertiesService.getScriptProperties().getProperty('assignDeletedIds') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function _rememberAssignDeleted_(ids) {
+  var list = _assignDeletedIds_().filter(function (id) { return ids.indexOf(id) === -1; }).concat(ids);
+  while (list.length > 300 || JSON.stringify(list).length > 8500) list.shift();   // bo id cu nhat
+  PropertiesService.getScriptProperties().setProperty('assignDeletedIds', JSON.stringify(list));
+}
+function deleteAssign_(data) {
+  var u = (data && data.token) ? _sessUser_(data.token) : null;
+  if (u && _roleBase_(u.role) !== 'admin') return jsonOut_({ error: 'Chi admin duoc xoa dot chia.', code: 'FORBIDDEN' });
+  var ids = {}, n = 0;
+  ((data && Array.isArray(data.ids)) ? data.ids : []).forEach(function (id) { id = String(id || '').trim(); if (id) { ids[id] = 1; n++; } });
+  if (!n) return jsonOut_({ error: 'Thieu id dot chia can xoa.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jsonOut_({ error: 'Dang co thao tac khac ghi du lieu chia, thu lai sau vai giay.' });
+  try {
+    _rememberAssignDeleted_(Object.keys(ids));   // ghi nho TRUOC khi xoa dong
+    var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS), last = sh.getLastRow(), rows = [];
+    if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { if (ids[String(r[0])]) rows.push(i + 2); });
+    if (rows.length && sh.getMaxRows() - rows.length < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);   // Sheets khong cho xoa het cac dong duoi tieu de
+    // Xoa tu duoi len, gom cac dong lien nhau thanh 1 lan goi (dot chia lon nam tren nhieu dong).
+    for (var e = rows.length - 1; e >= 0; ) {
+      var s = e;
+      while (s > 0 && rows[s - 1] === rows[s] - 1) s--;
+      sh.deleteRows(rows[s], e - s + 1);
+      e = s - 1;
+    }
+    return jsonOut_({ ok: true, deleted: rows.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
 function saveAssignHistoryGuarded_(data) {
   var u = (data && data.token) ? _sessUser_(data.token) : null;
-  if (!u || u.role === 'admin') return saveAssignHistory_(data && data.history);
+  if (!u || _roleBase_(u.role) === 'admin') return saveAssignHistory_(data && data.history);
   var own = _leadOwnNames_(u), incoming = {};
   ((data && data.history) || []).forEach(function (h) { if (h && h.id && own[_normTxt_(h.csName)]) incoming[String(h.id)] = h; });
   var lock = LockService.getScriptLock();

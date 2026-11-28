@@ -118,7 +118,8 @@ const reset = () => { fetchLog.length = 0; toasts.length = 0; audits.length = 0;
   ok(/html \+= _impPickCard_\('pos'[^\n]*\n\s*html \+= _impSrcCard_\(\);/.test(js), 'tab Up du lieu ve the Nguon ngay sau the Pos');
   ok((js.match(/action:'importSheetRows', token: _impTok_\(\)/g) || []).length === 2, 'js/11 van dung 2 cho goi importSheetRows (test-import-undo-ui khong bi vo)');
   ok(/srcItems: null, srcFileName: '', srcInfo: '', srcWarn: ''/.test(st16), 'js/16 _impState co du truong src*');
-  ok(/js\/11-fn-srload\.js\?v=20261121a/.test(idx) && /js\/16-main-currentuser\.js\?v=20261121a/.test(idx), 'index.html da bump ?v= cho js/11 va js/16 (Ctrl+F5)');
+  const ver = f => (idx.match(new RegExp('js/' + f + '\\.js\\?v=([0-9a-z]+)')) || [])[1] || '';   // ban moi hon cung dat (lan sua sau bump tiep)
+  ok(ver('11-fn-srload') >= '20261121a' && ver('16-main-currentuser') >= '20261121a', 'index.html da bump ?v= cho js/11 va js/16 (Ctrl+F5)');
   ok(!/importBaseSource', token: _impTok_\(\), items: items, dryRun: true \}, 'write'/.test(js), 'xem truoc khong dung phase "write" (phai la preview co thu lai)');
 
   console.log(fail ? '\n' + fail + ' LOI' : '\nTAT CA XANH');

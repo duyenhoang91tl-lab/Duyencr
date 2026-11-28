@@ -480,7 +480,7 @@ function _tkdRun_(opts) {
     if (e) { le.row = e.row; ledUpd.push(le); } else ledNew.push(le);
   }
   // don mo coi: da tru nhung khoa khong con trong sheet (don bi sua / xoa khoi Pos)
-  Object.keys(led.map).forEach(function (k) { var x = led.map[k]; if (x.status === 'da_tru' && !seenKeys[k] && rep.orphans.length < 100) rep.orphans.push({ key: k, ngay: x.ngay, sdt: x.sdt }); });
+  Object.keys(led.map).forEach(function (k) { var x = led.map[k]; if (x.status === 'da_tru' && !seenKeys[k] && k.indexOf('CRM|') !== 0 && rep.orphans   /* khoa don CRM (4c) khong phai don POS mat khoi sheet */.length < 100) rep.orphans.push({ key: k, ngay: x.ngay, sdt: x.sdt }); });
   if (opts.apply) {
     Object.keys(dirty).forEach(function (rw) { L.sh.getRange(Number(rw), 1, 1, TONKHO_HEADERS.length).setValues([_tonkhoItemToRow_(dirty[rw])]); });
     ledUpd.forEach(function (x) { led.sh.getRange(x.row, 1, 1, TKD_HEADERS.length).setValues([_tkdLedgerRow_(x)]); });
