@@ -1,9 +1,9 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
-- ✅ ĐÃ XONG: B1 nới ngân sách; B2 module; sinh lại css chế độ tối; sửa vị trí danh sách gợi ý; B3 nạp trong index.html (chỉ web, Ctrl+F5, không cần deploy GAS). Đã thử trên index.html thật bằng Chromium (dữ liệu giả, máy tính + 390px).
-- 🔧 ĐANG LÀM: B4 test.
-- ➡️ BƯỚC KẾ TIẾP: Đưa test tools/test-crm-order-pos-tags.js lên main.
+- ✅ ĐÃ XONG: XONG cả 4 bước + 2 sửa nhỏ (chế độ tối, vị trí gợi ý); test tools/test-crm-order-pos-tags.js xanh (dữ liệu giả). Chỉ web, không sửa GAS. Giá trị lưu vẫn là chuỗi 'thẻ1, thẻ2', tối đa 80 ký tự/ô.
+- 🔧 ĐANG LÀM: Không còn việc code.
+- ➡️ BƯỚC KẾ TIẾP: Duyên: chờ Actions deploy-web xanh → Ctrl+F5 → Tạo đơn, thử gắn thẻ với danh sách thật (GAS salesReportOptions). Test đỏ có sẵn của phiên khác: test-demo-scope (thiếu KPICOMMIT_GET_ACTIONS_ trong khung test), test-team-bonus-ui, test-team-daily-revenue.
 
 ## 2026-11-28 (phiên Claude — CRM ĐƠN GIẢN CHUYÊN NGHIỆP TRÊN BẢN WEB MÁY TÍNH: LÀM HẾT, BẮT ĐẦU BƯỚC 1+2) — BƯỚC 1/2 XONG (chỉ web, Ctrl+F5); ĐANG LÀM BƯỚC 2 (cột mặc định)
 - ĐỀ BÀI Duyên: sau khi hỏi "đã tối ưu bản web đơn giản chuyên nghiệp dễ dùng chưa", Claude trả lời CHƯA (mới làm điện thoại + trang Tổng quan), đề xuất 3 bước; Duyên: "ok làm hết nhưng bắt đầu bằng bước 1 và 2". Bước 1 = gọn phần đầu Danh sách KH trên máy tính; bước 2 = bảng chỉ hiện ~7 cột chính mặc định; bước 3 = rà soát Báo cáo / Chia data / Cài đặt bằng ảnh thật rồi sửa.
