@@ -1114,7 +1114,7 @@ function _srbSubCfg_(){
     t('⚙ % hoa hồng cá nhân', 'openIndividualRatesModal()'); t('🏆 Chương trình thưởng', 'openBonusProgramsModal()');
     t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()'); t('💰 Đơn giá vàng (Pancake AI)', 'openGoldUnitModal()'); t('📡 % hoa hồng theo Kênh', 'openChannelRatesModal()');
   } else if (sub === 'F' && admin){
-    t('🎯 Cài đặt KPI (bậc / commit riêng)', 'openSaleKpiConfigModal_()'); t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()');
+    t('🎯 Cài đặt KPI (bậc / commit riêng)', 'openSaleKpiConfigModal_()'); t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()'); t('💵 Lương cơ bản (ngày công)', 'openSalaryLcbModal_()', 'LCB Sale Offline theo % KPI; admin nhập ngày công thực tế cuối tháng');
   } else if (sub === 'G'){
     t('<b>📗 Excel đầy đủ (gửi kế toán) — 3 sheet</b>', "_srGExportXlsx_()"); t('📊 CSV Tổng hợp (theo Sale + chương trình)', "_srGExportCsv_('summary')");
     t('🧾 CSV Chi tiết từng lượt thưởng', "_srGExportCsv_('detail')"); t('📦 CSV Đơn Pos dùng để tính (đối chiếu)', "_srGExportCsv_('orders')");
