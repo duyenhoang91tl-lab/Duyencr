@@ -3,9 +3,9 @@
 ## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "ok áp dụng nhé" (phương án 1: ẩn với tài khoản test các màn máy chủ không phục vụ).
 - NGUYÊN NHÂN GỐC: tài khoản test mặc định thấy mọi màn, nhưng máy chủ không mở dữ liệu cho một số màn nên bấm vào chỉ gặp "không được phép".
-- ✅ Đã xong: (1) `js/05` — `_DEMO_HIDDEN_TABS_`: Zalo AI, Chat, Thư viện, Chat nội bộ, Công việc, Giai đoạn, Kho sản phẩm, Đơn CRM, Up dữ liệu bị ẩn với role demo; tài khoản khác không đổi. (2) `js/07` — máy chủ từ chối quyền (FORBIDDEN/AUTH) không còn bị hiểu là "Apps Script bản cũ" (trước đó tài khoản test thấy khung có nút Copy Apps Script).
-- 🔧 Đang làm: test tự động.
-- ➡️ Kế tiếp: `docs/TAI-KHOAN-TEST.md`, chạy toàn bộ.
+- ✅ Đã xong: (1) `js/05` ẩn 9 màn với role demo; (2) `js/07` không còn hiện khung "Apps Script bản cũ" khi máy chủ từ chối quyền; (3) test trong `tools/test-demo-scope-web.js`.
+- 🔧 Đang làm: `docs/TAI-KHOAN-TEST.md`.
+- ➡️ Kế tiếp: chạy toàn bộ test + thử trình duyệt rồi chốt.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
