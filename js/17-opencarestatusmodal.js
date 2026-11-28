@@ -121,7 +121,7 @@ function editCsLabel(pi, ci, isLeaf) {
 }
 
 // ── Xóa ──
-function removeCsNode(pi, ci) {
+async function removeCsNode(pi, ci) {
   var node = _careStatusDraft[pi];
   if (ci !== null && ci !== undefined && node.children) {
     if (!confirm('Xóa tình trạng con "' + node.children[ci].label + '"?\n\nDữ liệu KH vẫn giữ nguyên.')) return;
@@ -134,7 +134,7 @@ function removeCsNode(pi, ci) {
     var msg = node.children && node.children.length
       ? 'Xóa nhóm "' + node.label + '" và ' + node.children.length + ' tình trạng con?'
       : 'Xóa "' + node.label + '"?';
-    if (!confirm(msg + '\n\nDữ liệu KH đang có tình trạng này vẫn giữ nguyên.')) return;
+    if (!(await uiConfirm(msg + '\n\nDữ liệu KH đang có tình trạng này vẫn giữ nguyên.'))) return;
     _careStatusDraft.splice(pi, 1);
   }
   renderCareStatusList();
@@ -231,8 +231,8 @@ function removeCareStatusItem(idx) {
   removeCsNode(idx, null);
 }
 
-function resetCareStatusToDefault() {
-  if (!confirm('Khôi phục danh sách mặc định? Các tình trạng tự thêm sẽ bị xóa khỏi menu (dữ liệu KH vẫn giữ nguyên).')) return;
+async function resetCareStatusToDefault() {
+  if (!(await uiConfirm('Khôi phục danh sách mặc định? Các tình trạng tự thêm sẽ bị xóa khỏi menu (dữ liệu KH vẫn giữ nguyên).'))) return;
   _careStatusDraft = JSON.parse(JSON.stringify(CARE_STATUS_TREE_DEFAULT));
   renderCareStatusList();
   _renderCsParentSel();

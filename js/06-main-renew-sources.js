@@ -160,9 +160,13 @@ setTimeout(_syncBizRulesFromGAS, 0);
 // ── DANH SÁCH BÁO CÁO CẤU HÌNH ĐƯỢC (Settings 'reportsConfig') — mỗi công ty bật/tắt + đặt tên báo cáo riêng (CRM bán ra ngoài). ──
 // { "<mã A-L>": { enabled: false, label: "tên hiển thị" } }. Chưa cài = bật hết, tên mặc định. Chỉ ẨN trên giao diện chọn báo cáo; quyền xem dữ liệu
 // vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
-var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Pos'],['D','Báo cáo D — Sale tự thêm'],
+// Sắp xếp theo MỤC ĐÍCH dùng (đổi thứ tự hiển thị thôi — mã A–N, tên và cấu hình theo mã giữ nguyên):
+//  1) Doanh số theo nguồn dữ liệu  2) Hoa hồng · KPI · Thưởng  3) Chia data  4) Đối soát & chốt kỳ.
+var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['N','Báo cáo N — Tính đơn thuần'],['C','Báo cáo C — So sánh kỳ Pos'],['D','Báo cáo D — Sale tự thêm'],
   ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
-  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['K','Báo cáo K — Chốt tháng'],['L','Báo cáo L — KH qua cửa hàng'],['M','Báo cáo M – Tổng quan đơn chia'],['N','Báo cáo N — Tính đơn thuần']];
+  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['M','Báo cáo M – Tổng quan đơn chia'],['K','Báo cáo K — Chốt tháng'],['L','Báo cáo L — KH qua cửa hàng']];
+// Nhóm hiển thị trong ô chọn báo cáo (mã không có trong bảng này tự rơi vào nhóm "Khác")
+var _SR_GROUPS_ = [['📈 Doanh số', ['A','B','N','C','D']], ['💰 Hoa hồng · KPI · Thưởng', ['E','F','G']], ['🗂 Chia data', ['H','I','M']], ['🧾 Đối soát & chốt kỳ', ['K','L']]];
 var REPORTS_CFG = {};
 function _rcApply_(raw) {
   var out = {}, before = JSON.stringify(REPORTS_CFG);
@@ -433,7 +437,11 @@ let _filterDebounceTimer = null;
 //  VIRTUAL TABLE — chỉ render ~50-100 dòng đang nhìn thấy.
 //  Xử lý mượt 39.000+ KH vì DOM luôn nhỏ bất kể cuộn sâu.
 // ═══════════════════════════════════════════════════════
-const VT_ROW_H = 58;       // chiều cao 1 dòng (px) — phải khớp CSS
+// Chiều cao 1 dòng (px) — PHẢI khớp CSS: 58px (css/01) trên máy tính; ≤640px (điện thoại) dòng là "thẻ khách" 3 dòng cao 88px (css/16, khối "THẺ KHÁCH").
+// Dùng CÙNG điều kiện @media (max-width:640px) với CSS (matchMedia) để JS và CSS không bao giờ lệch nhau; xoay màn hình/đổi cỡ cửa sổ thì cập nhật và vẽ lại cửa sổ ảo.
+function _vtRowH_(){ try { return window.matchMedia('(max-width:640px)').matches ? 88 : 58; } catch(e){ return 58; } }
+let VT_ROW_H = _vtRowH_();
+window.addEventListener('resize', function(){ var h = _vtRowH_(); if (h === VT_ROW_H) return; VT_ROW_H = h; try { if (typeof _renderVirtualWindow === 'function') _renderVirtualWindow(true); } catch(e){} });
 const VT_BUFFER = 12;      // số dòng đệm trên/dưới khung nhìn
 let _vt = { list: [], raf: null, bound: false, lastStart: -1, lastEnd: -1 };
 
@@ -521,7 +529,8 @@ var HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'
 // ═══════════════════════════════════════════════════════
 //  NHẮC HẸN — thông báo góc dưới phải màn hình
 // ═══════════════════════════════════════════════════════
-let _reminderPanelOpen = true;
+// Dien thoai (<=640px): mac dinh THU thanh chuong co so. NGUYEN NHAN GOC: bang nhac hen mo san che 1/3 duoi man hinh, de len dung nut dang can bam.
+let _reminderPanelOpen = !(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width:640px)').matches);
 let _reminderTimer = null;
 // parseVNDate_: đọc chuỗi ngày dạng "dd/MM/yyyy" hoặc "dd/MM/yyyy HH:mm" mà backend
 // (readAllOrders_/readDTTong_ trong gas_v13.js) trả về cho các trường ngày của đơn hàng.

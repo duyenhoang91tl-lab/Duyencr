@@ -2988,20 +2988,73 @@
 
   function renderPriceRowsZai_(rows, q) {
     const box = document.getElementById('zai-price-result');
-    let html = '';
     if (!rows.length) {
-      html += '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Không tìm thấy sản phẩm' + (q ? ' cho "' + escHtml(q) + '"' : '') + '.</div>';
-    } else {
-      html += rows.slice(0, 30).map((row) => {
-        const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
-        const priceKeys = keys.filter((k) => /gia|price/i.test(k));
-        const otherKeys = keys.filter((k) => !/gia|price/i.test(k));
-        const line = (k) => '<span style="display:inline-block;margin-right:8px;color:#1e3a8a"><b>' + escHtml(k) + ':</b> ' + escHtml(row[k]) + '</span>';
-        return '<div style="border-bottom:1px solid #dbeafe;padding:6px 0;font-size:12px">' + otherKeys.map(line).join(' ') +
-          (priceKeys.length ? '<div style="margin-top:3px;font-weight:700;color:#b45309">' + priceKeys.map(line).join(' · ') + '</div>' : '') + '</div>';
-      }).join('');
+      box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Không tìm thấy sản phẩm' + (q ? ' cho "' + escHtml(q) + '"' : '') + '.</div>';
+      return;
     }
-    box.innerHTML = html;
+    // Y HET Pancake AI (renderPriceRows_, quy tac song song 08-extension-parity): nhan cot gia/ten BO DAU, bo cot STT + "Khoa", gia theo Loai da, gia quy ra DONG,
+    // va GOM cac dong CUNG SAN PHAM thanh 1 the (truong chung 1 lan, moi chat lieu 1 dong, moi SIZE 1 dong). Truoc day: nhan cot bang /gia|price/i truc tiep tren tieu de CO DAU
+    // ("Giá thường") nen KHONG BAO GIO khop -> gia hien lan trong cac truong khac, la so NGHIN tho ("6350"); MOI DONG SHEET 1 THE lap du Nhom/Ten/Chat lieu (Duyen 21/11/2026).
+    const parseK = (v) => parseFloat(String(v).replace(/[^\d.]/g, '')) || 0;
+    const isPriceKey = (k) => /gia|price/.test(zaiFold_(k));
+    const isHiddenKey = (k) => { const s = zaiFold_(k); return s === 'stt' || s.indexOf('khoa') === 0; };
+    const line = (row, k) => '<span class="zai-price-field"><b>' + escHtml(k) + ':</b> ' + escHtml(row[k]) + '</span>';
+    const info = (row) => {
+      const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
+      const priceKeys = keys.filter(isPriceKey);
+      const otherKeys = keys.filter((k) => !isPriceKey(k) && !isHiddenKey(k));
+      // Ten san pham: uu tien "ten san pham" roi "ten thuong mai" (giong GAS _priceFieldPick_); khong co -> cot dau (nhung KHONG gom theo cot do)
+      const nameKeyMatched = otherKeys.find((k) => /ten\s*san\s*pham/.test(zaiFold_(k))) || otherKeys.find((k) => /ten\s*thuong\s*mai/.test(zaiFold_(k))) || '';
+      const nameKey = nameKeyMatched || otherKeys[0] || '';
+      const name = nameKey ? String(row[nameKey]) : '';
+      const shownKeys = otherKeys.filter((k) => !(k !== nameKey && String(row[k]).trim() === name.trim() && /ten/.test(zaiFold_(k))));
+      const chatLieuKey = otherKeys.find((k) => zaiFold_(k).indexOf('chat lieu') !== -1);
+      const sizeKey = otherKeys.find((k) => { const s = zaiFold_(k); return s.indexOf('size') !== -1 || s.indexOf('kieu') !== -1; });
+      const stoneKey = (kw) => priceKeys.find((k) => zaiFold_(k).indexOf(kw) !== -1);
+      const defaultKey = priceKeys.find((k) => { const s = zaiFold_(k); return s.indexOf('saphia') === -1 && s.indexOf('ruby') === -1; });
+      let chosenKey = defaultKey || priceKeys[0] || '', priceLabel = 'Giá thường', fallbackNote = '';
+      if (_zaiStonePref === 'RUBY' || _zaiStonePref === 'SAPHIA') {
+        const sk = stoneKey(_zaiStonePref.toLowerCase());
+        if (sk) { chosenKey = sk; priceLabel = 'Giá ' + _zaiStonePref; }
+        else fallbackNote = ' (không có giá riêng cho ' + _zaiStonePref + ', đang dùng giá thường)';
+      }
+      const priceNum = chosenKey ? parseK(row[chosenKey]) * 1000 : 0;   // cot gia ghi theo NGHIN d (7950 = 7.950.000d)
+      const priceText = chosenKey ? (priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : String(row[chosenKey])) : '';
+      return { row, name, hasName: !!nameKeyMatched, shownKeys, chatLieuKey, sizeKey, priceText, priceLabel, fallbackNote, hasPrice: !!chosenKey };
+    };
+    const singleHtml = (it) => '<div class="zai-price-item">' + it.shownKeys.map((k) => line(it.row, k)).join(' ') +
+      (it.hasPrice ? '<div class="zai-price-amount"><span class="zai-price-field"><b>' + escHtml(it.priceLabel) + ':</b> ' + escHtml(it.priceText) + escHtml(it.fallbackNote) + '</span></div>' : '') + '</div>';
+    const groupHtml = (g) => {
+      const f0 = g[0], skip = {}; [f0.sizeKey, f0.chatLieuKey].forEach((k) => { if (k) skip[k] = 1; });
+      const val = (it, k) => (it.row[k] == null ? '' : String(it.row[k]).trim());
+      const common = f0.shownKeys.filter((k) => !skip[k] && g.every((it) => val(it, k) === val(f0, k)));
+      const isCommon = {}; common.forEach((k) => { isCommon[k] = 1; });
+      const varyKeys = []; g.forEach((it) => it.shownKeys.forEach((k) => { if (!skip[k] && !isCommon[k] && varyKeys.indexOf(k) === -1) varyKeys.push(k); }));
+      const matOf = (it) => (it.chatLieuKey ? String(it.row[it.chatLieuKey] == null ? '' : it.row[it.chatLieuKey]).replace(/\s*\n+\s*/g, ' · ').trim() : '');
+      const mats = []; let last = null;
+      g.forEach((it) => {   // o chat lieu TRONG = cung chat lieu dong tren (sheet hay GOP O)
+        const m = matOf(it);
+        let mg = (!m && last) ? last : mats.find((x) => zaiFold_(x.mat) === zaiFold_(m));
+        if (!mg) { mg = { mat: m, items: [] }; mats.push(mg); }
+        mg.items.push(it); last = mg;
+      });
+      const varHtml = (it) => {
+        let size = it.sizeKey ? val(it, it.sizeKey) : '';
+        if (/^\d+([.,]\d+)?$/.test(size)) size = 'Size ' + size;
+        const extra = varyKeys.map((k) => (val(it, k) ? k + ': ' + val(it, k) : '')).filter(Boolean).join(', ');
+        const price = it.hasPrice ? escHtml(it.priceText) + (it.fallbackNote ? '<small>' + escHtml(it.fallbackNote) + '</small>' : '') : '<i>chưa có giá</i>';
+        return '<div class="zai-price-var"><span class="zai-price-vlabel">' + escHtml(size) + (extra ? ' <small>(' + escHtml(extra) + ')</small>' : '') + '</span><span class="zai-price-vprice">' + price + '</span></div>';
+      };
+      const kind = g.some((it) => it.priceLabel !== 'Giá thường') ? '<div class="zai-price-kind"><b>Loại giá:</b> ' + escHtml(f0.priceLabel) + '</div>' : '';
+      return '<div class="zai-price-item zai-price-group">' + common.map((k) => line(f0.row, k)).join(' ') + kind +
+        mats.map((mg) => (mg.mat ? '<div class="zai-price-mat"><b>' + escHtml('Chất liệu') + ':</b> ' + escHtml(mg.mat) + '</div>' : '') + mg.items.map(varHtml).join('')).join('') + '</div>';
+    };
+    const groups = [], byName = {};
+    rows.slice(0, 30).map(info).forEach((it) => {
+      const key = it.hasName ? zaiFold_(it.name) : '';
+      if (key && byName[key]) byName[key].push(it); else { const g = [it]; groups.push(g); if (key) byName[key] = g; }
+    });
+    box.innerHTML = groups.map((g) => (g.length === 1 ? singleHtml(g[0]) : groupHtml(g))).join('');
   }
 
   // Nguồn dữ liệu thứ 3 "CSKH-Duyên" (khách VIP/SPV): GAS 'lookup' trả thêm d.cskh = các dòng của SĐT này. Lưu riêng theo SĐT

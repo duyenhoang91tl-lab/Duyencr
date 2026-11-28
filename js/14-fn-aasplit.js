@@ -692,7 +692,7 @@ function _aaResultTable(p, sh, haveLabel, missSuffix){
     p.entries.map(function(e){ var m = sh[e.name+'|'+(e.src||'pos')]; return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:var(--tn)">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td class="r">'+e.quota+'</td><td class="r"><b>'+e.phones.length+'</b></td><td style="color:var(--red)">'+(m?'thiếu '+m+missSuffix:'')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
 async function _aaRunNow(){
-  if (!confirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.')) return;
+  if (!(await uiConfirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.'))) return;
   var btn = document.getElementById('aa-run-btn'), old = btn ? btn.textContent : '';
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang chia...'; }
   var pv = document.getElementById('aa-preview'); if (pv) pv.innerHTML = '<div class="assign-section"><div style="font-size:13px">⏳ Đang chia, đợi chút...</div></div>';
@@ -1082,11 +1082,11 @@ function _injectV9UI(){
     // (tabVisible) thì tự động không xuất hiện trong dropdown; nếu ẩn hết cả 4 thì cả nút
     // "📊 Báo cáo ▾" cũng tự ẩn theo.
     var reportDefs = [
-      { id:'salesreport', label:'📈 Báo cáo doanh số' },
-      { id:'pancake',     label:'📥 Báo cáo Pancake' },
-      { id:'kpipancake',  label:'📈 KPI Pancake' },
-      { id:'mktchecklist',label:'✅ Checklist MKT' },
-      { id:'dailybrief',  label:'🎯 Báo cáo ngày' }
+      { id:'dailybrief',  label:'🎯 Báo cáo ngày',      grp:'Hằng ngày' },
+      { id:'salesreport', label:'📈 Báo cáo doanh số',  grp:'Doanh số' },
+      { id:'pancake',     label:'📥 Báo cáo Pancake',   grp:'Marketing' },
+      { id:'kpipancake',  label:'📈 KPI Pancake',       grp:'Marketing' },
+      { id:'mktchecklist',label:'✅ Checklist MKT',      grp:'Marketing' }
     ];
     var visibleReportDefs = reportDefs.filter(function(d){ return tabVisible[d.id] !== false; });
     if (visibleReportDefs.length){
@@ -1102,7 +1102,17 @@ function _injectV9UI(){
       var rgList = document.createElement('div');
       rgList.id = 'reportsgroup-list';
       rgList.style.cssText = 'display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:200px;z-index:950;padding:6px;';
+      var _lastRg = '';
       visibleReportDefs.forEach(function(d){
+        if (d.grp && d.grp !== _lastRg){   // tiêu đề nhóm: chỉ để nhìn, không bấm được, không có data-bar-id nên không dính cơ chế kéo mục ra/vào ☰ Menu
+          _lastRg = d.grp;
+          var gh = document.createElement('div');
+          gh.className = 'rg-head';
+          gh.style.cssText = 'padding:6px 10px 2px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);cursor:default';
+          gh.textContent = d.grp;
+          gh.setAttribute('onclick', 'event.stopPropagation()');
+          rgList.appendChild(gh);
+        }
         var item = document.createElement('div');
         item.className = 'tab';
         item.id = 'v9tab-' + d.id;
@@ -1269,16 +1279,19 @@ function _applyAuthIdentity(acct){
   // Doi sale Online/Van phong duoc XEM THEM khach/don cua nhom Sale "Quay" + phong CSKH (2026-10-29): may chu tra user.viewNames (_usersForClient_ full).
   // _inUserScope cong cac ten nay vao pham vi; vai tro admin/viewer khong gioi han nen bo qua.
   currentUser.viewNames = (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer' || !Array.isArray(acct.viewNames)) ? [] : acct.viewNames.filter(function(n){ return n && currentUser.names.indexOf(n) === -1; });
+  // Truong nhom bi gioi han thang (2026-11-26): _inUserScope (js/08) doc currentUser.viewMonths. Don POS chi tai san 90 ngay (js/88) -> tai them cho du thang cu nhat.
+  currentUser.viewMonths = (currentUser.role === 'leader' && Array.isArray(acct.viewMonths)) ? acct.viewMonths.slice() : [];
+  if (currentUser.viewMonths.length && typeof posOrdersEnsureDays_ === 'function') {
+    var _oldest = currentUser.viewMonths.slice().sort()[0];
+    try { posOrdersEnsureDays_(Math.ceil((Date.now() - new Date(_oldest + '-01T00:00:00').getTime()) / 86400000) + 1); } catch (eM) {}
+  }
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
-    // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.
-    currentUser.perms = ['salesreport','pancake','kpipancake','mktchecklist','dailybrief'];
+    // Tai khoan test (27/11): xem du tab nhu tai khoan thuong (tab theo perms/vai tro), du lieu khach loc theo sale da chon (server + js/08); body.demo-mode an nut quan tri/Google Sheets, server chan moi thao tac ghi.
     document.body.classList.add('demo-mode');
     // Xoa cache CSKH-Duyen/don cua phien truoc tren cung trinh duyet + bo du lieu dang giu trong bo nho: test chi duoc thay 5 dong tu may chu.
     try { cskhData = {}; cskhMeta = { found: null, total: 0, noPhone: 0 }; ['ome_cskh_duyen', 'ome_cskh_duyen_meta'].forEach(function(k){ localStorage.removeItem(k); }); } catch(eC){}
     try { if (typeof _idbDel_ === 'function') { _idbDel_('cskh_lite_v1').catch(function(){}); _idbDel_('orders_v1').catch(function(){}); } } catch(eI){}
-    // Vao thang bao cao doanh so (tab Danh sach KH dang bi an voi tai khoan nay)
-    setTimeout(function(){ try { switchTab('salesreport', document.querySelector('[data-bar-id="reportsgroup"]')); } catch(eS){} }, 400);
   } else { document.body.classList.remove('demo-mode'); try { localStorage.removeItem('ome_demo_token'); } catch(eT){} }
   saveLS('ome_user', currentUser);
   if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
@@ -1373,8 +1386,8 @@ async function doLogin(){
   _applyAuthIdentity(acct);
   if (typeof toast === 'function') toast('✓ Xin chào ' + (acct.name || acct.username) + ' (' + _roleLabel(acct.role) + ')');
 }
-function doLogout(){
-  if (!confirm('Đăng xuất khỏi tài khoản hiện tại?')) return;
+async function doLogout(){
+  if (!(await uiConfirm('Đăng xuất khỏi tài khoản hiện tại?'))) return;
   _authAccount = null;
   try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); sessionStorage.removeItem('ome_demo_clean'); }catch(e){}
   document.body.classList.remove('demo-mode');

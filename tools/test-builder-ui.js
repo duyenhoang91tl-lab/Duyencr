@@ -27,7 +27,7 @@ const P_HELP = ['_hasGoldPlating_', '_stripVNlocal_', '_fold_', '_vnSort_', '_it
 const pstate = ['PK_GOLD_KARATS', '_cartItems', '_cartExtra', '_cartLoadedFor', 'PK_SHIP_FEE', 'PRODUCT_NAME_OVERRIDES'].map(n => declSpan(psrc, n)).join('\n');
 const tabsStart = psrc.indexOf("    panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {"), tabsEnd = psrc.indexOf("    panelEl.querySelector('#pk-cart-add-manual')");
 const pconsts = ['PK_FLAT_TTL_MS', 'PK_COLOR_OPTS', 'PK_SHADE_OPTS'].map(n => declSpan(psrc, n)).join('\n');
-const pchunk = pconsts + '\n' + 'let _stonePref = "", _bannedWords = [], _goldUnitAmount = 350000, _currentPhone = "";\n' + P_HELP.map(n => declSpan(psrc, n)).join('\n') + '\n' + pstate + '\n' + P_CART_FUNCS.map(n => declSpan(psrc, n)).join('\n') + '\n' +
+const pchunk = pconsts + '\n' + 'let _stonePref = "", _bannedWords = [], _goldUnitAmount = 350000, _currentPhone = "";\nlet _comboRows = [], _comboLoading = false; function loadCombos_(){} function renderBuilderCombos_(){}\n' + P_HELP.map(n => declSpan(psrc, n)).join('\n') + '\n' + pstate + '\n' + P_CART_FUNCS.map(n => declSpan(psrc, n)).join('\n') + '\n' +
   P_BLD_CONSTS.map(n => declSpan(psrc, n)).join('\n') + '\n' + P_BLD_LETS.map(n => declSpan(psrc, n)).join('\n') + '\n' + P_BLD_FUNCS.map(n => declSpan(psrc, n)).join('\n') + '\nfunction bindTabs(){\n' + psrc.slice(tabsStart, tabsEnd) + '\n}\n';
 const Z_HELP = ['_zaiLocalStripVN_', '_zaiItemFold_', '_zaiVnSort_', '_zaiItemNames_', '_zaiParseNumberedList_', '_zaiSplitTopLevel_', '_zaiParseMaterialTree_'];
 const zchunk = Z_HELP.map(n => declSpan(zsrc, n)).join('\n') + '\n' + zsrc.slice(zsrc.indexOf('  let _zaiBannedWords = [];'), zsrc.indexOf('  // ── TIM ANH SAN PHAM'));

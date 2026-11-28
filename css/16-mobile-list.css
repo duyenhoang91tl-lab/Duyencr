@@ -17,7 +17,6 @@
   #ymf-bar .ymf-label{white-space:nowrap;}
 
   /* 2) "Cột hiển thị" chiếm 4 hàng chỉ vì nhãn xuống dòng; ít khi dùng → ẩn cùng khối "Tổng quan & tác vụ" (bấm thanh đó để mở, như 6 ô thống kê và thanh tác vụ) */
-  body.lov-on-list:not(.lov-open) #tab-list > .col-toggle-bar{display:none !important;}
   .col-toggle-bar{padding:4px 10px;}
   .col-toggle-bar .ymf-label{white-space:nowrap;}
 
@@ -52,3 +51,51 @@
 @media (max-width:900px){
   #main-table th{white-space:normal;line-height:1.25;overflow:visible;}
 }
+
+/* ═══ KHÔNG KÉO ĐƯỢC DANH SÁCH KHÁCH (Duyên 2026-11-26: "thanh công cụ kéo chỉ kéo được menu phía trên, không kéo được danh sách khách phía dưới") ═══
+   NGUYÊN NHÂN GỐC: #data-view (inline overflow:hidden) xếp dọc: thanh tab · lov-bar · stats-row · #tab-list. Mọi khối phía trên đều flex-shrink:0, và #tab-list (inline flex:1;overflow:hidden)
+   bị co lại còn phần dư. Trên điện thoại, khi mở "📊 Tổng quan & tác vụ" (6 ô thống kê 2 hàng + toolbar xuống dòng + thanh lọc + thanh cột) phần dư gần 0 → .table-wrap (flex:1) bị bóp còn
+   ~0px và bị #tab-list/#data-view cắt (overflow:hidden) → vuốt chỉ thấy các thanh phía trên, danh sách khách không có chỗ để kéo.
+   CÁCH SỬA (chỉ ≤900px, chỉ tab Danh sách KH — class lov-on-list do js/05 _lovSync_ đặt): #data-view được cuộn dọc, #tab-list không co dưới nội dung của nó, .table-wrap luôn cao tối thiểu
+   ~55% màn hình thật (--vh do js/59 đặt, rơi về 1vh) → luôn vuốt được danh sách; phần thanh phía trên vuốt đi được. Có chỗ dư thì .table-wrap vẫn tự giãn (flex:1) như cũ. Máy tính KHÔNG đổi.
+   LƯU Ý: KHÔNG đổi chiều cao dòng bảng (cuộn ảo VT_ROW_H js/02) — chỉ đổi chiều cao khung chứa. Cần !important vì #data-view và #tab-list đặt overflow/flex bằng style inline. */
+@media (max-width:900px){
+  body.lov-on-list #data-view{overflow-y:auto !important;overflow-x:hidden !important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;}
+  body.lov-on-list #tab-list{flex:1 0 auto !important;overflow:visible !important;}
+  /* CHIỀU CAO CỐ ĐỊNH (không dùng flex:1/min-height): #tab-list cao theo nội dung nên flex-basis 0% của .table-wrap bị hiểu là 'content' → khung giãn bằng cả bảng ảo (total*58px) → js/02 vẽ HẾT dòng → đơ máy. */
+  body.lov-on-list #tab-list > .table-wrap{flex:0 0 auto !important;height:calc(var(--vh,1vh)*70);max-height:calc(var(--vh,1vh)*70);min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto;}
+}
+
+/* NGUYÊN NHÂN GỐC "mở danh sách không thấy khách là ai": cột "Ngày mua gần nhất" đứng đầu rộng 152px (css/18) = 40% màn điện thoại, thường chỉ có dấu "—".
+   Thu còn 84px (đủ ngày dd/mm/yyyy) để tên + cột kế tiếp hiện ngay. Chỉ màn ≤640px; không ẩn cột, không đổi chiều cao dòng. */
+@media (max-width:640px){
+  html body #main-table th.col-lastpos,html body #main-table td.col-lastpos{width:84px;min-width:84px;max-width:84px;padding-left:4px;padding-right:4px;}
+  html body #main-table th.col-lastpos{font-size:10px;}
+  html body #main-table th.col-lastpos .th-inner{white-space:normal;flex-wrap:wrap;gap:2px;}
+}
+
+/* ═══ THẺ KHÁCH TRÊN ĐIỆN THOẠI (Duyên 2026-11-28: "danh sách khách dạng thẻ" cho người mới dùng) ═══
+   NGUYÊN NHÂN GỐC: dòng bảng 58px chỉ vừa tên + SĐT, còn CS/tình trạng/nút gọi nằm ngoài màn hình (phải vuốt ngang), người mới không biết có.
+   CÁCH SỬA (chỉ ≤640px): giữ NGUYÊN bảng cuộn ảo + mọi cột (vuốt ngang vẫn thấy hết), nhưng dòng thành "thẻ" cao 88px: cột tên rộng ~2/3 màn hình, thêm dòng thứ 3
+   "CS + 📞 Gọi + 💬 Zalo" (js/02 _cardLineHtml_). Chiều cao 88px PHẢI khớp JS: js/06 _vtRowH_() dùng cùng @media (max-width:640px). Máy tính: .cm-line ẩn, bảng không đổi. */
+.cm-line{display:none;}
+@media (max-width:640px){
+  html body #main-table tbody tr:not(.vspacer){height:88px;}
+  html body #main-table th.col-name,html body #main-table td.col-name{width:262px;min-width:262px;max-width:262px;}
+  html body #main-table td.col-name .cm-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
+  html body #main-table td.col-name .cm-cs{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);}
+  html body #main-table td.col-name .cm-btn{flex:0 0 auto;padding:3px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;}
+  html body #main-table td.col-name .cm-btn:active{background:var(--border);}
+}
+
+/* ═══ DANH SÁCH KH GỌN HƠN TRÊN MÁY TÍNH (Duyên 2026-11-28: "đơn giản chuyên nghiệp dễ sử dụng", bước 1) ═══
+   NGUYÊN NHÂN GỐC: trước bảng khách có ~340px đầu trang: thanh Tổng quan · 6 ô thống kê (mở sẵn trên màn rộng) · thanh công cụ · 2 hàng lọc ngày/giờ · hàng 15+ ô "Cột hiển thị"
+   → chỉ thấy ~7 dòng khách, người mới không biết bắt đầu từ đâu. CÁCH SỬA (chỉ đổi MẶC ĐỊNH, không xoá tính năng, ai đã chọn mở thì giữ):
+   - 6 ô thống kê: thu gọn mặc định (js/05 _lovIsOpen_), bấm thanh "Tổng quan" để mở như cũ.
+   - Thanh công cụ (sắp xếp, chiến dịch, Thêm KH/đơn, Xuất CSV): máy tính (>900px) LUÔN hiện kể cả khi thanh Tổng quan thu gọn (điện thoại giữ như cũ: nằm sau thanh Tổng quan).
+   - "📋 Cột hiển thị": ẩn mặc định ở mọi cỡ màn hình, mở bằng nút cạnh "Lọc nâng cao" (js/05 toggleColBar, body.cols-open). */
+@media (min-width:901px){
+  body.lov-on-list:not(.lov-open) #tab-list > .toolbar{display:flex !important;}
+}
+#tab-list > .col-toggle-bar{display:none;}
+body.cols-open #tab-list > .col-toggle-bar{display:flex;}

@@ -3,7 +3,8 @@
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const R = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), g = R('gas_v13.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js');
-const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
+const fn = (src, n) => { let i = src.indexOf('\nfunction ' + n + '('); if (i < 0) i = src.indexOf('\nasync function ' + n + '(');   // 26/11: hàm có thể đã chuyển sang async (uiConfirm)
+  if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
 const j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
 const ctx = { loadLS: () => null, SALE_CHANNELS: { An: 'online', Binh: 'offline' }, SALE_CHANNEL_PERIODS: {}, BONUS_PROGRAMS: [], _srMoney: n => String(n), accounts: [], _acctNamesOf: () => [] };

@@ -835,6 +835,14 @@
 }
 .pk-price-addbtn:hover { background: #dbeafe; }
 
+/* Thẻ GỘP cùng sản phẩm (21/11/2026): trường chung 1 lần, mỗi chất liệu 1 dòng, mỗi SIZE 1 dòng "SIZE 1 — giá [+ Thêm]" */
+.pk-price-group .pk-price-mat { margin-top: 5px; font-size: 11.5px; color: #1e3a8a; }
+.pk-price-var { display: flex; align-items: center; gap: 8px; margin-top: 3px; padding: 3px 0 3px 8px; border-left: 2px solid #bfdbfe; flex-wrap: wrap; }
+.pk-price-vlabel { flex: 1 1 70px; min-width: 0; font-weight: 600; color: #0f172a; }
+.pk-price-vlabel small, .pk-price-vprice small { font-weight: 400; color: #64748b; font-size: 10.5px; }
+.pk-price-vprice { font-weight: 700; color: #b45309; white-space: nowrap; }
+.pk-price-kind { margin-top: 3px; font-size: 11px; color: #1e3a8a; }
+
 /* ── ĐƠN HÀNG ĐANG TÍNH (giỏ tạm) ── */
 #pk-cart-section {
   border: 1px solid #fbcfe8;

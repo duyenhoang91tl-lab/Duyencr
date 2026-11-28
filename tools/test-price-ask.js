@@ -73,7 +73,7 @@ aiCalls = 0; r = e.run("priceQa_('giá xe máy')"); ok(r.ok && !r.found && r.sug
 aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && r.found && aiCalls === 1 && /450/.test(e.sys) && /Nhẫn Bạc Trơn/.test(e.sys), 'chi 1 tu khoa khop SP -> AI tra loi tu bang gia that (prompt co SP do)');
 aiCalls = 0; r = e.run("priceQa_('giá xe')"); ok(r.ok && !r.found && aiCalls === 0, 'chi 1 tu khong co trong bang -> KHONG goi AI');
 aiMode = 'err'; r = e.run("priceQa_('giá nhẫn bạc trơn')");
-ok(r.ok && r.found && /450/.test(r.text) && /nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
+ok(r.ok && r.found && /450\.000đ/.test(r.text) && !/nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC (da quy ra DONG, 21/11: truoc day hien so nghin tho) thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
 aiMode = 'throw'; r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(r.ok && r.found && /450/.test(r.text) && /mat mang/.test(r.aiError), 'AI nem loi -> van tra gia chinh xac');
 r = e.run("priceQa_('  ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
 e = makeEnv({ cat: [] }); r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(!r.ok && /rong|chua doc/.test(r.error), 'bang gia rong -> bao ro');

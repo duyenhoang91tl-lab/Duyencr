@@ -115,8 +115,9 @@ html.ui-pro .pro-gauge-s{font-size:var(--ui-fs-xs);color:var(--hint);}
 html.ui-pro .pro-foot{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;padding-top:8px;border-top:1px solid var(--pro-line);font-size:var(--ui-fs-sm);color:var(--muted);}
 html.ui-pro .pro-next.bad .n-pct{color:var(--pro-red);}
 html.ui-pro .pro-next .n-act{white-space:nowrap;}
-html.ui-pro .pro-bar-row{display:grid;grid-template-columns:minmax(90px,170px) 1fr minmax(88px,auto);gap:8px;align-items:center;margin:6px 0;font-size:var(--ui-fs-sm);}
-html.ui-pro .pro-bar-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+html.ui-pro .pro-bar-row{display:grid;grid-template-columns:minmax(130px,2fr) minmax(56px,1fr) auto;gap:8px;align-items:center;margin:6px 0;font-size:var(--ui-fs-sm);}
+/* Duyen 28/11: ten muc bieu do thanh khong bi cat '…' — cho xuong dong; thanh cot ngan lai de nhuong cho ten (xem grid .pro-bar-row). */
+html.ui-pro .pro-bar-lbl{white-space:normal;overflow-wrap:anywhere;line-height:1.3;}
 html.ui-pro .pro-bar{height:10px;border-radius:99px;background:var(--pro-soft);overflow:hidden;}
 html.ui-pro .pro-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--pro-blue2),var(--pro-blue));}
 html.ui-pro .pro-bar-n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
@@ -280,7 +281,11 @@ html.ui-pro .pro-qa:hover{background:var(--ui-brand-soft,var(--bg));border-color
    NGUYÊN NHÂN GỐC: .dp là cột flex cao đúng bằng màn hình + overflow:hidden (css/01) và CHỈ .dp-body cuộn; khối #dp-pro phía trên (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Việc tiếp theo)
    không co được nên trên điện thoại .dp-body chỉ còn ~100px (form nằm trong khung tí hon) và phần trên không cuộn được. Màn hẹp: cả ngăn #dp cuộn dọc, .dp-body hết cuộn riêng (cao theo nội dung),
    thanh tiêu đề (tên + nút ✕) dính trên cùng để luôn đóng được, chừa đáy cho thanh tab hồ sơ (pro-has-tabs, 44px) khỏi che ô cuối. Ngưỡng 640 = MOBILE_FIT_MAX_W (js/59). */
-@media (max-width:640px){
+/* FIX 19/11 (ảnh Duyên: hồ sơ khách "Huyen Mai Cuốn" không kéo xuống được trên cửa sổ rộng > 640px).
+   NGUYÊN NHÂN GỐC: bản fix 15/11 chỉ bọc trong @media (max-width:640px) nên cửa sổ rộng hơn (máy tính, cửa sổ thu nhỏ 641-900px, ngăn gắn cạnh chat Social) vẫn dùng luật cũ:
+   #dp overflow:hidden + chỉ .dp-body cuộn, mà #dp-pro (nút, Mức quan tâm, Gợi ý, giai đoạn, KPI, Dòng thời gian) + .dp-tabs không co được → .dp-body còn ~43px, phần trên không cuộn.
+   Đo Chromium 680px cao: .dp-body 43px, scrollTop không đổi. Nay luật cuộn cả #dp áp cho MỌI độ rộng (bỏ @media). */
+@media all{
   html.ui-pro #dp{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   html.ui-pro #dp .dp-hdr{position:sticky;top:0;z-index:3;background:var(--surface)}
   html.ui-pro #dp .dp-body{flex:none;overflow:visible;padding-bottom:72px}

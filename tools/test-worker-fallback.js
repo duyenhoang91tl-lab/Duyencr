@@ -19,10 +19,13 @@ function boot(net) {
   let r = await t.w.fetch(WORKER + '?action=orders&src=web');
   ok(r.status === 200 && t.calls[1] === DIRECT + '?action=orders&src=web', 'Worker 502 -> goi lai THANG Apps Script, nhan 200');
   ok(t.w.eval('gsUrl') === DIRECT && (t.w.__t || []).length === 1, 'doi sang Apps Script cho ca phien + bao 1 lan');
+  ok(t.w.eval('_wkLastFb') && t.w.eval('_wkLastFb.act') === 'orders' && t.w.eval('_wkLastFb.why') === 'HTTP 502', 'ghi LY DO bo Worker: action + HTTP 502');
+  ok(/Worker từng bị bỏ lúc \d\d:\d\d:\d\d: action=orders · HTTP 502/.test(t.w.eval('_cdState()')), 'Chan doan hien dong "Worker tung bi bo" kem ly do');
   t = boot(u => u.indexOf(WORKER) === 0 ? 404 : 200);
   r = await t.w.fetch(WORKER + '?action=donPhones&token=X'); ok(r.status === 200, 'Worker 404 -> thu lai thang, 200');
   t = boot(u => u.indexOf(WORKER) === 0 ? 'abort' : 200);
   r = await t.w.fetch(WORKER + '?action=customers'); ok(r.status === 200, 'loi mang Worker -> thu lai thang, 200');
+  ok(t.w.eval('_wkLastFb.act') === 'customers' && t.w.eval('_wkLastFb.why') === 'lỗi mạng' && /net::ERR/.test(t.w.eval('_wkLastFb.body')), 'loi mang: ghi ly do + noi dung loi');
   t = boot(() => 502);
   r = await t.w.fetch(WORKER + '?action=orders'); ok(r.status === 502 && t.w.eval('gsUrl') === WORKER, 'ca hai deu loi -> tra loi goc va giu Worker (khong ket o Apps Script)');
   t = boot(() => 502);

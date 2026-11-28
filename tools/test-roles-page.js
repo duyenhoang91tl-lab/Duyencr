@@ -18,7 +18,7 @@ function boot(opts) {
   const dom = new JSDOM('<body><div id="rs-page" class="rs-page"></div></body>', { url: 'http://localhost/', runScripts: 'dangerously', pretendToBeVisual: true });
   const w = dom.window; w.__toasts = []; w.__posts = []; w.__calls = [];
   w.gsUrl = 'https://gas.example/exec'; w.esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  w.toast = m => w.__toasts.push(m); w.confirm = () => (opts.confirm === undefined ? true : opts.confirm); w.alert = () => {};
+  w.toast = m => w.__toasts.push(m); w.confirm = () => (opts.confirm === undefined ? true : opts.confirm); w.uiConfirm = async (...a) => w.confirm(...a); w.alert = () => {};
   w._PERM_TAB_DEFS = TABS; w._SN_GROUPS = GROUPS; w._SN_ACTS = ACTS;
   w.accounts = [{ username: 'u1', name: 'Hà', role: 'cs', names: ['Hà'] }, { username: 'u2', name: 'Minh', role: 'ceo' }, { username: 'u3', name: 'Lan', role: 'tp', team: 'online' }];
   w.currentUser = { role: 'admin', name: 'Admin' }; w._applyAuthIdentity = function () {};

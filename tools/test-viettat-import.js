@@ -30,7 +30,7 @@ async function boot(o) {
   const dom = new JSDOM('<!doctype html><body><div id="vt-imp-msg"></div></body>', { runScripts: 'outside-only', url: 'https://crm.test/', pretendToBeVisual: true });
   const w = dom.window, calls = [], up = []; o = o || {};
   w.TextDecoder = TextDecoder; w.DecompressionStream = DecompressionStream; w.Response = Response;
-  w.gsUrl = 'https://gas.test/exec'; w.toast = () => {}; w.alert = () => {}; w.confirm = () => true;
+  w.gsUrl = 'https://gas.test/exec'; w.toast = () => {}; w.alert = () => {}; w.confirm = () => true; w.uiConfirm = async (...a) => w.confirm(...a);
   w.fetch = async (u, init) => { const b = init && init.body ? JSON.parse(init.body) : null; calls.push({ u, b });
     if (b && b.action === 'vietTatUploadImage') { up.push(b); return { json: async () => ({ ok: true, id: 'IMG_' + b.name.replace(/\W/g, '') + '_AAAAAAAAAA', name: b.name }) }; }
     if (b && b.action === 'saveVietTat') return { json: async () => (o.saveErr && o.saveErr(b.snippet) ? { error: 'loi gia' } : { ok: true, id: 'vt_' + calls.length }) };

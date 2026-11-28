@@ -10,6 +10,7 @@ on:
       - 'index.html'
       - 'js/**'
       - 'css/**'
+      - 'data/**'
       - 'manifest.webmanifest'
       - 'sw.js'
       - 'icon-*.png'
@@ -44,14 +45,32 @@ jobs:
       - name: Cài công cụ nén và kiểm thử
         run: npm i --no-save terser@5 clean-css@5 jsdom@24
 
+      - name: Kiểm tra sức khoẻ web (file thiếu, nạp trùng, thiếu ?v=, hàm trùng, cú pháp)
+        run: node tools/check-health.js
+
+      - name: Kiểm tra ngân sách nguồn (tổng js/css, số thẻ script, !important)
+        run: node tools/test-budget.js
+
       - name: Nén JS/CSS vào dist/
         run: node tools/build-dist.js
+
+      - name: Kiểm tra ?v= theo nội dung + _headers (cache dài an toàn)
+        run: node tools/test-dist-hash.js
+
+      - name: Kiểm tra ngân sách dung lượng (JS/CSS sau gzip)
+        run: node tools/measure-load.js --check
 
       - name: Kiểm tra cú pháp từng file đã nén
         run: for f in dist/js/*.js; do node --check "$f" || exit 1; done
 
       - name: So sánh bản nén với bản gốc (cùng biến/hàm toàn cục, cùng lỗi chạy)
         run: node tools/test-dist-equivalence.js
+
+      - name: Kiểm thử hộp thoại thống nhất (js/96)
+        run: node tools/test-ui-dialogs.js
+
+      - name: Kiểm thử báo lỗi ghi dữ liệu (js/97)
+        run: node tools/test-write-guard.js
 
       - name: Deploy lên Cloudflare
         if: env.HAS_CF == 'true'

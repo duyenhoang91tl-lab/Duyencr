@@ -98,12 +98,18 @@ var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones','part'];
 // 1 o Google Sheet toi da 50.000 ky tu; JSON 1 SDT ~13 ky tu => 3000 SDT ~39k. Dot chia lon hon se duoc tach nhieu dong (cot 'part').
 var ASSIGN_CHUNK = 3000;
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate','viewMonths'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
+// 'dateTo' (cot cuoi, THEM SAU de khong lech chi so cac cot cu — getSheet_ tu bo sung header o cuoi): file Pancake tai GOP NHIEU NGAY (vd ca thang 8) ghi
+// 'date' = ngay DAU, 'dateTo' = ngay CUOI cua khoang; rong = file 1 ngay (nhu cu). Cac cho doc PancakeStats hien tai bo qua cot nay (xem buoc 3: rai theo ngay).
 var PK_STATS_HEADERS = ['date','pageId','pageName','nhanVien','khCu','khMoi','tongTT',
-  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
+  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH','dateTo'];
+// PancakeStatsDaily: so lieu THEO NGAY THAT cua tung Page (sheet "By time" trong file gop nhieu ngay; khong tach nhan vien). 1 dong = 1 Page x 1 ngay,
+// khoa date+pageId -> nap lai ghi de. Dung de RAI dong gop (co dateTo) ra tung ngay dung trong so thay vi chia deu (buoc 3).
+var SH_PK_DAILY = 'PancakeStatsDaily';
+var PK_DAILY_HEADERS = ['date','pageId','pageName','khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
 // PK_MAP_HEADERS: khop 1-1 ten hien thi Pancake -> ten Sale chuan trong CRM (dung chung moi
 // Page, vi thuong 1 nguoi dung 1 ten Facebook ca nhan cho ca nhieu Page).
 var PK_MAP_HEADERS = ['pancakeName','saleName'];
@@ -111,9 +117,15 @@ var PK_MAP_HEADERS = ['pancakeName','saleName'];
 // "Thong ke nhan vien" (user_statistics_multi_pages, sheet "<pageId> By staff") Pancake xuat.
 // Khoa duy nhat = date+pageId (nap lai file CUNG 1 ngay se GHI DE toan bo nhan vien cua page
 // do trong ngay do — giong het co che PK_STATS_HEADERS o tren).
+// 'dateTo' (cot cuoi, THEM SAU de khong lech chi so cac cot cu — getSheet_ tu bo sung header o cuoi): file "Thong ke nhan vien" tai GOP NHIEU NGAY (vd ca thang 8) ghi
+// 'date' = ngay DAU, 'dateTo' = ngay CUOI cua khoang; rong = file 1 ngay (nhu cu). Cac cho doc PancakeSdtStats se RAI dong gop ra tung ngay (_pkExpandMergedSdtRows_, buoc 3/3).
 var PK_SDT_STATS_HEADERS = ['date','pageId','pageName','nhanVien',
   'tinNhanTuBinhLuan','binhLuan','phienTLBinhLuan','tinNhan','phienTLTinNhan',
-  'sdtMangVe','soDonChot'];
+  'sdtMangVe','soDonChot','dateTo'];
+// PancakeSdtDaily: so lieu THEO NGAY THAT cua tung Page (sheet "By time" trong file "Thong ke nhan vien" gop nhieu ngay; khong tach nhan vien). 1 dong = 1 Page x 1 ngay,
+// khoa date+pageId -> nap lai ghi de. Dung de RAI dong gop SDT ra tung ngay dung trong so thay vi chia deu (buoc 3/3).
+var SH_PK_SDT_DAILY = 'PancakeSdtDaily';
+var PK_SDT_DAILY_HEADERS = ['date','pageId','pageName','tinNhanTuBinhLuan','binhLuan','phienTLBinhLuan','tinNhan','phienTLTinNhan','sdtMangVe','soDonChot'];
 // PK_PAGEMAP_HEADERS: khop 1-1 pageId Pancake -> gia tri "Kenh ban" chuan dang dung trong
 // DT TONG (cot M "kenhBan"), de ghep doanh thu/so don theo dung Page.
 var PK_PAGEMAP_HEADERS = ['pageId','pageName','kenhBan'];
@@ -192,7 +204,7 @@ function _stripVN_(s) {
   s = s.replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o');
   s = s.replace(/[ùúụủũưừứựửữ]/g, 'u');
   s = s.replace(/[ỳýỵỷỹ]/g, 'y');
-  s = s.replace(/đ/g, 'd');
+  s = s.replace(/[đð]/g, 'd');   // ð = Eth U+00F0 (Ð) hay lẫn trong tên SP, trông giống đ — gõ "điếu" mới ra "ÐIẾU" (18/11/2026)
   s = s.replace(/[\u0300-\u036f]/g, '');   // dau roi con sot (to hop la/hiem)
   return s;
 }

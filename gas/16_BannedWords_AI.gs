@@ -174,19 +174,21 @@ function _priceCatalogRowsCached_() {
   return rows || [];
 }
 // GET action=priceAsk&q=<cau hoi>. Tra { ok, found:true, text, unit } | { ok, found:false, suggestions:[ten san pham gan dung] } | { ok:false, error }.
-function priceAsk_(q) {
-  var r = priceAskBase_(q);
+function priceAsk_(q, out, comboOnly) {
+  // comboOnly (Duyen 2026-11-18: o tich 'Combo' o Tro ly AI gia): CHI tra combo, khong tra san pham le. Khong co combo khop → combos:[] (giao dien bao 'khong co combo').
+  if (comboOnly) return { ok: true, found: false, text: '', unit: '', suggestions: [], combos: _priceAskCombos_(String(q || '').slice(0, 200), 8), comboOnly: true };
+  var r = priceAskBase_(q, out);
   if (r && r.ok) r.combos = _priceAskCombos_(String(q || '').slice(0, 200));   // + combo co san khop (sheet COMBO)
   return r;
 }
-function priceAskBase_(q) {
+function priceAskBase_(q, out) {
   q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!q) return { ok: false, error: 'Thieu cau hoi (q)' };
   var rows;
   try { rows = _priceCatalogRowsCached_(); } catch (e) { return { ok: false, error: 'Khong doc duoc bang gia (DANH_MUC): ' + String(e && e.message || e) }; }
   if (!rows.length) return { ok: false, error: 'Bang gia (DANH_MUC) dang rong hoac chua doc duoc.' };
   var info = '';
-  try { info = _priceVariantsForPrompt_(q, { allowSingle: true }); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
+  try { info = _priceVariantsForPrompt_(q, { allowSingle: true, out: out }); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
   if (info) return { ok: true, found: true, text: info, unit: 'nghin dong (vd 2.310 = 2.310.000d)' };
   // Khong khop du de bao gia chinh xac -> goi y ten san pham gan dung de nguoi dung hoi lai cu the hon
   var toks = _stripVN_(q).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 2 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
@@ -202,11 +204,12 @@ function priceAskBase_(q) {
   return { ok: true, found: false, suggestions: names };
 }
 // Combo dang ap dung khop cau hoi (toi da 5) — gan vao ket qua priceAsk_ de Tro ly AI "Gia san pham" hien kem. Loi/khong co sheet -> [].
-function _priceAskCombos_(q) {
+function _priceAskCombos_(q, max) {
   try {
     var rows = readComboCatalog_().filter(function (c) { return c.usable; });
     if (!rows.length) return [];
-    return searchCombos_(rows, q, true).slice(0, 5);
+    // text = chu hien thi theo mau moi (gia giam, dong SP co vang/gia, ship, qua) — Tro ly AI / extension dung thang, khong tu ghep lai.
+    return searchCombos_(rows, q, true).slice(0, max || 5).map(function (c) { c.text = _comboFormatText_(c); return c; });
   } catch (e) { return []; }
 }
 // GET action=priceItem&name=<TEN san pham chinh xac (lay tu goi y cua priceAsk)>.
@@ -255,13 +258,57 @@ function _priceQaSystemPrompt_(q) {
     'Bang da duoc loc san theo loai da (SAPHIA/RUBY) neu cau hoi co nhac; neu khong nhac thi chi la gia MAC DINH, cu the vay ma bao, khong hoi lai ve loai da. ' +
     'Neu cau hoi chua noi ro chat lieu/size thi liet ke DU cac truong hop trong bang, khong tu chon 1 muc.';
 }
+// ── DANH SACH GIA DU PHONG GON (2026-11-21, Duyen: "gia size 1, size 2 lien tiep, khong lap lai ca khoi") ─────────────────────────────────────────
+// Khi AI loi, priceQa_ tra danh sach gia goc. Truoc day moi SIZE 1 dong "- Chat lieu: ... | Kieu/Size: ... | Gia thuong: 6350" (gia nghin chua doi ra dong; o chat lieu nhieu dong lam vo dong; size 2,3 ghi "(khong ghi)").
+// Nay gom: ten san pham 1 lan, moi CHAT LIEU 1 lan, cac SIZE lien tiep kem gia DONG. Chat lieu TRONG = cung chat lieu dong tren (sheet hay GOP O). Chuoi cho prompt AI (_priceVariantsForPrompt_) KHONG doi.
+function _priceFmtDong_(v) {
+  var t = String(v == null ? '' : v).replace(/\s+/g, '').replace(/[đd₫]$/i, '');
+  if (!t) return '';
+  var n = /^\d+[.,]\d{1,2}$/.test(t) ? parseFloat(t.replace(',', '.')) : parseInt(t.replace(/[^\d]/g, ''), 10);   // 2.310 = 2310 nghin (3 so sau dau); 6,5 = 6,5 nghin
+  if (!isFinite(n) || n <= 0) return String(v).trim();
+  return String(Math.round(n * 1000)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ';   // gia trong bang tinh bang NGHIN dong
+}
+function _priceFmtPrices_(prices) {
+  var out = (prices || []).map(function (p) {
+    var m = /^\s*([^:]*?)\s*:\s*([^(]*?)\s*(\(.*\))?\s*$/.exec(String(p));
+    if (!m) return String(p);
+    var money = _priceFmtDong_(m[2]), note = m[3] ? ' ' + m[3] : '';
+    return (prices.length === 1 && /^gia( thuong)?$/.test(_stripVN_(m[1]).trim()) ? money : m[1] + ' ' + money) + note;
+  });
+  return out.join(' · ');
+}
+function _priceFallbackText_(blocks) {
+  var lines = ['Giá theo bảng giá:'];
+  (blocks || []).forEach(function (b) {
+    lines.push('', 'SẢN PHẨM: ' + b.name);
+    var groups = [], last = null;
+    (b.variants || []).forEach(function (v) {
+      var mat = String(v.mat || '').replace(/\s*\n+\s*/g, ' · ').trim();
+      var g = (!mat && last) ? last : null;
+      for (var i = 0; !g && i < groups.length; i++) if (_stripVN_(groups[i].mat) === _stripVN_(mat)) g = groups[i];
+      if (!g) { g = { mat: mat, rows: [] }; groups.push(g); }
+      var size = String(v.size || '').replace(/\s+/g, ' ').trim();
+      if (/^\(?\s*mặc định\s*\)?$/i.test(size)) size = '';
+      else if (/^\d+([.,]\d+)?$/.test(size)) size = 'size ' + size;
+      g.rows.push((size ? size + ': ' : '') + _priceFmtPrices_(v.prices));
+      last = g;
+    });
+    groups.forEach(function (g) {
+      if (g.mat) lines.push('Chất liệu: ' + g.mat);
+      g.rows.forEach(function (r) { lines.push('• ' + r); });
+    });
+  });
+  if (blocks && blocks.extra > 0) lines.push('', '(Còn ' + blocks.extra + ' sản phẩm khác cũng khớp — gõ thêm từ để thu hẹp, vd tên đầy đủ.)');
+  return lines.join('\n');
+}
 // POST action=priceQa { q } — nhan vien hoi gia, tra loi VAN NGAN. Gia luon lay tu bang gia (priceAsk_). Chi goi AI khi TIM THAY san pham (khong
 // ton token / khong co co hoi bia gia khi khong co du lieu). AI loi (het quota/429...) -> tra danh sach gia CHINH XAC thay vi bao loi.
 function priceQa_(q) {
-  var base = priceAsk_(q);
+  var blocksOut = [];
+  var base = priceAsk_(q, blocksOut);
   if (!base.ok) return base;
   if (!base.found) return { ok: true, found: false, suggestions: base.suggestions || [], text: '' };
-  var fallback = 'Giá theo bảng giá (nghìn đồng — vd 2.310 = 2.310.000đ):\n' + base.text;
+  var fallback = blocksOut.length ? _priceFallbackText_(blocksOut) : 'Giá theo bảng giá (nghìn đồng — vd 2.310 = 2.310.000đ):\n' + base.text;
   try {
     var o = JSON.parse(callAI_({ prompt: String(q).replace(/\s+/g, ' ').trim().slice(0, 200), priceQa: true }).getContent());
     if (o && o.ok && o.text) return { ok: true, found: true, text: String(o.text).trim(), provider: o.provider || '', base: base.text, unit: base.unit };
@@ -501,6 +548,7 @@ function testScript() {
   getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   getSheet_(SH_USER, USER_HEADERS);
   getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
   getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var oss = getOrderSS_();
   for (var i = 0; i < ORDER_SHEETS.length; i++) {

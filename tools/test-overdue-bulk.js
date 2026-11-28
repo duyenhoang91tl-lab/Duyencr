@@ -27,7 +27,7 @@ ok(cs.some(x => x.name === '(chưa gán)' && x.ids.join() === 'd') && cs.some(x 
 let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (e) { console.log('(bỏ qua phần DOM: chưa có jsdom)'); }
 const finish = () => { console.log(bad ? `\n${bad} LỖI` : '\nTẤT CẢ ĐẠT'); process.exit(bad ? 1 : 0); };
 if (!JSDOM) finish();
-else {
+else (async () => {   // 26/11: obMoveSelected đổi sang async (uiConfirm) nên phải đợi sau khi bấm
   const strip = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/if \(typeof module[^\n]*\n?[\s\S]*$/, '');
   const dom = new JSDOM('<div id="overdue-grid"></div>', { runScripts: 'outside-only' }); const w = dom.window;
   const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -35,7 +35,7 @@ else {
   w.eval('var schedules = ' + JSON.stringify([S({ id: 'p1', phone: '0911', date: dd(-3) }), S({ id: 'p2', phone: '0922', date: dd(-2), type: 'cs' }), S({ id: 'p3', phone: '0933', date: dd(-2), autoDao: true }), S({ id: 'f1', phone: '0944', date: dd(2) })]) +
          ', careData = { "0911": { schedGoi: "' + dd(-3) + '", cs: "Oanh" }, "0922": { cs: "Oanh" }, "0933": { cs: "Thúy" } };');
   const log = { saved: [], sync: [], audit: 0 };
-  w._csFilterListMatch = () => []; w._schedCsFilter = () => true; w.esc = s => String(s); w.confirm = () => true; w.toast = x => { w._toast = x; };
+  w._csFilterListMatch = () => []; w._schedCsFilter = () => true; w.esc = s => String(s); w.confirm = () => true; w.uiConfirm = async () => true; w.toast = x => { w._toast = x; };
   w._schedResponsibleCS = it => (w.eval('careData') [it.phone] || {}).cs || '';
   w.saveLS = k => log.saved.push(k); w._touchCare = () => {}; w.logAudit = () => { log.audit++; }; w.gsUrl = 'http://x'; w.queueCareSync = p => log.sync.push(p);
   w.updateSchedBadges = () => {}; w.renderReminderPanel = () => {}; w.renderScheduleTab = () => { w._schedRendered = true; };
@@ -54,7 +54,7 @@ else {
   g.querySelector('.ob-ck[data-id="p2"]').click();
   ok(w.eval('_ob.sel.join()') === 'p1', 'bỏ tích 1 dòng');
   g.querySelector('#ob-all').click(); ok(w.eval('_ob.sel.length') === 3, 'Chọn tất cả');
-  g.querySelector('[data-ob="today"]').click();
+  g.querySelector('[data-ob="today"]').click(); await new Promise(r => setTimeout(r, 15));
   const sch = w.eval('schedules');
   const t0 = w.eval('scYmd_(new Date())');
   ok(sch.find(x => x.id === 'p1').date === t0 && sch.find(x => x.id === 'p2').date === t0, 'dời 2 lịch sang hôm nay');
@@ -65,4 +65,4 @@ else {
   ok(g.querySelectorAll('.ob-ck').length === 1 && w._schedRendered === true, 'vẽ lại: chỉ còn 1 dòng quá hạn; màn Tuần/Ngày được vẽ lại');
   ok(w.eval('_ob.sel.length') === 0, 'xoá lựa chọn sau khi dời');
   finish();
-}
+})();

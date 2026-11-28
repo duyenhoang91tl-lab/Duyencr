@@ -9,8 +9,8 @@
 // không tách được theo CHẤT LIỆU/sản phẩm CHÍNH XÁC (chỉ khớp theo giá trị đơn hoặc từ khoá tên
 // sản phẩm) đều có ghi chú nhắc kế toán đối chiếu tay trước khi chốt — đúng tinh thần các mục 5/8
 // (ghi chú tự do, không tự động chấm) đã có sẵn trong hệ thống.
-function _bpSeedOfficialOnlineTemplate_(){
-  if (!confirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
+async function _bpSeedOfficialOnlineTemplate_(){
+  if (!(await uiConfirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.'))) return;
   // Duyen xac nhan 2026-10: bang nay ap dung cho MOI Sale CHINH THUC (ca online lan offline),
   // KHONG phai rieng Sale online — "online" trong ten bang/cot chi noi den kenh ban hang, khong
   // phai loai nhan vien. Chi loai tru Sale dang "Thu viec (TV)" (xem fix channel==='probation'
@@ -1102,6 +1102,7 @@ function _srbSubCfg_(){
   if (sub === 'A' || sub === 'B'){
     t('📊 Xuất Excel', 'exportSalesReport()');
     if (sub === 'B' && typeof _reconAllowed_ === 'function' && _reconAllowed_()) t('<b>📗 Excel đối soát (B+E+G+L+N) — 1 file</b>', 'exportReconAll_()', 'Tải 1 file Excel duy nhất gồm Báo cáo B, E, G, L, N cùng khoảng ngày + bộ lọc đang xem, có sheet "Mục lục" đối chiếu chéo các báo cáo');
+    if (sub === 'B' && typeof _srBxAllowed_ === 'function' && _srBxAllowed_()) t('<b>📤 Xuất doanh thu (cả team / từng sale)</b>', 'openBExportSale_()', 'Chọn team hoặc từng sale rồi tải file Excel doanh thu để các bạn tự đối chiếu — số khớp bảng "Theo Sale" đang xem', 'sr-export-bsale-btn');
     if (admin) t(sub === 'A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet', 'exportSalesReportToSheet()', sub === 'A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước', 'sr-export-sheet-btn');
     if (admin) t('👁 Ẩn/Hiện Page &amp; Sale', '_srToggleHiddenPanel()', 'Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung');
   } else if (sub === 'C'){
@@ -1113,7 +1114,7 @@ function _srbSubCfg_(){
     t('⚙ % hoa hồng cá nhân', 'openIndividualRatesModal()'); t('🏆 Chương trình thưởng', 'openBonusProgramsModal()');
     t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()'); t('💰 Đơn giá vàng (Pancake AI)', 'openGoldUnitModal()'); t('📡 % hoa hồng theo Kênh', 'openChannelRatesModal()');
   } else if (sub === 'F' && admin){
-    t('🎯 Cài đặt KPI (bậc / commit riêng)', 'openSaleKpiConfigModal_()'); t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()');
+    t('🎯 Cài đặt KPI (bậc / commit riêng)', 'openSaleKpiConfigModal_()'); t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()'); t('💵 Lương cơ bản (ngày công)', 'openSalaryLcbModal_()', 'LCB Sale Offline theo % KPI; admin nhập ngày công thực tế cuối tháng');
   } else if (sub === 'G'){
     t('<b>📗 Excel đầy đủ (gửi kế toán) — 3 sheet</b>', "_srGExportXlsx_()"); t('📊 CSV Tổng hợp (theo Sale + chương trình)', "_srGExportCsv_('summary')");
     t('🧾 CSV Chi tiết từng lượt thưởng', "_srGExportCsv_('detail')"); t('📦 CSV Đơn Pos dùng để tính (đối chiếu)', "_srGExportCsv_('orders')");
@@ -1660,7 +1661,8 @@ function doAssignByTeam(){
   _rebuildAssignIndex();
   if (typeof _applyCareCSToAssigned === 'function') _applyCareCSToAssigned(entries);
   entries.forEach(function(e){ logAudit('assign', '', '', 'Team '+e.team+': '+e.phones.length+' KH → '+e.csName); });
-  if (gsUrl && typeof pushAssignHistToGS==='function') pushAssignHistToGS();
+  // Chi day CAC DOT MOI (saveAssign tung dot). NGUYEN NHAN GOC (2026-11-27): ghi de ca lich su tu ban tren may admin lam mat dot Truong nhom vua chia lai / chia tu dong va tien do "da xong".
+  if (gsUrl && typeof pushAssignToGS==='function') (async function(){ for (var i = 0; i < entries.length; i++) await pushAssignToGS(entries[i]); })().catch(function(e){ console.warn('pushAssignToGS lỗi:', e); });
   toast('✓ Đã chia '+cursor+' KH cho '+entries.length+' CS ('+active.length+' team)');
   if (typeof updateMyDataBadge==='function') updateMyDataBadge();
   if (typeof closeAssignModal==='function') closeAssignModal();   // chia xong tự đóng

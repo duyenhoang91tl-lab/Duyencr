@@ -255,7 +255,7 @@ function _tkParseSheet(rows){
   }
   return { items: items, khos: Object.keys(khos) };
 }
-function tkImportDlg(){
+async function tkImportDlg(){
   var k = _tkCurKho(); if (!k) return;
   var parsed = null;
   var box = _tkDlg('<div class="tk-head"><b>📥 Nhập Excel — ' + esc(k.name) + '</b><span class="tk-sp"></span><button type="button" class="btn secondary sm" id="tk-d-x">✕</button></div>' +
@@ -283,7 +283,7 @@ function tkImportDlg(){
   box.querySelector('#tk-d-ok').onclick = async function(){
     if (!parsed) return;
     var mode = box.querySelector('#tk-mode').value, why = box.querySelector('#tk-w').value.trim() || 'Nhập Excel', btn = this, res = box.querySelector('#tk-res');
-    if (!confirm('Nhập ' + parsed.items.length + ' dòng vào kho “' + k.name + '” (' + (mode === 'set' ? 'đặt số đúng theo file' : 'cộng thêm') + ')?')) return;
+    if (!(await uiConfirm('Nhập ' + parsed.items.length + ' dòng vào kho “' + k.name + '” (' + (mode === 'set' ? 'đặt số đúng theo file' : 'cộng thêm') + ')?'))) return;
     btn.disabled = true; var tot = { created: 0, updated: 0, unchanged: 0, skipped: [] };
     try {
       for (var i = 0; i < parsed.items.length; i += 2000) {

@@ -66,6 +66,6 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok(sp('abc')===null&&sp('x 0123456789012 y')===null,'split: khong co / chuoi so qua dai -> null');
   ok(JSON.stringify(sp('SĐT 0912345678, đơn 12T3/2026.').map(x=>x.k))==='["t","p","t","o","t"]','split: tach dung SDT va ma don trong 1 cau');
   // index.html có nạp file
-  ok(/<script src="js\/58-auto-cust-link\.js"><\/script>/.test(fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')),'index.html nap js/58');
+  ok(/<script src="js\/58-auto-cust-link\.js(\?v=[0-9a-z]+)?"><\/script>/.test(fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')),'index.html nap js/58');
   process.exit(f?1:0);
 })();

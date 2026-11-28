@@ -10,6 +10,6 @@ ok(c._acctAddMonthsYmd('2026-12-16',1),'2027-01-16','qua nam');
 ok(c._acctYmdToDmy('2026-11-09'),'09/11/2026','dmy');
 ok(c._acctAddMonthsYmd('',1),'','rong');
 const src=fs.readFileSync(path.join(__dirname,'..','gas_v13.js'),'utf8');
-ok(/USER_HEADERS\s*=\s*\[[^\]]*'startDate','joinDate'\]/.test(src),true,'header joinDate');
-ok(/joinDate: v\[i\]\[10\]/.test(src)&&/o\.joinDate = u\.joinDate/.test(src)&&/u\.joinDate\|\|''\]\)/.test(src),true,'doc/ghi/tra client');
+ok(/USER_HEADERS\s*=\s*\[[^\]]*'startDate','joinDate'[^\]]*\]/.test(src),true,'header joinDate');
+ok(/joinDate: v\[i\]\[10\]/.test(src)&&/o\.joinDate = u\.joinDate/.test(src)&&/u\.joinDate\|\|''[\],]/.test(src),true,'doc/ghi/tra client');
 process.exit(f?1:0);

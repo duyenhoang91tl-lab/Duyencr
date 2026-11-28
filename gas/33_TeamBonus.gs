@@ -13,8 +13,23 @@ var SH_TEAM_PENALTY_ = 'ThuongPhatDoiSale';
 var TEAM_PENALTY_HEADERS_ = ['id', 'date', 'sale', 'type', 'amount', 'note', 'by', 'at'];
 var TEAMBONUS_GET_ACTIONS_ = { teamBonusReport: 1, teamPenaltySuggest: 1 };
 var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1, teamPenaltyIgnore: 1 };
+// ═══ PHỤ LỤC 02/QC-HTT — CHƯƠNG TRÌNH MINI GAME THÁNG 11/2026 (file Duyên gửi 27/11/2026), mục C + D (thưởng theo DOANH SỐ cá nhân; mục A sản phẩm, B bill = bước sau):
+//  C. Doanh số NGÀY: >=60tr → 50k/ngày, >=100tr → 100k/ngày (KHÔNG cộng dồn, lấy mốc cao nhất đạt trong ngày).
+//  D1. Target DOANH SỐ THÁNG cá nhân: 500tr→500k, 600tr→700k, 800tr→1tr, 1tỷ→1,5tr, 1,2tỷ→2tr, 1,5tỷ→2,5tr, 1,8tỷ→3tr, 2tỷ→3,5tr, 2,5tỷ→4,5tr, 3tỷ+→5tr (mốc cao nhất đạt).
+//  D2. Top 1 doanh thu: 0,1% doanh thu tháng (đã loại đơn thất bại/hoàn/hủy/trùng), điều kiện Sale >= 1 tỷ. ⚠ "tổng doanh thu tháng" mơ hồ → cfg topRevenue.base: 'self' (0,1% doanh thu CỦA Sale đó, mặc định) hoặc 'team' (0,1% tổng doanh thu cả đội) — Duyên chốt lại.
+//  D3. Top 1 tỷ lệ chốt tháng 1.000.000đ (monthlyReward, cơ chế sẵn có: tương tác >= TB team).
+//  D4. Sale ONLINE không lương cứng: doanh số tháng >= 700tr → +1.000.000đ phụ cấp.
+//  Doanh số tính theo NGƯỜI TẠO ĐƠN trên đơn Base (cùng nguồn với thưởng ngày hiện có: _dtOrderRevenue_, đã loại đơn đổi trả/bảo hành/thay dây/trạng thái loại).
+// ⚠ 27/11: mục A (SP trọng điểm), B (bill combo/vòng mix) và C (DS ngày 60tr/100tr) ĐÃ CÓ SẴN ở Báo cáo G (BONUS_PROGRAMS, seed js/13, đúng số Phụ lục 02) →
+// thưởng DS ngày ở đây (dayTargetsEnabled) MẶC ĐỊNH TẮT để không trả 2 lần. Mục D (mốc tháng, Top 1 DT, phụ cấp Online) CHỈ có ở đây.
 var TEAM_BONUS_DEFAULT_ = {
-  dailyMinOrders: 6, dailyMinRevenue: 50000000, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000,
+  dayTargetsEnabled: false,
+  dailyTiers: [ { min: 60000000, reward: 50000 }, { min: 100000000, reward: 100000 } ],
+  monthTiers: [ { min: 500000000, reward: 500000 }, { min: 600000000, reward: 700000 }, { min: 800000000, reward: 1000000 }, { min: 1000000000, reward: 1500000 }, { min: 1200000000, reward: 2000000 },
+                { min: 1500000000, reward: 2500000 }, { min: 1800000000, reward: 3000000 }, { min: 2000000000, reward: 3500000 }, { min: 2500000000, reward: 4500000 }, { min: 3000000000, reward: 5000000 } ],
+  topRevenue: { minRevenue: 1000000000, pct: 0.1, base: 'self' },
+  onlineAllowance: { minRevenue: 700000000, amount: 1000000 },
+  dailyMinOrders: 6, dailyMinRevenue: 50000000, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 1000000,
   excludeRe: 'doi tra|doi hang|bao hanh|thay day',   // so khop KHONG DAU voi Phan loai / Kenh ban / Giai doan cua don Base (don bhZero = BH khong doanh thu luon bi loai)
   penalties: [
     { type: 1, label: 'Tin trôi quá 30 phút không phản hồi (không phải tin nhảy từ Sale khác)', amount: 50000 },
@@ -34,6 +49,21 @@ function teamBonusCfg_() {
   if (raw && typeof raw === 'object') {
     ['dailyMinOrders', 'dailyMinRevenue', 'dailyReward', 'weeklyReward', 'monthlyReward'].forEach(function (k) { var n = Number(raw[k]); if (isFinite(n) && n >= 0) cfg[k] = n; });
     if (typeof raw.excludeRe === 'string' && raw.excludeRe.trim()) cfg.excludeRe = raw.excludeRe.trim();
+    ['dailyTiers', 'monthTiers'].forEach(function (k) {   // mốc tiền: mảng {min,reward}, bỏ dòng sai, xếp tăng dần theo min
+      if (!Array.isArray(raw[k])) return;
+      var a = raw[k].map(function (x) { return { min: Number(x && x.min), reward: Number(x && x.reward) }; }).filter(function (x) { return isFinite(x.min) && x.min > 0 && isFinite(x.reward) && x.reward >= 0; }).sort(function (a1, b1) { return a1.min - b1.min; });
+      if (a.length) cfg[k] = a;
+    });
+    if (typeof raw.dayTargetsEnabled === 'boolean') cfg.dayTargetsEnabled = raw.dayTargetsEnabled;
+    if (raw.topRevenue && typeof raw.topRevenue === 'object') {
+      var tr = raw.topRevenue, nm = Number(tr.minRevenue), np = Number(tr.pct);
+      if (isFinite(nm) && nm >= 0) cfg.topRevenue.minRevenue = nm; if (isFinite(np) && np >= 0) cfg.topRevenue.pct = np;
+      if (tr.base === 'self' || tr.base === 'team') cfg.topRevenue.base = tr.base;
+    }
+    if (raw.onlineAllowance && typeof raw.onlineAllowance === 'object') {
+      var oa = raw.onlineAllowance, om = Number(oa.minRevenue), oam = Number(oa.amount);
+      if (isFinite(om) && om >= 0) cfg.onlineAllowance.minRevenue = om; if (isFinite(oam) && oam >= 0) cfg.onlineAllowance.amount = oam;
+    }
     if (Array.isArray(raw.penalties)) raw.penalties.forEach(function (pn) {
       var t = Number(pn && pn.type), n = Number(pn && pn.amount);
       cfg.penalties.forEach(function (d) { if (d.type === t) { if (isFinite(n) && n >= 0) d.amount = n; if (pn.label) d.label = String(pn.label).slice(0, 200); } });
@@ -118,6 +148,8 @@ function _tbCloseFor_(dtRows, from, to, memberOf, active) {
     return pick;
   } catch (e) { Logger.log('_tbCloseFor_ ' + from + '..' + to + ': ' + e); return { avgHeld: 0, rows: [], winners: [], noData: true, error: String(e && e.message || e) }; }
 }
+// Mốc cao nhất đạt được (tiers sắp tăng dần theo min); null nếu chưa đạt mốc nào.
+function _tbTierFor_(tiers, v) { var hit = null; (tiers || []).forEach(function (t) { if (v >= t.min) hit = t; }); return hit; }
 // Phan THUONG (cache 10 phut; thang da qua cache lau hon). Nhat ky phat doc truc tiep, khong qua cache.
 function _tbComputeRewards_(month, cfg) {
   var today = _vnYmd_(new Date()), from = month + '-01', mEnd = _tbMonthEnd_(month), to = mEnd < today ? mEnd : today;
@@ -131,6 +163,23 @@ function _tbComputeRewards_(month, cfg) {
     var top = arr.length ? arr[0].orders : 0, topE = elig.length ? elig[0].orders : 0, ok = elig.length > 0;
     out.daily.push({ date: d, partial: d === today, top: top, qualified: ok, winners: ok ? elig.filter(function (x) { return x.orders === topE; }) : [], list: arr.slice(0, 8), excluded: day.excluded });
   }
+  // ── Mini game tháng 11 (Phụ lục 02): thưởng theo DOANH SỐ cá nhân (xem TEAM_BONUS_DEFAULT_) ──
+  out.dayTargets = []; var monthRev = {}, totalRev = 0;
+  for (var dd = from; dd <= to; dd = _tbYmdAdd_(dd, 1)) {
+    var dy = dc[dd] || { rev: {} };
+    Object.keys(dy.rev || {}).forEach(function (n) {
+      var rv = dy.rev[n] || 0; monthRev[n] = (monthRev[n] || 0) + rv; totalRev += rv;
+      var tr = cfg.dayTargetsEnabled ? _tbTierFor_(cfg.dailyTiers, rv) : null;
+      if (tr) out.dayTargets.push({ date: dd, name: n, revenue: Math.round(rv), min: tr.min, reward: tr.reward, partial: dd === today });
+    });
+  }
+  var mPartial = mEnd > today, grpOf = {}; team.list.forEach(function (m) { grpOf[m.name] = m.group; });
+  out.monthTargets = Object.keys(monthRev).map(function (n) { var t = _tbTierFor_(cfg.monthTiers, monthRev[n]); return { name: n, revenue: Math.round(monthRev[n]), min: t ? t.min : 0, reward: t ? t.reward : 0, partial: mPartial }; })
+    .filter(function (x) { return x.reward > 0; }).sort(function (a, b) { return b.revenue - a.revenue; });
+  var elig2 = Object.keys(monthRev).filter(function (n) { return monthRev[n] >= cfg.topRevenue.minRevenue; }).sort(function (a, b) { return monthRev[b] - monthRev[a]; });
+  out.topRevenue = { partial: mPartial, base: cfg.topRevenue.base, totalRevenue: Math.round(totalRev), winners: [] };
+  if (elig2.length) { var best = Math.round(monthRev[elig2[0]]); elig2.forEach(function (n) { if (Math.round(monthRev[n]) === best) out.topRevenue.winners.push({ name: n, revenue: best, amount: Math.round((cfg.topRevenue.base === 'team' ? totalRev : monthRev[n]) * cfg.topRevenue.pct / 100) }); }); }
+  out.allowances = Object.keys(monthRev).filter(function (n) { return grpOf[n] === 'online' && monthRev[n] >= cfg.onlineAllowance.minRevenue; }).map(function (n) { return { name: n, revenue: Math.round(monthRev[n]), amount: cfg.onlineAllowance.amount, partial: mPartial }; });
   var pm = _tbCloseFor_(dtRows, from, to, team.memberOf), activeNames = pm.rows.map(function (x) { return x.name; });   // sale co tuong tac trong thang = tap tinh TB tuong tac (tuan + thang)
   // Tuan: Thu 2 -> Chu nhat; tinh vao thang chua ngay Chu nhat. Tuan chua ket thuc / chua bat dau xu ly theo "to".
   var mon = from; while (_tbDow_(mon) !== 0) mon = _tbYmdAdd_(mon, -1);
@@ -166,7 +215,7 @@ function teamBonusReport_(p, acc) {
   var month = String(p.month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(month)) month = _vnYmd_(new Date()).substring(0, 7);
   var cfg = teamBonusCfg_(), today = _vnYmd_(new Date()), mEnd = _tbMonthEnd_(month);
-  var ck = 'tb_rw_v1_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe]), rw = null;
+  var ck = 'tb_rw_v2_' + month + '_' + JSON.stringify([cfg.dayTargetsEnabled, cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe, cfg.dailyTiers, cfg.monthTiers, cfg.topRevenue, cfg.onlineAllowance]), rw = null;
   try { var raw = _cacheGetBig_(ck); if (raw) rw = JSON.parse(raw); } catch (e0) {}
   if (!rw || p.nocache === '1') {
     rw = _tbComputeRewards_(month, cfg);
@@ -180,6 +229,11 @@ function teamBonusReport_(p, acc) {
   rw.daily.forEach(function (d) { if (d.partial) return; d.winners.forEach(function (w) { rewards.push({ kind: 'day', period: d.date, name: w.name, amount: cfg.dailyReward, detail: w.orders + ' đơn' }); var t = tot(w.name); t.reward += cfg.dailyReward; t.dayWins++; }); });
   rw.weekly.forEach(function (w) { if (w.partial) return; w.winners.forEach(function (x) { rewards.push({ kind: 'week', period: w.label, name: x.name, amount: cfg.weeklyReward, detail: x.closeRate + '% (' + x.closed + '/' + x.held + ')' }); var t = tot(x.name); t.reward += cfg.weeklyReward; t.weekWins++; }); });
   if (rw.monthly && !rw.monthly.partial) rw.monthly.winners.forEach(function (x) { rewards.push({ kind: 'month', period: month, name: x.name, amount: cfg.monthlyReward, detail: x.closeRate + '% (' + x.closed + '/' + x.held + ')' }); var t = tot(x.name); t.reward += cfg.monthlyReward; t.monthWins++; });
+  // Mini game tháng 11: thưởng ngày theo mốc doanh số (ngày đã qua), mốc doanh số tháng / Top 1 doanh thu / phụ cấp Online (chỉ khi THÁNG đã kết thúc, giống thưởng tháng hiện có)
+  (rw.dayTargets || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'dayTarget', period: x.date, name: x.name, amount: x.reward, detail: 'DS ' + Math.round(x.revenue / 1e6) + 'tr ≥ mốc ' + Math.round(x.min / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.reward; });
+  (rw.monthTargets || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'monthTarget', period: month, name: x.name, amount: x.reward, detail: 'DS tháng ' + Math.round(x.revenue / 1e6) + 'tr ≥ mốc ' + Math.round(x.min / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.reward; });
+  if (rw.topRevenue && !rw.topRevenue.partial) rw.topRevenue.winners.forEach(function (x) { rewards.push({ kind: 'topRevenue', period: month, name: x.name, amount: x.amount, detail: 'Top 1 DS ' + Math.round(x.revenue / 1e6) + 'tr × ' + cfg.topRevenue.pct + '%' + (cfg.topRevenue.base === 'team' ? ' tổng đội' : '') }); var t = tot(x.name); t.reward += x.amount; });
+  (rw.allowances || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'allowance', period: month, name: x.name, amount: x.amount, detail: 'Online DS ' + Math.round(x.revenue / 1e6) + 'tr ≥ ' + Math.round(cfg.onlineAllowance.minRevenue / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.amount; });
   pen.forEach(function (e) { var t = tot(e.sale); t.penalty += e.amount; t.penaltyCount++; });
   // Nguoi khong phai admin/quan ly/truong team chi thay phat + tong cua chinh minh (thuong ngay/tuan/thang la bang xep hang chung).
   var mine = {}; _profNames_(acc.u).forEach(function (n) { mine[_normTxt_(n)] = 1; });
@@ -188,7 +242,7 @@ function teamBonusReport_(p, acc) {
     Object.keys(totals).forEach(function (k) { if (!mine[_normTxt_(k)]) delete totals[k]; });
   }
   var totalList = Object.keys(totals).map(function (k) { var t = totals[k]; t.net = t.reward - t.penalty; return t; }).sort(function (a, b) { return b.net - a.net || (a.name < b.name ? -1 : 1); });
-  return { ok: true, month: month, today: today, cfg: cfg, canEdit: acc.admin, seeAll: acc.seeAll, team: rw.team, daily: rw.daily, weekly: rw.weekly, monthly: rw.monthly,
+  return { ok: true, month: month, today: today, cfg: cfg, canEdit: acc.admin, seeAll: acc.seeAll, team: rw.team, daily: rw.daily, weekly: rw.weekly, monthly: rw.monthly, dayTargets: rw.dayTargets || [], monthTargets: rw.monthTargets || [], topRevenue: rw.topRevenue || null, allowances: rw.allowances || [],
     rewards: rewards, penalties: pen, totals: totalList, note: 'Thuong tinh tren don goc Base (ngay tao), khong tinh theo Pos. Tuan tinh vao thang chua Chu nhat; ngay/tuan/thang chua ket thuc chi hien tam tinh, chua cong vao tien thuong.' };
 }
 function teamBonusDoGet_(action, p) {
@@ -374,3 +428,106 @@ function teamPenaltyIgnore_(d) {
   setSetting_('tbPenIgnore', JSON.stringify(a));
   return jsonOut_({ ok: true, key: key });
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  TOP SAN PHAM BAN (Duyen 2026-11-21): xem san pham ban chay nhat trong 1 ngay / 1 khoang ngay, loc theo TEAM, co DANH SACH LOAI TRU
+//  (san pham khong dua vao thong ke, vd qua tang / phi ship / hang mau). Nguon = "dữ liệu đơn" (Pos) — cung nguon + cung quy tac loai don
+//  (Huy/Da hoan/Dang hoan) + gop don tach voi Bao cao B. Moi don chi co TONG gia tri (khong chia theo tung san pham) nen xep hang theo SO LUONG
+//  ban (kem so don co san pham do), KHONG tinh doanh thu theo san pham.
+//  GET topProducts(dateFrom,dateTo,team[,limit]) — team = ten team cach nhau bang ',' ('' = tat ca; '(chưa có Team)' = don khong thuoc team nao).
+//  POST saveTopSpExclude {list:[{key,name}]} — chi admin/leader/manager (CFG_ACTIONS_). Luu Settings 'topSpExclude'.
+//  Don co nhieu sale thuoc nhieu team: tinh DU cho tung team duoc chon (khong chia), vi day la bang xep hang san pham khong phai doanh thu.
+// ═══════════════════════════════════════════════════════════════
+var TOPSP_UNASSIGNED_TEAM_ = '(chưa có Team)';
+// Gap ten san pham de so khop: bo dau + thuong + gon khoang trang ("Quà  Tặng" = "qua tang"). _normTxt_ KHONG bo dau nen khong dung rieng no.
+function _topSpFold_(s) { return _stripVN_(_normTxt_(s)).replace(/\s+/g, ' ').trim(); }
+function _topSpKey_(code, name) {
+  var c = String(code == null ? '' : code).trim();
+  if (c && c.indexOf('(không rõ mã') !== 0) return 'c:' + c.toUpperCase().replace(/\s+/g, '');
+  return 'n:' + _topSpFold_(name);
+}
+function readTopSpExclude_() {
+  var out = [];
+  try {
+    var raw = getSetting_('topSpExclude');
+    var arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) arr.forEach(function (x) {
+      var key = String((x && x.key) || '').trim();
+      if (key) out.push({ key: key, name: String((x && x.name) || '').trim() });
+    });
+  } catch (e) {}
+  return out;
+}
+function saveTopSpExclude_(list) {
+  if (!Array.isArray(list)) return jsonOut_({ ok: false, error: 'Danh sách loại trừ không hợp lệ' });
+  var clean = [], seen = {};
+  for (var i = 0; i < list.length && clean.length < 500; i++) {
+    var key = String((list[i] && list[i].key) || '').trim();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    clean.push({ key: key, name: String((list[i] && list[i].name) || '').trim().slice(0, 200) });
+  }
+  setSetting_('topSpExclude', JSON.stringify(clean));   // setSetting_ luon tra ok (tu ghi AuditLog)
+  return jsonOut_({ ok: true, count: clean.length, list: clean });
+}
+// Phan TINH TOAN thuan (khong doc sheet) de test bang Node. rows = dong don da gop; opt = { dateFrom, dateTo, teams:[], teamOf:fn(ten sale)->ten team, exclude:[{key,name}], limit }
+function _topSpAggregate_(rows, opt) {
+  opt = opt || {};
+  var wantTeams = (opt.teams || []).filter(Boolean), teamOf = opt.teamOf || function () { return TOPSP_UNASSIGNED_TEAM_; };
+  var exKeys = {}, exNames = {};
+  (opt.exclude || []).forEach(function (x) { if (x && x.key) exKeys[x.key] = 1; if (x && x.name) exNames[_topSpFold_(x.name)] = 1; });
+  var prods = {}, orders = 0, qtyAll = 0, excludedQty = 0, excludedHit = {}, skippedStatus = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (!dateInRange_(parseVNDate_(row.ngayTaoDon), opt.dateFrom, opt.dateTo)) continue;
+    if (_donHasExcludedStatus_(row.trangThai)) { skippedStatus++; continue; }
+    if (wantTeams.length) {
+      var sales = splitMulti_(row.theSale, ',').filter(function (x) { return !_isNumericTag_(x); });
+      var teamSet = {};
+      if (!sales.length) teamSet[TOPSP_UNASSIGNED_TEAM_] = 1;
+      sales.forEach(function (s) { teamSet[teamOf(s) || TOPSP_UNASSIGNED_TEAM_] = 1; });
+      if (!wantTeams.some(function (t) { return teamSet[t]; })) continue;
+    }
+    var names = splitMulti_(row.sanPham, ','), codes = splitMulti_(row.maSanPham, ';'), qtys = splitMulti_(row.soLuong, ',');
+    var len = Math.max(names.length, codes.length, qtys.length);
+    if (!len) continue;
+    var seenInOrder = {}, counted = false;
+    for (var p = 0; p < len; p++) {
+      var name = names[p] || codes[p] || '';
+      var key = _topSpKey_(codes[p], name);
+      var qty = Number(String(qtys[p] || '0').replace(',', '.')) || 0;
+      if (!name && !codes[p]) continue;
+      if (exKeys[key] || exNames[_topSpFold_(name)]) { excludedQty += qty; excludedHit[key] = name || codes[p]; continue; }
+      if (!prods[key]) prods[key] = { key: key, name: name || codes[p], code: codes[p] || '', soLuong: 0, orders: 0 };
+      prods[key].soLuong += qty; qtyAll += qty;
+      if (!seenInOrder[key]) { seenInOrder[key] = 1; prods[key].orders += 1; }
+      counted = true;
+    }
+    if (counted) orders++;
+  }
+  var arr = Object.keys(prods).map(function (k) { return prods[k]; });
+  arr.sort(function (a, b) { return (b.soLuong - a.soLuong) || (b.orders - a.orders) || String(a.name).localeCompare(String(b.name)); });
+  var limit = Math.max(1, Math.min(500, Number(opt.limit) || 100));
+  return { rows: arr.slice(0, limit), totalProducts: arr.length, totalOrders: orders, totalQty: qtyAll, excludedQty: excludedQty,
+           excludedHit: Object.keys(excludedHit).map(function (k) { return { key: k, name: excludedHit[k] }; }), skippedStatus: skippedStatus };
+}
+function buildTopProducts_(p) {
+  p = p || {};
+  var today = _vnYmd_(new Date());
+  var from = String(p.dateFrom || '').trim() || today, to = String(p.dateTo || '').trim() || from;
+  var teamsRaw = String(p.team || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  var resolver = _makeTeamResolver_(TOPSP_UNASSIGNED_TEAM_);
+  var teamNames = [];
+  try { readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) { if (t && t.name && teamNames.indexOf(t.name) < 0) teamNames.push(t.name); }); } catch (e) {}
+  var excl = readTopSpExclude_();
+  // onlyConfig=1 (2026-11-21, Bao cao B can danh sach team + loai tru ma KHONG quet don): tra nhanh, khong doc "dữ liệu đơn".
+  if (String(p.onlyConfig || '') === '1') return { ok: true, onlyConfig: true, teams: teamNames.concat([TOPSP_UNASSIGNED_TEAM_]), exclude: excl };
+  var rows = _mergeTachDon_(readDonChiTiet_());
+  var agg = _topSpAggregate_(rows, { dateFrom: from, dateTo: to, teams: teamsRaw, teamOf: resolver, exclude: excl, limit: p.limit });
+  agg.ok = true; agg.dateFrom = from; agg.dateTo = to; agg.team = teamsRaw;
+  agg.teams = teamNames.concat([TOPSP_UNASSIGNED_TEAM_]);
+  agg.exclude = excl;
+  return agg;
+}
+
