@@ -139,6 +139,14 @@ function _croSubmitReason(){
   if (!note){ _cro.msg = '⚠ Phải ghi lý do ' + (p.to === 'Hủy' ? 'huỷ' : 'hoàn') + ' đơn.'; _croRenderList(); return; }
   _croSetStatus(p.id, p.to, note);
 }
+// Câu báo điểm sau khi Hủy/Hoàn: điểm khách ĐÃ DÙNG được trả lại, điểm đơn ĐÃ TÍCH bị trừ (không để âm).
+function _croPtsMsg(d){
+  var back = Number(d.pointsRefunded) || 0, off = Number(d.pointsRevoked) || 0, s = '';
+  if (back > 0) s += ' Đã hoàn ' + back + ' điểm cho khách.';
+  if (off > 0) s += ' Đã trừ lại ' + off + ' điểm đã tích' + (d.pointsRevokeCapped ? ' (khách đã dùng bớt nên chỉ trừ phần còn lại).' : '.');
+  else if (d.pointsRevokeCapped) s += ' Khách đã dùng hết điểm tích của đơn nên không trừ thêm.';
+  return s;
+}
 async function _croSetStatus(id, to, note){
   _cro.busy = true; _cro.msg = ''; _croRenderList();
   try {
@@ -147,7 +155,7 @@ async function _croSetStatus(id, to, note){
     if (d && d.ok && d.order){
       var l = (_cro.data && _cro.data.orders) || [];
       for (var k = 0; k < l.length; k++) if (l[k].orderId === id){ var keep = l[k]; l[k] = Object.assign({}, keep, d.order, { items: (d.order.items && d.order.items.length) ? d.order.items : keep.items }); break; }
-      _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".' + (Number(d.pointsRefunded) > 0 ? ' Đã hoàn ' + Number(d.pointsRefunded) + ' điểm cho khách.' : '');
+      _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".' + _croPtsMsg(d);
     } else _cro.msg = '❌ ' + ((d && (d.error || d.message)) || 'Không đổi được trạng thái (GAS chưa deploy crmOrderStatus?).');
   } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
   _cro.busy = false; _croRenderList();

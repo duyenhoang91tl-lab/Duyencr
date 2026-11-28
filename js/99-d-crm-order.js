@@ -276,6 +276,36 @@ async function _coFillCustomer(){
   if (changed) _coRender(true);
 }
 // ── Điểm tích luỹ của khách (loyaltyGet) ──
+// Điểm đơn này sẽ tích: cùng công thức server (_loyaltyEarnPoints_) = floor(Cần thu SAU khi trừ điểm × rate ÷ giá trị 1 điểm). Chưa có cấu hình từ server thì 0 (không đoán).
+function _coEarnPoints(total, cfg){
+  var rate = Number(cfg && cfg.rate), pv = Number(cfg && cfg.pointValue);
+  if (!(rate > 0 && rate <= 1 && pv >= 1 && total > 0)) return 0;
+  return Math.floor(Math.round(total * rate * 1000000) / 1000000 / pv);
+}
+function _coYmdVn(ymd){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+function _coEarnRow(total){   // dòng "Sẽ tích" trong ô tóm tắt; chỉ khi đã tải điểm của đúng SĐT đang nhập
+  var d = _coLoy.data; if (!d || _coLoy.phone !== _coPhoneKey(_co.phone)) return '';
+  var p = _coEarnPoints(total, d.config); if (!p) return '';
+  var exp = _coYmdVn((d.points || {}).expiresOn);
+  return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#1e8449;margin-top:4px"><span>🎖️ Sẽ tích</span><span>+' + p + ' điểm' + (exp ? ' (hạn ' + exp + ')' : '') + '</span></div>';
+}
+function _coEarnSavedHtml(){   // màn "Đã lưu đơn": điểm server vừa tích (GAS cũ không trả → không hiện gì)
+  var e = _co.earned; if (!e) return '';
+  if (e.points > 0) return '<div style="font-size:12px;margin-top:4px;color:#1e8449">🎖️ Khách được tích <b>+' + e.points + '</b> điểm' + (_coYmdVn(e.expiresOn) ? ' (hạn ' + _coYmdVn(e.expiresOn) + ')' : '') + '</div>';
+  if (!e.error) return '';
+  return '<div style="font-size:12px;margin-top:4px;color:#c0392b">⚠ Đơn đã lưu nhưng chưa tích được điểm. <button class="btn sm" onclick="_coEarnRetry()"' + (e.busy ? ' disabled' : '') + '>' + (e.busy ? 'Đang tích…' : 'Tích lại điểm') + '</button></div>';
+}
+// Gửi lại đúng refKey của đơn vừa lưu: server không tạo đơn thứ 2, chỉ tích bù (khoá điểm cố định nên không tích 2 lần).
+async function _coEarnRetry(){
+  var e = _co.earned; if (!e || e.busy || !e.retry) return;
+  e.busy = true; _coRender();
+  var d = await _coPost('crmOrderSave', e.retry);
+  if (_co.earned !== e) return;
+  e.busy = false;
+  if (d && d.ok && d.pointsEarned > 0){ e.points = d.pointsEarned; e.expiresOn = d.pointsExpireOn; e.error = ''; }
+  else if (typeof toast === 'function') toast('Chưa tích được điểm, thử lại sau.');
+  _coRender();
+}
 function _coLoySync(){ var k = _coPhoneKey(_co.phone); if (_coLoy.phone !== k){ _coLoy.phone = k; _coLoy.data = null; _coLoy.err = ''; _coLoy.loading = false; _coLoy.seq++; if (_co.pointsUse) _co.pointsUse = 0; } return k; }
 async function _coLoyLoad(){
   var ph = _coLoySync(); _coLoyRender(); _coSummary();
@@ -297,7 +327,7 @@ function _coLoyHtml(){
   if (!_coLoy.data) return box('🎖️ Chưa tải điểm.');
   var d = _coLoy.data, bal = (d.points || {}).balance || 0, pv = (d.config || {}).pointValue || 1000, c = _coCalc(_coNow());
   if (bal <= 0) return box('🎖️ ' + E(d.tierLabel || '') + ' · khách chưa có điểm để dùng.');
-  return '<div style="font-size:12px;margin-bottom:4px">🎖️ <b>' + E(d.tierLabel || '') + '</b> · điểm dùng được: <b style="color:#c0392b">' + bal + '</b> <span style="color:var(--muted)">(1 điểm = ' + _coVnd(pv) + ')</span></div>' +
+  return '<div style="font-size:12px;margin-bottom:4px">🎖️ <b>' + E(d.tierLabel || '') + '</b> · điểm dùng được: <b style="color:#c0392b">' + bal + '</b> <span style="color:var(--muted)">(1 điểm = ' + _coVnd(pv) + (_coYmdVn((d.points || {}).expiresOn) ? ', hạn ' + _coYmdVn(d.points.expiresOn) : '') + ')</span></div>' +
     '<div style="display:flex;gap:6px;align-items:center"><input id="co-pts" type="number" min="0" max="' + c.pointsMax + '" value="' + (_co.pointsUse ? E(_co.pointsUse) : '') + '" placeholder="Số điểm dùng" oninput="_coPtsSet(this.value)" style="' + _coInp + '">' +
     '<button class="btn sm" style="white-space:nowrap" onclick="_coPtsMax()">Dùng tối đa</button></div><div id="co-pts-hint" style="font-size:11px;margin-top:3px"></div>';
 }
@@ -518,10 +548,12 @@ async function _coSave(){
   if (err){ _co.msg = err; _co.msgOk = false; _coMsgRender(); return; }
   if (!_co.refKey) _co.refKey = _coNewRef();   // giữ nguyên khi lỗi/thử lại → server không tạo đơn thứ 2
   _co.busy = true; _co.msg = 'Đang lưu đơn…'; _co.msgOk = true; _coMsgRender();
-  var d = await _coPost('crmOrderSave', { refKey: _co.refKey, pointsUse: _coPointsUse(_co), order: _coPayload(_co) });
+  var body = { refKey: _co.refKey, pointsUse: _coPointsUse(_co), order: _coPayload(_co) };
+  var d = await _coPost('crmOrderSave', body);
   _co.busy = false;
   if (d && d.ok && d.order){
     _co.saved = d.order; _co.refKey = ''; _co.msg = ''; _co.msgOk = true;
+    _co.earned = { points: Number(d.pointsEarned) || 0, expiresOn: d.pointsExpireOn || '', error: d.pointsEarnError || '', retry: body };
     if (typeof toast === 'function') toast((d.duplicate ? 'Đơn đã lưu trước đó: ' : '✓ Đã lưu đơn ') + d.order.orderId);
     _coRender();
   } else {
@@ -567,7 +599,7 @@ function _coSummaryHtml(c){
   var row = function(l, v, b){ return '<div style="display:flex;justify-content:space-between;font-size:13px;' + (b ? 'font-weight:800;font-size:15px;' : '') + '"><span>' + l + '</span><span>' + v + '</span></div>'; };
   return row('Tạm tính (' + c.qty + ' sp)', _coVnd(c.gross)) + (c.itemDiscount ? row('Giảm giá dòng', '-' + _coVnd(c.itemDiscount)) : '') + (c.tax ? row('Thuế', _coVnd(c.tax)) : '') + (c.orderDiscount ? row('Giảm giá đơn', '-' + _coVnd(c.orderDiscount)) : '') + (c.pointsUsed ? row('Dùng ' + c.pointsUsed + ' điểm', '-' + _coVnd(c.pointsDiscount)) : '') +
     (c.shipFee ? row('Phí vận chuyển', _coVnd(c.shipFee)) : '') + (c.surcharge ? row('Phụ thu', _coVnd(c.surcharge)) : '') +
-    '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true);
+    '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true) + _coEarnRow(c.total);
 }
 function _coSummary(){   // cập nhật số tiền KHÔNG dựng lại form (giữ nguyên ô đang gõ)
   _coPromoSync();
@@ -590,7 +622,7 @@ function _coRender(keepFocus){
       '<div style="font-size:34px">✅</div><div style="font-size:18px;font-weight:800;margin:6px 0">Đã lưu đơn ' + _coEsc(s.orderId) + '</div>' +
       '<div style="font-size:13px;color:var(--muted);margin-bottom:10px">' + _coEsc(s.custName || '') + ' · ' + _coEsc(s.phone) + ' · ' + (s.itemCount || 0) + ' dòng / ' + (s.qty || 0) + ' sp</div>' +
       '<div style="font-size:13px">Cần thu <b>' + _coVnd(s.total) + '</b> · Còn thiếu <b style="color:' + (s.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(s.due) + '</b></div>' +
-      (s.pointsUsed > 0 ? '<div style="font-size:12px;margin-top:4px">🎖️ Đã dùng <b>' + s.pointsUsed + '</b> điểm (−' + _coVnd(s.pointsDiscount) + ')</div>' : '') +
+      (s.pointsUsed > 0 ? '<div style="font-size:12px;margin-top:4px">🎖️ Đã dùng <b>' + s.pointsUsed + '</b> điểm (−' + _coVnd(s.pointsDiscount) + ')</div>' : '') + _coEarnSavedHtml() +
       '<div style="font-size:11px;color:var(--muted);margin:10px 0">Đơn nằm ở sheet "Đơn CRM" (đang chạy thử — chưa đẩy sang Pancake POS / DT Tổng / trừ kho).</div>' +
       '<button class="btn primary" onclick="_coNew()">➕ Tạo đơn mới</button></div>';
     return;

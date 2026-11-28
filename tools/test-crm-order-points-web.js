@@ -71,5 +71,32 @@ ok(!('pointsUse' in w._coPayload(Object.assign({}, clip, { pointsUse: 50 }))) &&
   // 9) lỗi GAS chưa có loyaltyGet: báo lỗi, KHÔNG chặn lưu đơn không dùng điểm
   replyGet = { ok: false, error: 'Unknown action' }; w._co.phone = '0944444444'; w._co.items = [Object.assign({}, clip.items[0])]; await w._coLoyLoad();
   ok(w._coLoy.err && /Unknown action/.test(w._coLoy.err) && w._coValidate(w._coNow()) === '', 'lỗi tải điểm hiện tại chỗ, vẫn lưu được đơn không dùng điểm');
+  // 10) điểm SẼ TÍCH: khớp công thức server; hiện ở ô tóm tắt kèm hạn 31/12; chưa tải điểm thì không đoán
+  let bad2 = 0; for (let i = 0; i < 400; i++) { const t = Math.floor(rnd() * 30000000), cfg = { rate: [0.01, 0.015, 0.02, 0.007][i % 4], pointValue: [1000, 500, 1][i % 3] }; if (w._coEarnPoints(t, cfg) !== g._loyaltyEarnPoints_(t, cfg)) bad2++; }
+  ok(bad2 === 0, 'điểm sẽ tích khớp _loyaltyEarnPoints_ của server trên 400 ca');
+  const LOY2 = bal => Object.assign(LOY(bal), { points: { balance: bal, expiresOn: '2026-12-31' } });
+  w._coNew(); w._co.phone = '0943028399'; w._co.items = [Object.assign({}, clip.items[0])]; w._co.shipFee = 40000;
+  w._coSummary(); ok(!/Sẽ tích/.test(fakeEl('co-sum').innerHTML), 'chưa tải điểm → không hiện "Sẽ tích"');
+  replyGet = LOY2(160); await w._coLoyLoad(); w._coPtsSet('100');
+  ok(/Sẽ tích<\/span><span>\+8 điểm \(hạn 31\/12\/2026\)/.test(fakeEl('co-sum').innerHTML), 'tóm tắt: tính trên cần thu SAU trừ điểm (831.000 → +8), ghi hạn 31/12/2026');
+  ok(/hạn 31\/12\/2026/.test(w._coLoyHtml()), 'ô Dùng điểm ghi hạn của số dư');
+  // 11) màn đã lưu hiện điểm vừa tích; lỗi tích → nút tích lại gửi ĐÚNG refKey cũ
+  const ORD = { orderId: 'CRM2', phone: '0943028399', total: 831000, due: 831000, pointsUsed: 0, itemCount: 1, qty: 1 };
+  w._co.pointsUse = 0; replyPost = { ok: true, order: ORD, pointsEarned: 9, pointsExpireOn: '2026-12-31', pointsEarnError: '' }; await w._coSave();
+  ok(/tích <b>\+9<\/b> điểm \(hạn 31\/12\/2026\)/.test(fakeEl('xt-wrap-taodon').innerHTML), 'màn đã lưu: +9 điểm, hạn 31/12/2026');
+  w._coNew(); w._co.phone = '0943028399'; w._co.items = [Object.assign({}, clip.items[0])];
+  replyPost = { ok: true, order: ORD, pointsEarned: 0, pointsEarnError: 'Lock timeout' }; await w._coSave();
+  const first = posts[posts.length - 1];
+  ok(/chưa tích được điểm/.test(fakeEl('xt-wrap-taodon').innerHTML) && /_coEarnRetry\(\)/.test(fakeEl('xt-wrap-taodon').innerHTML), 'tích lỗi: báo rõ + nút "Tích lại điểm"');
+  replyPost = { ok: true, duplicate: true, order: ORD, pointsEarned: 9, pointsExpireOn: '2026-12-31' }; await w._coEarnRetry();
+  const again = posts[posts.length - 1];
+  ok(again.action === 'crmOrderSave' && again.refKey === first.refKey && JSON.stringify(again.order) === JSON.stringify(first.order) && /\+9<\/b> điểm/.test(fakeEl('xt-wrap-taodon').innerHTML), 'tích lại: cùng refKey + cùng đơn, hiện +9 điểm');
+  w._coNew(); w._co.phone = '0943028399'; w._co.items = [Object.assign({}, clip.items[0])]; replyPost = { ok: true, order: ORD }; await w._coSave();
+  ok(!/tích/.test(fakeEl('xt-wrap-taodon').innerHTML.replace(/Đơn nằm ở[^<]*/, '')), 'GAS cũ không trả điểm → không hiện gì thêm');
+  // 12) đổi trạng thái Hủy/Hoàn: báo điểm hoàn lại + điểm tích bị trừ
+  const o = { window: {}, document: { getElementById: () => null, addEventListener() {} }, registerExtraTab: () => {}, console, Number, String };
+  vm.createContext(o); const src = fs.readFileSync(path.join(root, 'js/99-d-crm-orders.js'), 'utf8'), i = src.indexOf('function _croPtsMsg'); vm.runInContext(src.slice(i, src.indexOf('\n}\n', i) + 2), o);
+  ok(o._croPtsMsg({ pointsRefunded: 100, pointsRevoked: 8 }) === ' Đã hoàn 100 điểm cho khách. Đã trừ lại 8 điểm đã tích.', 'Hủy: hoàn 100 + trừ 8');
+  ok(/trừ lại 3 điểm đã tích \(khách đã dùng bớt/.test(o._croPtsMsg({ pointsRevoked: 3, pointsRevokeCapped: true })) && /không trừ thêm/.test(o._croPtsMsg({ pointsRevoked: 0, pointsRevokeCapped: true })) && o._croPtsMsg({}) === '', 'trừ một phần / đã dùng hết / không có điểm');
   console.log('ALL CRM-ORDER-POINTS-WEB TESTS PASSED');
 })().catch(e => { console.error('FAIL (exception): ' + (e && e.stack || e)); process.exit(1); });
