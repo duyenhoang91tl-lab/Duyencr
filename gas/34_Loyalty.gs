@@ -193,6 +193,35 @@ function _loyaltyUndo_(d, a) {
   return jsonOut_(_loyaltyUndoApply_(d, String(a.user.username || a.user.name || '')));
 }
 
+// ── Điểm TÍCH của ĐƠN CRM (Duyên 28/11: "tạo đơn trên CRM tích được điểm; đơn hoàn/hủy thì trừ điểm, không tính âm") ──
+// Đơn CRM tích như đơn POS: floor(tiền khách phải trả SAU khi trừ điểm × rate ÷ pointValue) (cùng `_loyaltyEarnPoints_`, mặc định 1%), ghi sổ 'earn' NGÀY TẠO ĐƠN
+// → dùng được từ đơn sau và HẾT HẠN 31/12 NĂM TẠO ĐƠN (luật quỹ theo năm của `_loyaltyBalance_`). Khoá cố định earn|crm|<mã đơn> / refund|crm|<mã đơn> → gọi lại bao nhiêu lần vẫn 1 dòng.
+// Hủy/Hoàn → ghi 'refund' đúng số điểm đơn đó đã tích, nhưng KHÔNG ÂM: nếu cùng năm khách đã tiêu bớt thì chỉ trừ tới phần còn lại (không để "nợ điểm" tự trừ vào điểm tích về sau).
+// Đơn tích từ năm trước: quỹ đó đã hết hạn nên ghi nhận đủ số điểm, không ảnh hưởng số dư năm nay.
+// GIẢ ĐỊNH chờ Duyên xác nhận: tích ngay khi tạo đơn (như đơn POS), không chờ "Đã giao"; tính trên Cần thu gồm ship/phụ thu (cùng cách tính tiền dùng điểm).
+function _loyaltyCrmEarn_(o, who, atMs) {
+  var ph = normPhone_(String(o && o.phone || '')); if (!ph) return { points: 0 };
+  var oid = 'crm|' + o.orderId, key = 'earn|' + oid, rows = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph);
+  var when = atMs && isFinite(Number(atMs)) ? new Date(Number(atMs)) : new Date(), ymd = _vnYmd_(when), exp = _loyaltyYearOf_(ymd) + '-12-31';
+  for (var i = 0; i < rows.length; i++) if (String(rows[i].key) === key) return { points: Number(rows[i].points) || 0, duplicate: true, expiresOn: exp };
+  var p = _loyaltyEarnPoints_(o.total, _loyaltyCfg_()); if (p <= 0) return { points: 0 };
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[key, ph, 'earn', oid, ymd, p, Number(o.total) || 0, 'Don CRM ' + o.orderId, String(who || ''), new Date()]]);
+  return { points: p, expiresOn: exp };
+}
+function _loyaltyCrmRevoke_(o, to, who) {
+  var ph = normPhone_(String(o && o.phone || '')); if (!ph) return { points: 0, earned: 0, skipped: true };
+  var oid = 'crm|' + o.orderId, ek = 'earn|' + oid, rk = 'refund|' + oid, now = new Date(), today = _vnYmd_(now), rows = _loyaltyRead_(SH_LOYALTY_, LOYALTY_HEADERS_, ph), earn = null, done = false;
+  rows.forEach(function (r) { if (String(r.key) === ek) earn = r; if (String(r.key) === rk) done = true; });
+  if (!earn || done) return { points: 0, earned: earn ? (Number(earn.points) || 0) : 0, skipped: true };   // đơn chưa từng tích / đã trừ rồi → không trừ lần 2
+  var ep = Math.max(0, Math.floor(Number(earn.points) || 0)), take = ep;
+  if (_loyaltyYearOf_(_loyaltyYmdCell_(earn.date)) === _loyaltyYearOf_(today)) {   // cùng năm → số dư không bao giờ âm
+    var led = rows.map(function (r) { return { type: String(r.type), key: String(r.key), orderId: String(r.orderId), date: _loyaltyYmdCell_(r.date), points: Number(r.points) || 0 }; });
+    take = Math.min(ep, _loyaltyBalance_(led, today).balance);
+  }
+  _loyaltyAppend_(SH_LOYALTY_, LOYALTY_HEADERS_, [[rk, ph, 'refund', oid, today, take, Number(earn.amount) || 0, (to === 'Hủy' ? 'Huy' : 'Hoan') + ' don CRM ' + o.orderId + (take < ep ? ' (khach da dung bot, chi tru ' + take + '/' + ep + ' diem)' : ''), String(who || ''), now]]);
+  return { points: take, earned: ep, capped: take < ep };
+}
+
 // ── Bước 9b: QUYỀN LỢI THEO THẺ (docx mục 9, Duyên chốt 27/11) — HÀM THUẦN, chưa nối đơn/UI ──
 // Thẻ VIP = khách mua từ LẦN THỨ 2 (đã có ≥ 1 đơn hợp lệ trước đó): giảm 5%. Thẻ SUPER VIP = lịch sử mua ≥ 50tr (đúng ngưỡng hạng Super VVip): giảm 10%.
 // Cả hai: miễn ship đơn từ 1tr, dưới 1tr không miễn ship. Hạng Ưu tiên/Vip theo doanh thu KHÔNG có quyền lợi riêng.
