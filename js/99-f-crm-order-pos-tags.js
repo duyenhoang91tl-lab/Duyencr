@@ -56,7 +56,7 @@ async function _cotLoad(){
 }
 function _cotHtml(label, key){
   var a = '\'' + key + '\'';
-  return '<div style="display:block;font-size:12px;color:var(--muted);position:relative">' + label +
+  return '<div style="display:block;font-size:12px;color:var(--muted);position:relative;align-self:start">' + label +
     '<div onclick="document.getElementById(\'co-f-' + key + '\').focus()" style="' + _coInp + ';display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:3px 6px;min-height:31px;cursor:text">' +
       '<span id="co-tags-' + key + '" style="display:contents">' + _cotChipsHtml(key) + '</span>' +
       '<input id="co-f-' + key + '" type="text" autocomplete="off" aria-label="' + label + '" value="' + _coEsc(_cotState(key).draft) + '" placeholder="Gắn thẻ Pos…" ' +
