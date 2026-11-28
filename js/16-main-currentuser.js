@@ -390,13 +390,10 @@ var _impState = { baseRows: null, baseFileName: '', baseWarn: '', posRows: null,
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
 // Dùng lại chính dataF.rows đang có (đã gồm ĐỦ mọi Sale trong SaleDirectory, kể cả 0 doanh thu
 // kỳ này) — không cần gọi thêm action nào để mở modal.
-var SALE_TIER_ORDER_CLIENT_ = ['TVF1','TVF2','F1','F2','F3','O1','O2','O3','O'];
-var SALE_TIER_LABEL_CLIENT_ = {
-  TVF1:'TVF1 — Thử việc 1', TVF2:'TVF2 — Thử việc 2',
-  F1:'F1 — Văn phòng', F2:'F2 — Văn phòng', F3:'F3 — Văn phòng',
-  O1:'O1 — Online (nhảy bậc)', O2:'O2 — Online (nhảy bậc)', O3:'O3 — Online (nhảy bậc)',
-  O:'O — Online (không nhảy bậc)'
-};
+// 2026-11-27 (Duyên chốt): CHỈ CÒN 2 BẬC — Thử việc (KPI 100tr, đúng 1 tháng) → Chính thức (KPI 500tr), áp dụng cả Sale Offline. Khớp SALE_TIER_ORDER_ ở GAS.
+var SALE_TIER_ORDER_CLIENT_ = ['TV','CT'];
+var SALE_TIER_LABEL_CLIENT_ = { TV:'Thử việc (1 tháng)', CT:'Chính thức' };
+
 document.addEventListener('click', closeGearMenus);
 
 var _irSearch = '';
