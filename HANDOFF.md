@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
+- ✅ ĐÃ XONG: B1 nới trần jsBytes 3.500.000→3.600.000 (tools/test-budget.js). Lúc áp, main đang VƯỢT trần cũ 1.155 byte nên deploy web bị chặn tới bước này. Phần S0 ping trong bản vá đã có sẵn trên main (ec2a6dd).
+- 🔧 ĐANG LÀM: B2 module js/99-f-crm-order-pos-tags.js.
+- ➡️ BƯỚC KẾ TIẾP: B3 nạp module trong index.html; B4 test.
+
 ## 2026-11-28 (phiên Claude — CRM ĐƠN GIẢN CHUYÊN NGHIỆP TRÊN BẢN WEB MÁY TÍNH: LÀM HẾT, BẮT ĐẦU BƯỚC 1+2) — BƯỚC 1/2 XONG (chỉ web, Ctrl+F5); ĐANG LÀM BƯỚC 2 (cột mặc định)
 - ĐỀ BÀI Duyên: sau khi hỏi "đã tối ưu bản web đơn giản chuyên nghiệp dễ dùng chưa", Claude trả lời CHƯA (mới làm điện thoại + trang Tổng quan), đề xuất 3 bước; Duyên: "ok làm hết nhưng bắt đầu bằng bước 1 và 2". Bước 1 = gọn phần đầu Danh sách KH trên máy tính; bước 2 = bảng chỉ hiện ~7 cột chính mặc định; bước 3 = rà soát Báo cáo / Chia data / Cài đặt bằng ảnh thật rồi sửa.
 - ✅ **BƯỚC 1 XONG (gọn đầu Danh sách KH, máy tính 1200px):** đầu bảng từ ~338px còn 258px (thấy thêm 1 dòng khách; đã đo + chụp Chromium thật). Chỉ đổi MẶC ĐỊNH, không xoá tính năng: (a) 6 ô thống kê thu gọn mặc định ở MỌI cỡ màn hình (`js/05 _lovIsOpen_`: chỉ mở khi `ome_list_ov_open==='1'`; số liệu đó đã có ở trang Tổng quan); (b) thanh công cụ (sắp xếp, chiến dịch, Thêm KH/đơn, Khách trùng, Đối soát POS, Xuất CSV) LUÔN hiện trên máy tính >900px (css/16 `@media (min-width:901px)`), điện thoại giữ nguyên (nằm sau thanh Tổng quan); (c) hàng "📋 Cột hiển thị" (15+ ô) ẨN mặc định, mở bằng NÚT MỚI `📋 Cột hiển thị ▾/▴` cạnh "Lọc nâng cao" (`js/05 toggleColBar`, `body.cols-open`, nhớ `ome_list_cols_open`), đã bỏ luật css/16 cũ ép ẩn thanh cột theo thanh Tổng quan. Ai đã từng chọn mở thì giữ nguyên. Đã bấm thử bằng Chromium: mở/đóng cột, nhớ lựa chọn, thanh Tổng quan mở lại thống kê, không lỗi JS. Điện thoại không đổi (đã chụp 390px). Bump `?v=20261128b` js/05, css/16. Test mới `node tools/test-list-compact.js` (11) + test-phone-card, test-lead-score-col xanh.
