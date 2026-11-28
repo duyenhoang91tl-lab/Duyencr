@@ -87,6 +87,8 @@ function _coPayload(o){
   });
   var tag = [];
   if (o.promoApplied && o.promoApplied.names && o.promoApplied.names.length) tag.push('CTKM: ' + o.promoApplied.names.join(', '));
+  var cmb = []; (o.items || []).forEach(function(it){ if (it.comboName && cmb.indexOf(it.comboName) < 0) cmb.push(it.comboName); });
+  if (cmb.length) tag.push('Combo: ' + cmb.join(', '));
   if (tag.length) P.note = (P.note ? P.note + ' | ' : '') + '[' + tag.join(' · ') + ']';
   return P;
 }
@@ -303,6 +305,76 @@ function _coPromoResRender(){
   else if (ev.applied.length) h += '<button class="btn sm" style="margin-top:6px;width:100%" onclick="_coPromoApply()">Áp dụng CTKM' + (ev.discount ? ' (−' + _coVnd(ev.discount) + ')' : '') + '</button>';
   box.innerHTML = h;
 }
+// ── Combo có sẵn (GAS comboList = sheet COMBO, tab "🎁 Combo") ──
+// Thêm combo = thêm các món vào đơn với GIÁ ĐÃ CHIA theo giá combo (finalPrice, đã trừ CTKM của combo) theo tỉ lệ giá niêm yết từng món —
+// KHÔNG dùng ô Giảm giá đơn / giảm dòng nên không đụng CTKM, thẻ VIP. Món quà trong combo = dòng 0đ. Combo miễn ship → tick Miễn phí giao.
+// Combo chưa có đơn giá từng món → gán cả giá combo vào món đầu. Tên combo ghi vào ghi chú đơn "[Combo: …]".
+var _coCmb = { open:false, q:'', rows:[], loading:false, err:'', msg:'', seq:0, timer:0 };
+async function _coCmbLoad(){
+  if (typeof gsUrl === 'undefined' || !gsUrl){ _coCmb.err = 'Chưa kết nối Google Sheets.'; _coCmbResRender(); return; }
+  var my = ++_coCmb.seq; _coCmb.loading = true; _coCmb.err = ''; _coCmbResRender();
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=comboList&q=' + encodeURIComponent(_coCmb.q), { redirect:'follow' }), d = await r.json();
+    if (my !== _coCmb.seq) return;
+    if (d && d.ok) _coCmb.rows = d.rows || []; else _coCmb.err = (d && d.error) || 'GAS chưa có action comboList — cần deploy lại GAS.';
+  } catch(e){ if (my !== _coCmb.seq) return; _coCmb.err = 'Không tải được combo: ' + (e && e.message || e); }
+  _coCmb.loading = false; _coCmbResRender();
+}
+function _coCmbVisible(){ return (_coCmb.rows || []).filter(function(c){ return c && c.usable; }).slice(0, 8); }
+function _coCmbQ(v){ _coCmb.q = v || ''; clearTimeout(_coCmb.timer); _coCmb.timer = setTimeout(_coCmbLoad, 400); }
+function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.rows.length && !_coCmb.loading) _coCmbLoad(); }
+// Hàm thuần: combo → { lines:[dòng đơn], freeShip, ship, warn }.
+function _coCmbLines(c){
+  var its = (c && c.items) || [], paid = its.filter(function(it){ return !it.gift; }), gifts = its.filter(function(it){ return it.gift; });
+  var fin = Math.max(0, Math.round(Number(c.finalPrice != null ? c.finalPrice : (Number(c.priceVnd) || 0) - (Number(c.discount) || 0)) || 0)), list = 0, warn = '';
+  paid.forEach(function(it){ list += Math.max(0, Number(it.price) || 0) * Math.max(1, Math.floor(Number(it.qty) || 1)); });
+  var mk = function(it, price, extra){ return Object.assign({ code:'', name:String(it.name || ''), note:[it.chatLieu, it.size, it.vang].filter(function(v){ return v && String(v).trim(); }).join(' · '), qty:Math.max(1, Math.floor(Number(it.qty) || 1)), price:price, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }, extra || {}); };
+  var lines = [];
+  if (list > 0){
+    if (fin > list) warn = 'Giá combo cao hơn tổng giá niêm yết các món — đã giữ giá niêm yết, kiểm tra lại giá.';
+    var target = Math.min(fin, list), sum = 0;
+    paid.forEach(function(it, i){
+      var q = Math.max(1, Math.floor(Number(it.qty) || 1)), g = Math.max(0, Number(it.price) || 0) * q, pr;
+      if (i === paid.length - 1 && q === 1) pr = Math.max(0, target - sum); else pr = Math.round(target * g / list / q);
+      sum += pr * q; lines.push(mk(it, pr));
+    });
+  } else {
+    paid.forEach(function(it, i){ lines.push(mk(it, i === 0 ? Math.round(fin / Math.max(1, Math.floor(Number(it.qty) || 1))) : 0)); });
+    if (!fin) warn = 'Combo chưa có giá — nhập giá từng món tay.';
+  }
+  gifts.forEach(function(it){ lines.push(mk(it, 0, { note: 'Quà tặng combo' })); });
+  (c.gifts || []).forEach(function(g){ var nm = g && (g.gift || g.name); if (nm) lines.push({ code:'', name:String(nm), note:'Quà tặng combo', qty:1, price:0, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }); });
+  return { lines: lines, freeShip: !!c.freeship, ship: Math.max(0, Math.round(Number(c.ship) || 0)), warn: warn };
+}
+function _coCmbAdd(i){
+  var c = _coCmbVisible()[i]; if (!c) return;
+  var r = _coCmbLines(c);
+  if (!r.lines.length){ _coCmb.msg = 'Combo này chưa có món nào.'; _coCmbResRender(); return; }
+  r.lines.forEach(function(l){ _co.items.push(l); });
+  if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
+  _coCmb.msg = r.warn || ('✓ Đã thêm combo "' + (c.name || c.code) + '" vào đơn.');
+  _coRender();
+}
+function _coCmbRender(){
+  var box = document.getElementById('co-cmb'); if (!box) return;
+  var h = '<button type="button" class="btn sm" onclick="_coCmbToggle()">🎁 Combo có sẵn ' + (_coCmb.open ? '▴' : '▾') + '</button>';
+  if (_coCmb.open) h += '<div style="margin-top:6px;padding:8px;border:1px dashed var(--border);border-radius:8px"><input type="text" value="' + _coEsc(_coCmb.q) + '" placeholder="🔍 Tìm combo (tên, mã, từ khoá, sản phẩm…)" oninput="_coCmbQ(this.value)" style="' + _coInp + ';margin-bottom:6px"><div id="co-cmb-res"></div></div>';
+  box.innerHTML = h; _coCmbResRender();
+}
+function _coCmbResRender(){
+  var box = document.getElementById('co-cmb-res'); if (!box) return;
+  var E = _coEsc, muted = function(t){ return '<div style="font-size:12px;color:var(--muted);padding:4px">' + t + '</div>'; };
+  var msg = _coCmb.msg ? '<div style="font-size:12px;font-weight:600;color:' + (/^✓/.test(_coCmb.msg) ? '#1e8449' : '#c0392b') + ';padding:2px 4px 6px">' + E(_coCmb.msg) + '</div>' : '';
+  if (_coCmb.loading){ box.innerHTML = msg + muted('Đang tải combo…'); return; }
+  if (_coCmb.err){ box.innerHTML = msg + '<div style="font-size:12px;color:#c0392b;padding:4px">' + E(_coCmb.err) + ' <button class="btn sm" onclick="_coCmbLoad()">Thử lại</button></div>'; return; }
+  var rows = _coCmbVisible();
+  box.innerHTML = msg + (!rows.length ? muted('Không có combo đang áp dụng' + (String(_coCmb.q).trim() ? ' khớp "' + E(_coCmb.q) + '"' : '') + '.') : rows.map(function(c, i){
+    var n = (c.items || []).filter(function(it){ return !it.gift; }).length, fin = Number(c.finalPrice != null ? c.finalPrice : c.priceVnd) || 0;
+    return '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px">' +
+      '<span style="font-size:13px"><b>' + E(c.name || c.code) + '</b>' + (c.code ? ' <span style="color:var(--muted)">(' + E(c.code) + ')</span>' : '') + '<br><span style="font-size:11px;color:var(--muted)">' + n + ' món' + ((c.gifts || []).length || (c.items || []).some(function(it){ return it.gift; }) ? ' + quà' : '') + (c.freeship ? ' · miễn ship' : '') + '</span></span>' +
+      '<span style="display:flex;gap:8px;align-items:center"><b style="font-size:12px;color:#c03960;white-space:nowrap">' + (fin ? _coVnd(fin) : 'chưa có giá') + '</b><button type="button" class="btn sm" onclick="_coCmbAdd(' + i + ')">＋ Thêm</button></span></div>';
+  }).join(''));
+}
 // ── Lưu ──
 async function _coSave(){
   if (_co.busy) return;
@@ -345,7 +417,7 @@ function _coItemRow(it, i){
   return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">' +
     '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input value="' + _coEsc(it.name) + '" placeholder="Tên sản phẩm" oninput="_coItemSet(' + i + ',\'name\',this.value)" style="' + _coInp + ';font-weight:700">' +
     '<button class="btn sm" title="Xoá dòng" onclick="_coDelItem(' + i + ')">🗑</button></div>' +
-    '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
+    (it.comboName ? '<div style="font-size:11px;color:#b5305a;margin:-2px 0 4px">🎁 Combo: ' + _coEsc(it.comboName) + ' — giá đã chia theo giá combo</div>' : '') + '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;align-items:end">' +
       '<label style="font-size:11px;color:var(--muted)">Số lượng<input type="number" min="1" value="' + _coEsc(it.qty) + '" oninput="_coItemSet(' + i + ',\'qty\',this.value)" style="' + _coInp + '"></label>' +
       '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="number" min="0" value="' + _coEsc(it.price) + '" oninput="_coItemSet(' + i + ',\'price\',this.value)" style="' + _coInp + '"></label>' +
@@ -396,7 +468,7 @@ function _coRender(keepFocus){
     sec('👤 Khách hàng') + '<div style="' + grid + '">' + _coField('Số điện thoại *', 'phone', { type:'tel', ph:'09…', onchange:'_coFillCustomer();_coLoyLoad()' }) + _coField('Tên khách', 'custName') + _coField('Giới tính', 'gender') + _coField('Sinh nhật', 'birthday', { ph:'dd/mm/yyyy' }) + '</div>' +
     sec('🛍 Sản phẩm') +
     '<input id="co-pick-q" type="text" placeholder="🔍 Tìm sản phẩm trong bảng giá (không cần dấu)…" value="' + _coEsc(_coPick.q) + '" oninput="_coPickQ(this.value)" onfocus="_coCatLoad()" style="' + _coInp + ';margin-bottom:6px">' +
-    '<div id="co-pick-res"></div>' +
+    '<div id="co-pick-res"></div><div id="co-cmb" style="margin-bottom:6px"></div>' +
     '<div id="co-items">' + (_co.items.length ? _co.items.map(_coItemRow).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px;border:1px dashed var(--border);border-radius:8px;text-align:center">Chưa có sản phẩm — tìm ở trên và bấm vào sản phẩm để thêm.</div>') + '</div>' +
     '<button class="btn sm" onclick="_coAddItem()">＋ Thêm dòng tay</button>' +
     sec('📦 Nhận hàng') + '<div style="' + grid + '">' + _coField('Người nhận', 'recvName') + _coField('SĐT nhận', 'recvPhone', { type:'tel' }) + _coField('Tỉnh / Thành', 'province') + _coField('Quận / Huyện', 'district') + _coField('Phường / Xã', 'ward') + _coField('Địa chỉ cụ thể', 'address') + _coField('Ngày giao dự kiến', 'expectedDate', { type:'date' }) + _coField('Đơn vị vận chuyển', 'carrier') + '</div>' +
@@ -416,7 +488,7 @@ function _coRender(keepFocus){
     '<button id="co-save" class="btn primary" onclick="_coSave()" style="width:100%;margin-top:8px;padding:10px;font-size:14px">💾 Lưu đơn (F2)</button>' +
     '<button class="btn sm" onclick="if(confirm(\'Xoá hết nội dung đơn đang soạn?\'))_coNew()" style="width:100%;margin-top:6px">Làm lại từ đầu</button>' +
     '</div></div></div>';
-  _coSummary(); _coMsgRender(); _coPickRender(); _coLoyRender(); _coPromoRender();
+  _coSummary(); _coMsgRender(); _coPickRender(); _coLoyRender(); _coPromoRender(); _coCmbRender();
 }
 document.addEventListener('keydown', function(e){
   if (e.key !== 'F2') return;
