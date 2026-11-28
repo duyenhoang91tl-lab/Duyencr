@@ -29,9 +29,9 @@
 
 ## 2026-11-28 (phiên Claude — WEB CHƯA HIỆN DẤU "ĐÃ XONG" TÍCH Ở PANCAKE AI CHO ĐỢT ĐÃ TẢI VỀ)
 - ĐỀ BÀI Duyên: "làm mục khác không liên quan phiên kia". Chọn lỗi đã báo ở mục "ĐỢT CHIA ĐÃ XOÁ…": web chưa tự hiện dấu tích Pancake cho đợt đã tải. Không đụng menu / thẻ khách / báo cáo / Tạo đơn.
-- ✅ **ĐÃ XONG:** CẢ 2/2 BƯỚC XONG (chỉ web): js/07 `_assignMergeDone_` cập nhật dấu "đã xong" cho đợt đã tải về; docs/crm-kb/16 đã ghi. Test chia data xanh (11 ca 2 máy, dữ liệu giả); toàn bộ kiểm tra chỉ còn 2 test đỏ có sẵn của phần mini game T11 (test-team-bonus-ui, test-team-daily-revenue — phiên khác đã ghi).
+- ✅ **ĐÃ XONG:** Web cập nhật dấu "đã xong" cho đợt đã tải về (js/07 `_assignMergeDone_`). Duyên chốt 28/11: xoá đợt chia KHÔNG rút lại "CS chăm sóc" (CS phụ trách = người lên đơn/gắn thẻ; CS chăm sóc chỉ có khi chia) → giữ nguyên code, đã ghi docs/crm-kb/16.
 - 🔧 **ĐANG LÀM:** Không còn việc code; chờ Duyên thử thật.
-- ➡️ **BƯỚC KẾ TIẾP:** Duyên: chờ Actions deploy-web xanh → Ctrl+F5 → tích 1 khách ở Pancake AI, khi web đang đồng bộ chờ ~15 giây, xem Data của tôi. Còn mở: xoá đợt chia không trả lại CS chăm sóc (cần Duyên chốt quy tắc).
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên: chờ Actions deploy-web xanh → Ctrl+F5 → tích 1 khách ở Pancake AI, khi web đang đồng bộ chờ ~15 giây, xem Data của tôi.
 
 ## 2026-11-27 (phiên Claude) — ZALO AI Ô TÌM GIÁ: GOM SIZE + SỬA CỘT GIÁ/TÊN CÓ DẤU (song song Pancake, quy tắc 08-extension-parity) — XONG (đã push; reload extension Zalo AI, manifest 2026.11.27.1; KHÔNG cần deploy GAS)
 - **Việc:** Duyên bảo "Tiếp" sau khi mình hỏi "làm luôn cho Zalo AI không?" → làm phần song song cho Zalo của bước gom thẻ giá Pancake (`4eb62db`). Kiểm `origin/main` trước: không phiên nào đụng `extension-zalo` → không trùng.
