@@ -13,7 +13,7 @@ const ctx = { JSON, Date, Math, Number, isFinite, Object, RegExp, String, Array,
   _tbCloseFor_: () => ({ avgHeld: 0, rows: [], winners: [], noData: true }) };
 let ROWS = [];
 vm.createContext(ctx); vm.runInContext(D, ctx);
-['teamBonusCfg_', '_tbPad_', '_tbYmdAdd_', '_tbDow_', '_tbMonthEnd_', '_tbFmtDm_', '_tbOrderCounts_', '_tbDailyCounts_', '_tbComputeRewards_'].forEach(n => vm.runInContext(grab(n), ctx));
+['teamBonusCfg_', '_tbPad_', '_tbYmdAdd_', '_tbDow_', '_tbMonthEnd_', '_tbFmtDm_', '_tbOrderCounts_', '_tbDailyCounts_', '_tbTierFor_', '_tbComputeRewards_'].forEach(n => vm.runInContext(grab(n), ctx));
 // ngay "hom nay" cua ham = ngay that; dung thang qua khu de khong bi "partial"
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const mk = (who, n, each) => Array.from({ length: n }, () => ({ ngayTao: '12/10/2026', nguoiTao: who, rev: each }));
