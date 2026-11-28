@@ -2,9 +2,9 @@
 
 ## 2026-11-28 (phiên Claude — SỬA 4 TEST ĐỎ CÓ SẴN TRÊN MAIN)
 - ĐỀ BÀI Duyên: "Tiếp" → xử lý test-demo-scope, test-team-daily-revenue, test-team-bonus-ui, test-srb-filter-menu (mỗi file một bước, push ngay).
-- ✅ **ĐÃ XONG:** XONG cả 4/4: test-demo-scope, test-team-daily-revenue, test-team-bonus-ui, test-srb-filter-menu. Cả 4 đều là test cũ chưa cập nhật theo tính năng mới (KPI tự cam kết, mini game T11, hộp xác nhận mới, mục Lương cơ bản); app không lỗi, không sửa mã app.
-- 🔧 **ĐANG LÀM:** Chạy lại toàn bộ kiểm tra.
-- ➡️ **BƯỚC KẾ TIẾP:** Không cần làm gì thêm cho phần này; Duyên không phải Ctrl+F5 vì chỉ đổi thư mục tools/.
+- ✅ **ĐÃ XONG:** XONG cả 4/4 test đỏ (demo-scope, team-daily-revenue, team-bonus-ui, srb-filter-menu): đều là test cũ chưa theo tính năng mới, app không lỗi, chỉ sửa thư mục tools/. Chạy lại 499 file test + các bước kiểm của CI: xanh hết (test-crm-order-pos-tags cần playwright, chạy riêng bằng NODE_PATH mặc định: xanh).
+- 🔧 **ĐANG LÀM:** Không còn việc.
+- ➡️ **BƯỚC KẾ TIẾP:** Duyên không cần Ctrl+F5 cho phần này.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
 - ✅ ĐÃ XONG: XONG cả 4 bước + 2 sửa nhỏ (chế độ tối, vị trí gợi ý); test tools/test-crm-order-pos-tags.js xanh (dữ liệu giả). Chỉ web, không sửa GAS. Giá trị lưu vẫn là chuỗi 'thẻ1, thẻ2', tối đa 80 ký tự/ô.
