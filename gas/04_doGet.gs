@@ -1,6 +1,9 @@
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || '';
+  // ping (28/11/2026): trả lời NGAY, KHÔNG mở Sheet nào, KHÔNG đọc Script Properties — để ĐO độ trễ thuần của Apps Script (so với `count` mở 2 bảng tính ≈3,9 s đo từ máy Duyên).
+  // NGUYÊN NHÂN GỐC cần có: doGetCore_ luôn `getCrmSS_()` (mở bảng tính) trước MỌI action nên không biết 3,9 s là do mở Sheet hay do nền tảng Apps Script. Hai hướng xử lý khác nhau hoàn toàn.
+  if (action === 'ping') return jsonOut_({ ok: true, ver: PK_GAS_VER_, t: Date.now() });
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
