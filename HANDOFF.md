@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — CAM KẾT KPI 8b-3: MÀN NHẬP + DUYỆT + NỐI CỘT COMMIT) — XONG (chỉ web, Ctrl+F5; cần GAS 8b-2 đã deploy)
+- Phiên khác đang làm Đơn các kênh B3→B8 — phiên NÀY chỉ nhận việc cam kết KPI (không đụng js/100-*).
+- ✅ `js/12-fn-rendersalesreporttabe.js` (gộp, KHÔNG thêm script; `?v=20261128a`): thẻ "🤝 Cam kết KPI tháng MM/YYYY" ngay dưới banner báo cáo F. CS: ô "Cam kết (triệu)" + Gửi (điền sẵn số đã có); quản lý (canApprove): danh sách từng sale + nút Duyệt / Từ chối (hỏi lý do) + ô nhập hộ (tên sale + triệu, hiệu lực ngay). Trạng thái: Chưa cam kết / ⏳ Chờ duyệt / ✅ Đã duyệt / ❌ Bị từ chối. Cột Commit/%HT Commit dùng `effective.commit` của server (cam kết ĐÃ DUYỆT thắng commit riêng cố định; bản chờ duyệt KHÔNG đổi số). Kỳ = tháng của `fDateFrom` (không có thì tháng hiện tại).
+- Quyền vẫn do SERVER quyết (sale chỉ thấy/gửi cho mình, không tự duyệt mình); client chỉ ẩn/hiện nút. GAS cũ chưa deploy → thẻ báo "cần deploy GAS", báo cáo vẫn chạy bình thường.
+- 🧪 `tools/test-kpi-commit-ui.js` xanh (gộp commit, không sửa object gốc, nút Duyệt chỉ ở dòng chờ, nhập hộ 120 triệu = 120000000, sale thường không thấy nút duyệt, số rỗng không gửi, GAS cũ). test-kpi-commit*, test-sr-*, test-srfetch-*, test-report-frame vẫn xanh.
+- [ ] **CÒN LẠI (không thuộc phiên này):** Đơn các kênh B3(đã có)→B8 (phiên khác); 7c chốt kỳ hoa hồng (sheet+action+màn); 11b Ticket (chờ Duyên chốt người được giao); điểm KPI nhiều chỉ tiêu (chờ danh sách chỉ tiêu + trọng số). Giả định chưa Duyên xác nhận: cam kết cần quản lý duyệt (tắt bằng Settings `kpiCommitConfig.requireApproval=false`).
+
 ## 2026-11-28 (phiên Claude — HỒ SƠ KHÁCH: "+ THÊM ĐƠN HÀNG" PHẢI LÀ TẠO ĐƠN THẬT) — XONG (chỉ web, Ctrl+F5)
 - ĐỀ BÀI Duyên (ảnh chụp tab Lịch sử đơn): form "+ Thêm đơn hàng" chỉ có Sản phẩm/Doanh thu gõ tay → "phải tạo đơn giống tạo đơn thông thường". Phần combo bỏ qua.
 - NGUYÊN NHÂN GỐC: nút ở js/03 (`renderHistTab`) và nút "🛒 Tạo đơn" ở js/33 vẫn mở form cũ `#add-order-form` (`addManualOrder`), không dùng màn ➕ Tạo đơn (js/99-d: chọn SP từ bảng giá, địa chỉ, ship, khuyến mãi, điểm, thẻ POS).
