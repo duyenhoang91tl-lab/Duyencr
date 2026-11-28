@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — CRM DỄ DÙNG: GỠ CÁC DÒNG CHỈ DẪN DO PHIÊN TRƯỚC THÊM) — XONG (chỉ web; Duyên Ctrl+F5)
+- ĐỀ BÀI Duyên (gửi lại): "trình bày CRM ai không biết dùng cũng dùng được, KHÔNG cần thêm mấy dòng chỉ dẫn; mình mới update giao diện mới rồi hãy làm tiếp". Một phiên khác ĐÃ làm 5/5 bước dễ dùng (mục ngay bên dưới) → KHÔNG làm lại.
+- ĐÃ LÀM: gỡ các câu giải thích mà các phiên trước (Chia data + Pancake) đã thêm, giữ nhãn ngắn tự nói lên ý nghĩa. `js/07` (Chia data): bỏ 3 dòng hướng dẫn nhỏ (nguồn người nhận / gõ tên để tìm / bấm chọn Team), bỏ chú thích dài của "Phòng ban Sale" và tooltip nút "Tạo nhanh Team", rút câu trạng thái rỗng còn "Chưa có Team nào / tài khoản nào / phòng ban nào". `js/09` (xem trước file Pancake gộp ngày): đoạn 3 dòng → 1 dòng ngắn "✓ Có số liệu từng ngày" hoặc "≈ Không có số từng ngày — chia đều". Logic KHÔNG đổi. `index.html` ?v=20261128b cho js/07 + js/09. Test assign/pk/team xanh, check-health 0 lỗi.
+- GIỮ NGUYÊN (không phải chỉ dẫn): thông báo lỗi, ghi chú "~ = ước tính" ở báo cáo Pancake (js/10, ngắn, báo số không thật), dòng trạng thái SĐT gộp ngày (js/09 ~963, của phiên SĐT). Hoa rơi/linh vật/vườn là do Duyên yêu cầu, canvas `pointer-events:none` (không chặn nút) + có nút tắt ở ☰ → Settings → KHÔNG đổi.
+- [ ] **VIỆC KẾ TIẾP (gợi ý, chưa làm — cần Duyên chọn):** (a) danh sách khách dạng thẻ trên điện thoại; (b) gọn menu (bớt mục, gom nhóm); (c) mặc định TẮT hoa rơi trên điện thoại. Duyên xem giao diện mới rồi nói muốn làm mục nào / màn nào còn khó dùng (gửi ảnh càng tốt).
+
 ## 2026-11-28 (phiên Claude — BÁO CÁO: THẺ KPI KÉO NGANG, SỐ TIỀN KHÔNG NGẮT DÒNG) — XONG (chỉ web CSS; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên: ở Báo cáo, ô doanh thu (vd 4.361.866.600₫, 2.300.834.167₫) bị ngắt thành 2 dòng; muốn kéo ngang ra.
 - NGUYÊN NHÂN GỐC (`css/17-reports-pro.css`): `.kpi-val{overflow-wrap:anywhere}` + lưới cột cố định `repeat(auto-fill,minmax(168px,1fr))` → số tiền 14 ký tự ở cỡ 21px rộng hơn ô 168px nên trình duyệt BẺ giữa chữ số. Tái hiện bằng Chromium: CSS cũ 1280px → 2 dòng, CSS mới → 1 dòng ở cả 1280px và 390px.
