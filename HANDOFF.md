@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — SỬA TEST `test-config-hub.js` ĐANG FAIL SẴN) — XONG, ĐÃ PUSH
+- Nguyên nhân gốc: test đòi nhóm "⚙ Settings" ở menu trái có ≥12 mục `act:*`, nhưng nhóm (`js/29-sidenav.js`, `k:'st'`) có 12 mục gồm 10 `act:*` + 2 tab thường (`config`, `audit`) nên chỉ đếm được 10 → FAIL. Lỗi nằm ở ngưỡng của test (nhóm đã được sắp lại), KHÔNG phải lỗi chức năng: các kiểm tra "lối tắt phủ hết mục rời" bên dưới vẫn PASS.
+- ✅ Đã sửa: ngưỡng ≥12 → ≥10 trong `tools/test-config-hub.js` (kèm chú thích). Kết quả: exit 0, 37 kiểm tra PASS. Không đổi code ứng dụng, không cần deploy GAS/reload extension.
+- [ ] **VIỆC KẾ TIẾP:** L2 còn: nút "Bộ lọc" + biểu tượng lịch, hàng chip đếm, bảng + chân phân trang "Dòng / trang", nhãn trạng thái dạng viên thuốc (chờ Duyên chọn mục làm trước và xem thử trạng thái tải/trống mới ở mục trên).
+
 ## 2026-11-28 (phiên Claude — TỐI ƯU GIAO DIỆN: TRẠNG THÁI TẢI / TRỐNG CỦA KHUNG BÁO CÁO) — XONG, ĐÃ PUSH
 - Nguyên nhân: mọi báo cáo dùng chung `uiReportFrame_` (js/76) nhưng khi đang tải chỉ hiện 1 dòng chữ nghiêng "Đang tải…", khi trống cũng chỉ 1 dòng chữ — nhìn như treo, khó phân biệt với lỗi (L2 trong `docs/UI-LAYOUT-PLAN.md` còn mục "trạng thái rỗng / đang tải").
 - ✅ Đã làm (chỉ CSS, `css/25-report-frame.css`, không đổi HTML/JS nên áp cho TẤT CẢ báo cáo dùng khung: A–M, BD, Nhật ký, Cấu hình): trạng thái tải = vòng xoay + khung xương mờ chạy sáng (tắt hiệu ứng khi máy bật "giảm chuyển động"); trạng thái trống = biểu tượng 📭 trên dòng chữ. Chỉ dùng biến `var(--ui-*)` (đúng quy ước, test cấm màu cứng). Tăng `?v=20261128a` cho css/25 trong index.html.
