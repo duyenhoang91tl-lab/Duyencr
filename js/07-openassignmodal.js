@@ -1909,7 +1909,28 @@ function _checkAssignResp(txt) {
   else { _assignBackendOK = false; showAssignBackendWarning(); }
 }
 
-// Kéo chiến dịch từ sheet về (merge): BỔ SUNG đợt mới; chỉ gỡ đợt máy chủ báo admin ĐÃ XOÁ (deletedIds). Đợt chỉ có ở máy (chưa gửi kịp) vẫn giữ.
+// Dấu "đã xong" của đợt ĐÃ CÓ trên máy: Pancake AI / máy khác ghi thẳng lên máy chủ. So 3 bên theo từng SĐT: h.srvDone = bản máy chủ thấy lần trước.
+// Máy chủ ĐỔI dấu (khác lần trước) thì theo máy chủ; máy chủ KHÔNG đổi thì giữ dấu trên máy (vừa bấm chưa gửi tới, gửi lỗi, hoặc câu trả lời cũ về muộn).
+// Trả 0 = máy chủ không đổi gì; 1 = chỉ cần lưu mốc mới; 2 = dấu trên máy đổi (phải vẽ lại).
+function _assignMergeDone_(h, serverDone) {
+  const norm = p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p);
+  const srv = new Set((serverDone || []).map(norm)), base = new Set((h.srvDone || []).map(norm)), loc = new Set((h.donePhones || []).map(norm));
+  let moved = false, shown = false;
+  new Set([...srv, ...base]).forEach(p => {
+    const now = srv.has(p);
+    if (now === base.has(p)) return;
+    moved = true;
+    if (now === loc.has(p)) return;
+    shown = true;
+    if (now) loc.add(p); else loc.delete(p);
+  });
+  if (!moved) return 0;
+  h.srvDone = [...srv];
+  if (shown) h.donePhones = [...loc];
+  return shown ? 2 : 1;
+}
+
+// Kéo chiến dịch từ sheet về (merge): BỔ SUNG đợt mới; đợt đã có thì cập nhật dấu "đã xong"; chỉ gỡ đợt máy chủ báo admin ĐÃ XOÁ (deletedIds). Đợt chỉ có ở máy (chưa gửi kịp) vẫn giữ.
 async function pullAssignHistory() {
   if (!gsUrl) return;
   try {
@@ -1925,18 +1946,32 @@ async function pullAssignHistory() {
     }
     _assignBackendOK = true;
     const gone = new Set((ad.deletedIds || []).map(String));
-    let removed = 0, added = 0;
+    let removed = 0, added = 0, ticked = 0, rebased = 0;
     for (let i = assignHistory.length - 1; i >= 0; i--) {
       if (gone.has(String(assignHistory[i].id))) { assignHistory.splice(i, 1); removed++; }
     }
-    const localIds = new Set(assignHistory.map(h => h.id));
+    const localById = new Map(assignHistory.map(h => [String(h.id), h]));
     for (const h of ad.assignHistory) {
-      if (!localIds.has(h.id) && !gone.has(String(h.id))) {
+      if (gone.has(String(h.id))) continue;
+      const cur = localById.get(String(h.id));
+      if (cur) {
+        const m = _assignMergeDone_(cur, h.donePhones);
+        if (m) rebased++;
+        if (m === 2) ticked++;
+      } else {
         // Normalize phones trong chiến dịch từ GS (có thể mất số 0 do Excel lưu kiểu số nguyên)
         if (h.phones) h.phones = h.phones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
         if (h.donePhones) h.donePhones = h.donePhones.map(p => (typeof normPhone === 'function') ? (normPhone(p) || String(p)) : String(p));
-        assignHistory.push(h); localIds.add(h.id); added++;
+        h.srvDone = (h.donePhones || []).slice();
+        assignHistory.push(h); localById.set(String(h.id), h); added++;
       }
+    }
+    // Dấu "đã xong" đổi: vẽ lại đúng màn đang mở (chỉ đổi dấu thì KHÔNG lọc lại cả danh sách khách)
+    if (!added && !removed && rebased) saveLS('ome_assign_hist', assignHistory);
+    if (ticked && !removed) {
+      if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
+      try { const t = document.getElementById('tab-mydata'); if (t && t.style.display === 'flex') renderMyDataTab(); } catch (e) {}
+      try { if (document.querySelector('#assign-body .assign-hist-item')) renderAssignHistory(); } catch (e) {}
     }
     if (added > 0 || removed > 0) {
       assignHistory.sort((a, b) => String(b.date).localeCompare(String(a.date)));
