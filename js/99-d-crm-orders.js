@@ -1,14 +1,15 @@
 // ════════════════════════════════════════════════════════════════════
 //  ĐƠN CRM — bước 3/4: tab "🧾 Đơn CRM" liệt kê + xem chi tiết các đơn CRM tự lên (sheet riêng "Đơn CRM").
 //  Backend: GAS crmOrders (gas/35_CrmOrder.gs). Phạm vi xem do SERVER quyết theo cấp bậc (trả `scope`): all (admin/CEO) | dept (trưởng phòng) | team (trưởng team) | own (còn lại).
-//  Xem + ĐỔI TRẠNG THÁI/HUỶ (GAS crmOrderStatus, 4a). Tạo đơn = js/99-d-crm-order.js (bước 2/4); in/trừ kho/dùng điểm = 4b–4d (chưa làm).
+//  Xem + ĐỔI TRẠNG THÁI/HUỶ (GAS crmOrderStatus, 4a). Tạo đơn = js/99-d-crm-order.js (bước 2/4). Kho (4c-2): hiện `stock` server trả sau khi đổi trạng thái;
+//  admin bấm "Chạy lại trừ kho" (GAS crmOrderStockRetry) cho đơn bị giữ / lúc đó kho tắt — server tự chống trừ 2 lần. In đơn = 4d (chưa làm).
 //  Đường đi trạng thái ở client CHỈ để hiện nút đúng; server (CRM_ORDER_FLOW_) mới là chỗ quyết định + kiểm quyền (admin hoặc người tạo).
 //  Mọi số tiền lấy từ server (đã tự tính lại), client KHÔNG tính lại tiền.
 //  Nạp SAU js/40 (registerExtraTab). Gỡ = xoá dòng <script> trong index.html + id 'crmorders' trong js/29.
 // ════════════════════════════════════════════════════════════════════
 var _CRO_FLOW = { 'Mới':['Đã xác nhận','Hủy'], 'Đã xác nhận':['Đang giao','Hủy'], 'Đang giao':['Đã giao','Hoàn','Hủy'], 'Đã giao':['Hoàn'], 'Hủy':[], 'Hoàn':[] };
 var _CRO_SCOPE = { all:'tất cả đơn', dept:'đơn của phòng bạn quản lý', team:'đơn của team bạn làm trưởng', own:'đơn của chính bạn' };
-var _cro = { from:'', to:'', q:'', data:null, loading:false, err:'', sel:'', seq:0, pend:null, busy:false, msg:'' };
+var _cro = { from:'', to:'', q:'', data:null, loading:false, err:'', sel:'', seq:0, pend:null, busy:false, msg:'', stock:{} };
 function _croTok(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
 function _croPad(n){ return (n < 10 ? '0' : '') + n; }
 function _croYmd(d){ return d.getFullYear() + '-' + _croPad(d.getMonth() + 1) + '-' + _croPad(d.getDate()); }
@@ -59,6 +60,44 @@ function _croMoneyHtml(o){
   h += row('Còn thiếu', _croVnd(o.due), true, Number(o.due) > 0 ? '#c0392b' : '');
   return '<div style="max-width:340px;margin-left:auto">' + h + '</div>';
 }
+// Kết quả kho server trả (`stock`) → câu tiếng Việt. Trả { text, warn } hoặc null.
+var _CRO_STOCK_OK = ['Đã xác nhận', 'Đang giao', 'Đã giao'];
+function _croStockInfo(st){
+  if (!st || !st.status) return null;
+  var n = Number(st.lines) || 0, unk = (st.unknown && st.unknown.length) ? ' Mã không thuộc kho nào (bỏ qua): ' + st.unknown.join(', ') + '.' : '';
+  if (st.status === 'off') return { text: 'Kho: đang TẮT trừ kho — tồn kho không đổi.', warn: false };
+  if (st.status === 'already') return { text: 'Kho: đơn đã trừ trước đó (' + n + ' dòng) — không trừ lần 2.', warn: false };
+  if (st.status === 'held') return { text: '⚠ Kho GIỮ đơn, CHƯA trừ: ' + ((st.reasons || []).join('; ') || 'không rõ lý do') + '.', warn: true };
+  if (st.status === 'no_stock') return { text: 'Kho: không có dòng nào thuộc kho đang theo dõi — không trừ.' + unk, warn: !!unk };
+  if (st.status === 'deducted'){
+    var sh = (st.shortage && st.shortage.length) ? ' ⚠ Thiếu tồn: ' + [].concat(st.shortage).join('; ') + '.' : '';
+    return { text: '✓ Kho: đã trừ ' + n + ' dòng.' + sh + unk, warn: !!(sh || unk) };
+  }
+  if (st.status === 'returned') return { text: '✓ Kho: đã cộng trả ' + n + ' dòng.', warn: false };
+  if (st.status === 'none') return { text: 'Kho: đơn chưa trừ nên không phải cộng trả.', warn: false };
+  return { text: 'Kho: ' + st.status, warn: true };
+}
+function _croIsAdmin(){ try { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin'); } catch(e){ return false; } }
+function _croStockHtml(o){
+  var info = _croStockInfo(_cro.stock[o.orderId]), canRetry = _croIsAdmin() && _CRO_STOCK_OK.indexOf(String(o.status)) > -1;
+  var h = info ? '<div style="font-size:12px;margin-top:6px;word-break:break-word;' + (info.warn ? 'color:#b45309;font-weight:600' : '') + '">' + _croEsc(info.text) + '</div>' : '';
+  if (canRetry) h += '<div style="margin-top:6px"><button class="btn sm" data-id="' + _croEsc(o.orderId) + '" onclick="_croStockRetry(this.dataset.id)" title="Dùng khi đơn bị giữ (thiếu mã, combo chưa khai báo…) hoặc lúc xác nhận kho đang tắt. Đơn đã trừ sẽ không bị trừ lần 2."' + (_cro.busy ? ' disabled' : '') + '>🔁 Chạy lại trừ kho</button></div>';
+  return h;
+}
+async function _croStockRetry(id){
+  if (_cro.busy || !_croIsAdmin()) return;
+  var q = 'Chạy lại trừ kho cho đơn ' + id + '?';
+  var okc = (typeof uiConfirm === 'function') ? await uiConfirm(q) : (typeof confirm === 'function' ? confirm(q) : true);
+  if (!okc || _cro.busy) return;
+  _cro.busy = true; _cro.msg = ''; _croRenderList();
+  try {
+    if (typeof gsUrl === 'undefined' || !gsUrl) throw new Error('Chưa cấu hình địa chỉ GAS.');
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'crmOrderStockRetry', token:_croTok(), orderId:id }) }), d = await r.json();
+    if (d && d.ok && d.stock) _cro.stock[id] = d.stock;
+    else _cro.msg = '❌ ' + ((d && (d.error || d.message)) || 'Không chạy được trừ kho (GAS chưa deploy crmOrderStockRetry?).');
+  } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
+  _cro.busy = false; _croRenderList();
+}
 function _croStatusHtml(o){
   var cur = String(o.status || 'Mới'), next = _CRO_FLOW[cur] || [], pend = _cro.pend && _cro.pend.id === o.orderId ? _cro.pend : null;
   var h = '<div style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px"><div style="font-size:12px"><b>Trạng thái: ' + _croEsc(cur) + '</b>' +
@@ -70,7 +109,7 @@ function _croStatusHtml(o){
   else h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + next.map(function(to){ var bad = to === 'Hủy' || to === 'Hoàn';
     return '<button class="btn sm" data-id="' + _croEsc(o.orderId) + '" data-to="' + _croEsc(to) + '" onclick="_croAskStatus(this.dataset.id,this.dataset.to)" style="' + (bad ? 'color:#c0392b;border-color:#c0392b' : '') + '"' + (_cro.busy ? ' disabled' : '') + '>' + (bad ? '' : '→ ') + _croEsc(to) + '</button>'; }).join('') + '</div>';
   if (_cro.msg && _cro.sel === o.orderId) h += '<div style="font-size:12px;font-weight:600;margin-top:6px">' + _croEsc(_cro.msg) + '</div>';
-  return h + '</div>';
+  return h + _croStockHtml(o) + '</div>';
 }
 function _croDetailHtml(o){
   var addr = [o.address, o.ward, o.district, o.province].filter(function(x){ return x && String(x).trim(); }).join(', ');
@@ -155,6 +194,7 @@ async function _croSetStatus(id, to, note){
     if (d && d.ok && d.order){
       var l = (_cro.data && _cro.data.orders) || [];
       for (var k = 0; k < l.length; k++) if (l[k].orderId === id){ var keep = l[k]; l[k] = Object.assign({}, keep, d.order, { items: (d.order.items && d.order.items.length) ? d.order.items : keep.items }); break; }
+      if (d.stock) _cro.stock[id] = d.stock;
       _cro.pend = null; _cro.msg = d.unchanged ? 'Đơn đã ở trạng thái "' + to + '" rồi.' : '✓ Đã chuyển sang "' + to + '".' + _croPtsMsg(d);
     } else _cro.msg = '❌ ' + ((d && (d.error || d.message)) || 'Không đổi được trạng thái (GAS chưa deploy crmOrderStatus?).');
   } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
