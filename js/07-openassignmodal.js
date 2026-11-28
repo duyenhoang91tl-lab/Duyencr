@@ -1902,8 +1902,9 @@ async function deleteAssignOnGS_(ids) {
 }
 
 function _checkAssignResp(txt) {
-  let ok = false;
-  try { const j = JSON.parse(txt); ok = !!(j && (j.ok || j.written !== undefined)); } catch(e) { ok = false; }
+  let ok = false, j = null;
+  try { j = JSON.parse(txt); ok = !!(j && (j.ok || j.written !== undefined)); } catch(e) { ok = false; }
+  if (j && (j.code === 'FORBIDDEN' || j.code === 'AUTH')) { if (typeof toast === 'function') toast('Máy chủ từ chối lưu đợt chia: ' + (j.error || 'không có quyền')); return; }
   if (ok) { _assignBackendOK = true; }
   else { _assignBackendOK = false; showAssignBackendWarning(); }
 }
@@ -1916,6 +1917,8 @@ async function pullAssignHistory() {
     // noOrders=1 để backend cũ (bỏ qua tham số action) không trả về toàn bộ đơn hàng
     const ar = await fetch(gsUrl + sep + 'action=assign&noOrders=1', { redirect: 'follow' });
     const ad = await ar.json();
+    // Máy chủ TỪ CHỐI quyền (tài khoản test / chặn xác thực) không phải backend cũ → bỏ qua, không hiện khung "Copy Apps Script"
+    if (ad && (ad.code === 'FORBIDDEN' || ad.code === 'AUTH')) { console.warn('Pull assignHistory bị từ chối:', ad.error || ad.code); return; }
     // Backend cũ không có khái niệm assignHistory → cảnh báo cần deploy lại bản mới
     if (!ad || typeof ad.assignHistory === 'undefined') {
       _assignBackendOK = false; showAssignBackendWarning(); return;
