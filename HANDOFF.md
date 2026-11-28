@@ -1,11 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — ĐANG LÀM
+## 2026-11-28 (phiên Claude — TÀI KHOẢN TEST: ẨN MÀN KHÔNG DÙNG ĐƯỢC) — XONG, ĐÃ PUSH
 - ĐỀ BÀI Duyên: "ok áp dụng nhé" (phương án 1: ẩn với tài khoản test các màn máy chủ không phục vụ).
 - NGUYÊN NHÂN GỐC: tài khoản test mặc định thấy mọi màn, nhưng máy chủ không mở dữ liệu cho một số màn nên bấm vào chỉ gặp "không được phép".
-- ✅ Đã xong: (1) `js/05` ẩn 9 màn với role demo; (2) `js/07` không còn hiện khung "Apps Script bản cũ" khi máy chủ từ chối quyền; (3) test; (4) `docs/TAI-KHOAN-TEST.md`.
-- 🔧 Đang làm: chạy toàn bộ test + thử trình duyệt.
-- ➡️ Kế tiếp: chốt.
+- ✅ Đã xong: (1) `js/05` ẩn Zalo AI, Chat, Thư viện, Chat nội bộ, Công việc, Giai đoạn, Kho sản phẩm, Đơn CRM, Up dữ liệu với role demo; (2) `js/07` không còn hiện khung "Apps Script bản cũ" khi máy chủ từ chối quyền; (3) test; (4) `docs/TAI-KHOAN-TEST.md`. Thử Chromium với máy chủ GIẢ: demo (máy tính + điện thoại) ẩn đủ 9 màn, admin/CS vẫn thấy đủ. Chưa thử GAS thật.
+- 🔧 Đang làm: không.
+- ➡️ Kế tiếp: Duyên Ctrl+F5, đăng nhập tài khoản test thử.
+- ⚠ Cho phiên MINI GAME T11: sau commit f518294 còn 2 test đỏ — `test-team-daily-revenue.js` (chưa nạp hàm `_tbTierFor_`) và `test-team-bonus-ui.js` (chỉ số cột lệch do thêm cột "Mini game T11"). Phiên này không sửa.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: COMBO CÓ SẴN HIỆN SAI ĐƠN GIÁ) — XONG, ĐÃ PUSH (js/99-d-crm-order.js)
 - ĐỀ BÀI Duyên: combo chuẩn "Vòng cầu đơn" = chuỗi lam thủy 6 li 1550 + ngũ điếu 990 + 2 bi vàng 380×2 = 3.300; chọn combo ở ➕ Tạo đơn thì đơn giá sai (ảnh: Charm bi SL2 đơn giá 1.650.000, Chuỗi lam thủy 0đ).
