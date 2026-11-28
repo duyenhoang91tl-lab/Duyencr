@@ -208,7 +208,7 @@
     var plan = ldaSplit_(list, picks);
     if (plan.error) { toast(plan.error); return; }
     var label = ($('lda-label') && $('lda-label').value || '').trim();
-    if (!confirm('Chia ' + plan.total + ' khách: ' + plan.entries.map(function (e) { return e.csName + ' ' + e.phones.length; }).join(', ') + '?')) return;
+    if (!(await uiConfirm('Chia ' + plan.total + ' khách: ' + plan.entries.map(function (e) { return e.csName + ' ' + e.phones.length; }).join(', ') + '?'))) return;
     ST.busy = true; var btn = $('lda-go'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang chia…'; }
     try {
       var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'leadAssign', token: tok_(), label: label, entries: plan.entries }) });
