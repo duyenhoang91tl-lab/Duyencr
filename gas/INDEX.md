@@ -151,6 +151,10 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
 - Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
 
+## 34c_CommClose.gs
+- Hàm: `_commPeriodOf_`, `_commNextPeriod_`, `_commPeriodState_`, `_commSettle_`, `_commLedgerRows_`
+- Hằng/biến: `COMMCLOSE_SECTION_`, `COMMCLOSE_DEFAULT_`
+
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`
 - Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`
