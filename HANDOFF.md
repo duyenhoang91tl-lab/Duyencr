@@ -8,9 +8,9 @@
 
 ## 2026-11-28 (phiên Claude — CRM DỄ DÙNG CHO NGƯỜI MỚI, KHÔNG THÊM DÒNG HƯỚNG DẪN)
 - ĐỀ BÀI Duyên: "hãy trình bày crm của mình ai không biết dùng đều có thể sử dụng được, mà không cần thêm mấy dòng chỉ dẫn". 5 bước: (1) nút lớn Tổng quan (2) Data của tôi nút Gọi/Xong (3) điện thoại: nhắc hẹn thu thành chuông (4) điện thoại: bảng khách thấy tên (5) lỗi dễ hiểu + Thử lại.
-- ✅ **ĐÃ XONG:** Bước 1–3/5: nút lớn Tổng quan; Data của tôi có nút Gọi/Xem khách/Xong; điện thoại (≤640px) nhắc hẹn mặc định thu thành chuông (js/06 ?v=20261128a). 467 test OK, đã xem ảnh.
-- 🔧 **ĐANG LÀM:** Bước 4/5 điện thoại: bảng khách thấy tên trước (css/16)
-- ➡️ **BƯỚC KẾ TIẾP:** css/16: thu hẹp cột Ngày mua gần nhất ở màn ≤640px
+- ✅ **ĐÃ XONG:** Bước 1–4/5: nút lớn Tổng quan; Data của tôi nút Gọi/Xem khách/Xong; điện thoại: nhắc hẹn thành chuông, cột Ngày mua gần nhất thu còn 84px (css/16 ?v=20261128a, bỏ min-width inline ở th-lastpos). 467 test OK, đã xem ảnh.
+- 🔧 **ĐANG LÀM:** Bước 5/5 lỗi dễ hiểu + Thử lại (js/31)
+- ➡️ **BƯỚC KẾ TIẾP:** js/31: thông báo không tải được tổng quan: chữ thường + nút Thử lại, chi tiết kỹ thuật chỉ admin thấy
 
 ## 2026-11-28 (phiên Claude — CHIA DATA: CHỌN THÁNG 5 VẪN BỊ LOẠI HÀNG LOẠT, LẦN 2) — XONG BƯỚC 1/1 (web `js/07`, chưa thử bằng dữ liệu thật)
 - ĐỀ BÀI Duyên: "phần chọn data khách thấy loại 1 loạt trong khi mình chọn của tháng 5 thì phải có tất cả đơn của tháng 5, khách nào có đơn ở đó thì đều tính" (không kèm ảnh). Lần sửa 27/11 (đơn POS + tải thêm cửa sổ POS) đã vào nhưng còn 2 chỗ nữa.
