@@ -74,6 +74,28 @@ ok(rowsOf('LoyaltyPoints').some(x => x[2] === 'redeem') && rowsOf('LoyaltyPoints
 g = get(); ok(g.ledger.find(x => x.type === 'redeem').undone === true && g.points.balance === 280, 'sổ đánh dấu đã hoàn tác');
 ok(J(ctx.loyaltyDoPost_('loyaltyUndo', { token: 't', phone: PH, key: redeemKey })).code === 'DUPLICATE', 'hoàn tác lần 2 bị chặn');
 ok(sheets.AuditLog && sheets.AuditLog.rows.some(x => x[2] === 'loyalty:undo' && x[1] === 'duyen' && String(x[4]).includes('50 diem')), 'ghi AuditLog loyalty:undo');
+// 9) báo giá quyền lợi thẻ (9c-1): chỉ đọc; thẻ theo lịch sử POS + đơn CRM hợp lệ
+let crmRows = []; ctx._crmReadAll_ = () => crmRows;
+const quote = (phone, items) => J(ctx.loyaltyDoPost_('loyaltyBenefitQuote', { token: 't', phone, items }));
+const Q = [{ name: 'Nhẫn bạc trơn', qty: 1, price: 1500000 }, { name: 'Charm 24k hoa sen', qty: 1, price: 500000 }];
+const before = sheets.LoyaltyPoints.rows.length;
+pos = []; let q = quote('0900000001', Q);
+ok(q.ok && q.level === 'none' && q.discount === 0 && q.freeShip === false && q.history.orders === 0, 'khách mới (0 đơn): không thẻ: ' + JSON.stringify(q));
+pos = [{ soDienThoai: '0900000002', ngayTaoDon: '10/01/2026', giaTriSauGiam: 2000000, trangThai: '' }];
+q = quote('0900000002', Q); ok(q.level === 'vip' && q.discount === 75000 && q.freeShip === true && q.lines[1].rule === 'excluded', 'đã có 1 đơn POS → VIP: giảm 5% dòng thường, charm 24k không giảm, miễn ship: ' + JSON.stringify(q));
+pos = [{ soDienThoai: '0900000003', ngayTaoDon: '10/01/2026', giaTriSauGiam: 2000000, trangThai: 'Hoàn đơn' }];
+q = quote('0900000003', Q); ok(q.level === 'none', 'đơn POS đã hoàn không tính là đã mua');
+pos = []; crmRows = [{ phone: '0900000004', status: 'Mới', total: 3000000 }];
+ok(quote('0900000004', Q).level === 'none', 'đơn CRM mới (chưa xác nhận) chưa tính');
+crmRows = [{ phone: '0900000004', status: 'Đã giao', total: 3000000 }];
+ok(quote('0900000004', Q).level === 'vip', 'đơn CRM đã giao tính là đã mua');
+crmRows = [{ phone: '0900000004', status: 'Hoàn', total: 3000000 }, { phone: '0900000004', status: 'Hủy', total: 3000000 }];
+ok(quote('0900000004', Q).level === 'none', 'đơn CRM hoàn/hủy không tính');
+pos = [{ soDienThoai: '0900000005', ngayTaoDon: '10/01/2026', giaTriSauGiam: 30000000, trangThai: '' }]; crmRows = [{ phone: '0900000005', status: 'Đang giao', total: 20000000 }];
+q = quote('0900000005', Q); ok(q.level === 'super' && q.history.cumulative === 50000000 && q.discount === 150000 && q.lines[1].pct === 0, 'POS 30tr + CRM 20tr = 50tr → SUPER (10%): ' + JSON.stringify(q));
+ok(!J(ctx.loyaltyDoPost_('loyaltyBenefitQuote', { token: 't', phone: '', items: Q })).ok && !J(ctx.loyaltyDoPost_('loyaltyBenefitQuote', { token: 't', phone: PH, items: [] })).ok, 'thiếu SĐT / đơn rỗng → lỗi');
+tokenUser = null; ok(J(ctx.loyaltyDoPost_('loyaltyBenefitQuote', { token: 'x', phone: PH, items: Q })).code === 'AUTH', 'chưa đăng nhập → AUTH'); tokenUser = { role: 'sale', username: 'hoa' };
+ok(sheets.LoyaltyPoints.rows.length === before, 'báo giá CHỈ ĐỌC: không ghi sổ điểm');
 // 7) dispatch qua doGet/doPost
 const viaGet = J(ctx.doGet({ parameter: { action: 'loyaltyGet', token: 't', phone: PH } })); ok(viaGet.ok && viaGet.phone, 'doGet có route loyaltyGet');
 const viaPost = J(ctx.doPost({ postData: { contents: JSON.stringify({ action: 'loyaltyRedeem', token: 't', phone: PH, orderValue: 1000000, points: 5 }) } }));

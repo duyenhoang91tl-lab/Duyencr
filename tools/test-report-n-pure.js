@@ -9,8 +9,8 @@ const a = j06.indexOf('var _SR_DEFAULT_ITEMS_'), b = j06.indexOf('setTimeout(_sy
 const ctx = { loadLS: () => null, saveLS() {}, gsUrl: '', fetch: async () => ({}), _srState: { sub: 'A' }, _srIsAdmin: () => false, esc: s => String(s) };
 vm.createContext(ctx); vm.runInContext(j06.slice(a, b), ctx);
 const run = e => vm.runInContext(e, ctx);
-// (1) N có trong danh sách, đứng sau M
-ok(run('_srItems_().map(function(i){return i[0]}).join(",")').endsWith('L,M,N') && run('_srItems_().filter(function(i){return i[0]==="N"})[0][1]') === 'Báo cáo N — Tính đơn thuần', 'N co trong danh sach bao cao');
+// (1) N có trong danh sách, đứng ngay sau B (thứ tự nhóm theo mục đích, 59d34c6)
+ok(run('_srItems_().map(function(i){return i[0]}).join(",")').includes('A,B,N,C') && run('_srItems_().filter(function(i){return i[0]==="N"})[0][1]') === 'Báo cáo N — Tính đơn thuần', 'N co trong danh sach bao cao');
 // (2) chuyển báo cáo: N => sub B + bView pure; mã khác xóa cờ; ô chọn hiện đúng N / B
 run('_srApplySub_("N")'); ok(run('_srState.sub') === 'B' && run('_srState.bView') === 'pure' && run('_srCurCode_()') === 'N', 'chon N => sub B + bView pure, ma hien thi N');
 run('_srApplySub_("B")'); ok(run('_srState.sub') === 'B' && !run('_srState.bView') && run('_srCurCode_()') === 'B', 'chon B => xoa co pure');

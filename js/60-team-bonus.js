@@ -17,6 +17,9 @@ function _tbDmy_(ymd){ var q = String(ymd || '').split('-'); return q.length ===
 function _tbDow_(ymd){ var q = String(ymd || '').split('-'); if (q.length !== 3) return ''; var d = new Date(Date.UTC(+q[0], +q[1] - 1, +q[2])).getUTCDay(); return ['CN','T2','T3','T4','T5','T6','T7'][d]; }
 function _tbToday_(){ var d = new Date(Date.now() + 7 * 3600 * 1000); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
 function _tbTok_(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
+// Mini game tháng 11 (Phụ lục 02/QC-HTT): các loại thưởng theo DOANH SỐ cá nhân — tổng tiền theo từng loại cho 1 Sale.
+var _TB_MG_KINDS_ = ['dayTarget', 'monthTarget', 'topRevenue', 'allowance'];
+function _tbMgOf_(d, name){ var s = 0; (d.rewards || []).forEach(function(r){ if (r.name === name && _TB_MG_KINDS_.indexOf(r.kind) > -1) s += r.amount; }); return s; }
 function _tbPenLabel_(cfg, type){ var l = ''; ((cfg && cfg.penalties) || []).forEach(function(p){ if (p.type === Number(type)) l = p.label; }); return l || ('Loại ' + type); }
 function _tbPenShort_(type){ return { 1:'Tin trôi >30p', 2:'Không báo cáo đúng giờ', 3:'Đã đọc không phản hồi', 4:'Đơn gộp không chia doanh thu', 5:'Khai thác mong cầu thiếu hình/ghi âm', 6:'PCMT – check nhầm cmt / trả lời cmt báo giá', 7:'Ptucam – dùng từ cấm', 8:'Pxltc – không xử lý từ chối', 9:'Psaiqt – tư vấn hời hợt / tin hàng loạt' }[Number(type)] || ('Loại ' + type); }
 
@@ -24,15 +27,32 @@ function _tbPenShort_(type){ return { 1:'Tin trôi >30p', 2:'Không báo cáo đ
 function _tbTotalsHtml_(d){
   var rows = d.totals || [];
   if (!rows.length) return '<div style="color:var(--muted);padding:12px">Chưa có nhân viên Online/Văn phòng — vào Báo cáo E → "Phân loại Sale" để xếp nhóm.</div>';
-  var h = '<div style="overflow-x:auto"><table class="sr-table" style="width:100%"><thead><tr><th>Sale</th><th style="text-align:right">Thưởng ngày</th><th style="text-align:right">Thưởng tuần</th><th style="text-align:right">Thưởng tháng</th><th style="text-align:right">Tổng thưởng</th><th style="text-align:right">Phạt</th><th style="text-align:right">Thực nhận</th></tr></thead><tbody>';
+  var h = '<div style="overflow-x:auto"><table class="sr-table" style="width:100%"><thead><tr><th>Sale</th><th style="text-align:right">Thưởng ngày</th><th style="text-align:right">Thưởng tuần</th><th style="text-align:right">Thưởng tháng</th><th style="text-align:right" title="Mini game T11: mốc DS ngày + mốc DS tháng + Top 1 DT + phụ cấp Online">Mini game T11</th><th style="text-align:right">Tổng thưởng</th><th style="text-align:right">Phạt</th><th style="text-align:right">Thực nhận</th></tr></thead><tbody>';
   var sT = { r: 0, p: 0, n: 0 };
   rows.forEach(function(t){
     sT.r += t.reward; sT.p += t.penalty; sT.n += t.net;
-    h += '<tr><td>' + _tbEsc_(t.name) + '</td><td style="text-align:right">' + (t.dayWins ? t.dayWins + ' ngày' : '–') + '</td><td style="text-align:right">' + (t.weekWins ? t.weekWins + ' tuần' : '–') + '</td><td style="text-align:right">' + (t.monthWins ? '✓' : '–') + '</td>' +
+    h += '<tr><td>' + _tbEsc_(t.name) + '</td><td style="text-align:right">' + (t.dayWins ? t.dayWins + ' ngày' : '–') + '</td><td style="text-align:right">' + (t.weekWins ? t.weekWins + ' tuần' : '–') + '</td><td style="text-align:right">' + (t.monthWins ? '✓' : '–') + '</td><td style="text-align:right">' + (_tbMgOf_(d, t.name) ? _tbMoney_(_tbMgOf_(d, t.name)) : '–') + '</td>' +
       '<td style="text-align:right;color:#16a34a">' + _tbMoney_(t.reward) + '</td><td style="text-align:right;color:' + (t.penalty ? '#dc2626' : 'var(--muted)') + '">' + (t.penalty ? '−' + _tbMoney_(t.penalty) + ' (' + t.penaltyCount + ' lần)' : '–') + '</td><td style="text-align:right"><b style="color:' + (t.net < 0 ? '#dc2626' : '#16a34a') + '">' + _tbMoney_(t.net) + '</b></td></tr>';
   });
-  h += '<tr style="font-weight:700;background:var(--surface2)"><td>Tổng</td><td></td><td></td><td></td><td style="text-align:right">' + _tbMoney_(sT.r) + '</td><td style="text-align:right">' + (sT.p ? '−' + _tbMoney_(sT.p) : '–') + '</td><td style="text-align:right">' + _tbMoney_(sT.n) + '</td></tr>';
-  return h + '</tbody></table></div><div style="font-size:11px;color:var(--muted);margin-top:6px">Chỉ cộng thưởng ngày/tuần/tháng ĐÃ KẾT THÚC. Mục "tạm tính" ở các tab bên cạnh chưa tính tiền.</div>';
+  h += '<tr style="font-weight:700;background:var(--surface2)"><td>Tổng</td><td></td><td></td><td></td><td></td><td style="text-align:right">' + _tbMoney_(sT.r) + '</td><td style="text-align:right">' + (sT.p ? '−' + _tbMoney_(sT.p) : '–') + '</td><td style="text-align:right">' + _tbMoney_(sT.n) + '</td></tr>';
+  return h + '</tbody></table></div><div style="font-size:11px;color:var(--muted);margin-top:6px">Chỉ cộng thưởng ngày/tuần/tháng ĐÃ KẾT THÚC (mốc DS tháng, Top 1 doanh thu, phụ cấp Online chỉ cộng khi hết tháng). Mục "tạm tính" ở các tab bên cạnh chưa tính tiền.</div>';
+}
+function _tbMiniGameHtml_(d){
+  var cfg = d.cfg || {}, tr = d.topRevenue || { winners: [] }, tiersTxt = function(a){ return (a || []).map(function(x){ return '≥' + _tbMoney_(x.min) + ' → ' + _tbMoney_(x.reward); }).join(' · '); };
+  var tbl = function(head, rows, empty){ return rows.length ? '<div style="overflow-x:auto"><table class="sr-table" style="width:100%"><thead><tr>' + head.map(function(x, i){ return '<th' + (i ? ' style="text-align:right"' : '') + '>' + x + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.map(function(r){ return '<tr>' + r.map(function(c, i){ return '<td' + (i ? ' style="text-align:right"' : '') + '>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' : '<div style="color:var(--muted);font-size:12px;padding:6px 0">' + empty + '</div>'; };
+  var tag = function(p){ return p ? ' <span style="color:#92400e;font-size:11px">(tạm tính)</span>' : ''; };
+  var h = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Chương trình Mini game tháng 11/2026 (Phụ lục 02/QC-HTT). Doanh số tính theo <b>người tạo đơn</b> trên đơn Base (đã loại hủy/hoàn/đổi trả/bảo hành/thay dây), cùng nguồn với thưởng ngày. Sale ngoài đội Online/Văn phòng (Quầy, Thử việc) không tính.</div>';
+  h += '<div style="font-weight:600;margin:8px 0 4px">C. Thưởng doanh số ngày <span style="font-weight:400;color:var(--muted);font-size:11px">(không cộng dồn, lấy mốc cao nhất: ' + _tbEsc_(tiersTxt(cfg.dailyTiers)) + ')</span></div>';
+  h += tbl(['Ngày', 'Sale', 'Doanh số', 'Mốc', 'Thưởng'], (d.dayTargets || []).slice().sort(function(a, b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : b.revenue - a.revenue; }).map(function(x){ return [x.date + tag(x.partial), _tbEsc_(x.name), _tbMoney_(x.revenue), '≥' + _tbMoney_(x.min), _tbMoney_(x.reward)]; }), 'Chưa có Sale đạt mốc doanh số ngày.');
+  h += '<div style="font-weight:600;margin:14px 0 4px">D1. Thưởng mốc doanh số tháng <span style="font-weight:400;color:var(--muted);font-size:11px">(' + _tbEsc_(tiersTxt(cfg.monthTiers)) + ')</span></div>';
+  h += tbl(['Sale', 'Doanh số tháng', 'Mốc', 'Thưởng'], (d.monthTargets || []).map(function(x){ return [_tbEsc_(x.name) + tag(x.partial), _tbMoney_(x.revenue), '≥' + _tbMoney_(x.min), _tbMoney_(x.reward)]; }), 'Chưa có Sale đạt mốc 500 triệu.');
+  var trc = cfg.topRevenue || {};
+  h += '<div style="font-weight:600;margin:14px 0 4px">D2. Top 1 doanh thu <span style="font-weight:400;color:var(--muted);font-size:11px">(' + (trc.pct || 0) + '% ' + (trc.base === 'team' ? 'tổng doanh thu cả đội' : 'doanh thu của Sale đó') + ', Sale đạt tối thiểu ' + _tbMoney_(trc.minRevenue || 0) + ')</span></div>';
+  h += tbl(['Sale', 'Doanh số tháng', 'Thưởng'], (tr.winners || []).map(function(x){ return [_tbEsc_(x.name) + tag(tr.partial), _tbMoney_(x.revenue), _tbMoney_(x.amount)]; }), 'Chưa có Sale đạt tối thiểu ' + _tbMoney_(trc.minRevenue || 0) + '.');
+  var oa = cfg.onlineAllowance || {};
+  h += '<div style="font-weight:600;margin:14px 0 4px">D4. Phụ cấp Sale Online không lương cứng <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh số tháng ≥ ' + _tbMoney_(oa.minRevenue || 0) + ' → +' + _tbMoney_(oa.amount || 0) + ')</span></div>';
+  h += tbl(['Sale', 'Doanh số tháng', 'Phụ cấp'], (d.allowances || []).map(function(x){ return [_tbEsc_(x.name) + tag(x.partial), _tbMoney_(x.revenue), _tbMoney_(x.amount)]; }), 'Chưa có Sale Online đạt mức phụ cấp.');
+  return h + '<div style="font-size:11px;color:var(--muted);margin-top:10px">D3 (Top 1 tỷ lệ chốt tháng ' + _tbMoney_(cfg.monthlyReward || 0) + ') nằm ở tab "Tuần / tháng". Mục A (thưởng theo sản phẩm trọng điểm) và B (thưởng theo bill combo / vòng mix charm) chưa tính tự động.</div>';
 }
 function _tbDailyHtml_(d){
   var cfg = d.cfg || {}, rows = (d.daily || []).slice().reverse();
@@ -99,7 +119,11 @@ function _tbCfgHtml_(d){
   var c = d.cfg || {}, g = function(id, label, val, step){ return '<label style="font-size:12px">' + label + '<br><input type="number" id="tbc-' + id + '" min="0" step="' + step + '" value="' + _tbEsc_(val == null ? '' : val) + '" style="width:130px"></label>'; };
   var h = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Admin chỉnh quy tắc thưởng ngày và số tiền. Lưu xong áp dụng ngay cho báo cáo (tháng đang xem tải lại).</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px">' +
-    g('minOrders', 'Thưởng ngày: số đơn tối thiểu', c.dailyMinOrders, 1) + g('minRev', 'Thưởng ngày: doanh thu tối thiểu (đ)', c.dailyMinRevenue, 1000000) + g('dayR', 'Thưởng ngày (đ)', c.dailyReward, 10000) + g('weekR', 'Thưởng tuần (đ)', c.weeklyReward, 10000) + g('monR', 'Thưởng tháng (đ)', c.monthlyReward, 10000) + '</div>' +
+    g('minOrders', 'Thưởng ngày: số đơn tối thiểu', c.dailyMinOrders, 1) + g('minRev', 'Thưởng ngày: doanh thu tối thiểu (đ)', c.dailyMinRevenue, 1000000) + g('dayR', 'Thưởng ngày (đ)', c.dailyReward, 10000) + g('weekR', 'Thưởng tuần (đ)', c.weeklyReward, 10000) + g('monR', 'Top tỷ lệ chốt THÁNG (đ)', c.monthlyReward, 10000) + '</div>' +
+    '<div style="font-weight:600;font-size:13px;margin-bottom:6px">Mini game T11</div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px">' +
+    g('trMin', 'Top 1 DT: doanh thu tối thiểu (đ)', (c.topRevenue || {}).minRevenue, 1000000) + g('trPct', 'Top 1 DT: % thưởng', (c.topRevenue || {}).pct, 0.05) +
+    '<label style="font-size:12px">Top 1 DT: tính % trên<br><select id="tbc-trBase"><option value="self"' + (((c.topRevenue || {}).base || 'self') === 'self' ? ' selected' : '') + '>Doanh thu của Sale đó</option><option value="team"' + (((c.topRevenue || {}).base) === 'team' ? ' selected' : '') + '>Tổng doanh thu cả đội</option></select></label>' +
+    g('oaMin', 'Phụ cấp Online: DS tối thiểu (đ)', (c.onlineAllowance || {}).minRevenue, 1000000) + g('oaAmt', 'Phụ cấp Online (đ)', (c.onlineAllowance || {}).amount, 10000) + '</div>' +
     '<div style="font-weight:600;font-size:13px;margin-bottom:6px">Mức phạt từng mã</div><div style="display:flex;gap:10px;flex-wrap:wrap">' +
     (c.penalties || []).map(function(p){ return '<label style="font-size:12px;width:210px">' + p.type + '. ' + _tbEsc_(_tbPenShort_(p.type)) + '<br><input type="number" class="tbc-pen" data-type="' + p.type + '" min="0" step="10000" value="' + p.amount + '" style="width:130px"></label>'; }).join('') + '</div>' +
     '<div style="margin-top:12px"><button class="btn sm" onclick="_tbCfgSave()"' + (_tbState.saving ? ' disabled' : '') + '>💾 Lưu cài đặt</button></div>';
@@ -107,9 +131,13 @@ function _tbCfgHtml_(d){
 }
 function _tbCfgCollect_(){
   var num = function(id){ var el = document.getElementById('tbc-' + id), v = el ? el.value : ''; return v === '' ? NaN : Number(v); };
-  var cfg = { dailyMinOrders: num('minOrders'), dailyMinRevenue: num('minRev'), dailyReward: num('dayR'), weeklyReward: num('weekR'), monthlyReward: num('monR'), penalties: [] };
+  var old = (_tbState.data && _tbState.data.cfg) || {}, baseEl = document.getElementById('tbc-trBase');
+  var cfg = { dailyMinOrders: num('minOrders'), dailyMinRevenue: num('minRev'), dailyReward: num('dayR'), weeklyReward: num('weekR'), monthlyReward: num('monR'), penalties: [],
+    dailyTiers: old.dailyTiers, monthTiers: old.monthTiers,   // các mốc tiền giữ nguyên (chỉnh bằng Settings teamBonusCfg)
+    topRevenue: { minRevenue: num('trMin'), pct: num('trPct'), base: baseEl && baseEl.value === 'team' ? 'team' : 'self' }, onlineAllowance: { minRevenue: num('oaMin'), amount: num('oaAmt') } };
   var bad = false;
   ['dailyMinOrders', 'dailyMinRevenue', 'dailyReward', 'weeklyReward', 'monthlyReward'].forEach(function(k){ if (!isFinite(cfg[k]) || cfg[k] < 0) bad = true; });
+  [cfg.topRevenue.minRevenue, cfg.topRevenue.pct, cfg.onlineAllowance.minRevenue, cfg.onlineAllowance.amount].forEach(function(v){ if (!isFinite(v) || v < 0) bad = true; });
   Array.prototype.forEach.call(document.querySelectorAll('.tbc-pen'), function(el){ var n = Number(el.value); if (el.value === '' || !isFinite(n) || n < 0) bad = true; else cfg.penalties.push({ type: Number(el.getAttribute('data-type')), amount: n }); });
   return bad ? null : cfg;
 }
@@ -127,11 +155,11 @@ function _tbPanelBodyHtml_(){
   if (_tbState.loading && !d) return '<div style="padding:16px;color:var(--muted)">Đang tải thưởng phạt…</div>';
   if (_tbState.err && !d) return '<div style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;font-size:13px">⚠️ ' + _tbEsc_(_tbState.err) + ' <button class="btn sm" onclick="_tbLoad(true)">🔄 Thử lại</button></div>';
   if (!d) return '';
-  var tabs = [['total', '💰 Tổng hợp'], ['day', '📅 Thưởng ngày'], ['period', '🏆 Tuần / tháng'], ['pen', '⚠️ Phạt (' + (d.penalties || []).length + ')']];
+  var tabs = [['total', '💰 Tổng hợp'], ['day', '📅 Thưởng ngày'], ['period', '🏆 Tuần / tháng'], ['mg', '🎯 Mini game T11'], ['pen', '⚠️ Phạt (' + (d.penalties || []).length + ')']];
   if (d.canEdit) tabs.push(['cfg', '⚙ Cài đặt']);
   var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + tabs.map(function(x){ return '<button class="btn sm' + (t === x[0] ? '' : ' secondary') + '" onclick="_tbTab(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
   if (_tbState.err) h += '<div style="color:#b91c1c;font-size:12px;margin-bottom:6px">⚠️ ' + _tbEsc_(_tbState.err) + '</div>';
-  h += t === 'day' ? _tbDailyHtml_(d) : t === 'period' ? _tbPeriodsHtml_(d) : t === 'pen' ? _tbPenaltiesHtml_(d) : t === 'cfg' && d.canEdit ? _tbCfgHtml_(d) : _tbTotalsHtml_(d);
+  h += t === 'day' ? _tbDailyHtml_(d) : t === 'period' ? _tbPeriodsHtml_(d) : t === 'mg' ? _tbMiniGameHtml_(d) : t === 'pen' ? _tbPenaltiesHtml_(d) : t === 'cfg' && d.canEdit ? _tbCfgHtml_(d) : _tbTotalsHtml_(d);
   return h;
 }
 // CHỈ ADMIN thấy mục này (Duyên 17/11: sale được thưởng cũng không thấy). Chặt: chưa xác định người dùng / vai trò khác → KHÔNG hiện. Máy chủ cũng chặn (teamBonusDoGet_ FORBIDDEN).
@@ -250,9 +278,9 @@ async function _tbDeletePenalty(id){
 
 // ── Xuất Excel (dữ liệu tháng đang xem) — 5 sheet: Tổng hợp, Thưởng ngày, Tuần-tháng, Nhật ký phạt, Quy định. Dùng XLSX (SheetJS) như các báo cáo khác. ──
 function _tbExportRows_(d){
-  var cfg = d.cfg || {}, sum = [['Sale', 'Thưởng ngày (đ)', 'Số ngày thắng', 'Thưởng tuần (đ)', 'Số tuần thắng', 'Thưởng tháng (đ)', 'Tổng thưởng (đ)', 'Phạt (đ)', 'Số lần phạt', 'Thực nhận (đ)']];
-  var byName = {}; (d.rewards || []).forEach(function(r){ var o = byName[r.name] || (byName[r.name] = { day: 0, week: 0, month: 0 }); o[r.kind] += r.amount; });
-  (d.totals || []).forEach(function(t){ var o = byName[t.name] || { day: 0, week: 0, month: 0 }; sum.push([t.name, o.day, t.dayWins, o.week, t.weekWins, o.month, t.reward, t.penalty, t.penaltyCount, t.net]); });
+  var cfg = d.cfg || {}, sum = [['Sale', 'Thưởng ngày (đ)', 'Số ngày thắng', 'Thưởng tuần (đ)', 'Số tuần thắng', 'Thưởng tháng (đ)', 'Mini game T11 (đ)', 'Tổng thưởng (đ)', 'Phạt (đ)', 'Số lần phạt', 'Thực nhận (đ)']];
+  var byName = {}; (d.rewards || []).forEach(function(r){ var o = byName[r.name] || (byName[r.name] = { day: 0, week: 0, month: 0 }); o[r.kind] = (o[r.kind] || 0) + r.amount; });
+  (d.totals || []).forEach(function(t){ var o = byName[t.name] || { day: 0, week: 0, month: 0 }; sum.push([t.name, o.day, t.dayWins, o.week, t.weekWins, o.month, _tbMgOf_(d, t.name), t.reward, t.penalty, t.penaltyCount, t.net]); });
   var day = [['Ngày', 'Trạng thái', 'Sale đạt thưởng', 'Số đơn cao nhất', 'Top trong ngày', 'Đơn bị loại (đổi trả/BH/huỷ…)', 'Thưởng (đ)']];
   (d.daily || []).forEach(function(r){ day.push([r.date, r.partial ? 'Tạm tính' : (r.qualified ? 'Đạt' : 'Chưa đủ ' + (cfg.dailyMinOrders || 6) + ' đơn'), r.qualified ? r.winners.map(function(w){ return w.name; }).join(', ') : '', r.top || 0, (r.list || []).slice(0, 5).map(function(x){ return x.name + ' ' + x.orders; }).join(' · '), r.excluded || 0, (r.qualified && !r.partial) ? r.winners.length * (cfg.dailyReward || 0) : 0]); });
   var per = [['Loại kỳ', 'Kỳ', 'Trạng thái', 'Sale', 'Tương tác', 'Đơn Base', 'Tỷ lệ chốt (%)', 'TB tương tác đội', 'Đủ điều kiện', 'Top (x)', 'Thưởng (đ)']];

@@ -52,18 +52,21 @@
 #salesreport-wrap .gear-menu-list{border-radius:var(--ui-r-lg);box-shadow:var(--shadow-md);border:1px solid var(--border-md);}
 
 /* ── 3. Thẻ KPI: lưới đều, thẻ cùng padding/bo góc, số lớn - nhãn nhỏ ── */
+/* 2026-11-28: lưới → flex-wrap + min-width:min-content để THẺ TỰ KÉO NGANG theo độ dài số tiền (vd 4.361.866.600₫, 2.300.834.167₫).
+   Trước: cột cố định minmax(168px,1fr) + overflow-wrap:anywhere nên số tiền 14 ký tự bị BẺ XUỐNG DÒNG giữa chừng. */
 #salesreport-wrap .kpi-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+  display:flex; flex-wrap:wrap;
   gap:12px; margin:0 0 var(--rp-gap);
 }
 #salesreport-wrap .kpi-card{
   display:flex; flex-direction:column; justify-content:center; gap:4px;
   padding:14px 16px !important; border-radius:var(--rp-radius) !important;
-  box-shadow:var(--shadow); min-width:0;
+  box-shadow:var(--shadow);
+  flex:1 1 168px; min-width:min-content;   /* min-content của thẻ = từ/số dài nhất không ngắt được = chính con số → thẻ không bao giờ hẹp hơn số */
 }
 #salesreport-wrap .kpi-card .kpi-val,#salesreport-wrap .kpi-val{
   font-size:21px; font-weight:700; line-height:1.15; letter-spacing:-.01em;
-  overflow-wrap:anywhere;
+  white-space:nowrap; overflow-wrap:normal;   /* số tiền KHÔNG ngắt dòng */
 }
 #salesreport-wrap .kpi-card .kpi-label,#salesreport-wrap .kpi-label{
   margin-top:0; font-size:11.5px; line-height:1.35; color:var(--muted); font-weight:500;
@@ -109,8 +112,9 @@
   #salesreport-wrap .srb-bar > *{flex:1 1 140px;min-width:0;}
   #salesreport-wrap .srb-bar > .srb-bar-arrow{flex:0 0 auto;}
   #salesreport-wrap .srb-bar select,#salesreport-wrap .srb-bar input[type=date]{max-width:none;width:100%;}
-  #salesreport-wrap .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  #salesreport-wrap .kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}   /* điện thoại: 2 cột, số co cỡ chữ bằng clamp bên dưới */
   #salesreport-wrap .kpi-card{padding:12px !important;}
+  #salesreport-wrap .kpi-card{min-width:0;}
   #salesreport-wrap .kpi-card .kpi-val{font-size:clamp(15px,4.4vw,18px);white-space:nowrap;overflow-wrap:normal;}
   #salesreport-wrap .dash-table{font-size:var(--ui-fs-sm);}
   #salesreport-wrap .dash-table th,#salesreport-wrap .dash-table td{padding:8px 9px;}

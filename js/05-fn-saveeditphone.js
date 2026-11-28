@@ -828,8 +828,14 @@ function _saveTabCustomize_(){
 // true = tài khoản đang đăng nhập được phép thấy tab id này. perms null/rỗng = KHÔNG giới
 // hạn (mặc định mọi tài khoản mới/cũ đều xem đủ như trước — Admin phải CHỦ ĐỘNG bật giới
 // hạn thì mới thu hẹp lại).
+// TAI KHOAN TEST (role demo): AN cac man ma may chu khong phuc vu cho tai khoan nay (action doc khong co trong DEMO_SESSION_GET_, hoac man chi de ghi) — Duyen chot 2026-11-28.
+// NGUYEN NHAN GOC: tai khoan test mac dinh thay moi man nen bam Zalo AI / Chat / Thu vien / Cong viec / Giai doan / Kho san pham / Don CRM chi gap "khong duoc phep".
+// Muon mo lai 1 man: mo action doc (co loc theo sale) o GAS truoc, roi bo id khoi danh sach nay.
+var _DEMO_HIDDEN_TABS_ = ['tab-zaloai', 'tab-chat', 'tab-media', 'tab-teamchat', 'tab-task', 'stageboard', 'plib', 'crmorders', 'uploaddata'];
+function _demoTabHidden_(id){ return !!(currentUser && currentUser.role === 'demo') && _DEMO_HIDDEN_TABS_.indexOf(id) !== -1; }
 function _tabAllowedForUser(id){
   if (!currentUser || currentUser.role === 'admin') return true;
+  if (_demoTabHidden_(id)) return false;   // thang ca perms rieng cua tai khoan: may chu khong tra du lieu nen cap quyen cung vo ich
   if (!currentUser.perms || !currentUser.perms.length) return (typeof _featAllowed === 'function') ? _featAllowed(id) : true;   // phân quyền theo vai trò + bộ phận (js/40-fn-rolesettings.js)
   return currentUser.perms.indexOf(id) !== -1;
 }
@@ -844,6 +850,14 @@ function _applyUserTabPermissions(){
     if (!el) return;
     if (_tabAllowedForUser(d.id)) { el.style.display = ''; }
     else { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; }
+  });
+  // Man phu (registerExtraTab) khong nam trong _PERM_TAB_DEFS: o day chi an theo luat tai khoan test, va tra lai khi doi sang tai khoan khac.
+  _DEMO_HIDDEN_TABS_.forEach(function(id){
+    if (_PERM_TAB_DEFS.some(function(d){ return d.id === id; })) return;
+    var el = document.querySelector('[data-bar-id="'+id+'"]');
+    if (!el) return;
+    if (_demoTabHidden_(id)) { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; el.setAttribute('data-demo-hid', '1'); }
+    else if (el.getAttribute('data-demo-hid')) { el.style.display = ''; el.removeAttribute('data-demo-hid'); }
   });
   // Nhóm "📊 Báo cáo ▾" gộp 4 tab con (salesreport/pancake/kpipancake/mktchecklist) — nếu cả 4
   // đều bị chặn thì ẩn luôn nút nhóm, tránh để lại 1 nút bấm ra menu rỗng gây khó hiểu.

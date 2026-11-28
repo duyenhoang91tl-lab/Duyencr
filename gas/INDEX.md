@@ -140,12 +140,16 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
 
 ## 33_TeamBonus.gs
-- Hàm: `teamBonusCfg_`, `_tbPad_`, `_tbYmdAdd_`, `_tbDow_`, `_tbMonthEnd_`, `_tbFmtDm_`, `_tbTeam_`, `_tbOrderCounts_`, `_tbDailyCounts_`, `_tbPickClose_`, `_tbCloseFor_`, `_tbComputeRewards_`, `_tbReadPenalties_`, `_tbAccess_`, `teamBonusReport_`, `teamBonusDoGet_`, `teamBonusDoPost_`, `_tbWaitMin_`, `_tbScanMsgs_`, `_tbParseTs_`, `_tbScanMergedOrders_`, `_tbReadDayMsgs_`, `_tbIgnored_`, `teamPenaltySuggest_`, `teamPenaltyIgnore_`, `_topSpFold_`, `_topSpKey_`, `readTopSpExclude_`, `saveTopSpExclude_`, `_topSpAggregate_`, `buildTopProducts_`
+- Hàm: `teamBonusCfg_`, `_tbPad_`, `_tbYmdAdd_`, `_tbDow_`, `_tbMonthEnd_`, `_tbFmtDm_`, `_tbTeam_`, `_tbOrderCounts_`, `_tbDailyCounts_`, `_tbPickClose_`, `_tbCloseFor_`, `_tbTierFor_`, `_tbComputeRewards_`, `_tbReadPenalties_`, `_tbAccess_`, `teamBonusReport_`, `teamBonusDoGet_`, `teamBonusDoPost_`, `_tbWaitMin_`, `_tbScanMsgs_`, `_tbParseTs_`, `_tbScanMergedOrders_`, `_tbReadDayMsgs_`, `_tbIgnored_`, `teamPenaltySuggest_`, `teamPenaltyIgnore_`, `_topSpFold_`, `_topSpKey_`, `readTopSpExclude_`, `saveTopSpExclude_`, `_topSpAggregate_`, `buildTopProducts_`
 - Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`, `TB_MSG_SCAN_MAX_ROWS_`, `TOPSP_UNASSIGNED_TEAM_`
 
 ## 34_Loyalty.gs
-- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`
-- Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
+- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`, `_loyNorm_`, `_loyRuleList_`, `_loyaltyBenefitCfgNormalize_`, `_loyRuleHit_`, `_loyaltyBenefitLevel_`, `_loyaltyBenefitApply_`, `_loyaltyBenefitCfg_`, `_loyaltyHistoryOf_`, `loyaltyBenefitQuote_`
+- Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`, `LOYALTY_BENEFIT_DEFAULT_`, `LOYALTY_CRM_VALID_STATUS_`, `LOYALTY_LEVEL_LABEL_`
+
+## 34b_Ticket.gs
+- Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
+- Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
 
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`, `_vpTarget_`, `_vpRead_`, `_vpTargetCur_`, `_vpApprovers_`, `_vpIsAdminName_`, `_vpNotifClear_`, `_vpNotifyAdmins_`, `vietTatPropose_`, `_vpOwn_`, `_vpSummaryFor_`, `vietTatProposalsList_`, `vietTatDecide_`, `_vpApply_`
