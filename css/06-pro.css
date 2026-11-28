@@ -86,8 +86,8 @@ html.ui-pro .logo .logo-mark{background:rgba(255,255,255,.2);}
 html.ui-pro .logo span{color:rgba(255,255,255,.7)!important;}   /* số phiên bản: HTML đang gán màu xanh lá inline */
 html.ui-pro header .fstatus{color:rgba(255,255,255,.78);}
 html.ui-pro header .mobile-menu-btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
-html.ui-pro header .btn,html.ui-pro #sn-toggle{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
-html.ui-pro header .btn:hover,html.ui-pro #sn-toggle:hover,html.ui-pro header .mobile-menu-btn:hover{background:rgba(255,255,255,.26);color:#fff;}
+html.ui-pro header .btn,html.ui-pro #sn-toggle,html.ui-pro #sn-back{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
+html.ui-pro header .btn:hover,html.ui-pro #sn-toggle:hover,html.ui-pro #sn-back:hover,html.ui-pro header .mobile-menu-btn:hover{background:rgba(255,255,255,.26);color:#fff;}
 html.ui-pro header .btn.primary{background:#fff;border-color:#fff;color:#14532d;}
 html.ui-pro #sn-toggle .sn-cur{color:#fff;opacity:.85;}
 html.ui-pro header input,html.ui-pro header select{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff;}

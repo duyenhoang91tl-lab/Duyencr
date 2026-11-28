@@ -2,6 +2,13 @@
    Tái dùng nguyên khối .tabs (giữ mọi data-bar-id, quyền, demo-mode, switchTab) nên chỉ đổi
    cách hiển thị: ngăn kéo cố định bên trái, vùng nội dung (#data-view) chiếm toàn bộ bề ngang. */
 #sn-toggle{display:none;align-items:center;gap:5px;flex-shrink:0;height:32px;padding:0 11px;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;}
+/* Nút "← Quay lại" (js/29): hiện khi đã có màn trước để quay về; cùng kiểu nút Menu. Điện thoại: chỉ mũi tên. */
+#sn-back{display:none;align-items:center;gap:5px;flex-shrink:0;height:32px;padding:0 11px;border:1px solid var(--border-md);border-radius:var(--rsm,8px);background:var(--surface);color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+#sn-back:hover{background:var(--surface2);}
+#sn-back.sn-on{display:inline-flex;}
+#sn-back .sn-bk-t{max-width:190px;overflow:hidden;text-overflow:ellipsis;}
+body.rpt-mode #sn-back,html.db-standalone #sn-back{display:none!important;}
+@media (max-width:768px){#sn-back{padding:0 10px;font-size:15px;}#sn-back .sn-bk-t{display:none;}}
 #sn-toggle:hover{background:var(--surface2);}
 #sn-toggle.sn-on{display:inline-flex;}
 #sn-toggle .sn-cur{color:var(--green);max-width:150px;overflow:hidden;text-overflow:ellipsis;}

@@ -7,6 +7,7 @@
   header{flex-wrap:wrap;height:auto;min-height:50px;padding:6px 10px;row-gap:6px;column-gap:6px;}
   header>*{min-width:0;}
   #sn-toggle{order:1;flex:1 1 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #sn-back{order:1;flex:0 0 auto;}   /* nút ← Quay lại (js/29) nằm ngay cạnh nút Menu */
   #qs-wrap{order:2;flex:0 0 42%;max-width:42%;}
   #qs-wrap input{width:100%;min-width:0;}
   header .mobile-menu-btn{order:3;flex:0 0 auto;}

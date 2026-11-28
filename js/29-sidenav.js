@@ -23,11 +23,56 @@
     var b = btn(); if (!b) return;
     var l = curLabel();
     b.innerHTML = '☰ Menu' + (l ? ' <span class="sn-cur">· ' + String(l).replace(/[<>&]/g,'') + '</span>' : '');
+    navTrack();
+  }
+  // ── LỊCH SỬ MÀN HÌNH + NÚT "← QUAY LẠI" (Duyên 28/11/2026: bấm vào một mục như Đơn CRM thì phải có nút quay lại) ──
+  // Trước đây mở mục từ menu xong chỉ có ô "☰ Menu · Đơn CRM", muốn về màn trước phải mở menu và tìm lại. Nay theo dõi tab đang chọn
+  // (cùng bộ quan sát đổi class của nhãn Menu) → nhớ các màn đã xem; nút "← Quay lại" bấm là về đúng màn ngay trước đó (bấm lại tab đó như người dùng bấm).
+  var navStack = [], navCur = null, navSkip = null;   // navStack: các màn đã xem [{key,label}]; navCur: màn hiện tại; navSkip: màn đang quay về (không ghi vào lịch sử)
+  function activeTab(){ return document.querySelector('#data-view .tabs .tab.active'); }
+  function tabKey(a){ return a ? (a.getAttribute('data-bar-id') || a.id || a.getAttribute('onclick') || '') : ''; }
+  function findTab(key){
+    var all = document.querySelectorAll('#data-view .tabs .tab');
+    for (var i = 0; i < all.length; i++) if (tabKey(all[i]) === key) return all[i];
+    return null;
+  }
+  function navShow(){
+    var nb = document.getElementById('sn-back'), dv = document.getElementById('data-view'); if (!nb) return;
+    var top = navStack[navStack.length - 1];
+    var show = !!top && !!dv && dv.style.display !== 'none';
+    nb.classList.toggle('sn-on', show);
+    if (top){
+      var l = String(top.label || '').replace(/[<>&]/g, '');
+      nb.innerHTML = '← <span class="sn-bk-t">Quay lại' + (l ? ' · ' + l : '') + '</span>';
+      nb.title = 'Quay lại: ' + (l || 'màn trước'); nb.setAttribute('aria-label', 'Quay lại ' + l);
+    }
+  }
+  function navTrack(){
+    var a = activeTab(), key = tabKey(a); if (!key) return;
+    var label = curLabel();
+    if (navCur && navCur.key === key){ if (label) navCur.label = label; navShow(); return; }
+    if (navSkip === key) navSkip = null;                       // đang quay về màn này → không ghi thêm
+    else if (navCur){ navStack.push(navCur); if (navStack.length > 15) navStack.shift(); }
+    navCur = { key: key, label: label };
+    navShow();
+  }
+  function navBack(){
+    var prev;
+    while ((prev = navStack.pop())){
+      var el = findTab(prev.key);
+      if (el && !el.classList.contains('sn-hide') && el.style.display !== 'none'){
+        navSkip = prev.key; setTimeout(function(){ navSkip = null; }, 600);
+        el.click(); navShow(); return;
+      }
+    }
+    navShow();
   }
   function syncVisible(){
     var b = btn(), dv = document.getElementById('data-view'); if (!b || !dv) return;
     var show = dv.style.display !== 'none';
+    if (!show){ navStack = []; navCur = null; navSkip = null; }   // đăng xuất / rời màn dữ liệu → xoá lịch sử
     b.classList.toggle('sn-on', show);
+    navShow();
     var q = document.getElementById('qs-wrap'); if (q) q.classList.toggle('sn-on', show);
     if (!show) setOpen(false);
   }
@@ -172,6 +217,10 @@
     var qw = document.createElement('div'); qw.id = 'qs-wrap';
     qw.innerHTML = '<input id="qs-input" type="search" placeholder="' + ((window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? '🔍 Tìm khách' : '🔍 Tìm nhanh: tên, SĐT, mã đơn...') + '" autocomplete="off">';
     hdr.insertBefore(qw, b.nextSibling);
+    var nbk = document.createElement('button');
+    nbk.id = 'sn-back'; nbk.type = 'button'; nbk.title = 'Quay lại màn trước';
+    nbk.addEventListener('click', function(e){ e.stopPropagation(); navBack(); });
+    hdr.insertBefore(nbk, qw);
     var qt;
     qw.firstChild.addEventListener('input', function(){
       var v = this.value; clearTimeout(qt);
