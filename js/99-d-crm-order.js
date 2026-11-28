@@ -150,7 +150,7 @@ function _coItemSet(i, k, v){
   if (k === 'qty' || k === 'price' || k === 'discValue' || k === 'taxPct') it[k] = _coNum(v); else it[k] = v;
   _coSummary();
 }
-function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discType = v === 'pct' ? 'pct' : 'amt'; _coSummary(); }
+function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discType = v === 'pct' ? 'pct' : 'amt'; if (it.discType === 'pct' && _coNum(it.discValue) > 100) it.discValue = 100; _coRender(); }
 function _coSet(k, v){ _co[k] = v; _coSummary(); }
 function _coSetNum(k, v){ _co[k] = _coNum(v); _coSummary(); }
 function _coSetBool(k, v){ _co[k] = !!v; _coSummary(); }
@@ -245,6 +245,13 @@ function _coField(label, key, opt){
 function _coMoneyField(label, key, ph){
   return '<label style="display:block;font-size:12px;color:var(--muted)">' + label + '<input id="co-f-' + key + '" type="number" min="0" value="' + (_co[key] ? _coEsc(_co[key]) : '') + '" placeholder="' + (ph || '0') + '" oninput="_coSetNum(\'' + key + '\',this.value)" style="' + _coInp + '"></label>';
 }
+// Nút chọn kiểu giảm: [đ | %] (thay hộp chọn nhỏ cũ — chỉ hiện chữ "đ" nên dễ bỏ sót lựa chọn %). fnAmt/fnPct = chuỗi onclick.
+function _coSeg(isPct, fnAmt, fnPct){
+  var b = function(on, t, f){ return '<button type="button" onclick="' + f + '" style="padding:5px 11px;border:1px solid ' + (on ? '#b5305a' : 'var(--border)') + ';font-size:13px;font-weight:700;cursor:pointer;' + (on ? 'background:#b5305a;color:#fff' : 'background:var(--card,#fff);color:inherit') + '">' + t + '</button>'; };
+  return '<span style="display:inline-flex;border-radius:6px;overflow:hidden;flex:none" role="group" aria-label="Kiểu giảm giá">' + b(!isPct, 'đ', fnAmt) + b(isPct, '%', fnPct) + '</span>';
+}
+function _coDiscType(v){ _co.discType = v === 'pct' ? 'pct' : 'amt'; if (_co.discType === 'pct' && _coNum(_co.discValue) > 100) _co.discValue = 100; _coRender(); }
+function _coDiscInput(v){ _co.discValue = _coNum(v); _coSummary(); }
 function _coItemRow(it, i){
   var pct = it.discType === 'pct';
   return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">' +
@@ -255,7 +262,7 @@ function _coItemRow(it, i){
       '<label style="font-size:11px;color:var(--muted)">Số lượng<input type="number" min="1" value="' + _coEsc(it.qty) + '" oninput="_coItemSet(' + i + ',\'qty\',this.value)" style="' + _coInp + '"></label>' +
       '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="number" min="0" value="' + _coEsc(it.price) + '" oninput="_coItemSet(' + i + ',\'price\',this.value)" style="' + _coInp + '"></label>' +
       '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px"><input type="number" min="0" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' +
-        '<select onchange="_coItemDiscType(' + i + ',this.value)" style="padding:4px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (pct ? '' : ' selected') + '>đ</option><option value="pct"' + (pct ? ' selected' : '') + '>%</option></select></span></label>' +
+        _coSeg(pct, '_coItemDiscType(' + i + ',\'amt\')', '_coItemDiscType(' + i + ',\'pct\')') + '</span></label>' +
       '<label style="font-size:11px;color:var(--muted)">Thuế (%)<input type="number" min="0" max="100" value="' + (it.taxPct ? _coEsc(it.taxPct) : '') + '" placeholder="0" oninput="_coItemSet(' + i + ',\'taxPct\',this.value)" style="' + _coInp + '"></label>' +
       '<div style="font-size:11px;color:var(--muted)">Thành tiền<div id="co-line-' + i + '" style="font-size:14px;font-weight:700;color:var(--text,inherit)"></div></div>' +
     '</div></div>';
@@ -269,6 +276,8 @@ function _coSummaryHtml(c){
 function _coSummary(){   // cập nhật số tiền KHÔNG dựng lại form (giữ nguyên ô đang gõ)
   var c = _coCalc(_coNow()), box = document.getElementById('co-sum'); if (box) box.innerHTML = _coSummaryHtml(c);
   c.lines.forEach(function(l, i){ var el = document.getElementById('co-line-' + i); if (el) el.textContent = _coVnd(l.amount); });
+  var h = document.getElementById('co-disc-hint');
+  if (h) h.textContent = _coNum(_co.discValue) > 0 ? (_co.discType === 'pct' ? Math.min(100, _coNum(_co.discValue)) + '% = giảm ' + _coVnd(c.orderDiscount) : 'Giảm ' + _coVnd(c.orderDiscount) + (c.gross - c.itemDiscount > 0 ? ' (' + (Math.round(c.orderDiscount / (c.gross - c.itemDiscount) * 1000) / 10) + '%)' : '')) : '';
 }
 function _coMsgRender(){
   var m = document.getElementById('co-msg'); if (!m) return;
@@ -305,8 +314,8 @@ function _coRender(keepFocus){
     '<div style="' + grid + ';margin-top:8px">' + _coField('Ghi chú nội bộ', 'note') + _coField('Ghi chú in trên đơn', 'printNote') + '</div>' +
     '</div><div style="flex:1;min-width:260px;position:sticky;top:8px">' +
     sec('💰 Thanh toán') + '<div style="border:1px solid var(--border);border-radius:10px;padding:10px">' +
-    '<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Giảm giá đơn', 'discValue') + '</div>' +
-    '<select onchange="_coSet(\'discType\',this.value)" style="padding:6px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (_co.discType === 'pct' ? '' : ' selected') + '>đ</option><option value="pct"' + (_co.discType === 'pct' ? ' selected' : '') + '>%</option></select></div>' +
+    '<div style="margin-bottom:8px"><div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:12px;color:var(--muted)">Giảm giá đơn (chọn giảm tiền hoặc giảm %)<input id="co-f-discValue" type="number" min="0"' + (_co.discType === 'pct' ? ' max="100"' : '') + ' value="' + (_co.discValue ? _coEsc(_co.discValue) : '') + '" placeholder="' + (_co.discType === 'pct' ? '% giảm, vd 10' : 'số tiền giảm, vd 50000') + '" oninput="_coDiscInput(this.value)" style="' + _coInp + '"></label></div>' +
+    _coSeg(_co.discType === 'pct', '_coDiscType(\'amt\')', '_coDiscType(\'pct\')') + '</div><div id="co-disc-hint" style="font-size:11px;color:var(--muted);margin-top:3px;min-height:14px"></div></div>' +
     '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Phí vận chuyển', 'shipFee') + '</div>' +
     '<label style="font-size:12px;white-space:nowrap;padding-bottom:7px"><input type="checkbox"' + (_co.freeShip ? ' checked' : '') + ' onchange="_coSetBool(\'freeShip\',this.checked)"> Miễn phí giao</label></div>' +
     '<div style="margin-bottom:8px">' + _coMoneyField('Phụ thu', 'surcharge') + '</div>' +
