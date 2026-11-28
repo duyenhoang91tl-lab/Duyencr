@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — XỬ LÝ NỐT: KHÁCH DẠNG THẺ TRÊN ĐIỆN THOẠI, MENU GỌN, TRANG TRÍ KHÔNG CHE)
+- ĐỀ BÀI Duyên: "xử lý nốt cho mình nhé" (3 chỗ đã báo ở mục CRM dễ dùng): (1) điện thoại: danh sách khách dạng thẻ (2) menu gọn (3) trang trí không che nội dung.
+- ✅ **ĐÃ XONG:** Bước 1/6 CSS thẻ khách trên điện thoại (css/16-mobile-list.css; chưa bật tới khi js/02 gắn class kh-card).
+- 🔧 **ĐANG LÀM:** Bước 2/6: js/02 bật dạng thẻ + nút đổi Dạng bảng/thẻ + nút Gọi.
+- ➡️ **BƯỚC KẾ TIẾP:** js/05 chặn khung lọc cột tràn màn; rồi menu gọn; trang trí không che; kiểm tra cuối.
+
 ## 2026-11-28 (phiên Claude — BÁO CÁO: THẺ KPI KÉO NGANG, SỐ TIỀN KHÔNG NGẮT DÒNG) — XONG (chỉ web CSS; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên: ở Báo cáo, ô doanh thu (vd 4.361.866.600₫, 2.300.834.167₫) bị ngắt thành 2 dòng; muốn kéo ngang ra.
 - NGUYÊN NHÂN GỐC (`css/17-reports-pro.css`): `.kpi-val{overflow-wrap:anywhere}` + lưới cột cố định `repeat(auto-fill,minmax(168px,1fr))` → số tiền 14 ký tự ở cỡ 21px rộng hơn ô 168px nên trình duyệt BẺ giữa chữ số. Tái hiện bằng Chromium: CSS cũ 1280px → 2 dòng, CSS mới → 1 dòng ở cả 1280px và 390px.
