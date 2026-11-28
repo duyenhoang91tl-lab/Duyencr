@@ -433,7 +433,11 @@ let _filterDebounceTimer = null;
 //  VIRTUAL TABLE — chỉ render ~50-100 dòng đang nhìn thấy.
 //  Xử lý mượt 39.000+ KH vì DOM luôn nhỏ bất kể cuộn sâu.
 // ═══════════════════════════════════════════════════════
-const VT_ROW_H = 58;       // chiều cao 1 dòng (px) — phải khớp CSS
+// Chiều cao 1 dòng (px) — PHẢI khớp CSS: 58px (css/01) trên máy tính; ≤640px (điện thoại) dòng là "thẻ khách" 3 dòng cao 88px (css/16, khối "THẺ KHÁCH").
+// Dùng CÙNG điều kiện @media (max-width:640px) với CSS (matchMedia) để JS và CSS không bao giờ lệch nhau; xoay màn hình/đổi cỡ cửa sổ thì cập nhật và vẽ lại cửa sổ ảo.
+function _vtRowH_(){ try { return window.matchMedia('(max-width:640px)').matches ? 88 : 58; } catch(e){ return 58; } }
+let VT_ROW_H = _vtRowH_();
+window.addEventListener('resize', function(){ var h = _vtRowH_(); if (h === VT_ROW_H) return; VT_ROW_H = h; try { if (typeof _renderVirtualWindow === 'function') _renderVirtualWindow(true); } catch(e){} });
 const VT_BUFFER = 12;      // số dòng đệm trên/dưới khung nhìn
 let _vt = { list: [], raf: null, bound: false, lastStart: -1, lastEnd: -1 };
 
