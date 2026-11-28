@@ -1,9 +1,9 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
-- ✅ ĐÃ XONG: B1 nới trần jsBytes 3.500.000→3.600.000 (tools/test-budget.js). Lúc áp, main đang VƯỢT trần cũ 1.155 byte nên deploy web bị chặn tới bước này. Phần S0 ping trong bản vá đã có sẵn trên main (ec2a6dd).
-- 🔧 ĐANG LÀM: B2 module js/99-f-crm-order-pos-tags.js.
-- ➡️ BƯỚC KẾ TIẾP: B3 nạp module trong index.html; B4 test.
+- ✅ ĐÃ XONG: B1 nới ngân sách; B2 js/99-f-crm-order-pos-tags.js (chưa nạp).
+- 🔧 ĐANG LÀM: B3 nạp module trong index.html.
+- ➡️ BƯỚC KẾ TIẾP: B4 test.
 
 ## 2026-11-28 (phiên Claude — CRM ĐƠN GIẢN CHUYÊN NGHIỆP TRÊN BẢN WEB MÁY TÍNH: LÀM HẾT, BẮT ĐẦU BƯỚC 1+2) — BƯỚC 1/2 XONG (chỉ web, Ctrl+F5); ĐANG LÀM BƯỚC 2 (cột mặc định)
 - ĐỀ BÀI Duyên: sau khi hỏi "đã tối ưu bản web đơn giản chuyên nghiệp dễ dùng chưa", Claude trả lời CHƯA (mới làm điện thoại + trang Tổng quan), đề xuất 3 bước; Duyên: "ok làm hết nhưng bắt đầu bằng bước 1 và 2". Bước 1 = gọn phần đầu Danh sách KH trên máy tính; bước 2 = bảng chỉ hiện ~7 cột chính mặc định; bước 3 = rà soát Báo cáo / Chia data / Cài đặt bằng ảnh thật rồi sửa.
