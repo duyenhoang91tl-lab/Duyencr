@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — SỬA 4 TEST ĐỎ CÓ SẴN TRÊN MAIN)
+- ĐỀ BÀI Duyên: "Tiếp" → xử lý test-demo-scope, test-team-daily-revenue, test-team-bonus-ui, test-srb-filter-menu (mỗi file một bước, push ngay).
+- ✅ **ĐÃ XONG:** (1/4) test-demo-scope xanh: khung test tự giả lập mọi bảng *_GET_ACTIONS_ mà doGet gọi, thêm kiểm tài khoản test bị chặn kpiCommitList. Chỉ sửa test, app không lỗi.
+- 🔧 **ĐANG LÀM:** (2/4) test-team-daily-revenue.
+- ➡️ **BƯỚC KẾ TIẾP:** test-team-bonus-ui, rồi test-srb-filter-menu.
+
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: GẮN THẺ POS Ở NV CHĂM SÓC + MARKETER)
 - ✅ ĐÃ XONG: XONG cả 4 bước + 2 sửa nhỏ (chế độ tối, vị trí gợi ý); test tools/test-crm-order-pos-tags.js xanh (dữ liệu giả). Chỉ web, không sửa GAS. Giá trị lưu vẫn là chuỗi 'thẻ1, thẻ2', tối đa 80 ký tự/ô.
 - 🔧 ĐANG LÀM: Không còn việc code.
