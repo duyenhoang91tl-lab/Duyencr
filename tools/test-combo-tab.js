@@ -33,7 +33,7 @@ ok(ctx._reg && ctx._reg.id === 'combo', 'đăng ký tab combo');
 ok(run('_cbVnd(1299000)') === '1.299.000đ' && run('_cbVnd(0)') === '', 'format giá');
 const t = run('_cbCopyText(' + JSON.stringify(C1) + ')');
 ok(t.split('\n')[0] === '🎁 Combo <Lắc> 4 lá (CB1)', 'dòng tên: ' + t);
-ok(t.includes('Giá combo: 1.299.000đ') && t.includes('- Lắc cỏ 4 lá · Bạc 925 · 16cm × 1') && t.includes('- Nhẫn bạc trơn · Size 12 × 2'), 'món + giá: ' + t);
+ok(t.includes('Giá combo: 1.299.000đ') && t.includes('- Lắc cỏ 4 lá · Bạc 925 · 16cm') && t.includes('- Nhẫn bạc trơn · Size 12 × 2'), 'món + giá: ' + t);
 ok(t.includes('Lưu ý: Chỉ online') && t.includes('Áp dụng đến hết 31/12/2026'), 'ghi chú + hạn');
 ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), 'không có priceVnd thì dùng priceText');
 (async () => {
@@ -278,6 +278,13 @@ ok(run('_cbCopyText(' + JSON.stringify(C2) + ')').includes('Giá combo: 990'), '
   bodies.length = 0; confirmAns = true; let pd = run('_cbKmDelete(0)'); await tick(); while (resolvers.length) resolvers.shift()(); await pd;
   ok(JSON.parse(bodies[0]).action === 'ctkmComboDelete' && JSON.parse(bodies[0]).code === 'KM1', 'xóa CTKM gọi ctkmComboDelete');
   run('_cbKmClose()'); ok(!wrap.innerHTML.includes('CTKM combo (tạo sẵn'), 'về danh sách combo');
+  // thẻ combo + copy theo mẫu mới (dữ liệu GAS comboList đã tính giảm/ship/quà)
+  const CV = Object.assign({}, C1, { code: 'CB261118171102', name: 'Vòng cầu đơn', priceVnd: 3300000, discount: 200000, finalPrice: 3100000, ship: 40000, freeship: false, total: 3140000, usable: true,
+    items: [{ name: 'CHARM BI MẪU SỐ 10 SIZE 3', chatLieu: '(mặc định)', size: '', qty: 2, vang: '10k', price: 380000, gift: false }], gifts: [{ code: 'KMQ', name: 'Tặng túi', gift: 'Túi tiền lam thủy', images: ['https://x.com/g1.png'] }], note: '', end: '' });
+  reply = () => ({ ok: true, total: 1, rows: [CV] }); let plv = run('_cbLoad()'); resolvers.shift()(); await plv;
+  run('_cb.edit = null; _cbKm.view = false; _cbRender()');
+  ok(wrap.innerHTML.includes('Giá combo: 3.300.000đ giảm 200k còn 3.100.000đ') && wrap.innerHTML.includes('CHARM BI MẪU SỐ 10 10k SIZE 3 380 × 2 = 760') && wrap.innerHTML.includes('40k ship tổng: 3.140.000đ') && wrap.innerHTML.includes('Quà tặng: Túi tiền lam thủy') && wrap.innerHTML.includes('https://x.com/g1.png'), 'thẻ combo hiện theo mẫu mới + ảnh quà');
+  ok(run('_cbCopyText(_cb.rows[0])').startsWith('🎁 Vòng cầu đơn (CB261118171102)\nGiá combo: 3.300.000đ giảm 200k còn 3.100.000đ'), 'Copy theo mẫu mới');
   }
   console.log('ALL COMBO TAB TESTS PASSED');
 })().catch(e => { console.error(e); process.exit(1); });

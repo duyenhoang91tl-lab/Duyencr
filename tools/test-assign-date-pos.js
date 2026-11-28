@@ -37,4 +37,13 @@ vm.runInContext('_advAssignDateFilteredList()', ctx); ok(ensured.length === 1, '
 // ngoai nguon
 vm.runInContext('_advAssign.srcSet = new Set(["cs"]);', ctx); r = vm.runInContext('_advAssignDateFilteredList()', ctx);
 ok(r.length === 0 && vm.runInContext('_advAssign._diag.srcOut', ctx) === 4, 'chon nguon khac -> dem so khach ngoai nguon');
+// --- 28/11: don chi co thang/nam (ds rong) + khach POS chua bat dataSrc.don van phai duoc tinh khi loc thang 5 ---
+CUST['0912345675'] = { phone: '0912345675', ymList: [{ ds: '', yr: 2026, mo: 5 }], dataSrc: { don: 1 } };      // don Base chi biet thang 5
+CUST['0912345676'] = { phone: '0912345676', ymList: [{ ds: '', yr: 2026, mo: 6 }], dataSrc: { don: 1 } };      // chi thang 6
+CUST['0912345677'] = { phone: '0912345677', ymList: [], dataSrc: {} };                                          // POS-only, dataSrc.don chua bat
+ctx._assignCustMap = () => new Map(Object.keys(CUST).map(k => [k, CUST[k]]));
+ctx.posOrdersByPhone = { '0912345672': [{ ds: '2026-05-20', sales: ['A'] }], '0912345677': [{ ds: '2026-05-03', sales: ['B'] }] };
+vm.runInContext('_assignFilteredList = ' + JSON.stringify(Object.keys(CUST)) + '; _advAssign.srcSet = new Set(["don"]); _advAssign.dateFrom = "2026-05-01"; _advAssign.dateTo = "2026-05-31";', ctx);
+r = vm.runInContext('_advAssignDateFilteredList()', ctx);
+ok(r.join() === '0912345671,0912345672,0912345675,0912345677', 'thang 5: du don Base co ngay, don chi biet thang, khach POS-only: ' + r.join());
 console.log(bad ? bad + ' LOI' : 'DAT'); process.exit(bad ? 1 : 0);

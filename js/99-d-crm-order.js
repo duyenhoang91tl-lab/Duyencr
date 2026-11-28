@@ -14,7 +14,7 @@ function _coBlank(){
   try { who = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? String(currentUser.name) : ''; } catch(e){}
   return { phone:'', custName:'', gender:'', birthday:'', recvName:'', recvPhone:'', province:'', district:'', ward:'', address:'', expectedDate:'', carrier:'',
     source:'', saleName:who, careName:'', marketer:'', tags:'', note:'', printNote:'', items:[], discType:'amt', discValue:0, freeShip:false, shipFee:0, surcharge:0, paid:0,
-    pointsUse:0, refKey:'', busy:false, msg:'', msgOk:false, saved:null };
+    pointsUse:0, promoApplied:null, promoCodes:'', refKey:'', busy:false, msg:'', msgOk:false, saved:null };
 }
 var _co = _coBlank();
 var _coLoy = { phone:'', loading:false, data:null, err:'', seq:0 };   // điểm tích luỹ của khách đang nhập SĐT (loyaltyGet)
@@ -22,6 +22,24 @@ var _coCat = { items:[], loaded:false, loading:false, err:'' };
 var _coPick = { q:'', list:[] };
 function _coNum(v){ var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function _coVnd(n){ n = Math.round(Number(n) || 0); return (n < 0 ? '-' : '') + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+// Ô nhập TIỀN hiện dấu chấm ngăn hàng nghìn khi gõ (100000 → 100.000). Ô là type=text inputmode=numeric; dữ liệu giữ NGUYÊN là số thuần
+// (chỉ chữ số → _coNum không hiểu nhầm dấu chấm thành dấu thập phân). Ô giảm % KHÔNG dùng (cần số lẻ như 7.5).
+function _coFmtMoney(n){ if (n === '' || n == null) return ''; var d = String(Math.round(Number(n) || 0)); return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function _coMoneyIn(el, fn){
+  var raw = String(el.value || ''), pos = el.selectionStart == null ? raw.length : el.selectionStart;
+  var before = raw.slice(0, pos).replace(/\D/g, '').length;                    // số chữ số nằm bên trái con trỏ
+  var d = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');                     // chỉ giữ chữ số, bỏ số 0 đầu thừa
+  var out = d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (out !== raw){
+    el.value = out;
+    var p = 0, c = 0; while (p < out.length && c < before){ if (out.charAt(p) !== '.') c++; p++; }   // đặt lại con trỏ sau đúng chừng ấy chữ số
+    try { el.setSelectionRange(p, p); } catch (e) {}
+  }
+  fn(d);
+}
+function _coMoneyItem(el, i, k){ _coMoneyIn(el, function(v){ _coItemSet(i, k, v); }); }
+function _coMoneyNum(el, key){ _coMoneyIn(el, function(v){ _coSetNum(key, v); }); }
+function _coMoneyDisc(el){ _coMoneyIn(el, _coDiscInput); }
 function _coKToVnd(n){ n = Math.round(Number(n) || 0); return n > 0 && n < 100000 ? n * 1000 : n; }   // bảng giá ghi nghìn; ≥100000 coi là đồng đầy đủ
 function _coFold(s){ try { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ​-‍﻿]/g, '').replace(/[đĐðÐ]/g, 'd').toLowerCase(); } catch(e){ return String(s == null ? '' : s).toLowerCase(); } }
 function _coWords(s){ return ' ' + _coFold(s).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
@@ -85,6 +103,11 @@ function _coPayload(o){
     return { code: String(it.code || ''), name: String(it.name || '').trim(), qty: Math.floor(_coNum(it.qty)), price: Math.round(_coNum(it.price)),
       discType: it.discType === 'pct' ? 'pct' : 'amt', discValue: Math.max(0, _coNum(it.discValue)), taxPct: Math.max(0, _coNum(it.taxPct)), note: String(it.note || '').trim() };
   });
+  var tag = [];
+  if (o.promoApplied && o.promoApplied.names && o.promoApplied.names.length) tag.push('CTKM: ' + o.promoApplied.names.join(', '));
+  var cmb = []; (o.items || []).forEach(function(it){ if (it.comboName && cmb.indexOf(it.comboName) < 0) cmb.push(it.comboName); });
+  if (cmb.length) tag.push('Combo: ' + cmb.join(', '));
+  if (tag.length) P.note = (P.note ? P.note + ' | ' : '') + '[' + tag.join(' · ') + ']';
   return P;
 }
 function _coPointsUse(o){ return Math.max(0, Math.floor(_coNum(o.pointsUse))); }   // gửi Ở CẤP NGOÀI order (server bỏ qua pointsUsed/pointsDiscount trong order)
@@ -150,7 +173,7 @@ function _coItemSet(i, k, v){
   if (k === 'qty' || k === 'price' || k === 'discValue' || k === 'taxPct') it[k] = _coNum(v); else it[k] = v;
   _coSummary();
 }
-function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discType = v === 'pct' ? 'pct' : 'amt'; _coSummary(); }
+function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discType = v === 'pct' ? 'pct' : 'amt'; if (it.discType === 'pct' && _coNum(it.discValue) > 100) it.discValue = 100; _coRender(); }
 function _coSet(k, v){ _co[k] = v; _coSummary(); }
 function _coSetNum(k, v){ _co[k] = _coNum(v); _coSummary(); }
 function _coSetBool(k, v){ _co[k] = !!v; _coSummary(); }
@@ -215,6 +238,161 @@ function _coLoyHint(){
 function _coLoyRender(){ var b = document.getElementById('co-loy'); if (b){ b.innerHTML = _coLoyHtml(); _coLoyHint(); } }
 function _coPtsSet(v){ _co.pointsUse = Math.max(0, Math.floor(_coNum(v))); _coSummary(); _coLoyHint(); }
 function _coPtsMax(){ var c = _coCalc(Object.assign(_coNow(), { pointsUse: 1e9 })); _co.pointsUse = c.pointsMax; _coLoyRender(); _coSummary(); }
+// ── Áp dụng CTKM (engine có sẵn calcPromo_ js/53 + cấu hình admin Settings 'promoConfig' ở ⚙ Cấu hình khuyến mãi) ──
+// Tính trên GIÁ DÒNG SAU giảm giá dòng (không giảm 2 lần). Áp dụng = điền Giảm giá đơn (đ) + thêm dòng quà tặng 0đ; ghi tên CTKM vào ghi chú đơn.
+// Đã áp thì số giảm TỰ cập nhật khi đổi sản phẩm/SL/giá/mã voucher; sửa tay ô Giảm giá đơn → thôi theo CTKM.
+var _coPromo = { list:null, loading:false, err:'' };
+async function _coPromoLoad(){
+  if (_coPromo.list || _coPromo.loading) return;
+  if (typeof gsUrl === 'undefined' || !gsUrl){ _coPromo.err = 'Chưa kết nối Google Sheets.'; _coPromoRender(); return; }
+  if (typeof promoNormalize_ !== 'function' || typeof calcPromo_ !== 'function'){ _coPromo.err = 'Thiếu engine khuyến mãi (js/53).'; _coPromoRender(); return; }
+  _coPromo.loading = true; _coPromo.err = ''; _coPromoRender();
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=getSettings&keys=promoConfig', { redirect:'follow' }), d = await r.json();
+    _coPromo.list = promoNormalize_(((d || {}).values || {}).promoConfig || '[]');
+  } catch(e){ _coPromo.err = 'Không tải được CTKM: ' + (e && e.message || e); }
+  _coPromo.loading = false; _coPromoRender(); _coSummary();
+}
+function _coPromoEval(){
+  if (!_coPromo.list || typeof calcPromo_ !== 'function') return null;
+  var c = _coCalc(_coNow()), items = [];
+  _co.items.forEach(function(it, i){
+    if (it.promoGift) return;
+    var q = Math.max(0, Math.floor(_coNum(it.qty))); if (!q) return;
+    items.push({ name: it.name, qty: q, price: ((c.lines[i] || {}).amount || 0) / q });
+  });
+  return calcPromo_(items, _coPromo.list, { vouchers: String(_co.promoCodes || '').split(/[,;\s]+/).filter(Boolean) });
+}
+function _coPromoSync(){   // đã áp CTKM → giữ ô Giảm giá đơn đúng theo giỏ hiện tại (KHÔNG gọi _coSummary)
+  var a = _co.promoApplied; if (!a) return;
+  var ev = _coPromoEval(); if (!ev) return;
+  a.names = ev.applied.map(function(x){ return x.name; });
+  if (!a.discountOn) return;
+  if (_co.discType !== 'amt' || _co.discValue !== ev.discount){ _co.discType = 'amt'; _co.discValue = ev.discount; var el = document.getElementById('co-f-discValue'); if (el) el.value = ev.discount ? ev.discount : ''; }
+}
+function _coPromoApply(){
+  var ev = _coPromoEval(); if (!ev || !ev.applied.length) return;
+  var on = ev.discount > 0;
+  if (on){ _co.discType = 'amt'; _co.discValue = ev.discount; }
+  _co.items = _co.items.filter(function(it){ return !it.promoGift; });
+  ev.gifts.forEach(function(g){ _co.items.push({ code:'', name:g.name, note:'Quà tặng CTKM', qty:g.qty, price:0, discType:'amt', discValue:0, taxPct:0, promoGift:true }); });
+  _co.promoApplied = { names: ev.applied.map(function(x){ return x.name; }), discountOn: on };
+  _coRender();
+}
+function _coPromoClear(){
+  var a = _co.promoApplied; if (!a) return;
+  if (a.discountOn) _co.discValue = 0;
+  _co.items = _co.items.filter(function(it){ return !it.promoGift; });
+  _co.promoApplied = null; _coRender();
+}
+function _coPromoCodes(v){ _co.promoCodes = v; _coSummary(); }
+function _coPromoRender(){
+  var box = document.getElementById('co-promo'); if (!box) return;
+  var muted = function(t){ return '<div style="font-size:12px;color:var(--muted)">' + t + '</div>'; };
+  var h = '<div style="font-size:13px;font-weight:700;margin-bottom:4px">🎁 Áp dụng CTKM</div>';
+  if (_coPromo.loading) h += muted('Đang tải CTKM…');
+  else if (_coPromo.err) h += '<div style="font-size:12px;color:#c0392b">' + _coEsc(_coPromo.err) + ' <button class="btn sm" onclick="_coPromo.err=\'\';_coPromoLoad()">Thử lại</button></div>';
+  else if (!_coPromo.list || !_coPromo.list.length) h += muted('Chưa có CTKM nào được cài (admin cài ở ⚙ Cấu hình khuyến mãi).');
+  else {
+    if (_coPromo.list.some(function(p){ return p.type === 'voucher' && p.active; }))
+      h += '<input type="text" value="' + _coEsc(_co.promoCodes) + '" placeholder="Mã voucher (nếu có, cách nhau dấu phẩy)" oninput="_coPromoCodes(this.value)" style="' + _coInp + ';margin-bottom:6px">';
+    h += '<div id="co-promo-res"></div>';
+  }
+  box.innerHTML = h; _coPromoResRender();
+}
+function _coPromoResRender(){
+  var box = document.getElementById('co-promo-res'); if (!box) return;
+  var E = _coEsc, a = _co.promoApplied, h = '';
+  var muted = function(t){ return '<div style="font-size:12px;color:var(--muted)">' + t + '</div>'; };
+  var ev = _coPromoEval(), hasItems = _co.items.some(function(it){ return !it.promoGift; });
+  if (!ev || !hasItems){ box.innerHTML = muted('Thêm sản phẩm để xem CTKM áp dụng được.'); return; }
+  if (ev.applied.length){
+    ev.applied.forEach(function(x){
+      h += '<div style="font-size:12px;margin-bottom:2px">✅ <b>' + E(x.name) + '</b>' + (x.discount ? ' <span style="color:#c0392b">−' + _coVnd(x.discount) + '</span>' : '') +
+        (x.gifts.length ? ' · tặng ' + x.gifts.map(function(g){ return g.qty + ' ' + E(g.name); }).join(', ') : '') + '</div>';
+    });
+  } else h += muted('Chưa có CTKM nào phù hợp với đơn này.');
+  var codes = String(_co.promoCodes || '').split(/[,;\s]+/).filter(Boolean);
+  codes.forEach(function(cd){
+    var up = cd.toUpperCase(), p = (_coPromo.list || []).filter(function(x){ return x.type === 'voucher' && x.code === up; })[0];
+    if (!p) h += '<div style="font-size:11px;color:#c0392b">Mã ' + E(up) + ': không có trong cấu hình.</div>';
+    else { var sk = (ev.skipped || []).filter(function(x){ return x.id === p.id; })[0]; if (sk) h += '<div style="font-size:11px;color:#c0392b">Mã ' + E(up) + ': ' + E(sk.why) + '.</div>'; }
+  });
+  if (a) h += '<div style="display:flex;gap:6px;margin-top:6px"><button class="btn sm" onclick="_coPromoApply()">Cập nhật CTKM</button><button class="btn sm" onclick="_coPromoClear()">Bỏ CTKM</button></div>' +
+    '<div style="font-size:11px;color:#1e8449;margin-top:3px">Đã áp CTKM — số giảm tự cập nhật khi đổi sản phẩm. Sửa tay ô Giảm giá đơn thì thôi theo CTKM.</div>';
+  else if (ev.applied.length) h += '<button class="btn sm" style="margin-top:6px;width:100%" onclick="_coPromoApply()">Áp dụng CTKM' + (ev.discount ? ' (−' + _coVnd(ev.discount) + ')' : '') + '</button>';
+  box.innerHTML = h;
+}
+// ── Combo có sẵn (GAS comboList = sheet COMBO, tab "🎁 Combo") ──
+// Thêm combo = thêm các món vào đơn với GIÁ ĐÃ CHIA theo giá combo (finalPrice, đã trừ CTKM của combo) theo tỉ lệ giá niêm yết từng món —
+// KHÔNG dùng ô Giảm giá đơn / giảm dòng nên không đụng CTKM, thẻ VIP. Món quà trong combo = dòng 0đ. Combo miễn ship → tick Miễn phí giao.
+// Combo chưa có đơn giá từng món → gán cả giá combo vào món đầu. Tên combo ghi vào ghi chú đơn "[Combo: …]".
+var _coCmb = { open:false, q:'', rows:[], loading:false, err:'', msg:'', seq:0, timer:0 };
+async function _coCmbLoad(){
+  if (typeof gsUrl === 'undefined' || !gsUrl){ _coCmb.err = 'Chưa kết nối Google Sheets.'; _coCmbResRender(); return; }
+  var my = ++_coCmb.seq; _coCmb.loading = true; _coCmb.err = ''; _coCmbResRender();
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=comboList&q=' + encodeURIComponent(_coCmb.q), { redirect:'follow' }), d = await r.json();
+    if (my !== _coCmb.seq) return;
+    if (d && d.ok) _coCmb.rows = d.rows || []; else _coCmb.err = (d && d.error) || 'GAS chưa có action comboList — cần deploy lại GAS.';
+  } catch(e){ if (my !== _coCmb.seq) return; _coCmb.err = 'Không tải được combo: ' + (e && e.message || e); }
+  _coCmb.loading = false; _coCmbResRender();
+}
+function _coCmbVisible(){ return (_coCmb.rows || []).filter(function(c){ return c && c.usable; }).slice(0, 8); }
+function _coCmbQ(v){ _coCmb.q = v || ''; clearTimeout(_coCmb.timer); _coCmb.timer = setTimeout(_coCmbLoad, 400); }
+function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.rows.length && !_coCmb.loading) _coCmbLoad(); }
+// Hàm thuần: combo → { lines:[dòng đơn], freeShip, ship, warn }.
+function _coCmbLines(c){
+  var its = (c && c.items) || [], paid = its.filter(function(it){ return !it.gift; }), gifts = its.filter(function(it){ return it.gift; });
+  var fin = Math.max(0, Math.round(Number(c.finalPrice != null ? c.finalPrice : (Number(c.priceVnd) || 0) - (Number(c.discount) || 0)) || 0)), list = 0, warn = '';
+  paid.forEach(function(it){ list += Math.max(0, Number(it.price) || 0) * Math.max(1, Math.floor(Number(it.qty) || 1)); });
+  var mk = function(it, price, extra){ return Object.assign({ code:'', name:String(it.name || ''), note:[it.chatLieu, it.size, it.vang].filter(function(v){ return v && String(v).trim(); }).join(' · '), qty:Math.max(1, Math.floor(Number(it.qty) || 1)), price:price, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }, extra || {}); };
+  var lines = [];
+  if (list > 0){
+    if (fin > list) warn = 'Giá combo cao hơn tổng giá niêm yết các món — đã giữ giá niêm yết, kiểm tra lại giá.';
+    var target = Math.min(fin, list), sum = 0;
+    paid.forEach(function(it, i){
+      var q = Math.max(1, Math.floor(Number(it.qty) || 1)), g = Math.max(0, Number(it.price) || 0) * q, pr;
+      if (i === paid.length - 1 && q === 1) pr = Math.max(0, target - sum); else pr = Math.round(target * g / list / q);
+      sum += pr * q; lines.push(mk(it, pr));
+    });
+  } else {
+    paid.forEach(function(it, i){ lines.push(mk(it, i === 0 ? Math.round(fin / Math.max(1, Math.floor(Number(it.qty) || 1))) : 0)); });
+    if (!fin) warn = 'Combo chưa có giá — nhập giá từng món tay.';
+  }
+  gifts.forEach(function(it){ lines.push(mk(it, 0, { note: 'Quà tặng combo' })); });
+  (c.gifts || []).forEach(function(g){ var nm = g && (g.gift || g.name); if (nm) lines.push({ code:'', name:String(nm), note:'Quà tặng combo', qty:1, price:0, discType:'amt', discValue:0, taxPct:0, comboName:String(c.name || c.code || 'Combo') }); });
+  return { lines: lines, freeShip: !!c.freeship, ship: Math.max(0, Math.round(Number(c.ship) || 0)), warn: warn };
+}
+function _coCmbAdd(i){
+  var c = _coCmbVisible()[i]; if (!c) return;
+  var r = _coCmbLines(c);
+  if (!r.lines.length){ _coCmb.msg = 'Combo này chưa có món nào.'; _coCmbResRender(); return; }
+  r.lines.forEach(function(l){ _co.items.push(l); });
+  if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
+  _coCmb.msg = r.warn || ('✓ Đã thêm combo "' + (c.name || c.code) + '" vào đơn.');
+  _coRender();
+}
+function _coCmbRender(){
+  var box = document.getElementById('co-cmb'); if (!box) return;
+  var h = '<button type="button" class="btn sm" onclick="_coCmbToggle()">🎁 Combo có sẵn ' + (_coCmb.open ? '▴' : '▾') + '</button>';
+  if (_coCmb.open) h += '<div style="margin-top:6px;padding:8px;border:1px dashed var(--border);border-radius:8px"><input type="text" value="' + _coEsc(_coCmb.q) + '" placeholder="🔍 Tìm combo (tên, mã, từ khoá, sản phẩm…)" oninput="_coCmbQ(this.value)" style="' + _coInp + ';margin-bottom:6px"><div id="co-cmb-res"></div></div>';
+  box.innerHTML = h; _coCmbResRender();
+}
+function _coCmbResRender(){
+  var box = document.getElementById('co-cmb-res'); if (!box) return;
+  var E = _coEsc, muted = function(t){ return '<div style="font-size:12px;color:var(--muted);padding:4px">' + t + '</div>'; };
+  var msg = _coCmb.msg ? '<div style="font-size:12px;font-weight:600;color:' + (/^✓/.test(_coCmb.msg) ? '#1e8449' : '#c0392b') + ';padding:2px 4px 6px">' + E(_coCmb.msg) + '</div>' : '';
+  if (_coCmb.loading){ box.innerHTML = msg + muted('Đang tải combo…'); return; }
+  if (_coCmb.err){ box.innerHTML = msg + '<div style="font-size:12px;color:#c0392b;padding:4px">' + E(_coCmb.err) + ' <button class="btn sm" onclick="_coCmbLoad()">Thử lại</button></div>'; return; }
+  var rows = _coCmbVisible();
+  box.innerHTML = msg + (!rows.length ? muted('Không có combo đang áp dụng' + (String(_coCmb.q).trim() ? ' khớp "' + E(_coCmb.q) + '"' : '') + '.') : rows.map(function(c, i){
+    var n = (c.items || []).filter(function(it){ return !it.gift; }).length, fin = Number(c.finalPrice != null ? c.finalPrice : c.priceVnd) || 0;
+    return '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px">' +
+      '<span style="font-size:13px"><b>' + E(c.name || c.code) + '</b>' + (c.code ? ' <span style="color:var(--muted)">(' + E(c.code) + ')</span>' : '') + '<br><span style="font-size:11px;color:var(--muted)">' + n + ' món' + ((c.gifts || []).length || (c.items || []).some(function(it){ return it.gift; }) ? ' + quà' : '') + (c.freeship ? ' · miễn ship' : '') + '</span></span>' +
+      '<span style="display:flex;gap:8px;align-items:center"><b style="font-size:12px;color:#c03960;white-space:nowrap">' + (fin ? _coVnd(fin) : 'chưa có giá') + '</b><button type="button" class="btn sm" onclick="_coCmbAdd(' + i + ')">＋ Thêm</button></span></div>';
+  }).join(''));
+}
 // ── Lưu ──
 async function _coSave(){
   if (_co.busy) return;
@@ -243,19 +421,26 @@ function _coField(label, key, opt){
     'oninput="_coSet(\'' + key + '\',this.value)"' + (opt.onchange ? ' onchange="' + opt.onchange + '"' : '') + ' style="' + _coInp + '"></label>';
 }
 function _coMoneyField(label, key, ph){
-  return '<label style="display:block;font-size:12px;color:var(--muted)">' + label + '<input id="co-f-' + key + '" type="number" min="0" value="' + (_co[key] ? _coEsc(_co[key]) : '') + '" placeholder="' + (ph || '0') + '" oninput="_coSetNum(\'' + key + '\',this.value)" style="' + _coInp + '"></label>';
+  return '<label style="display:block;font-size:12px;color:var(--muted)">' + label + '<input id="co-f-' + key + '" type="text" inputmode="numeric" autocomplete="off" value="' + (_co[key] ? _coFmtMoney(_co[key]) : '') + '" placeholder="' + (ph || '0') + '" oninput="_coMoneyNum(this,\'' + key + '\')" style="' + _coInp + '"></label>';
 }
+// Nút chọn kiểu giảm: [đ | %] (thay hộp chọn nhỏ cũ — chỉ hiện chữ "đ" nên dễ bỏ sót lựa chọn %). fnAmt/fnPct = chuỗi onclick.
+function _coSeg(isPct, fnAmt, fnPct){
+  var b = function(on, t, f){ return '<button type="button" onclick="' + f + '" style="padding:5px 11px;border:1px solid ' + (on ? '#b5305a' : 'var(--border)') + ';font-size:13px;font-weight:700;cursor:pointer;' + (on ? 'background:#b5305a;color:#fff' : 'background:var(--card,#fff);color:inherit') + '">' + t + '</button>'; };
+  return '<span style="display:inline-flex;border-radius:6px;overflow:hidden;flex:none" role="group" aria-label="Kiểu giảm giá">' + b(!isPct, 'đ', fnAmt) + b(isPct, '%', fnPct) + '</span>';
+}
+function _coDiscType(v){ _co.promoApplied = null; _co.discType = v === 'pct' ? 'pct' : 'amt'; if (_co.discType === 'pct' && _coNum(_co.discValue) > 100) _co.discValue = 100; _coRender(); }
+function _coDiscInput(v){ _co.promoApplied = null; _co.discValue = _coNum(v); _coSummary(); }
 function _coItemRow(it, i){
   var pct = it.discType === 'pct';
   return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">' +
     '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input value="' + _coEsc(it.name) + '" placeholder="Tên sản phẩm" oninput="_coItemSet(' + i + ',\'name\',this.value)" style="' + _coInp + ';font-weight:700">' +
     '<button class="btn sm" title="Xoá dòng" onclick="_coDelItem(' + i + ')">🗑</button></div>' +
-    '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
+    (it.comboName ? '<div style="font-size:11px;color:#b5305a;margin:-2px 0 4px">🎁 Combo: ' + _coEsc(it.comboName) + ' — giá đã chia theo giá combo</div>' : '') + '<input value="' + _coEsc(it.note) + '" placeholder="Chất liệu · size · màu / ghi chú dòng" oninput="_coItemSet(' + i + ',\'note\',this.value)" style="' + _coInp + ';margin-bottom:6px">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;align-items:end">' +
       '<label style="font-size:11px;color:var(--muted)">Số lượng<input type="number" min="1" value="' + _coEsc(it.qty) + '" oninput="_coItemSet(' + i + ',\'qty\',this.value)" style="' + _coInp + '"></label>' +
-      '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="number" min="0" value="' + _coEsc(it.price) + '" oninput="_coItemSet(' + i + ',\'price\',this.value)" style="' + _coInp + '"></label>' +
-      '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px"><input type="number" min="0" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' +
-        '<select onchange="_coItemDiscType(' + i + ',this.value)" style="padding:4px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (pct ? '' : ' selected') + '>đ</option><option value="pct"' + (pct ? ' selected' : '') + '>%</option></select></span></label>' +
+      '<label style="font-size:11px;color:var(--muted)">Đơn giá (đ)<input type="text" inputmode="numeric" autocomplete="off" value="' + _coFmtMoney(it.price) + '" oninput="_coMoneyItem(this,' + i + ',\'price\')" style="' + _coInp + '"></label>' +
+      '<label style="font-size:11px;color:var(--muted)">Giảm giá dòng<span style="display:flex;gap:4px">' + (pct ? '<input type="number" min="0" max="100" value="' + (it.discValue ? _coEsc(it.discValue) : '') + '" oninput="_coItemSet(' + i + ',\'discValue\',this.value)" style="' + _coInp + '">' : '<input type="text" inputmode="numeric" autocomplete="off" value="' + (it.discValue ? _coFmtMoney(it.discValue) : '') + '" oninput="_coMoneyItem(this,' + i + ',\'discValue\')" style="' + _coInp + '">') +
+        _coSeg(pct, '_coItemDiscType(' + i + ',\'amt\')', '_coItemDiscType(' + i + ',\'pct\')') + '</span></label>' +
       '<label style="font-size:11px;color:var(--muted)">Thuế (%)<input type="number" min="0" max="100" value="' + (it.taxPct ? _coEsc(it.taxPct) : '') + '" placeholder="0" oninput="_coItemSet(' + i + ',\'taxPct\',this.value)" style="' + _coInp + '"></label>' +
       '<div style="font-size:11px;color:var(--muted)">Thành tiền<div id="co-line-' + i + '" style="font-size:14px;font-weight:700;color:var(--text,inherit)"></div></div>' +
     '</div></div>';
@@ -267,8 +452,12 @@ function _coSummaryHtml(c){
     '<div style="border-top:1px dashed var(--border);margin:6px 0"></div>' + row('Cần thu', _coVnd(c.total), true) + (c.paid ? row('Đã chuyển khoản', '-' + _coVnd(c.paid)) : '') + row('Còn thiếu', '<span style="color:' + (c.due > 0 ? '#c0392b' : '#1e8449') + '">' + _coVnd(c.due) + '</span>', true);
 }
 function _coSummary(){   // cập nhật số tiền KHÔNG dựng lại form (giữ nguyên ô đang gõ)
+  _coPromoSync();
   var c = _coCalc(_coNow()), box = document.getElementById('co-sum'); if (box) box.innerHTML = _coSummaryHtml(c);
   c.lines.forEach(function(l, i){ var el = document.getElementById('co-line-' + i); if (el) el.textContent = _coVnd(l.amount); });
+  _coPromoResRender();
+  var h = document.getElementById('co-disc-hint');
+  if (h) h.textContent = _coNum(_co.discValue) > 0 ? (_co.discType === 'pct' ? Math.min(100, _coNum(_co.discValue)) + '% = giảm ' + _coVnd(c.orderDiscount) : 'Giảm ' + _coVnd(c.orderDiscount) + (c.gross - c.itemDiscount > 0 ? ' (' + (Math.round(c.orderDiscount / (c.gross - c.itemDiscount) * 1000) / 10) + '%)' : '')) : '';
 }
 function _coMsgRender(){
   var m = document.getElementById('co-msg'); if (!m) return;
@@ -297,7 +486,7 @@ function _coRender(keepFocus){
     sec('👤 Khách hàng') + '<div style="' + grid + '">' + _coField('Số điện thoại *', 'phone', { type:'tel', ph:'09…', onchange:'_coFillCustomer();_coLoyLoad()' }) + _coField('Tên khách', 'custName') + _coField('Giới tính', 'gender') + _coField('Sinh nhật', 'birthday', { ph:'dd/mm/yyyy' }) + '</div>' +
     sec('🛍 Sản phẩm') +
     '<input id="co-pick-q" type="text" placeholder="🔍 Tìm sản phẩm trong bảng giá (không cần dấu)…" value="' + _coEsc(_coPick.q) + '" oninput="_coPickQ(this.value)" onfocus="_coCatLoad()" style="' + _coInp + ';margin-bottom:6px">' +
-    '<div id="co-pick-res"></div>' +
+    '<div id="co-pick-res"></div><div id="co-cmb" style="margin-bottom:6px"></div>' +
     '<div id="co-items">' + (_co.items.length ? _co.items.map(_coItemRow).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px;border:1px dashed var(--border);border-radius:8px;text-align:center">Chưa có sản phẩm — tìm ở trên và bấm vào sản phẩm để thêm.</div>') + '</div>' +
     '<button class="btn sm" onclick="_coAddItem()">＋ Thêm dòng tay</button>' +
     sec('📦 Nhận hàng') + '<div style="' + grid + '">' + _coField('Người nhận', 'recvName') + _coField('SĐT nhận', 'recvPhone', { type:'tel' }) + _coField('Tỉnh / Thành', 'province') + _coField('Quận / Huyện', 'district') + _coField('Phường / Xã', 'ward') + _coField('Địa chỉ cụ thể', 'address') + _coField('Ngày giao dự kiến', 'expectedDate', { type:'date' }) + _coField('Đơn vị vận chuyển', 'carrier') + '</div>' +
@@ -305,8 +494,9 @@ function _coRender(keepFocus){
     '<div style="' + grid + ';margin-top:8px">' + _coField('Ghi chú nội bộ', 'note') + _coField('Ghi chú in trên đơn', 'printNote') + '</div>' +
     '</div><div style="flex:1;min-width:260px;position:sticky;top:8px">' +
     sec('💰 Thanh toán') + '<div style="border:1px solid var(--border);border-radius:10px;padding:10px">' +
-    '<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Giảm giá đơn', 'discValue') + '</div>' +
-    '<select onchange="_coSet(\'discType\',this.value)" style="padding:6px;border:1px solid var(--border);border-radius:6px"><option value="amt"' + (_co.discType === 'pct' ? '' : ' selected') + '>đ</option><option value="pct"' + (_co.discType === 'pct' ? ' selected' : '') + '>%</option></select></div>' +
+    '<div style="margin-bottom:8px"><div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:12px;color:var(--muted)">Giảm giá đơn (chọn giảm tiền hoặc giảm %)<input id="co-f-discValue" ' + (_co.discType === 'pct' ? 'type="number" min="0" max="100" value="' + (_co.discValue ? _coEsc(_co.discValue) : '') + '" oninput="_coDiscInput(this.value)"' : 'type="text" inputmode="numeric" autocomplete="off" value="' + (_co.discValue ? _coFmtMoney(_co.discValue) : '') + '" oninput="_coMoneyDisc(this)"') + ' placeholder="' + (_co.discType === 'pct' ? '% giảm, vd 10' : 'số tiền giảm, vd 50.000') + '" style="' + _coInp + '"></label></div>' +
+    _coSeg(_co.discType === 'pct', '_coDiscType(\'amt\')', '_coDiscType(\'pct\')') + '</div><div id="co-disc-hint" style="font-size:11px;color:var(--muted);margin-top:3px;min-height:14px"></div></div>' +
+    '<div id="co-promo" style="margin-bottom:8px;padding:8px;border:1px dashed var(--border);border-radius:8px"></div>' +
     '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px"><div style="flex:1">' + _coMoneyField('Phí vận chuyển', 'shipFee') + '</div>' +
     '<label style="font-size:12px;white-space:nowrap;padding-bottom:7px"><input type="checkbox"' + (_co.freeShip ? ' checked' : '') + ' onchange="_coSetBool(\'freeShip\',this.checked)"> Miễn phí giao</label></div>' +
     '<div style="margin-bottom:8px">' + _coMoneyField('Phụ thu', 'surcharge') + '</div>' +
@@ -316,7 +506,7 @@ function _coRender(keepFocus){
     '<button id="co-save" class="btn primary" onclick="_coSave()" style="width:100%;margin-top:8px;padding:10px;font-size:14px">💾 Lưu đơn (F2)</button>' +
     '<button class="btn sm" onclick="if(confirm(\'Xoá hết nội dung đơn đang soạn?\'))_coNew()" style="width:100%;margin-top:6px">Làm lại từ đầu</button>' +
     '</div></div></div>';
-  _coSummary(); _coMsgRender(); _coPickRender(); _coLoyRender();
+  _coSummary(); _coMsgRender(); _coPickRender(); _coLoyRender(); _coPromoRender(); _coCmbRender();
 }
 document.addEventListener('keydown', function(e){
   if (e.key !== 'F2') return;
@@ -324,4 +514,4 @@ document.addEventListener('keydown', function(e){
   if (!p || p.style.display === 'none' || !document.getElementById('co-save')) return;
   e.preventDefault(); _coSave();
 });
-registerExtraTab('taodon', '➕ Tạo đơn', function(){ _coRender(); _coCatLoad(); });
+registerExtraTab('taodon', '➕ Tạo đơn', function(){ _coRender(); _coCatLoad(); _coPromoLoad(); });

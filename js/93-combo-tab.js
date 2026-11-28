@@ -24,9 +24,7 @@ function _cbItemLine(it){
 }
 function _cbDateVN(ymd){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(ymd || ''); }
 function _cbCopyText(c){
-  var L = ['🎁 ' + c.name + (c.code ? ' (' + c.code + ')' : '')];
-  var p = _cbVnd(c.priceVnd) || c.priceText; if (p) L.push('Giá combo: ' + p);
-  (c.items || []).forEach(function(it){ L.push('- ' + _cbItemLine(it)); });
+  var L = [_cbFormatText(c)];   // mẫu hiển thị mới (giá giảm, dòng SP vàng/giá, quà, ship) — cùng chữ với xem trước & trợ lý AI
   if (c.note && String(c.note).trim()) L.push('Lưu ý: ' + String(c.note).trim());
   if (c.end) L.push('Áp dụng đến hết ' + _cbDateVN(c.end));
   return L.join('\n');
@@ -429,7 +427,7 @@ function _cbLineName(it){   // giống GAS _comboLineName_: vàng chèn ngay sau
 // c: { name, code, priceVnd, items[], discount, finalPrice, ship, freeship, total, gifts[] } (dòng từ GAS comboList hoặc _cbCalc(e)) → chữ hiển thị/copy theo mẫu Duyên (giống GAS _comboFormatText_).
 function _cbFormatText(c){
   var L = ['🎁 ' + c.name + (c.code ? ' (' + c.code + ')' : '')];
-  L.push('Giá combo: ' + _cbMoney(c.priceVnd) + (c.discount > 0 ? ' giảm ' + _cbK(c.discount) + ' còn ' + _cbMoney(c.finalPrice) : ''));
+  L.push('Giá combo: ' + (c.priceVnd > 0 ? _cbMoney(c.priceVnd) : (c.priceText || _cbMoney(0))) + (c.discount > 0 ? ' giảm ' + _cbK(c.discount) + ' còn ' + _cbMoney(c.finalPrice) : ''));
   (c.items || []).forEach(function(it){
     var q = it.qty || 1, n = _cbLineName(it);
     if (it.gift){ L.push('- 🎁 ' + n + (q > 1 ? ' × ' + q : '') + ' (quà tặng)'); return; }
@@ -590,14 +588,16 @@ function _cbCardImgs(c){
     return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="' + esc(c.name) + '" loading="lazy" style="height:110px;min-width:110px;max-width:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>'; }).join('') + '</div>';
 }
 function _cbCard(c, i){
-  var price = _cbVnd(c.priceVnd) || c.priceText || '';
-  var items = (c.items || []).map(function(it){ return '<li>' + esc(_cbItemLine(it)) + '</li>'; }).join('');
+  var price = _cbVnd(c.discount > 0 ? c.finalPrice : c.priceVnd) || c.priceText || '';
+  var body = _cbFormatText(c).split('\n').slice(1).join('\n');   // bỏ dòng tiêu đề (đã hiện ở trên)
+  var gi = []; (c.gifts || []).forEach(function(g){ (g.images || []).forEach(function(u){ gi.push(u); }); });
+  var giftImgs = gi.length ? '<div style="font-size:12px;margin-top:6px">🎁 Ảnh quà tặng:</div><div style="display:flex;gap:6px;margin-top:4px;overflow-x:auto">' + gi.map(function(u){ return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="quà tặng" loading="lazy" style="height:80px;min-width:80px;max-width:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>'; }).join('') + '</div>' : '';
   return '<div class="card" style="border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--card,#fff);opacity:' + (c.usable ? 1 : 0.65) + '">' +
     '<div style="display:flex;gap:8px;align-items:flex-start;justify-content:space-between">' +
       '<div><div style="font-weight:700;font-size:15px">' + esc(c.name) + '</div><div style="font-size:11px;color:var(--muted)">' + esc(c.code) + '</div></div>' +
       '<div style="font-weight:800;font-size:16px;color:#c0392b;white-space:nowrap">' + esc(price) + '</div></div>' +
     _cbCardImgs(c) +
-    '<ul style="margin:8px 0 6px 18px;padding:0;font-size:13px">' + items + '</ul>' +
+    '<div style="margin:8px 0 6px;font-size:13px;white-space:pre-wrap">' + esc(body) + '</div>' + giftImgs +
     (c.note && String(c.note).trim() ? '<div style="font-size:12px;margin-bottom:6px">📝 ' + esc(c.note) + '</div>' : '') +
     '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">' +
       '<span style="font-size:12px;color:var(--muted)">' + esc(c.statusLabel || '') + '</span>' +

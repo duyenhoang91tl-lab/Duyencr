@@ -60,7 +60,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`, `SH_POS_DEDUP_LOG`, `POS_DEDUP_LOG_HEADERS`, `POS_COL_TRANGTHAI`, `POS_DEDUP_MAX_DELETE`, `SH_IMPORT_UPD_LOG`, `IMPORT_UPD_LOG_HEADERS`, `IMPORT_UPD_MAX_ROWS`, `IMPORT_UPD_RUN_GAP`, `IMPORT_UPD_BUDGET_MS`, `BASESRC_MAX_ITEMS`, `SH_IMPORT_BATCH`, `IMPORT_BATCH_HEADERS`, `SH_IMPORT_UNDO_BACKUP`, `IMPORT_UNDO_MAX_ROWS`
 
 ## 13_Teams_Pancake.gs
-- Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `_savePancakeDaily_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkDaysBetween_`, `_pkApportion_`, `_pkExpandMergedRows_`, `_pkDailyRows_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `_savePancakeSdtDaily_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
+- Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `_savePancakeDaily_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkDaysBetween_`, `_pkApportion_`, `_pkExpandMergedRows_`, `_pkApplyRealDaily_`, `_pkDailyRows_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `_savePancakeSdtDaily_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
 - Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
@@ -144,8 +144,12 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`, `TB_MSG_SCAN_MAX_ROWS_`, `TOPSP_UNASSIGNED_TEAM_`
 
 ## 34_Loyalty.gs
-- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`
-- Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`
+- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`, `_loyNorm_`, `_loyRuleList_`, `_loyaltyBenefitCfgNormalize_`, `_loyRuleHit_`, `_loyaltyBenefitLevel_`, `_loyaltyBenefitApply_`, `_loyaltyBenefitCfg_`, `_loyaltyHistoryOf_`, `loyaltyBenefitQuote_`
+- Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`, `LOYALTY_BENEFIT_DEFAULT_`, `LOYALTY_CRM_VALID_STATUS_`, `LOYALTY_LEVEL_LABEL_`
+
+## 34b_Ticket.gs
+- Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
+- Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
 
 ## 35_CrmOrder.gs
 - Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`

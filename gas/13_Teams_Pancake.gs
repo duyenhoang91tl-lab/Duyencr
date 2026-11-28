@@ -324,6 +324,20 @@ function _pkExpandMergedRows_(rows, dailyRows) {
   }
   return out;
 }
+// byDay chinh xac: ngay (Page) da rai tu dong gop (est > 0) ma co so lieu THAT Page x ngay trong PancakeStatsDaily (sheet "By time") → dung thang
+// so that do (TT, DH) thay vi tong cac dong da rai/lam tron theo nhan vien (lech vai tin o Page nho). Ngay chi co uoc tinh (est = 2) giu nguyen.
+// list: [{date,pageId,tongTT,tongDH,est}], dailyRows: cac dong PancakeStatsDaily (cot 0 ngay, 1 pageId, 5 tongTT, 11 tongDH). Tra ve so ngay da thay.
+function _pkApplyRealDaily_(list, dailyRows) {
+  var real = {}, n = 0;
+  (dailyRows || []).forEach(function(r) { var d = normOrderDate_(r[0]); if (d) real[String(r[1]) + '|' + d] = { tt: +r[5] || 0, dh: +r[11] || 0 }; });
+  (list || []).forEach(function(x) {
+    if (!(x.est > 0)) return;
+    var rd = real[String(x.pageId) + '|' + x.date];
+    if (!rd) return;
+    x.tongTT = rd.tt; x.tongDH = rd.dh; x.est = 0; n++;
+  });
+  return n;
+}
 function _pkDailyRows_() {
   var sh = getSheet_(SH_PK_DAILY, PK_DAILY_HEADERS);
   return sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, PK_DAILY_HEADERS.length).getValues() : [];
@@ -434,6 +448,7 @@ function buildPancakeReport_(from, to, split) {
   var hiddenSets2 = _hiddenPageSaleSets_();
   // byDay = tong cac Page (da an Page theo cai dat admin, giong byPage) theo tung ngay; est: 0 so that, 1 rai theo ngay that cua Page, 2 chia deu theo lich (>=1 = ngay nay co phan UOC TINH tu file gop thang).
   var byDayAgg = {}, byDayPageList = [];
+  try { var _bdVals = Object.keys(byDayPage).map(function(k) { return byDayPage[k]; }); if (_bdVals.some(function(x) { return x.est > 0; })) _pkApplyRealDaily_(_bdVals, _pkDailyRows_()); } catch (eRd) { /* khong doc duoc PancakeStatsDaily → giu so da rai */ }
   Object.keys(byDayPage).forEach(function(k) {
     var r = byDayPage[k];
     if (hiddenSets2.channels && hiddenSets2.channels.length && hiddenSets2.channels.indexOf(r.pageName) !== -1) return;

@@ -94,4 +94,22 @@ const dock = require('../js/38-pro-dock.js');
 const txt = dock.proPriceFormat_({ ok: true, found: false, suggestions: ['A'], combos: [{ name: 'Combo X', code: 'CB1', priceVnd: 1299000, items: [{ name: 'Lắc', qty: 2, chatLieu: 'Bạc', size: '16cm' }], note: 'online', end: '2099-01-31' }] });
 ok(/COMBO CÓ SẴN/.test(txt) && /1\.299\.000đ/.test(txt) && /2 × Lắc \(Bạc, 16cm\)/.test(txt) && /đến 31\/01\/2099/.test(txt), 'client format combo');
 ok(/Giá theo BẢNG GIÁ/.test(dock.proPriceFormat_({ ok: true, found: true, text: 'x', combos: [] })) && !/COMBO/.test(dock.proPriceFormat_({ ok: true, found: true, text: 'x', combos: [] })), 'khong combo -> y nhu cu');
-console.log('ALL COMBO STEP2 TESTS PASSED');
+
+// ── Luot 2 buoc 4/5 (18/11/2026): combo hien theo mau moi + o tich 'Combo' o Tro ly AI gia ──
+ok(pa.combos.length === 0 || pa.combos.every(c => typeof c.text === 'string'), 'priceAsk_ thuong: moi combo co text');
+let pa2 = ctx.priceAsk_('Lắc cỏ bốn lá bao nhiêu tiền');
+ok(pa2.combos.length >= 1 && pa2.combos[0].text.startsWith('🎁 Combo Lắc cỏ 4 lá + nhẫn') && /Giá combo: 1\.299\.000đ/.test(pa2.combos[0].text), 'combo kem chu hien thi mau moi');
+const po = ctx.priceAsk_('combo', null, true);
+ok(po.ok && po.comboOnly === true && po.found === false && po.combos.length >= 1 && po.combos.every(c => c.text.startsWith('🎁 ')), 'comboOnly: chi combo (khong tra san pham le), co text');
+ok(ctx.priceAsk_('combo xyz khong co', null, true).combos.length === 0, 'comboOnly khong khop -> []');
+const gco = J(ctx.doGet({ parameter: { action: 'priceAsk', q: 'combo', combo: '1' } }));
+ok(gco.comboOnly === true && gco.combos.length >= 1 && !('suggestions' in gco && gco.suggestions.length), 'doGet priceAsk&combo=1');
+const t2 = dock.proPriceFormat_({ ok: true, found: false, comboOnly: true, combos: [{ name: 'X', text: '🎁 X (C)\nGiá combo: 3.300.000đ giảm 200k còn 3.100.000đ\n- A 380 × 2 = 760', note: 'online', end: '2099-01-31' }], suggestions: [] });
+ok(t2.includes('giảm 200k còn 3.100.000đ') && t2.includes('📝 online') && t2.includes('⏰ đến 31/01/2099') && !t2.includes('•') && !/Không có sản phẩm lẻ/.test(t2), 'client dung c.text + ghi chu/han, comboOnly khong bao thieu SP le');
+ok(/Không có combo đang áp dụng/.test(dock.proPriceFormat_({ ok: true, found: false, comboOnly: true, combos: [], suggestions: [] })), 'comboOnly khong ket qua: bao ro');
+const im = dock.proComboImages_([{ name: 'X', images: ['https://a/1.png'], gifts: [{ gift: 'Túi', images: ['https://a/g.png'] }] }]);
+ok(im.length === 2 && im[1].name === '🎁 Quà: Túi', 'anh qua tang hien kem anh combo');
+let seen = ''; dock.proPriceRequest_('https://s/exec', 'combo', async u => { seen = u; return { json: async () => ({ ok: true, combos: [], comboOnly: true }) }; }, 1000, true).then(() => {
+  ok(/&combo=1$/.test(seen), 'proPriceRequest_ them combo=1 khi tich');
+  console.log('ALL COMBO STEP2 TESTS PASSED'); });
+

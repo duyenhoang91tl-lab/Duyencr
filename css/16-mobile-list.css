@@ -66,3 +66,11 @@
   /* CHIỀU CAO CỐ ĐỊNH (không dùng flex:1/min-height): #tab-list cao theo nội dung nên flex-basis 0% của .table-wrap bị hiểu là 'content' → khung giãn bằng cả bảng ảo (total*58px) → js/02 vẽ HẾT dòng → đơ máy. */
   body.lov-on-list #tab-list > .table-wrap{flex:0 0 auto !important;height:calc(var(--vh,1vh)*70);max-height:calc(var(--vh,1vh)*70);min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto;}
 }
+
+/* NGUYÊN NHÂN GỐC "mở danh sách không thấy khách là ai": cột "Ngày mua gần nhất" đứng đầu rộng 152px (css/18) = 40% màn điện thoại, thường chỉ có dấu "—".
+   Thu còn 84px (đủ ngày dd/mm/yyyy) để tên + cột kế tiếp hiện ngay. Chỉ màn ≤640px; không ẩn cột, không đổi chiều cao dòng. */
+@media (max-width:640px){
+  html body #main-table th.col-lastpos,html body #main-table td.col-lastpos{width:84px;min-width:84px;max-width:84px;padding-left:4px;padding-right:4px;}
+  html body #main-table th.col-lastpos{font-size:10px;}
+  html body #main-table th.col-lastpos .th-inner{white-space:normal;flex-wrap:wrap;gap:2px;}
+}

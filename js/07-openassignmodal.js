@@ -124,6 +124,9 @@ function _advAssignDateFilteredList() {
     if (hasSrc) {
       var d = c.dataSrc || {}, ok = false;
       _advAssign.srcSet.forEach(function (k) { if (d[k]) ok = true; });
+      // NGUYEN NHAN GOC (Duyen 28/11: chon thang 5 van bi loai hang loat): khach co don POS la khach "Du lieu don" du c.dataSrc.don chua bat
+      // (donPhoneSet la danh sach SDT tai rieng, co the cu/chua ve) -> co don POS thi tinh la nguon don khi da chon nguon don.
+      if (!ok && hasDate && _advAssign.srcSet.has('don')) { try { var _pr = window.posOrdersByPhone && window.posOrdersByPhone[p]; if (_pr && _pr.length) ok = true; } catch (e) {} }
       if (!ok) { _advAssign._diag.srcOut++; return false; }
     }
     if (!hasDate) return true;
@@ -132,9 +135,17 @@ function _advAssignDateFilteredList() {
     // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
     // NGUYEN NHAN GOC (da sua 2026-10-10): truoc day KH POS (dt/don/cs) KHONG co ngay don van lot qua khi da chon nguon -> chia "khach thang 9" bi lan khach khong ro ngay.
     // Nay chi KH thuoc nguon CSKH-Duyen (khong co ngay don) moi duoc miễn loc ngay, va chi khi CSKH nam trong nguon da chon.
-    if (!yl.some(function (o) { return o.ds; })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
+    if (!yl.some(function (o) { return o.ds || (o.yr && o.mo); })) { var _okc = hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh); if (!_okc) _advAssign._diag.dateOut++; return _okc; }
     var inR = yl.some(function (o) {
-      if (!o.ds) return false;
+      if (!o.ds) {
+        // NGUYEN NHAN GOC: don Base co thang/nam nhung khong doc duoc ngay (o.ds rong) thi bo loc THANG cua bang van tinh, con Chia data loai -> khach thang 5 bi mat.
+        // Nay: don chi biet thang -> tinh neu thang do giao voi khoang ngay da chon.
+        if (!o.yr || !o.mo) return false;
+        var _ms = o.yr + '-' + String(o.mo).padStart(2, '0') + '-01', _me = o.yr + '-' + String(o.mo).padStart(2, '0') + '-31';
+        if (_advAssign.dateFrom && _me < _advAssign.dateFrom) return false;
+        if (_advAssign.dateTo && _ms > _advAssign.dateTo) return false;
+        return true;
+      }
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
       if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
       return true;
@@ -542,11 +553,10 @@ function renderAssignCreate() {
     </div>
 
     ${!isTeamMode ? `
-    <div class="as-lbl">Lấy người nhận từ <span class="as-sub">(bấm để đổi nguồn — người đã chọn ở nguồn khác vẫn được giữ)</span>:</div>
+    <div class="as-lbl">Lấy người nhận từ:</div>
     <div class="assign-sort-row" style="margin-bottom:8px">
       ${[['all','👤 Tất cả CS'],['sale','🧑‍💼 Danh sách Sale'],['acct','🔑 Tài khoản đăng nhập CRM']].map(([k,l])=>`<div class="assign-sort-btn ${recvSrc===k?'active':''}" onclick="_advAssignSetRecvSrc('${k}')">${l} (${recvCnt[k]})</div>`).join('')}
     </div>
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều người${recvSrc==='acct'?'; chọn tài khoản = chia cho tên CS của tài khoản đó':''})</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
@@ -557,7 +567,7 @@ function renderAssignCreate() {
     </div>
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
       ${recvList.map(r => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(r.cs)?'selected':''}" data-cs="${esc(r.cs)}" onclick="_advAssignToggleCS(this.dataset.cs)" title="${esc(r.sub||r.label)}">${esc(r.label)}${r.sub?` <span style="opacity:.6;font-size:10px">${esc(r.sub)}</span>`:''}</div>`).join('')}
-      ${recvList.length===0?`<span style="color:var(--hint);font-size:12px">${recvSrc==='acct'?'Chưa có tài khoản đăng nhập nào đang hoạt động (vào "Quản lý tài khoản" để tạo).':(recvSrc==='sale'?'Chưa có Sale nào trong dữ liệu':'Chưa có CS trong hệ thống')}</span>`:''}
+      ${recvList.length===0?`<span style="color:var(--hint);font-size:12px">${recvSrc==='acct'?'Chưa có tài khoản nào':(recvSrc==='sale'?'Chưa có Sale nào trong dữ liệu':'Chưa có CS trong hệ thống')}</span>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:11px;color:var(--muted)">Thêm CS mới:</span>
@@ -567,18 +577,17 @@ function renderAssignCreate() {
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
     ` : `
-    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team / Phòng ban — chọn được nhiều, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
     <div class="as-lbl">Team trong "Quản lý Team" <span class="as-sub">(${teams.length})</span>:</div>
     <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
       ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
-      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — bấm "➕ Tạo nhanh Team" bên dưới (lấy luôn những người đang chọn ở chế độ CS riêng lẻ) hoặc vào tab "Quản lý Team".</span>':''}
+      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào</span>':''}
     </div>
-    <div style="margin-bottom:10px"><button type="button" class="btn sm" onclick="_advAssignQuickTeam()" title="Tạo Team mới ngay tại đây; thành viên = những người đang chọn ở 'CS riêng lẻ' (chọn trước rồi bấm). Chỉ Admin.">➕ Tạo nhanh Team${_advAssign.selectedCS.size>0?` từ ${_advAssign.selectedCS.size} người đang chọn`:''}</button></div>
-    <div class="as-lbl">Phòng ban Sale <span class="as-sub">(theo "Phòng ban" ở cài đặt — thành viên lấy từ file nhân sự)</span>:</div>
+    <div style="margin-bottom:10px"><button type="button" class="btn sm" onclick="_advAssignQuickTeam()">➕ Tạo nhanh Team${_advAssign.selectedCS.size>0?` từ ${_advAssign.selectedCS.size} người đang chọn`:''}</button></div>
+    <div class="as-lbl">Phòng ban Sale:</div>
     <div class="assign-cs-list" id="assign-dept-chips" style="margin-bottom:8px">
       ${_asgDept.loading?'<span style="color:var(--hint);font-size:12px">Đang tải phòng ban…</span>':''}
       ${_asgDept.list.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">🏢 ${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
-      ${(!_asgDept.loading && _asgDept.list.length===0)?`<span style="color:var(--hint);font-size:12px">${_asgDept.err?('Không tải được phòng ban: '+esc(_asgDept.err)):'Chưa có phòng ban nào có thành viên (cài ở "Phòng ban").'} <a href="#" onclick="_assignLoadDeptTeams(true);renderAssignCreate();return false">↻ Tải lại</a></span>`:''}
+      ${(!_asgDept.loading && _asgDept.list.length===0)?`<span style="color:var(--hint);font-size:12px">${_asgDept.err?('Không tải được phòng ban: '+esc(_asgDept.err)):'Chưa có phòng ban nào'} <a href="#" onclick="_assignLoadDeptTeams(true);renderAssignCreate();return false">↻ Tải lại</a></span>`:''}
     </div>
     ${_advAssign.selectedTeams.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 Team</div>':''}
     `}
@@ -1732,14 +1741,19 @@ function renderMyDataTab() {
       }
       const ns = nextSched ? nextSched(p) : null;
       const schedHtml = ns ? `<span style="font-size:10px;color:${isOverdue(ns)?'var(--red)':'#2563eb'}">📅 ${schedTypeLabel(ns.type)} · ${fmtDate(ns.date)}</span>` : '';
-      return `<div class="my-data-row" style="flex-wrap:wrap;gap:4px">
-        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} data-cs="${esc(csName)}" onchange="toggleMyDataDone('${p}',this.dataset.cs,this.checked)">
-        <div style="flex:1;min-width:0" class="${isDone?'my-data-done':''}">
-          <div style="font-weight:500;display:flex;align-items:center;gap:6px">${c ? esc(c.name) : p}${lastActHtml}</div>
-          <div style="font-size:11px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
+      // Nut co CHU thay cho o tich nho: nguoi moi nhin la biet bam gi (goi, xem, danh dau xong); du to de bam tren dien thoai.
+      const btnCss = 'min-height:38px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;text-decoration:none;white-space:nowrap';
+      return `<div class="my-data-row" style="flex-wrap:wrap;gap:8px;padding:10px 0">
+        <div style="flex:1;min-width:200px;cursor:pointer" class="${isDone?'my-data-done':''}" onclick="openDp('${p}')">
+          <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${c ? esc(c.name) : p}${lastActHtml}</div>
+          <div style="font-size:12px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
           <div style="font-size:10px;color:var(--hint);display:flex;gap:8px;flex-wrap:wrap">${esc(batchLabels)}${schedHtml?'&nbsp;·&nbsp;'+schedHtml:''}</div>
         </div>
-        <button class="btn sm" onclick="openDp('${p}')" style="flex-shrink:0">Chi tiết</button>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+          <a class="btn" href="tel:${p}" style="${btnCss}">📞 Gọi</a>
+          <button type="button" class="btn" onclick="openDp('${p}')" style="${btnCss}">Xem khách</button>
+          <button type="button" class="btn my-data-donebtn" data-cs="${esc(csName)}" aria-pressed="${isDone}" onclick="toggleMyDataDone('${p}',this.dataset.cs,${!isDone})" style="${btnCss};min-width:104px;font-weight:600${isDone?'':';background:#15803d;border-color:#15803d;color:#fff'}">${isDone?'↩ Chưa xong':'✓ Xong'}</button>
+        </div>
       </div>`;
     }).join('');
   }
