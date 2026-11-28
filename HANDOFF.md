@@ -1,5 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — BÁO CÁO: THẺ KPI KÉO NGANG, SỐ TIỀN KHÔNG NGẮT DÒNG) — XONG (chỉ web CSS; Duyên Ctrl+F5)
+- ĐỀ BÀI Duyên: ở Báo cáo, ô doanh thu (vd 4.361.866.600₫, 2.300.834.167₫) bị ngắt thành 2 dòng; muốn kéo ngang ra.
+- NGUYÊN NHÂN GỐC (`css/17-reports-pro.css`): `.kpi-val{overflow-wrap:anywhere}` + lưới cột cố định `repeat(auto-fill,minmax(168px,1fr))` → số tiền 14 ký tự ở cỡ 21px rộng hơn ô 168px nên trình duyệt BẺ giữa chữ số. Tái hiện bằng Chromium: CSS cũ 1280px → 2 dòng, CSS mới → 1 dòng ở cả 1280px và 390px.
+- ĐÃ LÀM: `#salesreport-wrap .kpi-grid` đổi sang `display:flex;flex-wrap:wrap`; `.kpi-card{flex:1 1 168px;min-width:min-content}` (min-content = đúng con số dài nhất → thẻ tự rộng theo số); `.kpi-val{white-space:nowrap;overflow-wrap:normal}`. Điện thoại (≤640px) giữ lưới 2 cột (`display:grid`, `min-width:0`, chữ co bằng clamp như cũ). Bump `index.html` css/17 `?v=20261128a`. Áp cho MỌI thẻ KPI trong `#salesreport-wrap` (Báo cáo A/B/…). Test `node tools/test-kpi-nowrap-css.js` (6) + đo bằng Chromium thật.
+- [ ] **VIỆC KẾ TIẾP:** Duyên Ctrl+F5 xem Báo cáo B; nếu muốn thẻ cùng chiều rộng (không giãn theo số) báo lại. Màn nhỏ <640px có thể cần co chữ nếu số tiền > 11 chữ số (đang dùng clamp 15–18px).
+
 ## 2026-11-27 (phiên Claude — PANCAKE GỘP THÁNG: KIỂM CHỨNG BẢN CÓ SẴN + SỬA ĐỘ CHÍNH XÁC TLC THEO NGÀY) — XONG (GAS tự deploy; web không đổi)
 - BỐI CẢNH: Duyên yêu cầu "TLC tháng 8 từ file Pancake gộp cả tháng, có từng ngày thì dùng". Một phiên khác ĐÃ làm đủ 4 bước (commit 2f5c716, 331bb15, 508f26c, 8e7a2bf: dateTo + PancakeStatsDaily + `_pkExpandMergedRows_` + byDay/byDayPage + bảng "Tỷ lệ chốt theo ngày"). Phiên này làm TRÙNG trước khi fetch → bản trùng của phiên này đã BỎ (giữ ở nhánh cục bộ, không push). BÀI HỌC: trước khi làm tính năng Pancake/GAS lớn phải `git fetch` + `git log origin/main --grep` xem phiên khác đã làm chưa (repo có ~100 commit/ngày).
 - KIỂM CHỨNG bản có sẵn bằng file thật tháng 8 (pages_statistics_engagements): tổng tháng khớp tuyệt đối — TLC p595…=1.86% (557/29974), p862…=0.81% (89/11001), p678…=1.17% (4/342); tổng theo ngày so với sheet By time chỉ lệch ≤4 tin/đơn/ngày (do làm tròn số nguyên theo từng nhân viên).
