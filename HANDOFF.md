@@ -2,9 +2,9 @@
 
 ## 2026-11-28 (phiên Claude — KIỂM TRA & SỬA LỖI HIỆN HÀNH, tiếp) — ĐANG LÀM
 - ĐỀ BÀI Duyên: "kiểm tra và fix các lỗi hiện hành" → "tiếp". Chạy toàn bộ test trên main: 3 test đỏ do test chưa theo kịp 2 lần sắp lại menu/báo cáo (không phải lỗi chức năng). Tài khoản test bước 2/2 đã XONG (xem mục "TÀI KHOẢN TEST: LỌC THEO SALE ĐÃ CHỌN").
-- ✅ Đã xong: (1) `tools/test-mascot-samoyed.js` kiểm linh vật/vườn ở nhóm menu `ui`; (2) `tools/test-report-n-pure.js` theo thứ tự báo cáo mới (N ngay sau B).
-- 🔧 Đang làm: `tools/test-reports-config.js` (thứ tự báo cáo mới).
-- ➡️ Kế tiếp: test web tài khoản test, cập nhật `docs/TAI-KHOAN-TEST.md`, chạy lại toàn bộ.
+- ✅ Đã xong: 3 test đỏ đã sửa xong: `test-mascot-samoyed`, `test-report-n-pure`, `test-reports-config` (thứ tự mới A,B,N,C,D,E,F,G,H,I,M,K,L).
+- 🔧 Đang làm: test web tài khoản test.
+- ➡️ Kế tiếp: cập nhật `docs/TAI-KHOAN-TEST.md`, chạy lại toàn bộ.
 
 ## 2026-11-28 (phiên Claude — TẠO ĐƠN: Ô TIỀN HIỆN DẤU CHẤM NGĂN HÀNG NGHÌN) — XONG, ĐÃ PUSH
 - Yêu cầu Duyên: ở màn lên đơn, khi điền tiền hiện dấu `.` cho dễ nhìn (100000 → 100.000).
