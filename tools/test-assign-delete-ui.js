@@ -4,7 +4,7 @@ const s = fs.readFileSync(path.join(__dirname, '..', 'js', '07-openassignmodal.j
 const grab = n => s.match(new RegExp('^async function ' + n + '\\([\\s\\S]*?\\n}\\n', 'm'))[0];
 let fail = 0; const ok = (n, v) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + n); if (!v) fail++; };
 let reply, sent, msg;
-const g = { JSON, String, gsUrl: 'x', confirm: () => true, saveLS() {}, renderAssignHistory() {}, updateMyDataBadge() {}, toast: m => { msg = m; },
+const g = { JSON, String, gsUrl: 'x', confirm: () => true, uiConfirm: async () => true, saveLS() {}, renderAssignHistory() {}, updateMyDataBadge() {}, toast: m => { msg = m; },
   localStorage: { getItem: () => 'tk' }, fetch: async (_, o) => { sent.push(JSON.parse(o.body)); if (reply === 'net') throw new Error('net'); return { json: async () => reply }; } };
 vm.createContext(g); vm.runInContext(grab('deleteAssignEntry') + grab('deleteAssignOnGS_'), g);
 const run = async r => { reply = r; sent = []; msg = ''; g.assignHistory = [{ id: '1' }, { id: '2' }]; await g.deleteAssignEntry('1'); return g.assignHistory.map(h => h.id).join(); };

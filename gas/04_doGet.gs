@@ -581,8 +581,11 @@ function doGetCore_(e) {
     // ── VIET TAT (go tat -> chen noi dung; 2026-10-25): danh sach cho CRM (quan ly) va extension Pancake AI (go tat trong o chat). Chi tra muc CHUNG team + muc CUA MINH. ──
     if (action === 'vietTat') {
       var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
-      return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
+      var _vo = { ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' };
+      try { var _vs = _vpSummaryFor_(_vc); _vo.proposals = _vs.own; if (_vs.adminPending !== null) _vo.adminPending = _vs.adminPending; } catch (eVs) {}   // app/extension: trạng thái đề xuất CỦA MÌNH + số đề xuất chờ duyệt (admin)
+      return jsonOut_(_vo);
     }
+    if (action === 'vietTatProposals') return jsonOut_(vietTatProposalsList_(_tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // admin: tất cả (chờ duyệt trước); người khác: đề xuất của mình
     if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
     if (action === 'vietTatAudio') return jsonOut_(vietTatAudio_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // app/extension tai byte 1 tep ghi am cua muc Viet tat (base64)
     if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
