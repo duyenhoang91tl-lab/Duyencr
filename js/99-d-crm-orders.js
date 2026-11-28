@@ -2,7 +2,7 @@
 //  ĐƠN CRM — bước 3/4: tab "🧾 Đơn CRM" liệt kê + xem chi tiết các đơn CRM tự lên (sheet riêng "Đơn CRM").
 //  Backend: GAS crmOrders (gas/35_CrmOrder.gs). Phạm vi xem do SERVER quyết theo cấp bậc (trả `scope`): all (admin/CEO) | dept (trưởng phòng) | team (trưởng team) | own (còn lại).
 //  Xem + ĐỔI TRẠNG THÁI/HUỶ (GAS crmOrderStatus, 4a). Tạo đơn = js/99-d-crm-order.js (bước 2/4). Kho (4c-2): hiện `stock` server trả sau khi đổi trạng thái;
-//  admin bấm "Chạy lại trừ kho" (GAS crmOrderStockRetry) cho đơn bị giữ / lúc đó kho tắt — server tự chống trừ 2 lần. In đơn = 4d (chưa làm).
+//  admin bấm "Chạy lại trừ kho" (GAS crmOrderStockRetry) cho đơn bị giữ / lúc đó kho tắt — server tự chống trừ 2 lần. In đơn (4d): nút "🖨 In đơn" mở cửa sổ phiếu đơn (_croPrintHtml) rồi gọi in.
 //  Đường đi trạng thái ở client CHỈ để hiện nút đúng; server (CRM_ORDER_FLOW_) mới là chỗ quyết định + kiểm quyền (admin hoặc người tạo).
 //  Mọi số tiền lấy từ server (đã tự tính lại), client KHÔNG tính lại tiền.
 //  Nạp SAU js/40 (registerExtraTab). Gỡ = xoá dòng <script> trong index.html + id 'crmorders' trong js/29.
@@ -98,6 +98,43 @@ async function _croStockRetry(id){
   } catch(e){ _cro.msg = '❌ Lỗi kết nối: ' + (e && e.message || e); }
   _cro.busy = false; _croRenderList();
 }
+// ── IN ĐƠN (4d): phiếu gửi theo đơn — chỉ thông tin khách cần (KHÔNG in ghi chú nội bộ, sale, nguồn, thẻ). Khổ giấy chọn ở hộp thoại in.
+function _croPrintHtml(o){
+  var E = _croEsc, money = function(v){ return _croVnd(v); }, st = String(o.status || 'Mới');
+  var addr = [o.address, o.ward, o.district, o.province].filter(function(x){ return x && String(x).trim(); }).join(', ');
+  var rows = (o.items || []).map(function(i, k){
+    return '<tr><td class="c">' + (k + 1) + '</td><td>' + E(i.name || '') + (i.code ? ' <small>[' + E(i.code) + ']</small>' : '') + (i.note ? '<br><small>' + E(i.note) + '</small>' : '') + '</td><td class="c">' + (Number(i.qty) || 0) + '</td><td class="r">' + money(i.price) + '</td><td class="r">' + money(i.amount) + '</td></tr>';
+  }).join('');
+  var line = function(l, v, b){ return '<tr' + (b ? ' class="b"' : '') + '><td>' + l + '</td><td class="r">' + v + '</td></tr>'; };
+  var sum = line('Tạm tính', money(o.gross));
+  var disc = (Number(o.itemDiscount) || 0) + (Number(o.orderDiscount) || 0); if (disc) sum += line('Giảm giá', '-' + money(disc));
+  if (Number(o.tax)) sum += line('Thuế', money(o.tax));
+  if (Number(o.pointsUsed)) sum += line('Dùng ' + Number(o.pointsUsed) + ' điểm', '-' + money(o.pointsDiscount));
+  if (Number(o.shipFee)) sum += line('Phí vận chuyển', money(o.shipFee));
+  if (Number(o.surcharge)) sum += line('Phụ thu', money(o.surcharge));
+  sum += line('Tổng cộng', money(o.total), true);
+  if (Number(o.paid)) sum += line('Đã chuyển khoản', money(o.paid));
+  sum += line('CÒN PHẢI THU', money(o.due), true);
+  var kv = function(l, v){ return v && String(v).trim() ? '<div><b>' + l + ':</b> ' + E(v) + '</div>' : ''; };
+  return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + E(o.orderId) + '</title><style>' +
+    '@page{margin:8mm}body{font:13px/1.45 Arial,Helvetica,sans-serif;color:#000;background:#fff;margin:0;padding:12px}h1{font-size:18px;margin:0}table{width:100%;border-collapse:collapse;margin-top:8px}' +
+    '.it th,.it td{border:1px solid #000;padding:4px 6px;text-align:left;vertical-align:top}.c{text-align:center!important}.r{text-align:right!important;white-space:nowrap}.sum{max-width:320px;margin-left:auto}.sum td{padding:2px 6px}.sum tr.b td{font-weight:bold;border-top:1px solid #000;font-size:14px}' +
+    '.void{border:3px solid #000;text-align:center;font-size:20px;font-weight:bold;padding:4px;margin:8px 0}.note{margin-top:10px;white-space:pre-wrap;border:1px dashed #000;padding:6px}.bar{margin-bottom:10px}@media print{.bar{display:none}body{padding:0}}</style></head><body>' +
+    '<div class="bar"><button onclick="window.print()">🖨 In</button> <button onclick="window.close()">Đóng</button></div>' +
+    '<h1>ĐƠN HÀNG ' + E(o.orderId) + '</h1><div>' + E(_croDmyHm(o.createdAt)) + '</div>' +
+    (st === 'Hủy' || st === 'Hoàn' ? '<div class="void">ĐƠN ĐÃ ' + (st === 'Hủy' ? 'HUỶ' : 'HOÀN') + ' — KHÔNG GỬI</div>' : '') +
+    '<div style="margin-top:8px">' + kv('Người nhận', o.recvName || o.custName) + kv('Điện thoại', o.recvPhone || o.phone) + kv('Địa chỉ', addr) + kv('Đơn vị vận chuyển', o.carrier) + kv('Mã vận đơn', o.shipCode) + kv('Ngày giao dự kiến', o.expectedDate) + '</div>' +
+    '<table class="it"><thead><tr><th class="c">#</th><th>Sản phẩm</th><th class="c">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<table class="sum"><tbody>' + sum + '</tbody></table>' +
+    (o.printNote ? '<div class="note"><b>Ghi chú:</b> ' + E(o.printNote) + '</div>' : '') + '</body></html>';
+}
+function _croPrint(id){
+  var o = ((_cro.data && _cro.data.orders) || []).filter(function(x){ return x.orderId === id; })[0]; if (!o) return;
+  var w = null; try { w = window.open('', '_blank'); } catch(e){}
+  if (!w){ _cro.msg = '❌ Trình duyệt đang chặn cửa sổ in — cho phép mở cửa sổ (popup) cho trang này rồi bấm lại.'; _croRenderList(); return; }
+  w.document.open(); w.document.write(_croPrintHtml(o)); w.document.close();
+  setTimeout(function(){ try { w.focus(); w.print(); } catch(e){} }, 300);
+}
 function _croStatusHtml(o){
   var cur = String(o.status || 'Mới'), next = _CRO_FLOW[cur] || [], pend = _cro.pend && _cro.pend.id === o.orderId ? _cro.pend : null;
   var h = '<div style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px"><div style="font-size:12px"><b>Trạng thái: ' + _croEsc(cur) + '</b>' +
@@ -113,7 +150,7 @@ function _croStatusHtml(o){
 }
 function _croDetailHtml(o){
   var addr = [o.address, o.ward, o.district, o.province].filter(function(x){ return x && String(x).trim(); }).join(', ');
-  var h = '<div style="padding:8px 12px 12px;border-top:1px solid var(--border);background:var(--bg2,transparent)">' + _croStatusHtml(o) + _croItemsHtml(o.items) + '<div style="margin-top:8px">' + _croMoneyHtml(o) + '</div>' +
+  var h = '<div style="padding:8px 12px 12px;border-top:1px solid var(--border);background:var(--bg2,transparent)">' + _croStatusHtml(o) + '<div style="text-align:right;margin-bottom:6px"><button class="btn sm" data-id="' + _croEsc(o.orderId) + '" onclick="_croPrint(this.dataset.id)">🖨 In đơn</button></div>' + _croItemsHtml(o.items) + '<div style="margin-top:8px">' + _croMoneyHtml(o) + '</div>' +
     '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">' +
     _croBlock('Khách hàng', _croKv('Tên', o.custName) + _croKv('SĐT', o.phone) + _croKv('Giới tính', o.gender) + _croKv('Email', o.email) + _croKv('Sinh nhật', o.birthday)) +
     _croBlock('Nhận hàng', _croKv('Người nhận', o.recvName) + _croKv('SĐT nhận', o.recvPhone) + _croKv('Địa chỉ', addr) + _croKv('Ngày dự kiến', o.expectedDate) + _croKv('ĐVVC', o.carrier) + _croKv('Mã vận đơn', o.shipCode)) +

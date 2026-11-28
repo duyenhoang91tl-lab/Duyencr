@@ -1,9 +1,9 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
-## 2026-11-28 (phiên Claude — 4d: IN ĐƠN CRM + GHI CHÚ 7c) — ĐANG LÀM (phiên này đã NHẬN 4d, phiên khác đừng làm trùng)
-- 🔧 Đang làm: nút "🖨 In đơn" trong chi tiết đơn ở `js/99-d-crm-orders.js`.
+## 2026-11-28 (phiên Claude — 4d: IN ĐƠN CRM + GHI CHÚ 7c) — XONG 4d (web, Ctrl+F5) · 7c DỪNG chờ Duyên
+- ✅ 4d: `js/99-d-crm-orders.js` nút "🖨 In đơn" trong chi tiết đơn → cửa sổ phiếu (mã đơn, người nhận, địa chỉ, vận đơn, sản phẩm + mã, tiền, CÒN PHẢI THU, "Ghi chú để in"). KHÔNG in ghi chú nội bộ/sale/nguồn/thẻ; đơn Hủy/Hoàn đóng chữ "KHÔNG GỬI". Chưa có tên/địa chỉ cửa hàng trên phiếu (chờ Duyên cho nội dung + khổ giấy). Test `tools/test-crm-order-print.js` + thử trình duyệt. Không sửa GAS.
 - ⏸ **7c chốt kỳ hoa hồng — DỪNG, cần Duyên trả lời:** sổ `CommLedger` cần MÃ ĐƠN cố định (chống trả/trừ 2 lần). `_donConvertRows_` đọc sheet "dữ liệu đơn" KHÔNG lấy cột A; đơn trong Báo cáo B chỉ có `posRow` (đổi khi nhập lại file) và mã bộ đếm trong ghi chú (đơn ghép/tách, có đơn không có). Hỏi: cột nào là mã đơn Pancake, có giữ nguyên khi nhập lại file không? Thêm lưu ý: Báo cáo B LOẠI đơn Đã hoàn/Đang hoàn khỏi `orders` → muốn trừ lại phải dò trạng thái riêng theo mã đơn.
-- ➡️ Kế tiếp: xong 4d → kiểm tra tổng → chờ Duyên trả lời 7c.
+- ➡️ Kế tiếp: Duyên trả lời 7c; (nếu cần) sửa mã SP của đơn đã lưu (xem mục 4c-2).
 
 ## 2026-11-28 (phiên Claude — 4c-2: MÃ SP Ở TẠO ĐƠN + KẾT QUẢ TRỪ KHO) — XONG 4c-2 (web)
 - ĐỀ BÀI Duyên (28/11 21:01): "Làm tiếp mấy việc đang dang dở đi". Phiên này KHÔNG đụng Đơn các kênh (js/100-*, đang có phiên khác làm B4→B8).
@@ -425,7 +425,7 @@
   | 4a | `crmOrderStatus` (Mới→Đã xác nhận→Đang giao→Đã giao; Hủy/Hoàn cần lý do, là trạng thái cuối) + 3 cột `statusAt/statusBy/statusNote` | cùng file GAS | ✅ cần deploy GAS |
   | 4b | Dùng điểm tích luỹ: 4b-1 GAS (`crmOrderSave` nhận `pointsUse`, trừ thẳng vào đơn; Hủy/Hoàn tự hoàn điểm; cột `pointsUsed/pointsDiscount`) + 4b-2 web (ô "Dùng điểm" ở Tạo đơn, hiện điểm ở Đơn CRM) — chi tiết ở mục 4b ngay trên | `gas/34_Loyalty.gs`, `gas/35_CrmOrder.gs`, `js/99-d-crm-order.js`, `js/99-d-crm-orders.js` | ✅ cần deploy GAS + Ctrl+F5 |
   | 4c | Trừ kho khi "Đã xác nhận", cộng trả khi Hủy/Hoàn (`docs/KHO-TRU-TON.md`): **4c-1 GAS ✅** (`_crmStockApply_/_crmStockReverse_`, `crmOrderStockRetry`; CẦN deploy GAS; kho mặc định off) · **4c-2 web ✅** (28/11: ô Mã SP + hiện kết quả kho + nút chạy lại) — chi tiết ở mục 4c-2 đầu file | `gas/35_CrmOrder.gs` | ✅ |
-  | 4d | In đơn (dùng `printNote`) | — | ⬜ CHƯA |
+  | 4d | In đơn (dùng `printNote`): nút "🖨 In đơn" ở tab Đơn CRM (28/11) | `js/99-d-crm-orders.js` | ✅ |
 - **QUY ƯỚC CHUNG (để các phiên không đè nhau):** (a) mỗi file js dùng 1 tiền tố hàm/biến/id RIÊNG: Tạo đơn = `_co*`/`co-*`, Đơn CRM = `_cro*`/`cro-*`, thẻ điểm = `_loy*` — file mới phải kiểm không trùng (grep hàm toàn cục ở các file js khác) — đã từng trùng `_co*` 27/11; (b) mọi sửa GAS làm ở `gas_v13.js` rồi `node tools/split-gas.js` (check: `--check`, hiện 35 file khớp); (c) sau khi thêm màu inline mới chạy `node tools/gen-dark-theme.js` (nếu quên, `test-dark-theme` đỏ); (d) trước khi push luôn `git fetch` + `git rebase origin/main` (HANDOFF.md hay xung đột: giữ CẢ HAI mục), không force-push; (e) tiền do SERVER tính, client chỉ xem trước (đã có test khớp 400 ca).
 - **DUYÊN CẦN LÀM (1 lần cho cả cụm):** chờ tab Actions `deploy-gas` xanh (hoặc dán `gas_v13.js` → New version, nhớ có file `35_CrmOrder.gs` nếu dán từng file) → Ctrl+F5 → thử: ➕ Tạo đơn (nhập SĐT, 1 sản phẩm, giảm/ship/CK như clip → Cần thu 931.000, Còn thiếu 631.000) → Lưu → 🧾 Đơn CRM thấy đơn → đổi trạng thái → kiểm sheet "Đơn CRM". Chưa kiểm trên trình duyệt thật (không có tài khoản/GAS thật ở môi trường làm việc).
 - **ĐANG LÀM:** phiên làm 4b/4c/4d (nếu có) ghi tiến độ vào mục RIÊNG phía trên mục này, đừng sửa bảng trên cho tới khi push xong bước đó rồi mới đổi ⬜ → ✅.
