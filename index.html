@@ -28,7 +28,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/00-tokens.css?v=20261114b"><!-- R1: mã thiết kế --ui-* (chỉ thêm biến, chưa đổi giao diện); PHẢI nạp trước 01-base -->
-<link rel="stylesheet" href="css/01-base.css?v=20261115g">
+<link rel="stylesheet" href="css/01-base.css?v=20261128a">
 <link rel="stylesheet" href="css/02-style.css?v=20261126a">
 </head>
 <body>
@@ -348,7 +348,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
     </div>
     <div class="sb-label">Phân loại KH</div>
     <div class="fgroup">
-      <button class="fi active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
+      <button class="fi fi-all active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
       <button class="fi" onclick="setTier('VIP',this)"><div class="fleft"><span class="fdot" style="background:#6d28d9"></span><span>VIP ≥10 đơn</span></div><span class="fbadge" id="b-vip">0</span></button>
       <button class="fi" onclick="setTier('Thân thiết',this)"><div class="fleft"><span class="fdot" style="background:#1558a8"></span><span>Thân thiết 5–9</span></div><span class="fbadge" id="b-tt">0</span></button>
       <button class="fi" onclick="setTier('Tiềm năng',this)"><div class="fleft"><span class="fdot" style="background:#b45309"></span><span>Tiềm năng T1/25+</span></div><span class="fbadge" id="b-tn">0</span></button>

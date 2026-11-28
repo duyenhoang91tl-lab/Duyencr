@@ -1,5 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — SIDEBAR: Ô "TẤT CẢ" PHÂN LOẠI KH ĐỒNG BỘ VỚI Ô "TẤT CẢ" TÌNH TRẠNG CHĂM SÓC) — XONG BƯỚC 1/1 (web css/01 + index.html)
+- ĐỀ BÀI Duyên: ô "Tất cả" ở Phân loại KH khác ô "Tất cả" ở Tình trạng chăm sóc; chọn đồng bộ theo kiểu Tình trạng chăm sóc (nền xám nhạt, chữ thường, số không tô đậm).
+- NGUYÊN NHÂN GỐC: Phân loại KH dùng class `.fi.active` (nền hồng/xanh `--green-bg`, chữ màu, số trắng trên nền đậm); Tình trạng chăm sóc dùng `.section-btn.active` (nền `--surface2`, chữ `--text`) — 2 class khác nhau nên khác kiểu.
+- ✅ ĐÃ SỬA: thêm class `fi-all` cho riêng nút Tất cả Phân loại KH (index.html) + 2 rule `.fi.fi-all.active` ở css/01-base.css cho cùng kiểu `.section-btn.active`. Các hàng VIP/Thân thiết/Tiềm năng/Chưa bán lại được và ô "Đã mua" (data-buy) GIỮ NGUYÊN (vẫn tô màu khi chọn). `index.html` css ?v=20261128a. check-health 0 lỗi.
+- ➡️ BƯỚC KẾ TIẾP: Duyên Ctrl+F5 xem. Nếu muốn cả các hàng hạng KH khi chọn cũng nền xám giống Tình trạng chăm sóc (hoặc ô "Đã mua → Tất cả"), nói để đổi `.fi.active` chung.
 ## 2026-11-28 (phiên Claude — 11 HẠNG MỤC CRM, MỤC 9: MÀN TẠO ĐƠN TỰ ĐIỀN QUYỀN LỢI THẺ) — BƯỚC 9c-2 XONG (web; Ctrl+F5; cần GAS 9c-1 đã deploy)
 - ✅ `js/99-e-crm-card-benefit.js` mới (+1 thẻ script sau js/99-d-crm-orders): màn ➕ Tạo đơn, ngay trên khối điểm `#co-loy`, hiện nhãn NGẮN khi khách có thẻ: "🏷 Thẻ VIP (mua lại) · giảm 5% (−75.000đ) · miễn ship" + nút **Áp dụng**. Bấm → điền `discType:'pct'` + `discValue` = % từng dòng (mã KHÔNG GIẢM → 0, mã TỐI ĐA 5% → 5) và tick Miễn ship (nếu đơn ≥ 1tr); "Áp dụng" THAY giảm giá dòng đang nhập. Khách chưa có thẻ → KHÔNG hiện gì (Duyên đã dặn không thêm dòng chỉ dẫn). Lỗi GAS → nhãn ngắn "Chưa tải được quyền lợi thẻ" (chi tiết ở tooltip). `crmOrderSave` KHÔNG đổi: sale vẫn có thể sửa tay các ô sau khi áp dụng.
 - Kỹ thuật: bọc `_coRender` (gắn khối) và `_coSummary` (gọi lại báo giá, debounce 0,5s); chữ ký = SĐT + (tên, SL, giá) từng dòng — KHÔNG gồm giảm giá/ship nên bấm Áp dụng không gọi lại báo giá; kết quả tải cũ bị bỏ khi đổi nhanh. KHÔNG sửa `js/99-d-crm-order.js`.
