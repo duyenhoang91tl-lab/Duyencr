@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TỔNG QUAN: TÊN NGUỒN KHÁCH / GIAI ĐOẠN BỊ CẮT) — XONG BƯỚC 1/1 (web `js/42`)
+- ĐỀ BÀI Duyên: "ô cột thì ngắn lại, tên dài ra để nhìn được tên mục biểu đồ 'Nguồn khách (đơn Pos)' trong tổng quan; các ô khác cũng nên làm tương tự".
+- NGUYÊN NHÂN GỐC: `_hsBars` (js/42) cho cột tên cố định 120px + nowrap/ellipsis (cắt "Facebook / Phạm…"), thanh cột `flex:1` chiếm hết chỗ còn lại, ô số liệu 92px nên "489 đơn" bị rớt dòng.
+- ✅ ĐÃ SỬA `js/42-fn-homesummary.js` `_hsBars`: cột tên co giãn (min 150px, xuống dòng, không cắt, vẫn có tooltip), thanh cột ngắn lại (28%, tối thiểu 56px), số liệu không rớt dòng. `_hsBars` dùng chung cho 2 thẻ (Nguồn khách + Phân bổ giai đoạn đơn) nên cả 2 đã đổi. Đã grep: không còn chỗ nào khác trong js/ dùng kiểu cột tên cố định + ellipsis. `index.html` ?v=20261128a. Đã syntax-check + thử render tên dài (không cắt).
+- 🔧 ĐANG LÀM: không còn việc code; chờ Duyên xem thật.
+- ➡️ BƯỚC KẾ TIẾP: Duyên Ctrl+F5, xem Tổng quan → thẻ Nguồn khách. Nếu còn ô/biểu đồ khác bị cắt tên (ở tab nào), gửi ảnh để chỉnh tiếp.
+
 ## 2026-11-28 (phiên Claude — CRM DỄ DÙNG: GỠ CÁC DÒNG CHỈ DẪN DO PHIÊN TRƯỚC THÊM) — XONG (chỉ web; Duyên Ctrl+F5)
 - ĐỀ BÀI Duyên (gửi lại): "trình bày CRM ai không biết dùng cũng dùng được, KHÔNG cần thêm mấy dòng chỉ dẫn; mình mới update giao diện mới rồi hãy làm tiếp". Một phiên khác ĐÃ làm 5/5 bước dễ dùng (mục ngay bên dưới) → KHÔNG làm lại.
 - ĐÃ LÀM: gỡ các câu giải thích mà các phiên trước (Chia data + Pancake) đã thêm, giữ nhãn ngắn tự nói lên ý nghĩa. `js/07` (Chia data): bỏ 3 dòng hướng dẫn nhỏ (nguồn người nhận / gõ tên để tìm / bấm chọn Team), bỏ chú thích dài của "Phòng ban Sale" và tooltip nút "Tạo nhanh Team", rút câu trạng thái rỗng còn "Chưa có Team nào / tài khoản nào / phòng ban nào". `js/09` (xem trước file Pancake gộp ngày): đoạn 3 dòng → 1 dòng ngắn "✓ Có số liệu từng ngày" hoặc "≈ Không có số từng ngày — chia đều". Logic KHÔNG đổi. `index.html` ?v=20261128b cho js/07 + js/09. Test assign/pk/team xanh, check-health 0 lỗi.
