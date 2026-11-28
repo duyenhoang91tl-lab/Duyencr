@@ -10,6 +10,8 @@ const SRC = fs.readFileSync(path.join(root, 'js/79-mascot-samoyed.js'), 'utf8');
 function makeEnv(opts) {
   opts = opts || {};
   const store = Object.assign({}, opts.ls || {});
+  // Mặc định mới: điện thoại (≤640px) CHƯA từng chọn → tắt. Các ca cũ kiểm cảnh ở bề rộng điện thoại = người dùng đã bật ('1'); ca mặc định dùng opts.fresh = true.
+  if (opts.w && opts.w <= 640 && !opts.fresh && !('ome_mascot' in store)) store.ome_mascot = '1';
   const calls = { draw: 0, clear: 0, raf: 0, text: 0, texts: [] };
   const ctx = new Proxy({}, { get(t, k) {
     if (k === 'clearRect') return () => { calls.clear++; };
@@ -298,7 +300,7 @@ ok(e.els.length === 1, 'nạp lại không nhân đôi canvas');
 
 // 9) Nối đúng vào menu / trang cấu hình / index.html
 const sn = fs.readFileSync(path.join(root, 'js/29-sidenav.js'), 'utf8');
-ok(/'act:sakura','act:mascot','act:garden','act:errlog'/.test(sn), 'menu Settings có act:mascot + act:garden');
+ok(/k:'ui',[^\n]*ids:\[[^\]]*'act:mascot','act:garden'/.test(sn), 'menu nhóm Giao diện & trợ giúp (k ui) có act:mascot + act:garden');
 const gLine = sn.split('\n').find(l => /^\s*garden:\s*\{/.test(l)) || '';
 ok(/f:'toggleGarden'/.test(gLine) && /open:true/.test(gLine) && !/admin:true/.test(gLine), 'ACTS.garden gọi toggleGarden, mọi vai trò');
 const mLine = sn.split('\n').find(l => /^\s*mascot:\s*\{/.test(l)) || '';
@@ -354,4 +356,20 @@ ok(ix.indexOf('js/66-sakura-petals.js') < ix.indexOf('js/79-mascot-samoyed.js') 
   for (let i = 0; i < 20; i++) eg.step(1000 + (i + 1) * 100);
   ok(gg.dragonflies.map(d => d.x + ',' + d.y).join('|') === x0, 'tắt vườn → chuồn chuồn đứng yên (không cập nhật)');
 }
+
+// 8) Mặc định theo thiết bị: điện thoại (≤640px) chưa từng chọn → TẮT (không canvas, không rAF); máy tính → bật; đã chọn thì theo lựa chọn
+e = makeEnv({ w: 390, fresh: true });
+ok(e.win._mascotIsOn() === false && e.els.length === 0 && e.calls.raf === 0, 'điện thoại chưa chọn → mặc định TẮT (không canvas, không rAF)');
+ok(e.win._mascotLabel() === '🐶 Bật linh vật Samoyed', 'điện thoại mặc định tắt → nhãn nút là "Bật"');
+e.win.toggleMascot();
+ok(e.store.ome_mascot === '1' && e.win._mascotIsOn() === true, 'điện thoại bấm "Bật" → lưu ome_mascot=1 và bật');
+e = makeEnv({ w: 390, ls: { ome_mascot: '1' } });
+ok(e.win._mascotIsOn() === true && e.els.length > 0, 'điện thoại đã chủ động bật → vẫn bật');
+e = makeEnv({ w: 640, fresh: true });
+ok(e.win._mascotIsOn() === false, 'đúng 640px vẫn tính là điện thoại → tắt');
+e = makeEnv({ w: 641, fresh: true });
+ok(e.win._mascotIsOn() === true, '641px trở lên chưa chọn → bật như cũ');
+e = makeEnv({ fresh: true });
+ok(e.win._mascotIsOn() === true && e.els.length > 0, 'máy tính chưa chọn → mặc định bật như cũ');
+
 console.log('PASS', pass, 'FAIL', fail); process.exit(fail ? 1 : 0);

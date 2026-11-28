@@ -2,7 +2,7 @@
 // Chạy: node tools/test-base-check-report.js
 const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../js/11-fn-srload.js', 'utf8');
-const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srBcOrders_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcIsLech_', '_srBcBuild_', '_srBcCheckRows_', '_srBaseCheckPanelHtml_'];
+const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srBcOrders_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcCause_', '_srBcIsLech_', '_srBcBuild_', '_srBcCheckRows_', '_srBaseCheckPanelHtml_'];
 let code = "var _SR_BC_LIM_=100; var _srState={}; function _srBcEditCellHtml_(){ return ''; } function _custLinkHtml_(p, h){ return h; } var _SR_UNASSIGNED_='(chưa gán sale)'; function fmt(n){return (n||0).toLocaleString('vi-VN');} function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');} function _srMoney(n){return fmt(Math.round(n||0))+'đ';}\n";
 for (const n of names) {
   const i = src.indexOf('function ' + n + '(');

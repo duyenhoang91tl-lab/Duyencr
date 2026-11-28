@@ -11,7 +11,16 @@
 .rf-table-wrap{overflow-x:auto;max-width:100%}
 .rf-body,.rf-after{min-width:0}
 .rf-state{padding:var(--ui-sp-8) var(--ui-sp-4);text-align:center;color:var(--muted);font-size:var(--ui-fs-md)}
-.rf-loading,.rf-empty{font-style:italic}
+.rf-empty{font-style:italic}
+/* Trạng thái tải: vòng xoay + khung xương mờ thay cho dòng chữ nghiêng đơn điệu (giữ nguyên class + chữ "Đang tải…" nên test khung báo cáo không đổi) */
+.rf-loading{font-style:normal}
+.rf-loading::before{content:"";display:block;width:26px;height:26px;margin:0 auto 10px;border:3px solid var(--ui-border);border-top-color:var(--ui-brand);border-radius:50%;animation:rf-spin .8s linear infinite}
+.rf-loading::after{content:"";display:block;max-width:560px;height:96px;margin:18px auto 0;border-radius:10px;background:linear-gradient(90deg,var(--ui-border) 25%,var(--ui-brand-soft) 50%,var(--ui-border) 75%);background-size:200% 100%;opacity:.55;animation:rf-shimmer 1.4s ease-in-out infinite}
+/* Trạng thái trống: biểu tượng + chữ rõ hơn, dễ nhận ra là "không có dữ liệu" chứ không phải lỗi */
+.rf-empty::before{content:"📭";display:block;font-size:30px;line-height:1;margin-bottom:8px;opacity:.65;font-style:normal}
+@keyframes rf-spin{to{transform:rotate(360deg)}}
+@keyframes rf-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.rf-loading::before,.rf-loading::after{animation:none}}
 .rf-export-btn{white-space:nowrap}
 .rf-error{display:flex;flex-direction:column;align-items:center;gap:var(--ui-sp-3);color:var(--ui-danger)}
 .rf-export{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--ui-sp-2)}

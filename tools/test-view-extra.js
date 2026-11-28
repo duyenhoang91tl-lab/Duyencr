@@ -27,18 +27,19 @@ vm.runInContext("var _VIEW_EXTRA_SALE_KEYS_ = { online: 1, offline: 1 }; var __v
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const names = r => Object.keys(r || {}).sort().join('|');
 
+// 2026-11-26 (commit 34eb476): pham vi gom them TEN DANG NHAP cua chinh tai khoan (data chia ghi theo ten dang nhap van phai thay) -> ten mong doi co 'hoa'/'tan'/'quynh'.
 // 1) Sale Online (cs) -> ten minh + 2 nguoi nhom Quay + 2 nguoi phong CSKH
 let u = { username: 'hoa', role: 'cs', name: 'Hoa Online', names: ['Hoa Online'] };
-ok(names(ctx._scopeAllowedNames_(u)) === ['Hoa Online', 'Lan Quầy', 'Minh Quầy', 'Mến CS', 'Quỳnh CS'].sort().join('|'), 'sale Online: ten minh + nhom Quay + phong CSKH');
+ok(names(ctx._scopeAllowedNames_(u)) === ['Hoa Online', 'hoa', 'Lan Quầy', 'Minh Quầy', 'Mến CS', 'Quỳnh CS'].sort().join('|'), 'sale Online: ten minh + nhom Quay + phong CSKH');
 // 2) Sale Van phong (leader, khong co ten team) -> cung duoc them
 u = { username: 'nam', role: 'leader', name: 'Nam Văn Phòng', names: ['Nam Văn Phòng'] };
 ok(ctx._scopeAllowedNames_(u)['Lan Quầy'] === 1 && ctx._scopeAllowedNames_(u)['Quỳnh CS'] === 1, 'sale Van phong (leader): thay Quay + CSKH');
 // 3) Sale "Thu viec" KHONG thuoc Online/Van phong -> khong them
 u = { username: 'tan', role: 'cs', name: 'Tân Thử Việc', names: ['Tân Thử Việc'] };
-ok(names(ctx._scopeAllowedNames_(u)) === 'Tân Thử Việc', 'sale Thu viec: giu nguyen, chi ten minh');
+ok(names(ctx._scopeAllowedNames_(u)) === ['Tân Thử Việc', 'tan'].sort().join('|'), 'sale Thu viec: giu nguyen, chi ten minh');
 // 4) Nhan vien CSKH (khong phai sale Online/Van phong) -> khong them
 u = { username: 'quynh', role: 'cs', name: 'Quỳnh CS', names: ['Quỳnh CS'] };
-ok(names(ctx._scopeAllowedNames_(u)) === 'Quỳnh CS', 'nhan vien CSKH: chi ten minh');
+ok(names(ctx._scopeAllowedNames_(u)) === ['Quỳnh CS', 'quynh'].sort().join('|'), 'nhan vien CSKH: chi ten minh');
 // 5) admin / viewer: khong gioi han (null) nhu cu
 ok(ctx._scopeAllowedNames_({ username: 'ad', role: 'admin', name: 'Ad' }) === null, 'admin: null (khong gioi han)');
 // 6) tai khoan chua co ten trong saleChannels nhung cot saleType = online
@@ -53,7 +54,7 @@ ok(ctx._viewExtraNames_({ username: 'hoa', name: 'Hoa Online', names: ['Hoa Onli
 settings.saleGroups = [{ key: 'online', label: 'Online' }]; settings.saleChannels = { 'Hoa Online': 'online' };
 depts.length = 0; depts.push({ key: 'sale', label: 'Sale' });
 vm.runInContext('__viewExtraMemo_ = {}; __viewExtraShared_ = null;', ctx);
-ok(names(ctx._scopeAllowedNames_({ username: 'hoa', role: 'cs', name: 'Hoa Online', names: ['Hoa Online'] })) === 'Hoa Online', 'chua cau hinh Quay/CSKH: khong them gi');
+ok(names(ctx._scopeAllowedNames_({ username: 'hoa', role: 'cs', name: 'Hoa Online', names: ['Hoa Online'] })) === ['Hoa Online', 'hoa'].sort().join('|'), 'chua cau hinh Quay/CSKH: khong them gi');
 
 // 9) _usersForClient_(full) tra viewNames (de pullUsers/_findAccount cua web giu dung sau khi tai lai trang); khong full thi KHONG tra
 vm.runInContext('__viewExtraMemo_ = {}; __viewExtraShared_ = null;', ctx);

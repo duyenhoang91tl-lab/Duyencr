@@ -887,6 +887,26 @@ function _dbRender(){
   wrap.innerHTML = html;
 }
 
+// Bang "Ty le chot theo ngay" (buoc 4b Pancake gop thang): d.byDay do GAS tra (buoc 4a). est: 0 = so that, 1 = rai theo so lieu ngay that cua Page, 2 = chia deu tu file gop thang.
+// GAS cu chua co byDay -> tra '' (khong hien gi, khong loi). Ngay uoc tinh co nhan va dau "~" de nguoi xem khong nham la so that.
+function _pkEstLabel_(est){ return est >= 2 ? 'chia đều (file gộp tháng)' : est === 1 ? 'rải theo số liệu ngày thật của Page' : ''; }
+function _pkDayTableHtml_(d){
+  if (!d || !d.byDay || !d.byDay.length) return '';
+  var tt = 0, dh = 0, anyEst = false;
+  var html = '<div class="dash-section-title" style="margin-top:16px">Tỷ lệ chốt theo ngày</div>'+
+    '<table class="dash-table"><thead><tr><th>Ngày</th><th style="text-align:right">Tổng TT</th><th style="text-align:right">Đơn chốt</th><th style="text-align:right">Tỉ lệ CĐ</th><th>Nguồn số</th></tr></thead><tbody>';
+  d.byDay.forEach(function(r){
+    tt += r.tongTT || 0; dh += r.tongDH || 0; if (r.est) anyEst = true;
+    var lb = _pkEstLabel_(r.est);
+    html += '<tr><td>'+esc(r.date)+'</td><td style="text-align:right">'+(r.est?'~':'')+fmt(r.tongTT)+'</td><td style="text-align:right">'+(r.est?'~':'')+fmt(r.tongDH)+'</td><td style="text-align:right">'+(r.est?'~':'')+(r.tyLeCD||0)+'%</td>'+
+      '<td style="font-size:11px;color:'+(r.est?'#9a3412':'var(--muted)')+'">'+(lb ? '⚠ ước tính — '+esc(lb) : 'số thật')+'</td></tr>';
+  });
+  html += '<tr style="font-weight:700"><td>Tổng</td><td style="text-align:right">'+fmt(Math.round(tt*100)/100)+'</td><td style="text-align:right">'+fmt(Math.round(dh*100)/100)+'</td><td style="text-align:right">'+(tt?Math.round(dh/tt*1000)/10:0)+'%</td><td></td></tr>';
+  html += '</tbody></table>';
+  if (anyEst) html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">~ = số ước tính từ file Pancake tải gộp nhiều ngày; tổng cả khoảng vẫn đúng với file gốc. Tải file từng ngày để có số thật.</div>';
+  return html;
+}
+
 function _pkRenderReportHtml(){
   var d = _pkState.report;
   if (!d) return '';
@@ -917,6 +937,7 @@ function _pkRenderReportHtml(){
   });
   if (!d.byCS.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu trong khoảng ngày này</td></tr>';
   html += '</tbody></table>';
+  html += _pkDayTableHtml_(d);
   return html;
 }
 
@@ -929,6 +950,11 @@ function _pkExportReport(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byPageRows), 'Theo Page');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byCSRows), 'Theo CS');
+  if (d.byDay && d.byDay.length){
+    var byDayRows = [['Ngày','Tổng TT','Đơn chốt','Tỉ lệ CĐ (%)','Nguồn số']];
+    d.byDay.forEach(function(r){ byDayRows.push([r.date, r.tongTT, r.tongDH, r.tyLeCD, r.est ? 'Ước tính — ' + _pkEstLabel_(r.est) : 'Số thật']); });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byDayRows), 'Theo ngày');
+  }
   XLSX.writeFile(wb, 'BaoCaoPancake_'+_pkState.from+'_'+_pkState.to+'.xlsx');
 }
 
@@ -1326,7 +1352,7 @@ function _srCachePut_(key, txt){
   if (ks.length > _SR_CACHE_MAX_) { ks.sort(function(a, b){ return _srCache_[a].t - _srCache_[b].t; }); while (ks.length > _SR_CACHE_MAX_) delete _srCache_[ks.shift()]; }
 }
 // Lay TEXT (co cache/dung chung). Tra {txt} khi co du lieu, {err} khi loi mang/HTTP (loi duoc ghi vao lastFetchError boi _srFetch).
-async function _srFetchText_(url, cacheKey, useCache){
+async function _srFetchText_(url, cacheKey, useCache, timeoutMs){
   if (useCache && cacheKey) {
     var hit = _srCache_[cacheKey];
     if (hit && Date.now() - hit.t < _SR_CACHE_TTL_) return { txt: hit.txt, cached: true };
@@ -1334,7 +1360,7 @@ async function _srFetchText_(url, cacheKey, useCache){
   if (cacheKey && _srInflight_[cacheKey]) return _srInflight_[cacheKey];
   var job = (async function(){
     var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
+    var timer = ac ? setTimeout(function(){ ac.abort(); }, timeoutMs > 0 ? timeoutMs : 55000) : null;
     try {
       var r = await fetch(url, { redirect:'follow', signal: ac ? ac.signal : undefined });
       if (timer) clearTimeout(timer);
@@ -1348,7 +1374,8 @@ async function _srFetchText_(url, cacheKey, useCache){
   if (cacheKey) { _srInflight_[cacheKey] = job; var clr = function(){ if (_srInflight_[cacheKey] === job) delete _srInflight_[cacheKey]; }; job.then(clr, clr); }
   return job;
 }
-async function _srFetch(action, params, useCache){
+// timeoutMs (tuy chon): bao cao NANG (G goi salesReportB keo them 30 ngay Pos) can cho lau hon mac dinh 55s; GAS toi da 6 phut va CACHE ket qua 120s nen cho them la dung.
+async function _srFetch(action, params, useCache, timeoutMs){
   if (!gsUrl) return null;
   _srState.lastFetchError = '';
   var sep = gsUrl.includes('?') ? '&' : '?';
@@ -1357,7 +1384,7 @@ async function _srFetch(action, params, useCache){
   var cacheable = !!_SR_CACHE_ACTIONS_[action] && !(params && params.fresh);
   var cacheKey = cacheable ? url : '';
   try{
-    var got = await _srFetchText_(url, cacheKey, useCache === true && cacheable);
+    var got = await _srFetchText_(url, cacheKey, useCache === true && cacheable, timeoutMs);
     if (got.netErr) throw got.netErr;
     if (got.httpErr) {
       _srState.lastFetchError = 'Server trả về lỗi HTTP ' + got.httpErr + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
@@ -1386,7 +1413,7 @@ async function _srFetch(action, params, useCache){
     }
   } catch(e) {
     _srState.lastFetchError = (e && e.name === 'AbortError')
-      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
+      ? 'Yêu cầu quá ' + Math.round((timeoutMs > 0 ? timeoutMs : 55000) / 1000) + ' giây chưa có phản hồi nên đã huỷ — ' + ((!params.dateFrom && !params.dateTo && params.dateFrom !== undefined) ? 'bạn đang xem TẤT CẢ thời gian (chưa chọn ngày), hãy chọn "Tháng này" hoặc từng tháng một.' : 'khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.')
       : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
     return null;
   }

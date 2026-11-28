@@ -34,15 +34,18 @@
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
-    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','care2','stageboard','combo','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
+    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','taodon','crmorders','care2','stageboard','combo','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat','tab-media','plib'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
-    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','topsp','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
+    { k:'rp',  t:'📊 Báo cáo',              ids:['dailybrief','dashboard','salesreport','topsp','pancake','kpipancake','mktchecklist','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist','act:leadassign','act:leadreport'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:pancakemap','act:ordersale','act:splitextra','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:sakura','act:mascot','act:garden','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
+    // 🎨 Giao diện & trợ giúp: tuỳ chọn CÁ NHÂN dùng được ở mọi vai trò, tách khỏi ⚙ Settings (chỉ còn cấu hình quản trị) để người mới không phải lục trong 17 mục.
+    // PHẢI đứng TRƯỚC 'st': mục chưa khai báo dồn vào nhóm CUỐI ("Khác", xem gOf) nên Settings phải luôn là nhóm cuối.
+    { k:'ui',  t:'🎨 Giao diện & trợ giúp',  ids:['act:theme','act:help','act:sakura','act:mascot','act:garden'] },
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {

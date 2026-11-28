@@ -192,8 +192,28 @@ function switchDpTab(tab, el) {
   else body.innerHTML = renderInfoTab(c);
 }
 
-function _csPickList_(customers, teamsArr, isAdmin){
+// Tên CS lấy từ TÀI KHOẢN CRM (đúng tên mà _assignAcctEntries / Chia data dùng: names[0] → name → username) + tài khoản đang đăng nhập.
+// NGUYÊN NHÂN GỐC ô "CS chăm sóc" báo "Không tìm thấy CS": danh sách chỉ gồm CS có trong ĐƠN (+ team nếu là admin) nên CS vừa được tạo tài khoản,
+// chưa có đơn nào, không thấy tên mình để chọn dù Chia data đã chia cho đúng tên đó. Bỏ tài khoản khóa / chỉ xem / tên toàn số.
+function _csAccountNames_(){
+  const out = [];
+  try {
+    ((typeof accounts !== 'undefined' && accounts) ? accounts : []).forEach(a => {
+      if (!a || a.active === false) return;
+      const base = (typeof _roleBaseOf === 'function') ? _roleBaseOf(a.role) : a.role;
+      if (base === 'viewer') return;
+      const nm = String(((a.names && a.names.length) ? a.names[0] : (a.name || a.username)) || '').trim();
+      if (nm && !/^\d+$/.test(nm)) out.push(nm);
+    });
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'viewer' && currentUser.role !== 'admin') {
+      [currentUser.name].concat(currentUser.names || []).forEach(n => { n = String(n || '').trim(); if (n && !/^\d+$/.test(n)) out.push(n); });
+    }
+  } catch (e) {}
+  return out;
+}
+function _csPickList_(customers, teamsArr, isAdmin, extraNames){
   const set = new Set();
+  (extraNames || []).forEach(n => { n = String(n || '').trim(); if (n) set.add(n); });
   (customers || []).forEach(x => (x.orders || []).forEach(o => { if (o && o.cs) set.add(String(o.cs).trim()); }));
   if (isAdmin) (teamsArr || []).forEach(t => { [t && t.leader].concat((t && t.members) || []).forEach(n => { n = String(n || '').trim(); if (n) set.add(n); }); });
   set.delete('');
@@ -203,7 +223,8 @@ function renderCareTab(c) {
   const care = careData[c.phone] || {};
   // Danh sách CS để chọn: CS đã có trong đơn + (admin) mọi thành viên/trưởng nhóm các Team. NGUYÊN NHÂN GỐC thêm: trước đây chỉ lấy CS xuất hiện trong ĐƠN
   // nên CS mới (chưa có đơn nào) không chọn được -> admin không chia được KH cho họ ở hồ sơ khách.
-  const allCS = _csPickList_(allCustomers, (typeof teams !== 'undefined' ? teams : []), (typeof currentUser === 'undefined' || !currentUser || currentUser.role === 'admin'))   // cùng quy ước admin với nút Xóa đơn bên dưới;
+  const allCS = _csPickList_(allCustomers, (typeof teams !== 'undefined' ? teams : []), (typeof currentUser === 'undefined' || !currentUser || currentUser.role === 'admin'),   // cùng quy ước admin với nút Xóa đơn bên dưới
+    _csAccountNames_().concat([(careData[c.phone] || {}).cs, c.careCS]));   // + tên tài khoản CRM + CS đang gán (để không bị mất khi không còn trong đơn)
   const today = _ymd(new Date());
   // MENU gập (yêu cầu Duyên 2026-10-11): "Thông tin chăm sóc" + "Lịch chăm sóc nhanh" là 2 mục của 1 menu, chỉ mở 1 mục một lúc (dpAccToggle)
   const _schedCnt = [care.schedGoi, care.schedSP, care.schedCS, care.schedHen].filter(Boolean).length;
@@ -1049,7 +1070,7 @@ function pushOrderCareCS(phone, careCS){
   if (!gsUrl || !phone) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
     body: JSON.stringify({ action:'setOrderCareCS', phone:String(phone), careCS:careCS||'' }) })
-    .catch(function(){});
+    .then(_writeCheck_('CS chăm sóc của đơn (SĐT ' + phone + ')')).catch(_writeCatch_('CS chăm sóc của đơn (SĐT ' + phone + ')'));   // 26/11: trước đây .catch rỗng nuốt lỗi
 }
 
 // ── Ô "CS chăm sóc" trong panel: gõ tên để tìm rồi chọn ──

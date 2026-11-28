@@ -28,8 +28,8 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/00-tokens.css?v=20261114b"><!-- R1: mã thiết kế --ui-* (chỉ thêm biến, chưa đổi giao diện); PHẢI nạp trước 01-base -->
-<link rel="stylesheet" href="css/01-base.css?v=20261115g">
-<link rel="stylesheet" href="css/02-style.css">
+<link rel="stylesheet" href="css/01-base.css?v=20261128a">
+<link rel="stylesheet" href="css/02-style.css?v=20261126a">
 </head>
 <body>
 <div id="boot-splash"><i></i><span>Đang mở CRM…</span><small>Lần đầu có thể mất vài giây</small></div>
@@ -348,7 +348,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
     </div>
     <div class="sb-label">Phân loại KH</div>
     <div class="fgroup">
-      <button class="fi active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
+      <button class="fi fi-all active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
       <button class="fi" onclick="setTier('VIP',this)"><div class="fleft"><span class="fdot" style="background:#6d28d9"></span><span>VIP ≥10 đơn</span></div><span class="fbadge" id="b-vip">0</span></button>
       <button class="fi" onclick="setTier('Thân thiết',this)"><div class="fleft"><span class="fdot" style="background:#1558a8"></span><span>Thân thiết 5–9</span></div><span class="fbadge" id="b-tt">0</span></button>
       <button class="fi" onclick="setTier('Tiềm năng',this)"><div class="fleft"><span class="fdot" style="background:#b45309"></span><span>Tiềm năng T1/25+</span></div><span class="fbadge" id="b-tn">0</span></button>
@@ -616,7 +616,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="table-wrap">
         <table id="main-table">
           <thead><tr>
-            <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" title="Nhấn ▼ để lọc · Nhấn ↕ để sắp xếp mới nhất/xa nhất"><div class="th-inner" onclick="openColDropdown('lastpos',event)">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div><span id="lastpos-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();toggleLastPosSort()" title="Sắp xếp theo ngày mua gần nhất">↕</span></th>
+            <th class="filterable col-lastpos" id="th-lastpos" title="Nhấn ▼ để lọc · Nhấn ↕ để sắp xếp mới nhất/xa nhất"><div class="th-inner" onclick="openColDropdown('lastpos',event)">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div><span id="lastpos-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();toggleLastPosSort()" title="Sắp xếp theo ngày mua gần nhất">↕</span></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-hang" id="th-hang"><div class="th-inner"><span id="hang-label-btn" onclick="openTierTooltip(event,'hang-tooltip')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân hạng">Phân hạng KH</span> <span class="th-filter-icon" onclick="openColDropdown('hang',event)" style="cursor:pointer">▼</span></div></th>
@@ -976,12 +976,14 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
+<script src="js/96-ui-dialogs.js?v=20261127a"></script><!-- hop thoai thong nhat: ghi de window.alert (khong chan, xep hang, Esc/Enter dong); lui ve cu: localStorage ome_native_alert=1 -->
+<script src="js/97-write-guard.js?v=20261126a"></script>
 <script src="js/01-fn-splitmulti.js?v=20261126b"></script>
 <script src="js/02-fn-showrowerrorbanner.js?v=20261126b"></script>
-<script src="js/03-fn-refreshopendptab.js?v=20261126a"></script>
+<script src="js/03-fn-refreshopendptab.js?v=20261126b"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261117a"></script>
 <script src="js/05-fn-saveeditphone.js?v=20261116a"></script>
-<script src="js/06-main-renew-sources.js?v=20261115e"></script>
+<script src="js/06-main-renew-sources.js?v=20261128c"></script>
 
 <!-- ASSIGN DATA MODAL -->
 <div class="assign-modal-overlay" id="assign-modal">
@@ -1008,7 +1010,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <div id="reminder-panel" class="reminder-panel" style="display:none"></div>
 <button id="reminder-bell" class="reminder-bell" type="button" style="display:none" onclick="toggleReminderPanel()" title="Xem nhắc hẹn">🔔<span class="rb-count">0</span></button>
 
-<script src="js/07-openassignmodal.js?v=20261126b"></script>
+<script src="js/07-openassignmodal.js?v=20261128b"></script>
 
 
 <!-- ════════════ V9: ROLE MODAL ════════════ -->
@@ -1058,14 +1060,14 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js?v=20261126c"></script>
-<script src="js/09-fn-deleteteam.js?v=20261120b"></script>
-<script src="js/10-fn-pkkpipct.js?v=20261126a"></script>
-<script src="js/11-fn-srload.js?v=20261125a"></script>
-<script src="js/12-fn-rendersalesreporttabe.js?v=20261115g"></script>
-<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261126a"></script>
-<script src="js/14-fn-aasplit.js?v=20261126a"></script>
-<script src="js/15-fn-hidelogin.js?v=20261126b"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261127a"></script>
+<script src="js/09-fn-deleteteam.js?v=20261128b"></script>
+<script src="js/10-fn-pkkpipct.js?v=20261127a"></script>
+<script src="js/11-fn-srload.js?v=20261128c"></script>
+<script src="js/12-fn-rendersalesreporttabe.js?v=20261127a"></script>
+<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261127a"></script>
+<script src="js/14-fn-aasplit.js?v=20261128c"></script>
+<script src="js/15-fn-hidelogin.js?v=20261127b"></script>
 <script src="js/16-main-currentuser.js?v=20261121a"></script>
 
 <!-- CARE STATUS MANAGER MODAL -->
@@ -1106,9 +1108,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/17-opencarestatusmodal.js"></script>
+<script src="js/17-opencarestatusmodal.js?v=20261126a"></script>
 
-<link rel="stylesheet" href="css/03-style.css">
+<link rel="stylesheet" href="css/03-style.css?v=20261126a">
 
 
 <!-- ── TRẠNG THÁI KH MANAGER MODAL ── -->
@@ -1267,38 +1269,38 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<link rel="stylesheet" href="css/04-style.css">
+<link rel="stylesheet" href="css/04-style.css?v=20261126a">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261115g">
-<link rel="stylesheet" href="css/06-pro.css?v=20261119a">
+<link rel="stylesheet" href="css/06-pro.css?v=20261128a">
 <link rel="stylesheet" href="css/07-teamchat.css?v=20261115g">
 <link rel="stylesheet" href="css/08-kho.css?v=20261115g">
-<link rel="stylesheet" href="css/09-profile.css">
+<link rel="stylesheet" href="css/09-profile.css?v=20261127a">
 <link rel="stylesheet" href="css/10-medialib.css?v=20261115g">
 <link rel="stylesheet" href="css/10-filter-presets.css?v=20261115g">
 <link rel="stylesheet" href="css/10-dark.css?v=20261113a">
 <link rel="stylesheet" href="css/11-roles.css?v=20261115g">
 <link rel="stylesheet" href="css/12-salematch.css?v=20261115g">
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
-<link rel="stylesheet" href="css/14-qrpills.css">
-<link rel="stylesheet" href="css/15-mobile.css">
-<link rel="stylesheet" href="css/16-mobile-list.css?v=20261126b">
-<link rel="stylesheet" href="css/17-reports-pro.css?v=20261103b">
+<link rel="stylesheet" href="css/14-qrpills.css?v=20261126a">
+<link rel="stylesheet" href="css/15-mobile.css?v=20261126a">
+<link rel="stylesheet" href="css/16-mobile-list.css?v=20261128a">
+<link rel="stylesheet" href="css/17-reports-pro.css?v=20261128a">
 <link rel="stylesheet" href="css/18-list-pro.css?v=20261103a">
 <link rel="stylesheet" href="css/19-theme-sunset.css?v=20261105b"><!-- bảng màu hồng hoàng hôn (chỉ chế độ sáng); gỡ = xoá dòng này -->
-<link rel="stylesheet" href="css/20-kit.css?v=20261115a"><!-- R2: bộ thành phần ui-* (khung Hoàng hôn + màu đổ nhẹ); nạp SAU theme hoàng hôn, TRƯỚC 99-dark-auto -->
+<link rel="stylesheet" href="css/20-kit.css?v=20261128a"><!-- R2: bộ thành phần ui-* (khung Hoàng hôn + màu đổ nhẹ); nạp SAU theme hoàng hôn, TRƯỚC 99-dark-auto -->
 <link rel="stylesheet" href="css/21-task-board.css?v=20261115a"><!-- R6a: bảng công việc dạng cột (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/22-sched-calendar.css?v=20261115a"><!-- R6b: lịch tuần/ngày (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/23-overdue-bulk.css?v=20261115a"><!-- R6c-1: Quá hạn chọn nhiều + dời hàng loạt (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/24-cs-leave.css?v=20261115g"><!-- R6c-2: form nghỉ phép + xem trước giao khách (chỉ var(--ui-*)) -->
-<link rel="stylesheet" href="css/25-report-frame.css?v=20261115e"><!-- R7a: khuôn chung báo cáo (chỉ var(--ui-*)) -->
+<link rel="stylesheet" href="css/25-report-frame.css?v=20261128a"><!-- R7a: khuôn chung báo cáo (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/26-lead-score.css?v=20261115c"><!-- R8b: thanh đang lọc theo mức khách (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/27-settings-hub.css?v=20261115f"><!-- R9a: trung tâm lối tắt cài đặt (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/28-cust-select.css?v=20261116b"><!-- R5a: chọn nhiều khách (chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/29-kh-sb-toggle.css?v=20261116a"><!-- ẩn/hiện cột lọc Danh sách KH (js/85; chỉ var(--ui-*)) -->
 <link rel="stylesheet" href="css/30-cust-dup.css?v=20261117a"><!-- R5d bước 1: bảng xem khách trùng SĐT (js/87; chỉ var(--ui-*)) -->
-<link rel="stylesheet" href="css/99-dark-auto.css?v=20261116a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
+<link rel="stylesheet" href="css/99-dark-auto.css?v=20261128a"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
-<script src="js/18-openkhstatusmodal.js"></script>
+<script src="js/18-openkhstatusmodal.js?v=20261126a"></script>
 
 
 <!-- ── HANG TOOLTIP (Phân hạng KH theo doanh thu) ── -->
@@ -1399,7 +1401,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 
-<script src="js/19-opentiertooltip.js"></script>
+<script src="js/19-opentiertooltip.js?v=20261126a"></script>
 
 <script src="js/20-loadaiexamples.js?v=20261115f"></script>
 
@@ -1452,7 +1454,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 
-<script src="js/21-openbroadcastcompose.js"></script>
+<script src="js/21-openbroadcastcompose.js?v=20261126a"></script>
 
 <!-- ═══ MẪU TIN HỎI THĂM TỰ ĐỘNG (FollowUpTemplates) ═══ -->
 <div class="modal-overlay" id="futpl-modal" style="z-index:2600">
@@ -1492,7 +1494,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/22-fumycs.js"></script>
+<script src="js/22-fumycs.js?v=20261126a"></script>
 
 <!-- ═══ XÓA ĐƠN TRÙNG (DuplicateOrders) ═══ -->
 <div class="modal-overlay" id="dup-orders-modal" style="z-index:2600">
@@ -1569,7 +1571,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/24-openbctmodal.js"></script>
+<script src="js/24-openbctmodal.js?v=20261126a"></script>
 
 <!-- ═══ THỐNG KÊ CHIẾN DỊCH GỬI HÀNG LOẠT ═══ -->
 <div class="modal-overlay" id="bcstat-modal" style="z-index:2600">
@@ -1604,7 +1606,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
   </div>
 </div>
 </div>
-<script src="js/25-openbcstatmodal.js"></script>
+<script src="js/25-openbcstatmodal.js?v=20261126a"></script>
 
 <!-- ═══ LOG GỬI TN CHIẾN DỊCH CỦA 1 KHÁCH ═══ -->
 <div class="modal-overlay" id="bclog-modal" style="z-index:2700">
@@ -1782,28 +1784,28 @@ function openBcLogModal(phone){
   </div>
 </div>
 
-<script src="js/26-loadtasks.js"></script>
+<script src="js/26-loadtasks.js?v=20261126a"></script>
 <script src="js/44-fn-taskflow.js?v=20261115g"></script>
 <script src="js/45-fn-taskflow-admin.js?v=20261115g"></script>
-<script src="js/27-fn-bonuscore.js"></script>
+<script src="js/27-fn-bonuscore.js?v=20261126a"></script>
 <script src="js/28-fn-bonusdetail.js?v=20261115g"></script>
-<script src="js/34-fn-todaytasks.js"></script>
+<script src="js/34-fn-todaytasks.js?v=20261126a"></script>
 <script src="js/35-fn-deptsettings.js?v=20261126c"></script>
-<script src="js/36-fn-homechips.js?v=20261115f"></script>
+<script src="js/36-fn-homechips.js?v=20261128a"></script>
 <script src="js/37-fn-configpage.js?v=20261116a"></script>
-<script src="js/39-fn-buyfilter.js"></script>
+<script src="js/39-fn-buyfilter.js?v=20261126a"></script>
 <script src="js/40-fn-carepage.js?v=20261115g"></script>
 <script src="js/41-fn-stageboard.js?v=20261115g"></script>
-<script src="js/42-fn-homesummary.js"></script>
+<script src="js/42-fn-homesummary.js?v=20261128a"></script>
 <script src="js/43-fn-uxtools.js?v=20261115g"></script>
 <script src="js/30-fn-teamanalysis.js?v=20261116a"></script>
-<script src="js/29-sidenav.js?v=20261126a"></script>
-<script src="js/31-fn-orgoverview.js?v=20261116a"></script>
+<script src="js/29-sidenav.js?v=20261128c"></script>
+<script src="js/31-fn-orgoverview.js?v=20261128a"></script>
 <script src="js/32-fn-furesult.js?v=20261115g"></script>
-<script src="js/33-fn-tierconfig.js"></script>
+<script src="js/33-fn-tierconfig.js?v=20261126a"></script>
 <script src="js/33-pro-profile.js?v=20261126a"></script>
-<script src="js/34-pro-charts.js"></script>
-<script src="js/36-pro-home.js"></script>
+<script src="js/34-pro-charts.js?v=20261126a"></script>
+<script src="js/36-pro-home.js?v=20261126a"></script>
 <script src="js/38-pro-dock.js?v=20261118b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js?v=20261126a"></script>
@@ -1812,36 +1814,36 @@ function openBcLogModal(phone){
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/48-fn-medialib.js?v=20261113e"></script>
 <script src="js/43-teamchat.js?v=20261101a"></script>
-<script src="js/40-main-restorenav.js"></script>
-<script src="js/43-fn-viewstate.js"></script>
-<script src="js/46-fn-kho.js"></script>
-<script src="js/47-staff-profile.js?v=20261126n"></script>
+<script src="js/40-main-restorenav.js?v=20261126a"></script>
+<script src="js/43-fn-viewstate.js?v=20261126a"></script>
+<script src="js/46-fn-kho.js?v=20261126a"></script>
+<script src="js/47-staff-profile.js?v=20261126p"></script>
 <script src="js/48-filter-presets.js?v=20261110a"></script>
 <script src="js/48-pro-chatinfo.js?v=20261115h"></script>
-<script src="js/49-pro-discuss.js"></script>
+<script src="js/49-pro-discuss.js?v=20261126a"></script>
 <script src="js/50-split-orders.js?v=20261116a"></script>
 <script src="js/50-person-tags.js?v=20261115g"></script>
-<script src="js/51-demo-guard.js"></script>
-<script src="js/52-fn-salematch.js"></script>
-<script src="js/53-fn-promo-engine.js"></script>
+<script src="js/51-demo-guard.js?v=20261127d"></script>
+<script src="js/52-fn-salematch.js?v=20261126a"></script>
+<script src="js/53-fn-promo-engine.js?v=20261126a"></script>
 <script src="js/54-fn-promo-admin.js?v=20261115g"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
-<script src="js/56-fn-qrpills.js"></script>
+<script src="js/56-fn-qrpills.js?v=20261126a"></script>
 <script src="js/59-fn-mobilefit.js?v=20261115g"></script>
 <script src="js/57-viettat.js?v=20261116a"></script>
-<script src="js/58-auto-cust-link.js"></script>
+<script src="js/58-auto-cust-link.js?v=20261126a"></script>
 <script src="js/59-conn-diag.js?v=20261115g"></script>
 <script src="js/59-report-drill.js?v=20261115g"></script>
 <script src="js/60-team-bonus.js?v=20261117a"></script>
 <script src="js/61-recon-export.js?v=20261105b"></script>
 <script src="js/62-sale-channel-periods.js?v=20261102h"></script>
-<script src="js/63-fn-saleincome.js?v=20261103e"></script>
+<script src="js/63-fn-saleincome.js?v=20261126a"></script>
 <script src="js/64-thidua.js?v=20261104d"></script>
 <script src="js/65-order-sale-ovr.js?v=20261115g"></script>
 <script src="js/67-report-k.js?v=20261115c"></script>
-<script src="js/66-sakura-petals.js?v=20261104a"></script>
-<script src="js/67-pancake-namemap-modal.js?v=20261120a"></script><!-- 🔗 Khớp tên Pancake ↔ Sale (Cài đặt team); gỡ = xoá dòng này + act:pancakemap ở js/29-sidenav.js + khôi phục mục ở js/09 -->
-<script src="js/79-mascot-samoyed.js?v=20261117a"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
+<script src="js/66-sakura-petals.js?v=20261128a"></script>
+<script src="js/67-pancake-namemap-modal.js?v=20261127a"></script><!-- 🔗 Khớp tên Pancake ↔ Sale (Cài đặt team); gỡ = xoá dòng này + act:pancakemap ở js/29-sidenav.js + khôi phục mục ở js/09 -->
+<script src="js/79-mascot-samoyed.js?v=20261128a"></script><!-- 🐶 linh vật chó Samoyed (từ game ChromaBlast); gỡ = xoá dòng này + mục act:mascot ở js/29-sidenav.js + it('mascot') ở js/37 -->
 <script src="js/68-ui-kit.js?v=20261115a"></script>
 <script src="js/69-pro-smart-search.js?v=20261118a"></script>
 <script src="js/70-task-board.js?v=20261115a"></script><!-- R6a: bảng công việc dạng cột (kéo thả theo giai đoạn) --><!-- R5c: tìm kiếm thông minh (bỏ dấu, SĐT đủ kiểu, gợi ý khi gõ) --><!-- 🌸 cánh đào rơi nhẹ; gỡ = xoá dòng này + mục act:sakura ở js/29-sidenav.js -->
@@ -1862,17 +1864,25 @@ function openBcLogModal(phone){
 <script src="js/86-pos-diag.js?v=20261118a"></script><!-- Danh sach KH khop don POS, buoc 8: nut admin Doi soat POS (donDayDiag, chi doc)-->
 <script src="js/87-cust-dup.js?v=20261117a"></script><!-- R5d bước 1: nút admin "🔎 Khách trùng" (CHỈ XEM) — gọi GAS findDuplicateCustomers; gỡ = xoá dòng này + css/30 -->
 <script src="js/88-pos-orders.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 2: tai + giu don POS theo tung don (GAS donDaily), chi RAM; boc syncFromGS; go = xoa dong nay -->
-<script src="js/89-pos-customers.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 3: them khach chi co o POS (js/02 buildCustomers goi posCustomersInject_); nap SAU js/88, TRUOC js/90; go = xoa dong nay (hook trong js/02 tu bo qua) -->
+<script src="js/89-pos-customers.js?v=20261126a"></script><!-- Danh sach KH khop don POS, buoc 3: them khach chi co o POS (js/02 buildCustomers goi posCustomersInject_); nap SAU js/88, TRUOC js/90; go = xoa dong nay (hook trong js/02 tu bo qua) -->
 <script src="js/90-pos-filter.js?v=20261117b"></script><!-- Danh sach KH khop don POS, buoc 4: loc ngay + CS theo don POS cung luc (boc applyFilters, tam thoi ymList/csSet roi tra lai); nap SAU js/88; go = xoa dong nay -->
 <script src="js/91-pos-revenue.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 5: cot Don/DT = ca doi + phan cua CS/ngay dang loc (boc applyFilters ngoai js/90)-->
 <script src="js/92-pos-recon.js?v=20261117a"></script><!-- Danh sach KH khop don POS, buoc 6: thanh doi soat Khop POS / Lech POS duoi thanh cong cu (chi doc, boc applyFilters ngoai cung)-->
 <script src="js/93-combo-tab.js?v=20261118f"></script><!-- COMBO co san, buoc 3/6: tab Combo tra cuu (GAS comboList); nap SAU js/40 (registerExtraTab); go = xoa dong nay + them 'combo' trong js/29 -->
-<script src="js/94-plib-tab.js?v=20261118c"></script><!-- THU VIEN SAN PHAM, buoc 2/4: tab thu muc anh theo SP/combo (GAS plibList); nap SAU js/40 (registerExtraTab); go = xoa dong nay + them 'plib' trong js/29 -->
+<script src="js/94-plib-tab.js?v=20261126a"></script><!-- THU VIEN SAN PHAM, buoc 2/4: tab thu muc anh theo SP/combo (GAS plibList); nap SAU js/40 (registerExtraTab); go = xoa dong nay + them 'plib' trong js/29 -->
 <script src="js/95-top-sp-tab.js?v=20261121b"></script><!-- TOP SAN PHAM BAN, buoc 2/3: tab xep hang SP theo ngay + team + danh sach loai tru (GAS topProducts); nap SAU js/40; go = xoa dong nay + id topsp trong js/29 -->
 <script src="js/96-lead-assign.js?v=20261126a"></script><!-- TRUONG NHOM: man "Data cua team" (chia lai + bao cao nhan vien); go = xoa dong nay + act:leadassign/leadreport trong js/29 -->
 <script src="js/97-staff-directory.js?v=20261126b"></script><!-- THU MUC HO SO CHUAN: Cai dat Team hien ho ten chuan + tim theo ten 4 he thong; go = xoa dong nay (js/08, js/09 tu dung cach cu) -->
-<script src="js/98-b-export-sale.js?v=20261126a"></script><!-- XUAT DOANH THU B cả team/từng sale, hàm dựng file; gỡ = xoá dòng này + js/99 + 1 dòng menu trong js/13 -->
+<script src="js/98-staff-names-migrate.js?v=20261126a"></script><!-- CONG CU GOM TEN CU -> HO SO CHUAN (admin); go = xoa dong nay + nut openStaffNamesMigrate trong js/08 -->
+<script src="js/98-b-export-sale.js?v=20261126a"></script>
+<script src="js/99-acct-pk-normalize.js?v=20261127a"></script><!-- XUAT DOANH THU B cả team/từng sale, hàm dựng file; gỡ = xoá dòng này + js/99 + 1 dòng menu trong js/13 -->
 <script src="js/99-b-export-sale-ui.js?v=20261126a"></script><!-- XUAT DOANH THU B: hộp thoại chọn team/sale (admin + trưởng nhóm) -->
+<script src="js/99-c-loyalty-card.js?v=20261127b"></script><!-- Diem tich luy muc 9 buoc 2c: khoi Hang & diem trong ho so khach (tai luoi, goi GAS loyaltyGet/loyaltyRedeem); go = xoa dong nay + file js -->
+<script src="js/99-d-crm-order.js?v=20261128d"></script><!-- Len don tren CRM buoc 2/4: tab "Tao don" (GAS crmOrderSave, sheet rieng "Don CRM"); nap SAU js/40 (registerExtraTab); go = xoa dong nay + id taodon trong js/29 -->
+<script src="js/99-d-crm-orders.js?v=20261127d"></script><!-- DON CRM buoc 3/4: tab "Don CRM" liet ke + xem chi tiet (GAS crmOrders); nap SAU js/40 (registerExtraTab); go = xoa dong nay + file js + id crmorders trong js/29 -->
+<script src="js/99-e-crm-card-benefit.js?v=20261128a"></script><!-- Muc 9 buoc 9c-2: quyen loi the (VIP 5% / Super VIP 10% / mien ship) tu dien o man Tao don, goi GAS loyaltyBenefitQuote; nap SAU js/99-d-crm-order; go = xoa dong nay + file js -->
+<script src="js/100-assign-customers.js?v=20261126a"></script><!-- SDT duoc chia luon co trong Danh sach KH; nap SAU js/07 va js/89; go = xoa dong nay -->
+<script src="js/99-e-select-search.js?v=20261127a"></script><!-- o chon (dropdown) co o go tim nhanh cho MOI <select>; go = xoa dong nay + file js; tat khan cap: localStorage ome_native_select=1 -->
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

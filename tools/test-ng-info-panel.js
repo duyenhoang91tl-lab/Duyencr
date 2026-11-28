@@ -28,6 +28,6 @@ ok(/không khớp <b>2<\/b>/.test(h), 'khongKhop that van hien dung (2)');
 
 // 3) File nguon da khai bao ngChuaCapNhatCount + dong Excel tong hop
 ok(/mã NG \(kênh nguồn\) chưa có trên Base → tính theo Thẻ Pos/.test(src), 'sheet tong hop Excel co dong "ma NG chua co tren Base"');
-ok(/js\/11-fn-srload\.js\?v=20261125a/.test(fs.readFileSync(__dirname + '/../index.html', 'utf8')), 'index.html da bump ?v=20261125a cho js/11');
+ok(((fs.readFileSync(__dirname + '/../index.html', 'utf8').match(/js\/11-fn-srload\.js\?v=([0-9a-z]+)/) || [])[1] || '') >= '20261125a', 'index.html da bump ?v= (tu 20261125a tro len) cho js/11');
 
 console.log(fail ? ('\n' + fail + ' LỖI') : '\nTẤT CẢ ĐẠT'); process.exit(fail ? 1 : 0);

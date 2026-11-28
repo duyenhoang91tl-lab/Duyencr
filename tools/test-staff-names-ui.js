@@ -42,7 +42,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ADMIN = false; calls.length = 0; w.eval(`_authAccount = { username:'ninhnga99', role:'cs', name:'Ninh' }; currentUser = { name:'ninhnga99', names:[], role:'cs', team:'VP' };`);
     w.openProfileModal('ninhnga99'); await wait(300);
     ok(!D.getElementById('sp-nm-base'), 'nhan vien thuong KHONG co o sua ten theo he thong');
-    ok(/Ninh Nga, ninhnga\.base/.test(D.querySelector('.sp-names').textContent) && /Chỉ admin sửa được/.test(D.querySelector('.sp-names').textContent), 'nhan vien thay ten (chi doc) + ghi chu chi admin sua');
+    ok(/Ninh Nga, ninhnga\.base/.test(D.querySelector('.sp-names').textContent) && /chỉ xem được, không sửa/.test(D.querySelector('.sp-names').textContent), 'khi server khong cho sua (canEditNames=false) -> chi doc + ghi chu chi xem');
     D.getElementById('sp-save').click(); await wait(100);
     const sv2 = calls.filter(c => c.body && /profileSave/.test(c.body)); ok(sv2.length === 1 && JSON.parse(sv2[0].body).names === undefined, 'nhan vien luu ho so thi KHONG gui names (server giu nguyen)');
     console.log('ALL STAFF NAMES UI TESTS PASSED'); w.close();

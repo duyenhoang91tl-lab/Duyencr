@@ -527,6 +527,7 @@ function renderAcctModal(){
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tài khoản &amp; mật khẩu do admin cấp. Mật khẩu được mã hoá trước khi lưu. '+
       'Bấm vào 1 tài khoản để xem tài khoản đó đang phụ trách những sale nào, rồi <b>thêm</b> hoặc <b>cắt</b> sale ngay tại đó. '+
       'Để cấp cho cả team, hãy bật kết nối Google Sheets.</div>'+
+    ((typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin' && typeof openAcctPkNormalize === 'function') ? '<div style="margin-bottom:8px"><button class="btn sm" onclick="openAcctPkNormalize()" title="Đưa tên Pancake của từng người lên làm tên chính của tài khoản đã có (xem trước rồi mới lưu)">🥞 Chuẩn hóa tên gốc theo Pancake</button></div>' : '')+
     '<div style="max-height:300px;overflow:auto;margin-bottom:12px">'+list+'</div>'+
     '<div id="acct-form-box" style="border-top:1px solid var(--border);padding-top:12px">'+
       formHead+
@@ -651,7 +652,9 @@ async function addAccount(){
   var existing = _findAccount(u);
   if (!p && !existing){ toast('Đặt mật khẩu cho tài khoản mới.'); return; }
   // Mat khau (neu co) di theo truong tam _setPw -> pushUsers gui cho may chu tu bam; client KHONG con giu passHash.
-  var rec = { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
+  // Chep ban cu roi moi ghi de truong cua form. NGUYEN NHAN GOC (2026-11-27): dung lai rec tu dau lam mat perms (quyen tab rieng), saleType, startDate (ngay nhan tin), joinDate
+  // — 4 truong nay sua o phan chi tiet tai khoan, form Sua khong co -> bam "Luu thay doi" la bi xoa tren may chu.
+  var rec = Object.assign({}, existing || {}, { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true });
   if (p) rec._setPw = p;
   rec.viewMonths = (_roleBaseOf(role) === 'leader') ? _acctCollectMonths_() : [];
   if (existing){ for (var i=0;i<accounts.length;i++){ if (String(accounts[i].username).toLowerCase()===String(existing.username).toLowerCase()){ accounts[i]=rec; break; } } }

@@ -2,7 +2,7 @@
 const fs = require('fs'); let bad = 0; const ok = (c, m) => { if (!c) { bad++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const src = fs.readFileSync(__dirname + '/../js/11-fn-srload.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
-const api = new Function('esc', fn('_srPageTotals_') + '\n' + fn('_srPageThHtml_') + '\nreturn { _srPageTotals_, _srPageThHtml_ };')(s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+const api = new Function('esc', fn('_srKdScopeRows_') + '\n' + fn('_srPageTotals_') + '\n' + fn('_srPageThHtml_') + '\nreturn { _srPageTotals_, _srPageThHtml_ };')(s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
 // so lieu theo anh Duyen gui: 2 sale, 3 page
 const scbp = { pages: [{ kenhBan: 'K1', pageName: 'HIỂN PHẠM TOURMALINE' }, { kenhBan: 'K2', pageName: 'HIỂN TOUR SHOP' }, { kenhBan: 'K3', pageName: 'Page chưa ai chốt' }],
   rows: [{ name: 'thanhNP', perPage: { K1: { closed: 1, held: 43, rate: 2.3 }, K3: { closed: 0, held: 0 } }, total: { closed: 2, held: 57, rate: 3.5 } },

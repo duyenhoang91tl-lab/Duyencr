@@ -2996,19 +2996,23 @@
       return;
     }
     _lastPriceRows = rows; _lastPriceQ = q;
-    box.innerHTML = rows.slice(0, 30).map((row, idx) => {
+    const isPriceKey = (k) => /gia|price/.test(_stripVNlocal_(k)); // bo dau truoc khi so: header co the la "Giá" co dau
+    // Bo hẳn cot STT va cot "Khoa (an dung de tra cuu)" khoi ket qua — khong can Sale nhin thay.
+    const isHiddenKey = (k) => { const s = _stripVNlocal_(k).trim(); return s === 'stt' || s.indexOf('khoa') === 0; };
+    const line = (row, k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+    // Thong tin 1 dong (LOGIC CU cua tung the, giu nguyen): ten, cac truong hien, cot chat lieu/mau/size, gia theo Loai da, nut "+ Them".
+    const info = (row, idx) => {
       const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
-      const isPriceKey = (k) => /gia|price/.test(_stripVNlocal_(k)); // bo dau truoc khi so: header co the la "Giá" co dau
-      // Bo hẳn cot STT va cot "Khoa (an dung de tra cuu)" khoi ket qua — khong can Sale nhin thay.
-      const isHiddenKey = (k) => { const s = _stripVNlocal_(k).trim(); return s === 'stt' || s.indexOf('khoa') === 0; };
       const priceKeys = keys.filter(isPriceKey);
       const otherKeys = keys.filter((k) => !isPriceKey(k) && !isHiddenKey(k));
       // Ten san pham: uu tien cot "ten san pham"/"ten thuong mai", khong co thi lay cot dau tien
-      const nameKey = otherKeys.find((k) => /ten\s*san\s*pham|ten\s*thuong\s*mai/i.test(k)) || otherKeys[0] || '';
+      // NGUYEN NHAN GOC (21/11): truoc day so regex voi tieu de CO DAU ("Tên sản phẩm") nen khong bao gio khop -> ten bi lay nham la COT DAU TIEN (vd "Nhóm sản phẩm" = "NHẪN 10K"):
+      // nut + Them ghi ten nhom thay vi ten san pham, va "Ten thuong mai" trung "Ten san pham" van hien 2 lan. Nay bo dau khi so; uu tien "ten san pham" roi "ten thuong mai" (giong GAS _priceFieldPick_).
+      const nameKeyMatched = otherKeys.find((k) => /ten\s*san\s*pham/.test(_stripVNlocal_(k))) || otherKeys.find((k) => /ten\s*thuong\s*mai/.test(_stripVNlocal_(k))) || '';
+      const nameKey = nameKeyMatched || otherKeys[0] || '';
       const name = nameKey ? String(row[nameKey]) : ('Sản phẩm ' + (idx + 1));
       // Neu "Ten thuong mai" trung y het "Ten san pham" thi chi hien 1 dong cho gon
       const shownKeys = otherKeys.filter((k) => !(k !== nameKey && String(row[k]).trim() === name.trim() && /ten/i.test(_stripVNlocal_(k))));
-      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
       // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm"
       const chatLieuKey = otherKeys.find((k) => _stripVNlocal_(k).indexOf('chat lieu') !== -1);
       const mauKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s === 'mau' || s === 'mau sac' || /(^|\s)mau($|\s)/.test(s); });
@@ -3029,13 +3033,51 @@
         else fallbackNote = ` (không có giá riêng cho ${_stonePref}, đang dùng giá thường)`;
       }
       const priceNum = chosenKey ? _parsePriceNum_(row[chosenKey]) * 1000 : 0; // cot gia ghi theo nghin d (7950 = 7.950.000d)
+      const priceText = chosenKey ? (priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : String(row[chosenKey])) : '';
       const priceHtml = chosenKey
-        ? `<div class="pk-price-amount"><span class="pk-price-field"><b>${escapeHtml(priceLabel)}:</b> ${escapeHtml(priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : String(row[chosenKey]))}${escapeHtml(fallbackNote)}</span></div>`
+        ? `<div class="pk-price-amount"><span class="pk-price-field"><b>${escapeHtml(priceLabel)}:</b> ${escapeHtml(priceText)}${escapeHtml(fallbackNote)}</span></div>`
         : '';
       const noteFull = noteKey + (chosenKey ? (noteKey ? ' · ' : '') + 'Loại giá: ' + priceLabel : '');
       const addBtn = `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteFull)}" data-price="${priceNum}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${chosenKey ? '+ Thêm' : '+ Thêm (chưa có giá)'}</button>`;
-      return `<div class="pk-price-item">${shownKeys.map(line).join(' ')}${priceHtml}<div class="pk-price-addrow">${addBtn}</div></div>`;
-    }).join('');
+      return { row, name, hasName: !!nameKeyMatched, nameKey, shownKeys, chatLieuKey, sizeKey, mauKey, priceHtml, priceText, priceLabel, fallbackNote, hasPrice: !!chosenKey, addBtn };
+    };
+    const singleHtml = (it) => `<div class="pk-price-item">${it.shownKeys.map((k) => line(it.row, k)).join(' ')}${it.priceHtml}<div class="pk-price-addrow">${it.addBtn}</div></div>`;
+    // GOM CUNG SAN PHAM (Duyen 21/11/2026: "gia size 1, size 2 lien tiep, khong hien lai ca khoi noi dung cho tung size"):
+    // truoc day MOI DONG sheet = 1 the lap du Nhom/Ten/Chat lieu/... nen cung 1 san pham 3 size ra 3 the giong het nhau. Nay: truong CHUNG hien 1 lan,
+    // moi CHAT LIEU 1 dong (o chat lieu TRONG = cung chat lieu dong tren vi sheet hay GOP O; o nhieu dong gop 1 dong), moi SIZE 1 dong "SIZE 1 — 6.350.000đ [+ Thêm]".
+    // Moi nut "+ Thêm" van mang data-* cua DUNG dong sheet do (khong doi cach vao gio).
+    const groupHtml = (g) => {
+      const f0 = g[0];
+      const skip = {}; [f0.sizeKey, f0.chatLieuKey].forEach((k) => { if (k) skip[k] = 1; });
+      const val = (it, k) => (it.row[k] == null ? '' : String(it.row[k]).trim());
+      const common = f0.shownKeys.filter((k) => !skip[k] && g.every((it) => val(it, k) === val(f0, k)));
+      const isCommon = {}; common.forEach((k) => { isCommon[k] = 1; });
+      const varyKeys = []; g.forEach((it) => it.shownKeys.forEach((k) => { if (!skip[k] && !isCommon[k] && varyKeys.indexOf(k) === -1) varyKeys.push(k); }));
+      const matOf = (it) => (it.chatLieuKey ? String(it.row[it.chatLieuKey] == null ? '' : it.row[it.chatLieuKey]).replace(/\s*\n+\s*/g, ' · ').trim() : '');
+      const mats = []; let last = null;
+      g.forEach((it) => {
+        const m = matOf(it);
+        let mg = (!m && last) ? last : mats.find((x) => _stripVNlocal_(x.mat) === _stripVNlocal_(m));
+        if (!mg) { mg = { mat: m, items: [] }; mats.push(mg); }
+        mg.items.push(it); last = mg;
+      });
+      const varHtml = (it) => {
+        let size = it.sizeKey ? val(it, it.sizeKey) : '';
+        if (/^\d+([.,]\d+)?$/.test(size)) size = 'Size ' + size;
+        const extra = varyKeys.map((k) => (val(it, k) ? k + ': ' + val(it, k) : '')).filter(Boolean).join(', ');
+        const price = it.hasPrice ? escapeHtml(it.priceText) + (it.fallbackNote ? `<small>${escapeHtml(it.fallbackNote)}</small>` : '') : '<i>chưa có giá</i>';
+        return `<div class="pk-price-var"><span class="pk-price-vlabel">${escapeHtml(size)}${extra ? ` <small>(${escapeHtml(extra)})</small>` : ''}</span><span class="pk-price-vprice">${price}</span>${it.addBtn}</div>`;
+      };
+      const kind = g.some((it) => it.priceLabel !== 'Giá thường') ? `<div class="pk-price-kind"><b>Loại giá:</b> ${escapeHtml(f0.priceLabel)}</div>` : '';
+      return `<div class="pk-price-item pk-price-group">${common.map((k) => line(f0.row, k)).join(' ')}${kind}` +
+        mats.map((mg) => (mg.mat ? `<div class="pk-price-mat"><b>${escapeHtml(f0.chatLieuKey || 'Chất liệu')}:</b> ${escapeHtml(mg.mat)}</div>` : '') + mg.items.map(varHtml).join('')).join('') + '</div>';
+    };
+    const groups = [], byName = {};
+    rows.slice(0, 30).map(info).forEach((it) => {
+      const key = it.hasName ? _stripVNlocal_(it.name).trim() : '';
+      if (key && byName[key]) byName[key].push(it); else { const g = [it]; groups.push(g); if (key) byName[key] = g; }
+    });
+    box.innerHTML = groups.map((g) => (g.length === 1 ? singleHtml(g[0]) : groupHtml(g))).join('');
     box.querySelectorAll('.pk-price-addbtn').forEach((btn) => {
       btn.addEventListener('click', () => {
         addToCart_({

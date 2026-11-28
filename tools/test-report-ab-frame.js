@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 // R7b — báo cáo A / B / N vẽ qua khuôn uiReportFrame_ (_srPaintMain_); thân A/B/N KHÔNG đổi. Chạy: node tools/test-report-ab-frame.js
-const fs = require('fs'), vm = require('vm'), cp = require('child_process'), path = require('path');
+const fs = require('fs'), vm = require('vm'), path = require('path');
 const root = path.join(__dirname, '..'), F = 'js/11-fn-srload.js';
 const cur = fs.readFileSync(path.join(root, F), 'utf8');
-const old = cp.execSync('git show 8e15a15:' + F, { cwd: root, maxBuffer: 1 << 26 }).toString('utf8');
 function fn(src, n) { const i = src.indexOf('function ' + n + '('); if (i < 0) throw new Error('thiếu ' + n); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 let fail = 0; const t = (c, m) => { if (c) console.log('ok   ' + m); else { fail++; console.log('FAIL ' + m); } };
-for (const n of ['_srRenderA', '_srRenderB']) t(fn(cur, n) === fn(old, n), n + ': thân hàm KHÔNG đổi so với bản cũ');
+// (Da bo 2026-11-27) kiem "than _srRenderA/_srRenderB khong doi so voi commit 8e15a15": chi dung cho dot chuyen khung R7b; sau do A/B duoc sua co chu y.
 const main = fn(cur, 'renderSalesReportTab'); t(/_srPaintMain_\(wrap, bar \+ hiddenPanelHtml, body, !!_srState\.loading\)/.test(main) && !/wrap\.innerHTML = bar \+ hiddenPanelHtml/.test(main), 'renderSalesReportTab gọi _srPaintMain_ (A/B/N cùng đường vẽ)');
 function load(frame, sub) {
   const ctx = { location: { search: '' }, document: { readyState: 'complete', addEventListener() {} }, console, esc: s => String(s), fmt: String, _srState: { sub: sub, loading: false } };

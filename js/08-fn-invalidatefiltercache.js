@@ -295,6 +295,8 @@ function _inUserScope(c){
   // Tài khoản có thể gắn NHIỀU tên (vd đơn "chia" cho nhiều sale, hoặc 1 tài khoản gộp nhiều bí
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
+  // 2026-11-26 (lan 5): tai khoan khong co ten nao thi lay TEN DANG NHAP (khop server _scopeAllowedNames_ trong gas_v13.js, vi data duoc chia ghi theo ten dang nhap).
+  if (!myNames.length && currentUser.username) myNames = [currentUser.username];
   if (!myNames.length) return false;
   // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
   var _vn = currentUser.viewNames;
@@ -302,7 +304,8 @@ function _inUserScope(c){
     if (currentUser._scopeNamesSrc !== _vn || currentUser._scopeNamesBase !== myNames){ currentUser._scopeNamesAll = myNames.concat(_vn); currentUser._scopeNamesSrc = _vn; currentUser._scopeNamesBase = myNames; }
     myNames = currentUser._scopeNamesAll;
   }
-  if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
+  // Tai khoan test ('demo') loc y nhu CS theo cac sale duoc chon (27/11) — truoc day roi xuong 'return true' cuoi ham nen thay HET khach. Khong cong viewNames (khop server).
+  if (currentUser.role === 'cs' || currentUser.role === 'manager' || currentUser.role === 'demo'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
     // (order-level seller, o.cs) — thêm chiều này để hỗ trợ đơn "chia nhiều sale": mỗi sale trong
@@ -1111,7 +1114,7 @@ function pushMktTeamsToGS(){
   saveLS('ome_mkt_teams', mktTeams);
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveMktTeams', teams: mktTeams }) }).then(_writeCheck_('danh sách đội Marketing')).catch(_writeCatch_('danh sách đội Marketing'));
 }
 async function _mktLoadPages_(){
   if (_mktPagesCache || _mktPagesLoading || !gsUrl) return;
@@ -1199,7 +1202,7 @@ function _mktSetShare(id,pageId,val){
 function pushTeamsToGS(){
   if (!gsUrl) return;
   fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).catch(function(){});
+    body: JSON.stringify({ action:'saveTeams', teams: teams }) }).then(_writeCheck_('danh sách Team')).catch(_writeCatch_('danh sách Team'));
 }
 function renderTeamTab(){
   var wrap = document.getElementById('team-wrap');
@@ -1211,6 +1214,7 @@ function renderTeamTab(){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
     (isAdmin ? '<div style="display:flex;gap:8px">'+
+        '<button class="btn sm" onclick="openStaffNamesMigrate()" title="Gom tên đang nối thủ công thành hồ sơ chuẩn">🧩 Gom tên → Hồ sơ</button>'+
         '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>'+
         '<button class="btn primary" onclick="addTeam()">+ Thêm Team</button></div>'
              : '<span style="color:var(--muted);font-size:12px">Chỉ Admin mới chỉnh sửa được</span>')+
