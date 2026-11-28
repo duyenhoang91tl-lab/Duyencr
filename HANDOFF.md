@@ -1,5 +1,20 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — BẢNG "ĐƠN CÁC KÊNH" THEO GIAI ĐOẠN KIỂU BASE) — KẾ HOẠCH 8 BƯỚC, ĐANG LÀM BƯỚC 1
+- ĐỀ BÀI Duyên (clip + 3 ảnh Base): làm bảng đơn theo giai đoạn y như Base "ĐƠN CÁC KÊNH 2025-2026": bên trái danh sách kênh, bên phải các cột giai đoạn (Tiếp nhận đơn → Tạo đơn POS → Phân loại đơn → Phòng sản xuất → Kho thành phẩm → Đóng hàng → Hoàn thành / Thất bại). Form lên đơn y như Base (SĐT làm tên nhiệm vụ, Kênh bán, Sale bán, Sản phẩm order, Phân loại [Thanh toán toàn bộ / Cọc trước / Thu COD], Giá trị cọc, Tổng giá trị đơn (ko ship), Giá trị chênh đơn đổi, hình ảnh chuyển khoản, mô tả, người theo dõi, tài liệu đính kèm). Trang chi tiết như clip (thanh giai đoạn, trường dữ liệu, danh sách công việc, thảo luận, cột phải: mã bộ đếm / mã nhiệm vụ / người tạo / thời gian từng giai đoạn). Cần check tiền → tạo CÔNG VIỆC con ngay trong đơn giao bộ phận khác. Bình luận tương tác như Base.
+- QUYẾT ĐỊNH THIẾT KẾ: thực thể RIÊNG "Đơn Kênh" (sheet riêng, KHÔNG đụng sheet "Đơn CRM"/kho/điểm tích luỹ/DT Tổng — đúng quy tắc 14). Đơn CRM có cấu trúc (js/99-d) vẫn giữ nguyên. Quyền xem tái dùng `_crmCanSee_` (admin/CEO tất cả, trưởng phòng/team theo phạm vi, còn lại đơn của mình) + người được theo dõi + người được giao công việc trong đơn.
+- Sheet mới: "Đơn Kênh", "Đơn Kênh GĐ" (nhật ký giai đoạn, để tính thời gian từng giai đoạn), "Đơn Kênh Việc" (công việc con), "Đơn Kênh BL" (bình luận + dòng hệ thống).
+- [ ] **B1** GAS backend: khối `36_CrmStage` cuối gas_v13.js (+ PARTS trong tools/split-gas.js, gas/ tự sinh) — action kenhBoard / kenhOrder / kenhSave / kenhUpdate / kenhMove / kenhComment / kenhTaskSave / kenhTaskDone / kenhFollow. Test: tools/test-kenh-gas.js.
+- [ ] **B2** `js/100-a-kenh-board.js`: tab "📦 Đơn các kênh": cột trái = kênh (có đếm), phải = cột giai đoạn, thẻ đơn, lọc ngày/tìm, kéo/nhấn chuyển giai đoạn.
+- [ ] **B3** `js/100-b-kenh-create.js`: modal "Tạo nhiệm vụ mới" đúng form ảnh 2–3 (+ đầu vào giai đoạn Tiếp nhận đơn).
+- [ ] **B4** `js/100-c-kenh-detail.js`: trang chi tiết như clip (thanh giai đoạn, trường dữ liệu, cột phải thông tin + thời gian từng giai đoạn).
+- [ ] **B5** `js/100-d-kenh-tasks.js`: danh sách công việc trong đơn (giao bộ phận check tiền, đánh dấu xong).
+- [ ] **B6** `js/100-e-kenh-comments.js`: thảo luận/bình luận trong đơn.
+- [ ] **B7** Ảnh/tệp đính kèm (hình chuyển khoản, tài liệu, ảnh trong bình luận) — tái dùng cách upload Drive của thư viện ảnh.
+- [ ] **B8** Thông báo (chuông) khi được giao công việc / có bình luận; KB `docs/crm-kb/17-don-kenh.md` + dòng định tuyến trong 00-READ-FIRST.
+- 🔧 **ĐANG LÀM:** B1.
+- ➡️ **BƯỚC KẾ TIẾP:** B2 sau khi B1 push xong.
+
 ## 2026-11-28 (phiên Claude — WEB CHƯA HIỆN DẤU "ĐÃ XONG" TÍCH Ở PANCAKE AI CHO ĐỢT ĐÃ TẢI VỀ)
 - ĐỀ BÀI Duyên: "làm mục khác không liên quan phiên kia". Chọn lỗi đã báo ở mục "ĐỢT CHIA ĐÃ XOÁ…": web chưa tự hiện dấu tích Pancake cho đợt đã tải. Không đụng menu / thẻ khách / báo cáo / Tạo đơn.
 - ✅ **ĐÃ XONG:** CẢ 2/2 BƯỚC XONG (chỉ web): js/07 `_assignMergeDone_` cập nhật dấu "đã xong" cho đợt đã tải về; docs/crm-kb/16 đã ghi. Test chia data xanh (11 ca 2 máy, dữ liệu giả); toàn bộ kiểm tra chỉ còn 2 test đỏ có sẵn của phần mini game T11 (test-team-bonus-ui, test-team-daily-revenue — phiên khác đã ghi).
