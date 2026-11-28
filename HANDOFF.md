@@ -1,5 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 
+## 2026-11-28 (phiên Claude — TỐI ƯU GIAO DIỆN: TRẠNG THÁI TẢI / TRỐNG CỦA KHUNG BÁO CÁO) — XONG, ĐÃ PUSH
+- Nguyên nhân: mọi báo cáo dùng chung `uiReportFrame_` (js/76) nhưng khi đang tải chỉ hiện 1 dòng chữ nghiêng "Đang tải…", khi trống cũng chỉ 1 dòng chữ — nhìn như treo, khó phân biệt với lỗi (L2 trong `docs/UI-LAYOUT-PLAN.md` còn mục "trạng thái rỗng / đang tải").
+- ✅ Đã làm (chỉ CSS, `css/25-report-frame.css`, không đổi HTML/JS nên áp cho TẤT CẢ báo cáo dùng khung: A–M, BD, Nhật ký, Cấu hình): trạng thái tải = vòng xoay + khung xương mờ chạy sáng (tắt hiệu ứng khi máy bật "giảm chuyển động"); trạng thái trống = biểu tượng 📭 trên dòng chữ. Chỉ dùng biến `var(--ui-*)` (đúng quy ước, test cấm màu cứng). Tăng `?v=20261128a` cho css/25 trong index.html.
+- Test: 8 test khung báo cáo (`tools/test-report-frame/ab/e/m/k/bd/l/body-frame.js`) đều PASS. LƯU Ý: `tools/test-config-hub.js` đang FAIL sẵn từ trước ("đọc được danh sách mục rời của nhóm Settings (10 mục)") — KHÔNG do thay đổi này (đã chạy lại trên bản gốc), chưa sửa.
+- Không đổi gas_v13.js: không cần deploy GAS. Chỉ cần Ctrl+F5, không cần reload extension.
+- [ ] **VIỆC KẾ TIẾP:** Duyên xem thử khi bấm đổi báo cáo (vòng xoay + khung xương) và báo cáo không có dữ liệu (📭); chưa tự nhìn được hình dáng thật. Còn trong L2: nút "Bộ lọc" + biểu tượng lịch, hàng chip đếm, bảng + chân phân trang "Dòng / trang", nhãn trạng thái dạng viên thuốc. Việc phụ: sửa `tools/test-config-hub.js` đang fail sẵn.
+
 ## 2026-11-28 (phiên Claude — XỬ LÝ NỐT: KHÁCH DẠNG THẺ TRÊN ĐIỆN THOẠI, MENU GỌN, TRANG TRÍ KHÔNG CHE) — PHIÊN NÀY ĐÃ DỪNG ĐỂ KHÔNG LÀM TRÙNG
 - ĐỀ BÀI Duyên: "xử lý nốt cho mình nhé" (3 chỗ đã báo ở mục CRM dễ dùng): (1) điện thoại: danh sách khách dạng thẻ (2) menu gọn (3) trang trí không che nội dung.
 - ✅ **ĐÃ XONG (do phiên "3 GỢI Ý CÒN LẠI" làm):** trang trí tắt mặc định trên điện thoại; menu tách nhóm Giao diện khỏi Settings. Phiên này KHÔNG đổi code web/GAS.
