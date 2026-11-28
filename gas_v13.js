@@ -3427,6 +3427,7 @@ function doGetCore_(e) {
         sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
       }));
     }
+    if (action === 'salaryReport') return jsonOut_(buildSalaryReport_((e && e.parameter) || {}));
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
@@ -6256,6 +6257,104 @@ function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTarget
   return timeline;
 }
 
+// ═══ LƯƠNG CƠ BẢN (LCB) SALE OFFLINE — Quy chế lương, hoa hồng và phân ca (26/10/2026, áp dụng 01/11/2026), PHẦN I mục 1 ═══
+//  LCB theo TỶ LỆ ĐẠT KPI của tháng: < 65% = 3.000.000 · 65% → <85% = 3.500.000 · 85% → <100% = 4.250.000 · ≥ 100% = 5.000.000
+//  (KPI Chính thức 500tr ⇒ mốc 325tr / 425tr / 500tr; KPI Thử việc 100tr — bậc lấy từ Báo cáo F: bậc + tháng bắt đầu, xem SALE_TIER_ORDER_).
+//  LCB thực nhận = (LCB theo tỷ lệ đạt KPI / NGÀY CÔNG CHUẨN của tháng) × NGÀY CÔNG THỰC TẾ đi làm.
+//  Ngày công chuẩn + ngày công thực tế do ADMIN NHẬP TAY cuối tháng (Settings 'salaryWorkdays' = { 'YYYY-MM': { standard: n, byName: { tên: ngày } } });
+//  chưa nhập ngày công của ai → hiện LCB theo tỷ lệ (chưa chia ngày công) và đánh dấu "chưa nhập ngày công".
+//  ⚠ Thử việc "KPI 100tr tính theo ngày làm việc thực tế, không gồm thời gian đào tạo": hiện KPI giữ nguyên 100tr/tháng (chưa quy theo ngày công) — Duyên chốt lại nếu cần.
+//  Chỉ các Sale thuộc kênh trong cfg.channels (mặc định offline + thử việc) — Sale Online không lương cứng (xem phụ cấp ở Team Bonus).
+var SALARY_DEFAULT_CFG_ = {
+  standardDays: 26,
+  lcbTiers: [ { minPct: 0, amount: 3000000 }, { minPct: 65, amount: 3500000 }, { minPct: 85, amount: 4250000 }, { minPct: 100, amount: 5000000 } ],
+  channels: ['offline', 'probation']
+};
+function readSalaryConfig_() {
+  var out = JSON.parse(JSON.stringify(SALARY_DEFAULT_CFG_)), raw = null;
+  try { var r0 = getSetting_('salaryConfig'); if (r0) raw = JSON.parse(r0); } catch (e) { raw = null; }
+  if (raw && typeof raw === 'object') {
+    var sd = Number(raw.standardDays); if (isFinite(sd) && sd >= 1 && sd <= 31) out.standardDays = sd;
+    if (Array.isArray(raw.lcbTiers)) {
+      var t = raw.lcbTiers.map(function (x) { return { minPct: Number(x && x.minPct), amount: Number(x && x.amount) }; }).filter(function (x) { return isFinite(x.minPct) && x.minPct >= 0 && isFinite(x.amount) && x.amount >= 0; }).sort(function (a, b) { return a.minPct - b.minPct; });
+      if (t.length) out.lcbTiers = t;
+    }
+    if (Array.isArray(raw.channels)) { var ch = raw.channels.map(function (x) { return String(x || '').trim(); }).filter(Boolean); if (ch.length) out.channels = ch; }
+  }
+  return out;
+}
+function readSalaryWorkdays_() {
+  var out = {};
+  try { var raw = getSetting_('salaryWorkdays'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') out = o; } } catch (e) { out = {}; }
+  return out;
+}
+// Mức LCB theo tỷ lệ đạt KPI (%): lấy mốc cao nhất có minPct <= pct; pct null/NaN → null (chưa có KPI để so).
+function _lcbFor_(pct, tiers) {
+  if (pct === null || pct === undefined || !isFinite(Number(pct))) return null;
+  var hit = null; (tiers || []).forEach(function (t) { if (Number(pct) >= t.minPct) hit = t; });
+  return hit ? hit.amount : null;
+}
+// LCB thực nhận theo ngày công; wd = null (chưa nhập) → trả LCB nguyên (chưa chia ngày công).
+function _lcbNet_(lcb, standard, wd) {
+  if (lcb === null) return null;
+  if (wd === null || wd === undefined || wd === '') return lcb;
+  return Math.round(lcb / standard * Number(wd));
+}
+// GET action=salaryReport&month=YYYY-MM&all=1 — CHỈ ADMIN (là bảng lương).
+function buildSalaryReport_(p) {
+  var viewer = _sessUser_(p.token);
+  if (!viewer) return { ok: false, error: 'Cần đăng nhập.', code: 'AUTH' };
+  if (viewer.role !== 'admin') return { ok: false, error: 'Chỉ admin xem được bảng lương cơ bản.', code: 'FORBIDDEN' };
+  var month = String(p.month || '').trim() || _todayYm_();
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: 'Tháng không hợp lệ (YYYY-MM).' };
+  var cfg = readSalaryConfig_(), wdMap = readSalaryWorkdays_(), wm = wdMap[month] || {};
+  var standard = Number(wm.standard); if (!isFinite(standard) || standard < 1 || standard > 31) standard = cfg.standardDays;
+  var byName = (wm.byName && typeof wm.byName === 'object') ? wm.byName : {};
+  var from = month + '-01', to = _tbMonthEnd_(month);
+  var k = buildSaleKpiReport_({ dateFrom: from, dateTo: to, dateField: 'ngayTao', sale: [], kenh: [], sanPham: '', byCreator: false });
+  var all = String(p.all || '') === '1', rows = [];
+  (k.rows || []).forEach(function (r) {
+    if (!r.tier) return;                                        // chưa gán bậc / chưa bắt đầu → chưa có KPI
+    if (!all && cfg.channels.indexOf(r.nhomKey) === -1) return; // chỉ Sale Offline / Thử việc
+    var lcb = _lcbFor_(r.pct, cfg.lcbTiers);
+    var wdRaw = byName[r.name], wd = (wdRaw === undefined || wdRaw === null || wdRaw === '') ? null : Number(wdRaw);
+    rows.push({ name: r.name, tier: r.tier, channel: r.nhomKey || '', revenue: r.revenue, target: r.target, pct: r.pct, lcbTier: lcb,
+                workdays: wd, lcbNet: _lcbNet_(lcb, standard, wd), missingWorkdays: wd === null });
+  });
+  rows.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'vi'); });
+  return { ok: true, month: month, standardDays: standard, lcbTiers: cfg.lcbTiers, channels: cfg.channels, rows: rows,
+           total: rows.reduce(function (s0, r) { return s0 + (r.lcbNet || 0); }, 0), missingCount: rows.filter(function (r) { return r.missingWorkdays; }).length };
+}
+// POST action=salarySaveWorkdays { token, month, standard, byName:{tên:ngày} } — CHỈ ADMIN; gộp vào tháng đã có (tên nào gửi mới ghi đè; ngày trống = xoá).
+function salarySaveWorkdays_(d) {
+  var viewer = _sessUser_(d.token);
+  if (!viewer) return jsonOut_({ ok: false, error: 'Cần đăng nhập.', code: 'AUTH' });
+  if (viewer.role !== 'admin') return jsonOut_({ ok: false, error: 'Chỉ admin nhập ngày công.', code: 'FORBIDDEN' });
+  var month = String(d.month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) return jsonOut_({ ok: false, error: 'Tháng không hợp lệ (YYYY-MM).' });
+  var std = Number(d.standard);
+  if (d.standard !== undefined && d.standard !== '' && (!isFinite(std) || std < 1 || std > 31)) return jsonOut_({ ok: false, error: 'Ngày công chuẩn phải từ 1 đến 31.' });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var map = readSalaryWorkdays_(), cur = map[month] || {};
+    var by = (cur.byName && typeof cur.byName === 'object') ? cur.byName : {};
+    var bad = '';
+    Object.keys(d.byName || {}).forEach(function (n) {
+      var name = String(n || '').replace(/\s+/g, ' ').trim(); if (!name || name.length > 60) return;
+      var v = d.byName[n];
+      if (v === '' || v === null) { delete by[name]; return; }
+      var num = Number(v);
+      if (!isFinite(num) || num < 0 || num > 31) { bad = bad || ('Ngày công của "' + name + '" phải từ 0 đến 31.'); return; }
+      by[name] = Math.round(num * 2) / 2;   // bước 0,5 ngày (nghỉ nửa ngày)
+    });
+    if (bad) return jsonOut_({ ok: false, error: bad });
+    map[month] = { standard: (d.standard !== undefined && d.standard !== '') ? std : (cur.standard || null), byName: by };
+    if (map[month].standard === null) delete map[month].standard;
+    setSetting_('salaryWorkdays', JSON.stringify(map));   // setSetting_ tự ghi AuditLog (người đổi theo token)
+  } finally { try { lock.releaseLock(); } catch (eL) {} }
+  return jsonOut_({ ok: true, month: month });
+}
+
 function buildSaleKpiReport_(filters) {
   var a = buildSalesReportB_(filters);
   var cfg = readSaleKpiConfig_();
@@ -8708,6 +8807,7 @@ function doPostCore_(e) {
     if (action === 'pkChatTag') return pkChatTag_(data);
     if (action === 'pkChatRead') return pkChatRead_(data);
     if (action === 'profileSave') return profileSave_(data);
+    if (action === 'salarySaveWorkdays') return salarySaveWorkdays_(data);
     if (action === 'splitFeedbackSave') return jsonOut_(saveSplitFeedback_(data));   // Sale phan hoi o Chi tiet don chia (Bao cao M)
     if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }

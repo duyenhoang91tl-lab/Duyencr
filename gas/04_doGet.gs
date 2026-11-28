@@ -333,6 +333,7 @@ function doGetCore_(e) {
         sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
       }));
     }
+    if (action === 'salaryReport') return jsonOut_(buildSalaryReport_((e && e.parameter) || {}));
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',

@@ -41,8 +41,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_REV_EXCLUDE_KENH_`
 
 ## 08_SaleKPI_FailedOrders.gs
-- Hàm: `_saleKpiMigrate_`, `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`
-- Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_TIER_LEGACY_`, `SALE_TIER_TRIAL_NAMES_`, `SALE_KPI_DEFAULT_CFG_`
+- Hàm: `_saleKpiMigrate_`, `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `readSalaryConfig_`, `readSalaryWorkdays_`, `_lcbFor_`, `_lcbNet_`, `buildSalaryReport_`, `salarySaveWorkdays_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`
+- Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_TIER_LEGACY_`, `SALE_TIER_TRIAL_NAMES_`, `SALE_KPI_DEFAULT_CFG_`, `SALARY_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
 - Hàm: `_posGhepMinCodes_`, `_posGhepRatioOn_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_posSiblingAdd_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_bhPrepaidDeduct_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_acctParseSheet_`, `_acctShName_`, `_acctIsOnlSheetName_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_acctExtraRaw_`, `_loadAcctExtra_`, `_acctRowCodes_`, `_acctMatchExtra_`, `_saleCanonOrders_`, `_orderSaleOvrMap_`, `_applyOrderSaleOvr_`, `buildSalesReportB_`, `_goldChannelRule_`, `_csChannelCommissionOf_`
