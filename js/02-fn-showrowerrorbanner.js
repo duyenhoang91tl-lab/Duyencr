@@ -117,10 +117,10 @@ async function gsGetOrderCount() {
 // ── ĐỒNG BỘ 2 CHIỀU OrderData: làm Google Sheets KHỚP CHÍNH XÁC dữ liệu đang có trên máy ──
 async function fullSyncOrdersToGS() {
   if (!gsUrl) { toast('Chưa kết nối Google Sheets'); return; }
-  if (!confirm('ĐỒNG BỘ 2 CHIỀU (GỘP đơn — KHÔNG xóa đơn nào):\n\n'
+  if (!(await uiConfirm('ĐỒNG BỘ 2 CHIỀU (GỘP đơn — KHÔNG xóa đơn nào):\n\n'
     + '①  TẢI mọi đơn từ Google Sheets về máy (gộp vào dữ liệu đang có)\n'
     + '②  ĐẨY các đơn mới trên máy lên Google Sheets\n\n'
-    + 'Kết quả: cả máy và Sheet đều có đủ đơn của nhau, không đơn nào bị xóa.\n\nTiếp tục?')) return;
+    + 'Kết quả: cả máy và Sheet đều có đủ đơn của nhau, không đơn nào bị xóa.\n\nTiếp tục?'))) return;
   // ① TẢI đơn từ Sheet → gộp vào máy (dùng luồng pull sẵn có: mergeRows + dựng lại danh sách)
   const beforePull = Object.values(customerMap).reduce((s,c)=>s+c.orders.length,0);
   await syncFromGS({ pullOrders: true, manual: true });

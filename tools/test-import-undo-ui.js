@@ -9,7 +9,7 @@ const calls = [], toasts = [], confirms = []; let renders = 0, answers = {}, con
 const ctx = { console, JSON, Date, Number, String, Object, Array, Math, encodeURIComponent, setTimeout: (f) => { ctx.__timers.push(f); }, __timers: [],
   localStorage: { getItem: (k) => (k === 'ome_sess_token' ? 'TOK123' : null) }, GAS_URL_DIRECT: 'https://gas.example/exec', gsUrl: 'https://worker.example/',
   fmt: (n) => String(n), esc: (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
-  toast: (m) => toasts.push(m), confirm: (m) => { confirms.push(m); return confirmAnswer; }, renderSalesReportTab: () => { renders++; }, logAudit() {},
+  toast: (m) => toasts.push(m), confirm: (m) => { confirms.push(m); return confirmAnswer; }, get uiConfirm() { return async (...a) => this.confirm(...a); }, renderSalesReportTab: () => { renders++; }, logAudit() {},
   _srState: { dataA: 1, dataB: 1, dataC: 1, dataE: 1, dataF: 1, dataG: 1, dataH: 1 },
   _impJson_: async (r) => r.json(),
   fetch: async (u, o) => { calls.push({ u, body: o && o.body ? JSON.parse(o.body) : null }); const key = o && o.body ? JSON.parse(o.body).action + ':' + (JSON.parse(o.body).dryRun ? 'dry' : 'real') : 'GET'; const a = answers[key] || answers.GET; return { json: async () => (typeof a === 'function' ? a() : a), text: async () => JSON.stringify(a) }; } };

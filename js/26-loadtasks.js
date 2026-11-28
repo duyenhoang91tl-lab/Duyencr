@@ -334,7 +334,7 @@ async function saveTaskFromModal(){
 }
 
 async function deleteTaskUI(id){
-  if (!confirm('Xóa công việc này?')) return;
+  if (!(await uiConfirm('Xóa công việc này?'))) return;
   try{
     var r_ = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'deleteTask', id: id }) });
     _writeCheck_('việc xoá công việc')(r_);

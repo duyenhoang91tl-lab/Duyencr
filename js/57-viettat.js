@@ -631,7 +631,7 @@ async function vtSave() {
 async function vtDelete(id) {
   var s = _vtSt.list.find(function (x) { return x.id === id; });
   if (s && s.fromTpl) { alert('Mục này lấy từ Mẫu tin đã duyệt — xoá ở 📚 Quản lý mẫu (tab Zalo AI).'); return; }
-  if (!confirm('Xoá viết tắt "' + (s ? s.abbr : '') + '"?' + (s && s.scope === 'team' ? '\n(Mục CHUNG — cả team sẽ không dùng được nữa.)' : ''))) return;
+  if (!(await uiConfirm('Xoá viết tắt "' + (s ? s.abbr : '') + '"?' + (s && s.scope === 'team' ? '\n(Mục CHUNG — cả team sẽ không dùng được nữa.)' : '')))) return;
   try {
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteVietTat', id: id }) });
     var d = await r.json();
@@ -783,12 +783,12 @@ async function vtImportFile(file) {
   if (!files && plan.items.some(function (x) { return x.imgs.length; })) { plan.items.forEach(function (x) { x.imgs = []; }); plan.noMedia = true; }   // file .json trần không có hình
   if (!plan.items.length) { say('Không có mục nào để nhập.'); return; }
   var scope = 'me';
-  if (_vtSt.canTeam && confirm('Nhập ' + plan.items.length + ' mục làm mục CHUNG cho cả team?\n\nOK = Chung (cả team)\nHủy = Của tôi (chỉ mình bạn)')) scope = 'team';
+  if (_vtSt.canTeam && (await uiConfirm('Nhập ' + plan.items.length + ' mục làm mục CHUNG cho cả team?\n\nOK = Chung (cả team)\nHủy = Của tôi (chỉ mình bạn)'))) scope = 'team';
   var have = {}; (_vtSt.list || []).forEach(function (s) { if (s.scope === scope) have[_vtFold(s.abbr)] = 1; });
   var todo = plan.items.filter(function (x) { var k = _vtFold(x.abbr); if (have[k]) return false; have[k] = 1; return true; });
   var dup = plan.items.length - todo.length;
   if (!todo.length) { say('Tất cả ' + plan.items.length + ' mục đã có sẵn (trùng viết tắt) — không nhập gì.'); return; }
-  if (!confirm('Nhập ' + todo.length + ' mục (' + (scope === 'team' ? 'CHUNG' : 'của tôi') + ')' + (dup ? ', bỏ ' + dup + ' mục trùng' : '') + (plan.audio ? ', bỏ ' + plan.audio + ' ghi âm (chưa hỗ trợ)' : '') + '?')) return;
+  if (!(await uiConfirm('Nhập ' + todo.length + ' mục (' + (scope === 'team' ? 'CHUNG' : 'của tôi') + ')' + (dup ? ', bỏ ' + dup + ' mục trùng' : '') + (plan.audio ? ', bỏ ' + plan.audio + ' ghi âm (chưa hỗ trợ)' : '') + '?'))) return;
   _vtImporting = true;
   var done = 0, okN = 0, imgN = 0, errs = [], next = 0, cache = {};
   async function upImg(name) {

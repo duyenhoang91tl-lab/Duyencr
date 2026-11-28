@@ -376,7 +376,7 @@ async function pkcFind() {
 }
 async function pkcLink(convId, curPhone) {
   var P = _pkc; if (!P.phone) return;
-  if (curPhone && curPhone !== P.phone && !confirm('Hội thoại này đang gắn với SĐT ' + curPhone + '. Chuyển sang khách này (' + P.phone + ')?')) return;
+  if (curPhone && curPhone !== P.phone && !(await uiConfirm('Hội thoại này đang gắn với SĐT ' + curPhone + '. Chuyển sang khách này (' + P.phone + ')?'))) return;
   try {
     var j = await (await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'pkChatLink', convId: convId, phone: P.phone }) })).json();
     if (!j || !j.ok) { if (typeof toast === 'function') toast('✕ ' + ((j && j.error) || 'Gắn lỗi')); return; }

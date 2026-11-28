@@ -1872,7 +1872,7 @@ async function _srBcSave_(i){
   cur.names.forEach(function(nm, k){ if (cur.amts[k] > 0) rows.push({ sales: [nm], tong: cur.amts[k] }); });
   if (!rows.length){ toast('❌ Chưa có sale nào có tiền'); return; }
   var txt = cur.names.map(function(nm, k){ return nm + ': ' + fmt(cur.amts[k]) + 'đ'; }).join('\n');
-  if (typeof confirm === 'function' && !confirm('Lưu chia tay đơn ' + cur.code + '?\n\n' + txt + '\n\nTổng ' + fmt(cur.total) + 'đ. Từ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).')) return;
+  if (typeof confirm === 'function' && !(await uiConfirm('Lưu chia tay đơn ' + cur.code + '?\n\n' + txt + '\n\nTổng ' + fmt(cur.total) + 'đ. Từ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).'))) return;
   try{
     var old = await _splitFixGetExtra_();
     await _splitFixPutExtra_(splitFixMergeExtra_(old, cur.code, rows));
@@ -1986,11 +1986,11 @@ function _srPosMonthPanelHtml_(){
 async function _srPosMonthClose_(force){
   var month = (document.getElementById('sr-posm-close')||{}).value;
   if (!month){ toast('Chọn tháng cần chốt'); return; }
-  if (!force && !confirm('Chốt doanh thu Pos tháng '+month+' làm mốc?\n\nChỉ nên chốt khi đã cập nhật ĐỦ dữ liệu tháng này. Sau khi chốt, đơn tháng '+month+' bị hoàn/hủy về sau sẽ bị trừ vào doanh thu tháng kế tiếp.')) return;
+  if (!force && !(await uiConfirm('Chốt doanh thu Pos tháng '+month+' làm mốc?\n\nChỉ nên chốt khi đã cập nhật ĐỦ dữ liệu tháng này. Sau khi chốt, đơn tháng '+month+' bị hoàn/hủy về sau sẽ bị trừ vào doanh thu tháng kế tiếp.'))) return;
   try {
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'closePosMonth', month: month, force: !!force }) });
     var d = await r.json();
-    if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
+    if (d && d.needForce){ if ((await uiConfirm(d.error+'\n\nGhi đè mốc cũ?'))) return _srPosMonthClose_(true); return; }
     if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
     toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
     try { _srLoad(); } catch(e2){}   // tải lại màn đang xem (K); Báo cáo B không còn bị trừ nên không cần nhảy theo mốc
@@ -2398,7 +2398,7 @@ async function _impUndo_(batchId){
       + (d0.skippedNoRow ? '• ' + fmt(d0.skippedNoRow) + ' ô không tìm thấy đơn tương ứng — bỏ qua\n' : '')
       + '\nChỉ hoàn tác được 1 lần. Tiếp tục?';
     if (!d0.wouldDelete && !d0.wouldRestoreCells) { toast('ℹ️ Không còn gì để hoàn tác (các dòng/ô của lần nhập này đã không còn hoặc đã bị sửa).'); return; }
-    if (!confirm(msg)) { toast('Đã hủy — chưa thay đổi gì.'); return; }
+    if (!(await uiConfirm(msg))) { toast('Đã hủy — chưa thay đổi gì.'); return; }
     var d = await call(false);
     if (d.error) throw new Error(d.error);
     toast('↩️ Đã hoàn tác: xóa ' + fmt(d.deleted || 0) + ' dòng, khôi phục ' + fmt(d.restoredCells || 0) + ' ô.');

@@ -7,7 +7,7 @@ let scanReply = { ok: true, rootName: 'Hình ảnh theo File Giá', folders: [ {
 const ctx = { console, Date, JSON, Math, String, Number, Array, Object, setTimeout, clearTimeout, encodeURIComponent, Promise,
   gsUrl: 'https://x/exec', esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   document: { getElementById: id => id === 'xt-wrap-plib' ? wrap : null, activeElement: null, querySelector: () => null },
-  localStorage: { getItem: () => 'TOK' }, registerExtraTab: (id, label, fn) => { ctx._reg = { id, label, fn }; }, confirm: () => true, toast() {},
+  localStorage: { getItem: () => 'TOK' }, registerExtraTab: (id, label, fn) => { ctx._reg = { id, label, fn }; }, confirm: () => true, get uiConfirm() { return async (...a) => this.confirm(...a); }, toast() {},
   switchTab: t => { ctx._tab = t; },
   fetch: (url, o) => {
     calls.push(url);

@@ -16,7 +16,7 @@ const mk=()=>{
     return res({ok:true});
   };
   Object.assign(w,{gsUrl:'https://gs.example/exec',currentUser:{role:'admin'},esc:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
-    toast:m=>S.toasts.push(m),confirm:()=>S.confirmAns,_ov:{data:null},teams:[{name:'Team A',members:['An','Binh']},{name:'Team B',members:['Chi']}],accounts:[{name:'Dung',names:'dung1,dung2'}],
+    toast:m=>S.toasts.push(m),confirm:()=>S.confirmAns, get uiConfirm() { return async (...a) => this.confirm(...a); },_ov:{data:null},teams:[{name:'Team A',members:['An','Binh']},{name:'Team B',members:['Chi']}],accounts:[{name:'Dung',names:'dung1,dung2'}],
     _ovAfterRoomChange:()=>{S.ovCalls++;if(S.ovThrow)throw new Error('ov fail')}});
   w.eval(code);return {w,S,$:id=>w.document.getElementById(id)};
 };
@@ -59,9 +59,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  c.w.eval("_dp.list=[{key:'a',label:'Sale'},{key:'b',label:'sale '}]");await c.w.eval('_dpSave()');
  t('2 phòng trùng tên (khác hoa/thường) → báo lỗi, KHÔNG gửi',/trùng tên/.test(c.$('dp-errbar').textContent)&&c.S.posts.length===0);
  // xoá phòng có người
- c=mk();await c.w.openDeptSettings();c.S.confirmAns=false;c.w.eval('_dpDelRoom(0)');
+ c=mk();await c.w.openDeptSettings();c.S.confirmAns=false;await c.w.eval('_dpDelRoom(0)');
  t('xoá phòng đang có người, chọn Hủy → giữ nguyên phòng và người',c.w.eval('_dp.list.length')===2&&c.w.eval("_dp.map.An")==='sale');
- c.S.confirmAns=true;c.w.eval('_dpDelRoom(0)');
+ c.S.confirmAns=true;await c.w.eval('_dpDelRoom(0)');
  t('xoá phòng đang có người, chọn Đồng ý → bỏ phòng + người thành chưa phân phòng + đánh dấu chưa lưu',c.w.eval('_dp.list.length')===1&&c.w.eval("_dp.map.An")===undefined&&c.$('dp-dirty').style.display==='');
  // team + từng người
  c=mk();await c.w.openDeptSettings();c.w.eval("_dpSetSec('teams')");

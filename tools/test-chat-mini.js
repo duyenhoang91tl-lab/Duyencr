@@ -16,7 +16,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   w.toast = m => toasts.push(m);
   w.switchTab = (t) => switched.push(t);
   w.innerWidth = 1600;
-  w.confirm = () => true;
+  w.confirm = () => true; w.uiConfirm = async (...a) => w.confirm(...a);
   let oscs = 0;   // dem so not am bao (Web Audio gia)
   const gp = () => ({ setValueAtTime() {}, exponentialRampToValueAtTime() {} });
   w.AudioContext = function () { return { currentTime: 0, state: 'running', destination: {}, resume() {}, createOscillator: () => { oscs++; return { frequency: gp(), connect() {}, start() {}, stop() {} }; }, createGain: () => ({ gain: gp(), connect() {} }) }; };

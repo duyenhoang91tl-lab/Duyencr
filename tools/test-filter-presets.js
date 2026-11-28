@@ -18,7 +18,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
       _srState.optionsLoaded = true; _srState._teamsAutoSynced = true;
       _srState.saleOptions = ['anhNP1999','dungnguyen1995','thuNH1986','yenNTH2004']; _srState.saleBOptions = _srState.saleOptions.slice();
       _srState.kenhOptions = ['K1','K2']; _srState.dateFrom = '2026-10-01'; _srState.dateTo = '2026-10-12';
-      window.__prompt = 'Văn phòng'; window.prompt = function(){ return window.__prompt; }; window.confirm = function(){ return true; };
+      window.__prompt = 'Văn phòng'; window.prompt = function(){ return window.__prompt; }; window.confirm = function(){ return true; }; window.uiConfirm = function(){ return Promise.resolve(window.confirm.apply(window, arguments)); };
       _srState.sub = 'A'; renderSalesReportTab();`);
     const ctl = () => D.getElementById('fp-ctl'), rows = () => [...D.querySelectorAll('#fp-gear .fp-mrow')];
     const one = () => D.querySelector('#fp-ctl .fp-one'), sel = () => D.querySelector('#fp-ctl .fp-sel'), off = () => D.querySelector('#fp-ctl .fp-off');
