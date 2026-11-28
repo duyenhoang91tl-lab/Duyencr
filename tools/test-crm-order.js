@@ -57,7 +57,8 @@ ok(/qua nhieu/.test(bad({ phone: '0912345678', items: Array.from({ length: 61 },
 // 4) lưu: sheet RIÊNG 'Đơn CRM', KHÔNG đụng DT Tổng/OrderData; client không ép được tổng tiền
 let r = save(Object.assign({}, base, { total: 1, due: 1, gross: 1 }), 'K1');
 ok(r.ok && r.duplicate === false && /^CRM\d{6}-0001$/.test(r.order.orderId) && r.order.total === 931000 && r.order.status === 'Mới' && r.order.createdBy === 'hoa', 'lưu đơn + server tự tính tiền: ' + JSON.stringify(r));
-ok(Object.keys(sheets).join('|') === 'Đơn CRM', 'chỉ tạo sheet "Đơn CRM", không đụng sheet khác: ' + Object.keys(sheets));
+// 28/11: đơn CRM nay TÍCH ĐIỂM → ngoài "Đơn CRM" chỉ thêm sổ "LoyaltyPoints" (xem test-crm-order-earn.js); KHÔNG sheet nào khác (kho/DT/Pos...).
+ok(Object.keys(sheets).join('|') === 'Đơn CRM|LoyaltyPoints', 'chỉ có sheet "Đơn CRM" + sổ điểm "LoyaltyPoints", không đụng sheet khác: ' + Object.keys(sheets));
 ok(rowsOf('Đơn CRM').length === 1 && String(rowsOf('Đơn CRM')[0][13]) === '0943028399', 'đúng 1 dòng, SĐT giữ số 0');
 // 5) chống bấm Lưu 2 lần (cùng refKey) → trả đơn cũ, KHÔNG thêm dòng; refKey khác → đơn mới số thứ tự tiếp
 r = save(base, 'K1'); ok(r.ok && r.duplicate === true && r.order.orderId.endsWith('-0001') && rowsOf('Đơn CRM').length === 1, 'cùng refKey không tạo đơn 2: ' + JSON.stringify(r).slice(0, 150));

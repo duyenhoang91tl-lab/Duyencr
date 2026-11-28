@@ -89,6 +89,8 @@ async function _cdRun(deep, pre) {
   function flush() { pre.textContent = out.join('\n'); }
   flush();
   var direct = (typeof GAS_URL_DIRECT !== 'undefined') ? GAS_URL_DIRECT : '', viaWorker = (typeof WORKER_URL !== 'undefined' && gsUrl === WORKER_URL);
+  // 0) ping: Apps Script trả lời ngay, KHÔNG mở Sheet → đo độ trễ thuần. Đọc kết quả: ping≈count ⇒ chậm do nền tảng Apps Script (cần Worker đọc thẳng Supabase); ping << count ⇒ chậm do mở/đọc Sheet (có thể tối ưu trong GAS).
+  var t0p = await _cdTest('0) ping (Apps Script, không mở Sheet) qua ' + (viaWorker ? 'Worker' : 'máy chủ hiện tại'), gsUrl + sep + 'action=ping&_=' + Date.now(), { timeout: 20000 }); out.push(t0p.line); flush();
   var t1 = await _cdTest('1) count qua ' + (viaWorker ? 'Worker' : 'máy chủ hiện tại'), gsUrl + sep + 'action=count&_=' + Date.now(), { timeout: 20000 }); out.push(t1.line); flush();
   var t2 = null;
   if (direct && gsUrl !== direct) { t2 = await _cdTest('2) count gọi THẲNG Apps Script', direct + '?action=count&src=web&_=' + Date.now(), { timeout: 30000 }); out.push(t2.line); flush(); }

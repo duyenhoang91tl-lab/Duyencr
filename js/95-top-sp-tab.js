@@ -65,9 +65,9 @@ function tspAddName(){
   if (l.some(function(x){ return _tsFold(x.name) === f; })){ _ts.msg = 'Tên này đã có trong danh sách loại trừ.'; tspNotify(false); return; }
   l.push({ key:'x:' + f, name:name }); _ts.exQ = ''; tspSaveExclude(l);   // server khớp cả theo TÊN bỏ dấu/hoa thường nên khoá 'x:' vẫn chặn đúng
 }
-function tspExcludeSp(code, name){
+async function tspExcludeSp(code, name){
   if (!_tsCanEdit()) return;
-  if (!confirm('Loại "' + name + '" khỏi thống kê Top sản phẩm?\n(Áp dụng cho mọi người; bỏ loại lại bất cứ lúc nào ở khung "Sản phẩm đã loại trừ".)')) return;
+  if (!(await uiConfirm('Loại "' + name + '" khỏi thống kê Top sản phẩm?\n(Áp dụng cho mọi người; bỏ loại lại bất cứ lúc nào ở khung "Sản phẩm đã loại trừ".)'))) return;
   var key = tspKey(code, name), l = tspExclude(); if (!l.some(function(x){ return x.key === key; })) l.push({ key:key, name:name });
   tspSaveExclude(l);
 }

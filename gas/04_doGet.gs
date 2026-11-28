@@ -1,6 +1,9 @@
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || '';
+  // ping (28/11/2026): trả lời NGAY, KHÔNG mở Sheet nào, KHÔNG đọc Script Properties — để ĐO độ trễ thuần của Apps Script (so với `count` mở 2 bảng tính ≈3,9 s đo từ máy Duyên).
+  // NGUYÊN NHÂN GỐC cần có: doGetCore_ luôn `getCrmSS_()` (mở bảng tính) trước MỌI action nên không biết 3,9 s là do mở Sheet hay do nền tảng Apps Script. Hai hướng xử lý khác nhau hoàn toàn.
+  if (action === 'ping') return jsonOut_({ ok: true, ver: PK_GAS_VER_, t: Date.now() });
   if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
@@ -13,8 +16,10 @@ function doGet(e) {
   if (PLIB_GET_ACTIONS_[action] === 1) return plibDoGet_(action, p);   // thu vien san pham (thu muc anh theo SP/combo): tu kiem token
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
-  if (LOYALTY_GET_ACTIONS_[action] === 1) return loyaltyDoGet_(action, p);   // diem tich luy + lich su hang khach (token, moi tai khoan dang nhap)
+  if (LOYALTY_GET_ACTIONS_[action] === 1) return loyaltyDoGet_(action, p);
+  if (KPICOMMIT_GET_ACTIONS_[action] === 1) return kpiCommitDoGet_(action, p);   // KPI tu cam ket (token): danh sach theo thang   // diem tich luy + lich su hang khach (token, moi tai khoan dang nhap)
   if (CRM_ORDER_GET_ACTIONS_[action] === 1) return crmOrderDoGet_(action, p);   // danh sach Don CRM (sheet rieng, token): admin xem tat ca, tai khoan khac chi don cua minh
+  if (KENH_GET_ACTIONS_[action] === 1) return kenhDoGet_(action, p);   // Don cac kenh theo giai doan kieu Base (sheet rieng 'Don Kenh', token)
   if (TEAMBONUS_GET_ACTIONS_[action] === 1) return teamBonusDoGet_(action, p);   // thuong phat doi Sale Online/Van phong (Bao cao B): token -> phan quyen
   if (SPLIT_GET_ACTIONS_[action] === 1) return splitDoGet_(action, p);   // don chia (bao cao M + danh sach don chia): token -> phan quyen theo vai tro
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
@@ -581,8 +586,11 @@ function doGetCore_(e) {
     // ── VIET TAT (go tat -> chen noi dung; 2026-10-25): danh sach cho CRM (quan ly) va extension Pancake AI (go tat trong o chat). Chi tra muc CHUNG team + muc CUA MINH. ──
     if (action === 'vietTat') {
       var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
-      return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
+      var _vo = { ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' };
+      try { var _vs = _vpSummaryFor_(_vc); _vo.proposals = _vs.own; if (_vs.adminPending !== null) _vo.adminPending = _vs.adminPending; } catch (eVs) {}   // app/extension: trạng thái đề xuất CỦA MÌNH + số đề xuất chờ duyệt (admin)
+      return jsonOut_(_vo);
     }
+    if (action === 'vietTatProposals') return jsonOut_(vietTatProposalsList_(_tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // admin: tất cả (chờ duyệt trước); người khác: đề xuất của mình
     if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
     if (action === 'vietTatAudio') return jsonOut_(vietTatAudio_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // app/extension tai byte 1 tep ghi am cua muc Viet tat (base64)
     if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)

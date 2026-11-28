@@ -226,7 +226,7 @@ async function _cfgBannedSave(reset){
     if (bad){ toast('Dòng quá dài: "' + bad.tuCam.slice(0, 30) + '…" (từ tối đa 100 ký tự, chữ thay thế tối đa 300)'); return; }
     if (P.items.length > 500){ toast('Tối đa 500 từ cấm (đang có ' + P.items.length + ')'); return; }
     out = { useSheet: !!(g('cfg-ban-sheet') || {}).checked, items: P.items };
-    if (!out.useSheet && !out.items.length && !confirm('Bạn đang TẮT sheet và để trống danh sách → sẽ KHÔNG còn từ cấm nào. Vẫn lưu?')) return;
+    if (!out.useSheet && !out.items.length && !(await uiConfirm('Bạn đang TẮT sheet và để trống danh sách → sẽ KHÔNG còn từ cấm nào. Vẫn lưu?'))) return;
     if (P.dup) toast('Đã bỏ ' + P.dup + ' dòng trùng');
   }
   var oldStr = JSON.stringify(_cfgBanned), btn = g('cfg-ban-save'); if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang lưu…'; }

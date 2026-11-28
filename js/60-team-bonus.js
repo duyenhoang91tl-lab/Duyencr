@@ -273,7 +273,7 @@ async function _tbSuggestIgnore(i){
   catch (e) { g.err = 'Không bỏ qua được: ' + e.message; _tbRepaint_(); }
 }
 async function _tbDeletePenalty(id){
-  if (!confirm('Xoá dòng phạt này?')) return;
+  if (!(await uiConfirm('Xoá dòng phạt này?'))) return;
   try { await _tbPost_({ action: 'teamPenaltyDelete', id: id }); await _tbLoad(true); }
   catch (e) { _tbState.err = 'Không xoá được: ' + e.message; _tbRepaint_(); }
 }

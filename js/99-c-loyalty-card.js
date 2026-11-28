@@ -98,7 +98,7 @@ async function _loyRedeem(){
   var ov = document.getElementById('loy-ov'), pt = document.getElementById('loy-pt');
   var x = _loyPreview(ov && ov.value, pt && pt.value, (_loy.data.points || {}).balance, (_loy.data.config || {}).pointValue);
   if (x.points <= 0){ _loy.msg = 'Nhập giá trị đơn > 0 và số điểm > 0 (trong số dư).'; _loyRender(); return; }
-  if (!confirm('Trừ ' + x.points + ' điểm của khách này, giảm ' + _loyVnd(x.discount) + ' cho đơn ' + _loyVnd(Number(ov.value)) + '?\nĐiểm đã trừ không tự hoàn lại.')) return;
+  if (!(await uiConfirm('Trừ ' + x.points + ' điểm của khách này, giảm ' + _loyVnd(x.discount) + ' cho đơn ' + _loyVnd(Number(ov.value)) + '?\nĐiểm đã trừ không tự hoàn lại.'))) return;
   _loy.busy = true; var ph = _loy.phone; if (!_loy.refKey) _loy.refKey = _loyNewRef();
   try {
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'loyaltyRedeem', phone: ph, orderValue: Number(ov.value), points: x.points, refKey: _loy.refKey }) }), d = await r.json();
@@ -112,7 +112,7 @@ async function _loyRedeem(){
 }
 async function _loyUndo(i){
   var r = _loy.data && _loy.data.ledger && _loy.data.ledger[i]; if (_loy.busy || !r || r.type !== 'redeem' || r.undone || !_loyIsAdmin()) return;
-  if (!confirm('Hoàn tác lần dùng ' + r.points + ' điểm (' + _loyDmy(r.date) + ')?\n' + r.points + ' điểm sẽ quay lại số dư của năm đó (nếu năm đó đã qua thì điểm đã hết hạn). Có ghi nhật ký.')) return;
+  if (!(await uiConfirm('Hoàn tác lần dùng ' + r.points + ' điểm (' + _loyDmy(r.date) + ')?\n' + r.points + ' điểm sẽ quay lại số dư của năm đó (nếu năm đó đã qua thì điểm đã hết hạn). Có ghi nhật ký.'))) return;
   _loy.busy = true; var ph = _loy.phone;
   try {
     var res = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'loyaltyUndo', phone: ph, key: r.key }) }), d = await res.json();

@@ -124,7 +124,7 @@ async function _tfmSave(){
   await loadTaskFlows(true); _tfm.draft = null; _tfmRender();
 }
 async function _tfmDelete(id){
-  if (!confirm('Xóa quy trình này?')) return;
+  if (!(await uiConfirm('Xóa quy trình này?'))) return;
   try{ var r = await _tfPost({ action:'deleteTaskFlow', id:id }); if (r && r.error){ alert(r.error); return; } }
   catch(e){ alert('Lỗi kết nối, thử lại'); return; }
   await loadTaskFlows(true); _tfmRender();

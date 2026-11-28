@@ -20,7 +20,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     w.eval(`gsUrl = 'https://script.google.com/macros/s/TEST/exec'; _authAccount = { username:'admin1', role:'admin' }; currentUser = { name:'Admin', names:[], role:'admin', team:'' };
       _srFetch = async function(){ return null; }; _srState.optionsLoaded = true; _srState._teamsAutoSynced = true;
       _srState.saleOptions = ['anhNP1999','dungnguyen1995']; _srState.saleBOptions = _srState.saleOptions.slice();
-      window.prompt = function(){ return 'MauMay'; }; window.confirm = function(){ return true; };
+      window.prompt = function(){ return 'MauMay'; }; window.confirm = function(){ return true; }; window.uiConfirm = function(){ return Promise.resolve(window.confirm.apply(window, arguments)); };
       _srState.sub = 'A'; renderSalesReportTab();`);
     await wait(150);
     const names = () => JSON.parse(w.eval('JSON.stringify(_fpList())')).map(p => p.name);

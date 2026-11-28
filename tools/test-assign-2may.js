@@ -26,7 +26,7 @@ const machine = () => {
   const m = { gsUrl: 'x', JSON, String, Set, console, Promise, fetch: server, saveLS() {}, updateMyDataBadge() {}, renderMyDataTab() {}, renderAssignHistory() {}, showAssignBackendWarning() {}, _writeFail_: (w, why) => { throw new Error(why); },
     normPhone: p => String(p), document: { getElementById: () => null, querySelector: () => null } };
   vm.createContext(m);
-  vm.runInContext('var _assignBackendOK, assignHistory = [];\nlet _doneQueue_ = Promise.resolve();\n' + ['_pushDoneToGS_', '_myBatchesOf_', 'toggleMyDataDone', 'pullAssignHistory'].map(n => grab(web, n)).join(''), m);
+  vm.runInContext('var _assignBackendOK, assignHistory = [];\nlet _doneQueue_ = Promise.resolve();\n' + ['_pushDoneToGS_', '_myBatchesOf_', 'toggleMyDataDone', '_assignMergeDone_', 'pullAssignHistory'].map(n => grab(web, n)).join(''), m);
   return m;
 };
 const A = '0900000001', B = '0900000002';
@@ -42,5 +42,34 @@ const row = id => S.readAssign_(sh).find(h => h.id === id);
   ok('nhan vien bam trong luc con giu dot da xoa: dot KHONG song lai', !row('d2') && row('d1').donePhones.join() === B);
   await nv.pullAssignHistory();
   ok('lan tai tiep theo: may nhan vien go dot da xoa', nv.assignHistory.map(h => h.id).join() === 'd1');
+  // ── Dau tich Pancake AI hien tren web cho dot DA TAI VE (khong can xoa du lieu may) ──
+  rows = [['d3', '2026-11-03', 'Lan', 'dot 3', JSON.stringify([A, B]), '[]', 0]]; props = {};
+  const m = machine(); let drawn = 0; m.document = { getElementById: () => ({ style: { display: 'flex' } }), querySelector: () => null }; m.renderMyDataTab = () => drawn++;
+  const done = () => (m.assignHistory[0].donePhones || []).slice().sort().join();
+  await m.pullAssignHistory();
+  S.toggleAssignDone_('Lan', B, true); await m.pullAssignHistory();
+  ok('Pancake tich B: web hien da xong sau lan tai tiep, ve lai tab Data cua toi', done() === B && drawn === 1);
+  await m.pullAssignHistory();
+  ok('may chu khong doi: khong ve lai', done() === B && drawn === 1);
+  S.toggleAssignDone_('Lan', B, false); await m.pullAssignHistory();
+  ok('Pancake bo tich B: web bo theo', done() === '' && drawn === 2);
+  // web vua bam A nhung may chu CHUA nhan (mang cham) -> lan tai xen giua khong duoc xoa dau
+  let release; const gate = new Promise(r => { release = r; });
+  m.fetch = async (u, o) => { if (o && o.method === 'POST') await gate; return server(u, o); };
+  m.toggleMyDataDone(A, 'Lan', true); S.toggleAssignDone_('Lan', B, true); await m.pullAssignHistory();
+  ok('dau vua bam chua gui toi may chu van con, dau cua Pancake van vao', done() === A + ',' + B);
+  const old = await (await server('x')).json();                  // cau tra loi cu: chup TRUOC khi may chu nhan A
+  release(); await vm.runInContext('_doneQueue_', m);
+  m.fetch = async () => ({ json: async () => old }); await m.pullAssignHistory();
+  ok('cau tra loi cu ve muon khong xoa dau da bam', done() === A + ',' + B);
+  m.fetch = server; await m.pullAssignHistory(); m.toggleMyDataDone(A, 'Lan', false); await vm.runInContext('_doneQueue_', m); await m.pullAssignHistory();
+  ok('bo tich A tren web: ca may chu va web deu bo, B con', done() === B && row('d3').donePhones.join() === B);
+  // gui loi (mat mang) -> giu dau tren may
+  m.fetch = async (u, o) => { if (o && o.method === 'POST') throw new Error('mat mang'); return server(u, o); }; m._writeFail_ = () => {};
+  m.toggleMyDataDone(A, 'Lan', true); await vm.runInContext('_doneQueue_', m); await m.pullAssignHistory();
+  ok('gui loi: dau tren may khong bi lan tai sau xoa', done() === A + ',' + B);
+  // may da luu tu ban cu (chua co moc srvDone), co dau chi o may: giu, dong thoi nhan them dau tu may chu
+  m.fetch = server; m.assignHistory = [{ id: 'd3', date: '2026-11-03', csName: 'Lan', phones: [A, B], donePhones: [A] }]; await m.pullAssignHistory();
+  ok('du lieu cu tren may: khong mat dau cu, nhan them dau Pancake', done() === A + ',' + B);
   process.exit(fail ? 1 : 0);
 })();

@@ -83,7 +83,7 @@ async function saveAiExample(i, btn) {
 }
 async function deleteAiExample(i) {
   var x = _aiExamples[i];
-  if (!x || !confirm('Xóa mẫu AI đã học này? AI sẽ không học theo mẫu này nữa.')) return;
+  if (!x || !(await uiConfirm('Xóa mẫu AI đã học này? AI sẽ không học theo mẫu này nữa.'))) return;
   try {
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteAIExample', id: x.id }) });
     var d = await r.json();
@@ -439,7 +439,7 @@ async function approveMsgTemplateUI(id, decision) {
 }
 
 async function deleteMsgTemplateUI(id) {
-  if (!confirm('Xóa mẫu tin nhắn này?')) return;
+  if (!(await uiConfirm('Xóa mẫu tin nhắn này?'))) return;
   try {
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteMessageTemplate', id: id, createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '' }) });
     var d = await r.json();

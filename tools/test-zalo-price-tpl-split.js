@@ -12,7 +12,7 @@ function fnSrc(name) {
   throw new Error('khong khop ngoac ' + name);
 }
 const NAMES = ['escHtml', 'zaiFold_', 'zaiRankTpls_', 'zaiTplLines_', 'isMyOpenTplZai_', '_zaiTplStatus_', 'fillTplGroupSelectZai_', 'renderMsgTemplateRowsZai_', 'loadMsgTemplatesZai_', 'doPriceSearchZai_', 'renderPriceRowsZai_', '_zaiAiFallbackHint_'];
-const chunk = "let _zaiMsgTemplates = [], _zaiMsgTplGroups = [], _currentCS = 'Mai'; const GAS_URL = 'https://gas.test/exec';\n" +
+const chunk = "let _zaiMsgTemplates = [], _zaiMsgTplGroups = [], _currentCS = 'Mai', _zaiStonePref = ''; const GAS_URL = 'https://gas.test/exec';\n" +
   "const escAttrZai_ = (s) => escHtml(s).replace(/\"/g, '&quot;').replace(/'/g, '&#39;'); const _zaiTplFlashProxy_ = {}; const fillZaloInput_ = () => {}; const openTplFormZai_ = () => {}; const deleteTplZai_ = () => {};\n" +
   NAMES.map(fnSrc).join('\n') + "\nreturn { doPriceSearchZai_, renderPriceRowsZai_, loadMsgTemplatesZai_, renderMsgTemplateRowsZai_, fillTplGroupSelectZai_, _zaiAiFallbackHint_, getTpls: () => _zaiMsgTemplates };";
 const T = [
@@ -36,7 +36,7 @@ function mk(opts) {
   d.getElementById('zai-price-q').value = 'nhẫn vàng'; await api.doPriceSearchZai_();
   let html = d.getElementById('zai-price-result').innerHTML;
   ok(urls.length === 1 && /action=priceSearch/.test(urls[0]) && !urls.some(u => /messageTemplates/.test(u)), 'tra gia CHI goi priceSearch (khong tai mau tin nhan): ' + urls.join(' | '));
-  ok(/Nhẫn vàng 10K Type B/.test(html) && /Lắc tay bạc/.test(html) && /Giá/.test(html) && /4450/.test(html), 'hien san pham + gia');
+  ok(/Nhẫn vàng 10K Type B/.test(html) && /Lắc tay bạc/.test(html) && /Giá thường/.test(html) && /4\.450\.000đ/.test(html) && !/4450/.test(html), 'hien san pham + gia QUY RA DONG (4450 nghin -> 4.450.000đ, y het Pancake; truoc day hien so nghin tho)');
   ok(!/Tin nhắn gợi ý|zai-tpl-item|Dạ nhẫn vàng giá/.test(html), 'KHONG con tin nhan goi y / the mau trong ket qua tra gia');
   ({ d, api, urls } = mk({ priceFail: true })); await api.doPriceSearchZai_();
   ok(/Lỗi: sheet loi/.test(d.getElementById('zai-price-result').innerHTML), 'loi bang gia -> bao loi ro');

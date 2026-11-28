@@ -8,7 +8,7 @@ const calls = [], bodies = [], resolvers = [], host = { id: '', style: {}, inner
 const tabs = { parentNode: { insertBefore: h => { ctxHost.set(h); } } }; const ctxHost = { cur: null, set(h) { this.cur = h; } };
 let reply = null, confirmAns = true; const toasts = [];
 const ctx = { console, Date, JSON, Math, Number, String, Object, Array, setTimeout, encodeURIComponent, module: undefined,
-  gsUrl: 'https://x/exec', currentPhone: '0912345678', toast: m => toasts.push(m), confirm: () => confirmAns,
+  gsUrl: 'https://x/exec', currentPhone: '0912345678', toast: m => toasts.push(m), confirm: () => confirmAns, get uiConfirm() { return async (...a) => this.confirm(...a); },
   esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   document: { getElementById: id => id === 'dp-loy' ? ctxHost.cur : (els[id] || null), querySelector: () => tabs, createElement: () => host },
   fetch: (url, o) => { calls.push(url); if (o && o.body) bodies.push(JSON.parse(o.body)); return new Promise(res => resolvers.push(() => res({ json: async () => reply(url) }))); } };
@@ -54,18 +54,18 @@ run('_loyRender()'); ok(calls.length === 0 && host.innerHTML.includes('Hạng &a
   const set = (ov, pt) => { els['loy-ov'] = { value: ov }; els['loy-pt'] = { value: pt }; };
   bodies.length = 0; set('2000000', '100'); confirmAns = false; await run('_loyRedeem()'); ok(!bodies.length, 'hủy xác nhận → không POST');
   set('', '100'); confirmAns = true; await run('_loyRedeem()'); ok(!bodies.length && ctx._loy.msg.includes('Nhập giá trị đơn'), 'đơn trống → không POST');
-  set('2000000', '100'); reply = () => ({ error: 'loi tam' }); let pr = run('_loyRedeem()'); resolvers.shift()(); await pr; const ref1 = bodies[0].refKey;
+  set('2000000', '100'); reply = () => ({ error: 'loi tam' }); let pr = run('_loyRedeem()'); await flush(); resolvers.shift()(); await pr; const ref1 = bodies[0].refKey;
   ok(bodies[0].action === 'loyaltyRedeem' && bodies[0].phone === '0912345678' && bodies[0].orderValue === 2000000 && bodies[0].points === 100 && ref1, 'POST đúng nội dung: ' + JSON.stringify(bodies[0]));
   ok(ctx._loy.msg.includes('loi tam'), 'hiện lỗi server'); resolvers.shift && 0;
   while (resolvers.length) resolvers.shift()();
   await flush();
   reply = u => /loyaltyGet/.test(u) ? DATA : { ok: true, redeemed: { points: 100, discount: 100000, payable: 1900000 }, points: { balance: 140 } };
-  pr = run('_loyRedeem()'); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
+  pr = run('_loyRedeem()'); await flush(); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
   ok(bodies[1].refKey === ref1, 'thử lại sau lỗi DÙNG LẠI refKey (chống trừ 2 lần)');
   ok(ctx._loy.msg.includes('Đã trừ 100 điểm') && ctx._loy.msg.includes('100.000đ') && ctx._loy.msg.includes('1.900.000đ') && toasts.some(t => t.includes('100 điểm')), 'báo thành công + số tiền');
   ok(ctx._loy.refKey === '', 'thành công → đổi refKey cho lần sau');
   reply = u => /loyaltyGet/.test(u) ? DATA : { ok: false, code: 'DUPLICATE' };
-  pr = run('_loyRedeem()'); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
+  pr = run('_loyRedeem()'); await flush(); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
   ok(ctx._loy.msg.includes('đã được ghi trước đó'), 'DUPLICATE báo không trừ lại');
   // ── hoàn tác (admin)
   const L2 = Object.assign({}, DATA, { ledger: [{ key: 'redeem|p|1', type: 'redeem', date: '2026-04-01', points: 40, amount: 2000000, note: '' }, { key: 'redeem|p|0', type: 'redeem', date: '2026-03-01', points: 10, amount: 500000, note: '', undone: true }, { type: 'undo', date: '2026-03-02', points: 10, amount: 500000, note: 'hoan tac' }] });
@@ -75,7 +75,7 @@ run('_loyRender()'); ok(calls.length === 0 && host.innerHTML.includes('Hạng &a
   ok(hh.includes('_loyUndo(0)') && !hh.includes('_loyUndo(1)') && !hh.includes('_loyUndo(2)'), 'admin chỉ thấy ↩ ở lần dùng CHƯA hoàn tác');
   ctx._loy.data = L2; ctx._loy.phone = '0912345678'; bodies.length = 0; confirmAns = false; await run('_loyUndo(0)'); ok(!bodies.length, 'hủy xác nhận → không POST');
   confirmAns = true; reply = u => /loyaltyGet/.test(u) ? DATA : { ok: true, undone: { points: 40 } };
-  pr = run('_loyUndo(0)'); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
+  pr = run('_loyUndo(0)'); await flush(); resolvers.shift()(); await pr; await flush(); while (resolvers.length) resolvers.shift()(); await flush();
   ok(bodies[0].action === 'loyaltyUndo' && bodies[0].key === 'redeem|p|1' && bodies[0].phone === '0912345678' && ctx._loy.msg.includes('Đã hoàn tác 40 điểm'), 'POST loyaltyUndo đúng key: ' + JSON.stringify(bodies[0]));
   ctx.currentUser = { role: 'sale' }; ctx._loy.data = L2; bodies.length = 0; await run('_loyUndo(0)'); ok(!bodies.length, 'non-admin gọi thẳng cũng không POST');
   console.log('ALL LOYALTY CARD TESTS PASSED');

@@ -12,7 +12,7 @@
 function _coBlank(){
   var who = '';
   try { who = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? String(currentUser.name) : ''; } catch(e){}
-  return { phone:'', custName:'', gender:'', birthday:'', recvName:'', recvPhone:'', province:'', district:'', ward:'', address:'', expectedDate:'', carrier:'',
+  return { phone:'', custName:'', gender:'', birthday:'', recvName:'', recvPhone:'', province:'', district:'', ward:'', address:'', addrOld:false, expectedDate:'', carrier:'',
     source:'', saleName:who, careName:'', marketer:'', tags:'', note:'', printNote:'', items:[], discType:'amt', discValue:0, freeShip:false, shipFee:0, surcharge:0, paid:0,
     pointsUse:0, promoApplied:null, promoCodes:'', refKey:'', busy:false, msg:'', msgOk:false, saved:null };
 }
@@ -177,6 +177,79 @@ function _coItemDiscType(i, v){ var it = _co.items[i]; if (!it) return; it.discT
 function _coSet(k, v){ _co[k] = v; _coSummary(); }
 function _coSetNum(k, v){ _co[k] = _coNum(v); _coSummary(); }
 function _coSetBool(k, v){ _co[k] = !!v; _coSummary(); }
+// ── Địa chỉ nhận hàng: MỚI (từ 01/07/2025: 34 tỉnh → phường/xã, KHÔNG còn quận/huyện) hoặc CŨ (63 tỉnh → quận/huyện → phường/xã) ──
+// Danh mục ở data/vn-address-{new,old}.json (sinh bởi tools/gen-vn-address.js), tải lười khi mở màn / khi tích địa chỉ cũ; tải lỗi → quay về ô gõ tay như trước.
+// Backend KHÔNG đổi: đơn vẫn lưu chữ vào province/district/ward ('district' rỗng khi địa chỉ mới). Ô <select> được js/99-e-select-search.js tự thêm khung gõ tìm không dấu.
+var _coAddr = { data: { 'new': null, old: null }, loading: {}, err: {} };
+function _coAddrKey(){ return _co.addrOld ? 'old' : 'new'; }
+// Hàm thuần: danh mục + lựa chọn hiện tại → { provs, dists, wards } (mảng tên). Địa chỉ mới không có quận/huyện.
+function _coAddrLists(data, old, prov, dist){
+  var out = { provs: [], dists: [], wards: [] };
+  if (!data || !data.p) return out;
+  data.p.forEach(function(p){ out.provs.push(p[0]); });
+  var pr = data.p.filter(function(p){ return p[0] === prov; })[0];
+  if (!pr) return out;
+  if (!old){ out.wards = pr[1].slice(); return out; }
+  pr[1].forEach(function(d){ out.dists.push(d[0]); });
+  var di = pr[1].filter(function(d){ return d[0] === dist; })[0];
+  if (di) out.wards = di[1].slice();
+  return out;
+}
+async function _coAddrLoad(which){
+  if (_coAddr.data[which] || _coAddr.loading[which]) return;
+  _coAddr.loading[which] = true; _coAddr.err[which] = ''; _coAddrRender();
+  try {
+    var r = await fetch('data/vn-address-' + which + '.json?v=20261128a');
+    if (r.ok === false) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    if (d && Array.isArray(d.p) && d.p.length) _coAddr.data[which] = d; else _coAddr.err[which] = 'Danh mục địa chỉ rỗng.';
+  } catch(e){ _coAddr.err[which] = 'Không tải được danh mục địa chỉ (' + (e && e.message || e) + ').'; }
+  _coAddr.loading[which] = false; _coAddrRender();
+}
+function _coAddrSelect(label, key, list, ph){
+  var cur = String(_co[key] || ''), has = !cur || list.indexOf(cur) >= 0;
+  return '<label style="display:block;font-size:12px;color:var(--muted)">' + label +
+    '<select id="co-f-' + key + '" onchange="_coAddrPick(\'' + key + '\',this.value)" style="' + _coInp + '">' +
+    '<option value="">' + _coEsc(ph) + '</option>' +
+    (has ? '' : '<option value="' + _coEsc(cur) + '" selected>' + _coEsc(cur) + ' (nhập tay)</option>') +
+    list.map(function(n){ return '<option value="' + _coEsc(n) + '"' + (n === cur ? ' selected' : '') + '>' + _coEsc(n) + '</option>'; }).join('') +
+    '</select></label>';
+}
+function _coAddrHtml(){
+  var which = _coAddrKey(), d = _coAddr.data[which], old = !!_co.addrOld;
+  if (!d){   // chưa có danh mục (đang tải / lỗi) → ô gõ tay như trước để vẫn nhập được địa chỉ
+    var msg = _coAddr.loading[which] ? 'Đang tải danh mục địa chỉ… (đang tải xong sẽ chuyển sang ô chọn; có thể gõ tay trước)' : (_coAddr.err[which] || '');
+    return _coField('Tỉnh / Thành', 'province') + (old ? _coField('Quận / Huyện', 'district') : '') + _coField('Phường / Xã', 'ward') +
+      (msg ? '<div style="grid-column:1/-1;font-size:11px;color:var(--muted)">' + _coEsc(msg) +
+        (_coAddr.err[which] ? ' <a href="#" onclick="_coAddr.err[_coAddrKey()]=\'\';_coAddrLoad(_coAddrKey());return false">Thử lại</a>' : '') + '</div>' : '');
+  }
+  var L = _coAddrLists(d, old, _co.province, _co.district);
+  var wardPh = !_co.province ? '— Chọn tỉnh trước —' : (old && !_co.district ? '— Chọn quận/huyện trước —' : (L.wards.length ? '— Chọn —' : '(không có phường/xã)'));
+  return _coAddrSelect('Tỉnh / Thành', 'province', L.provs, '— Chọn —') +
+    (old ? _coAddrSelect('Quận / Huyện', 'district', L.dists, _co.province ? '— Chọn —' : '— Chọn tỉnh trước —') : '') +
+    _coAddrSelect('Phường / Xã', 'ward', L.wards, wardPh);
+}
+function _coAddrRender(){
+  var el = null; try { el = document.getElementById('co-addr'); } catch(e){}
+  if (el) el.innerHTML = _coAddrHtml();
+}
+function _coAddrPick(key, v){
+  _co[key] = v;
+  if (key === 'province'){ _co.district = ''; _co.ward = ''; } else if (key === 'district'){ _co.ward = ''; }
+  _coAddrRender();
+}
+// Tích / bỏ tích "địa chỉ cũ": xoá quận/huyện + phường/xã (khác hệ nên không dùng lại được); giữ Tỉnh nếu tên vẫn có trong hệ mới chọn.
+function _coAddrToggle(on){
+  _co.addrOld = !!on; _co.district = ''; _co.ward = '';
+  var which = _coAddrKey();
+  _coRender();
+  Promise.resolve(_coAddrLoad(which)).then(function(){
+    if (_coAddrKey() !== which) return;   // đã bấm đổi lại trong lúc tải
+    var d = _coAddr.data[which];
+    if (d && _co.province && _coAddrLists(d, _co.addrOld, '', '').provs.indexOf(_co.province) < 0) _co.province = '';
+    _coAddrRender();
+  });
+}
 // ── Khách: tự điền theo SĐT ──
 async function _coFillCustomer(){
   var ph = String(_co.phone || '').replace(/\D/g, ''); if (ph.length < 9) return;
@@ -340,7 +413,7 @@ async function _coCmbLoad(){
 }
 function _coCmbVisible(){ return (_coCmb.rows || []).filter(function(c){ return c && c.usable; }).slice(0, 8); }
 function _coCmbQ(v){ _coCmb.q = v || ''; clearTimeout(_coCmb.timer); _coCmb.timer = setTimeout(_coCmbLoad, 400); }
-function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.rows.length && !_coCmb.loading) _coCmbLoad(); }
+function _coCmbToggle(){ _coCmb.open = !_coCmb.open; _coCmbRender(); if (_coCmb.open && !_coCmb.loading) _coCmbLoad(); }
 // Hàm thuần: combo → { lines:[dòng đơn], freeShip, ship, warn }.
 function _coCmbLines(c){
   var its = (c && c.items) || [], paid = its.filter(function(it){ return !it.gift; }), gifts = its.filter(function(it){ return it.gift; });
@@ -386,6 +459,15 @@ function _coCmbWithText(c){
   var t = _coCmbParseText(c.itemsText);
   return t.some(function(it){ return !it.gift && it.price > 0; }) ? Object.assign({}, c, { items: t }) : c;
 }
+async function _coCmbFresh(c){
+  try {
+    if (typeof gsUrl === 'undefined' || !gsUrl || !c || !c.code) return c;
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=comboList&q=' + encodeURIComponent(c.code) + '&_=' + Date.now(), { redirect:'follow' }), d = await r.json();
+    var f = d && d.ok && (d.rows || []).filter(function(x){ return x && String(x.code).toUpperCase() === String(c.code).toUpperCase(); })[0];
+    if (f){ var k = (_coCmb.rows || []).findIndex(function(x){ return x && x.code === f.code; }); if (k >= 0) _coCmb.rows[k] = f; return f; }
+  } catch (e) {}
+  return c;
+}
 async function _coCmbFillPrices(c){
   var its = ((c && c.items) || []).map(function(it){ return Object.assign({}, it); }), idx = [];
   its.forEach(function(it, k){ if (!it.gift && !(Number(it.price) > 0)) idx.push(k); });
@@ -399,10 +481,10 @@ async function _coCmbFillPrices(c){
 }
 async function _coCmbAdd(i){
   var c = _coCmbVisible()[i]; if (!c) return;
-  c = _coCmbWithText(c);
+  c = _coCmbWithText(await _coCmbFresh(c));   // luôn lấy bản combo MỚI NHẤT từ sheet: danh sách ở màn này chỉ tải 1 lần, sửa combo xong mà chưa tải lại trang sẽ còn giá cũ
   if ((c.items || []).some(function(it){ return !it.gift && !(Number(it.price) > 0); })){ _coCmb.msg = 'Đang tra giá từng món…'; _coCmbResRender(); c = await _coCmbFillPrices(c); }
   var r = _coCmbLines(c);
-  if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món (hoặc báo để deploy lại GAS) rồi thêm lại.';
+  if (!(c.items || []).some(function(it){ return !it.gift && Number(it.price) > 0; }) && !r.warn && r.lines.length) r.warn = 'Combo chưa có đơn giá từng món nên cả giá combo đang nằm ở món đầu — mở tab 🎁 Combo điền đơn giá từng món và bấm LƯU combo rồi thêm lại. (Sheet đang lưu: «' + String(c.itemsText || '(trống)').replace(/\\s*\\n\\s*/g, ' ⏎ ').slice(0, 140) + '»)';
   if (!r.lines.length){ _coCmb.msg = 'Combo này chưa có món nào.'; _coCmbResRender(); return; }
   r.lines.forEach(function(l){ _co.items.push(l); });
   if (r.freeShip) _co.freeShip = true; else if (r.ship > 0 && !_coNum(_co.shipFee)) _co.shipFee = r.ship;
@@ -525,7 +607,10 @@ function _coRender(keepFocus){
     '<div id="co-pick-res"></div><div id="co-cmb" style="margin-bottom:6px"></div>' +
     '<div id="co-items">' + (_co.items.length ? _co.items.map(_coItemRow).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px;border:1px dashed var(--border);border-radius:8px;text-align:center">Chưa có sản phẩm — tìm ở trên và bấm vào sản phẩm để thêm.</div>') + '</div>' +
     '<button class="btn sm" onclick="_coAddItem()">＋ Thêm dòng tay</button>' +
-    sec('📦 Nhận hàng') + '<div style="' + grid + '">' + _coField('Người nhận', 'recvName') + _coField('SĐT nhận', 'recvPhone', { type:'tel' }) + _coField('Tỉnh / Thành', 'province') + _coField('Quận / Huyện', 'district') + _coField('Phường / Xã', 'ward') + _coField('Địa chỉ cụ thể', 'address') + _coField('Ngày giao dự kiến', 'expectedDate', { type:'date' }) + _coField('Đơn vị vận chuyển', 'carrier') + '</div>' +
+    '<div style="display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:14px 0 2px"><span style="font-size:14px;font-weight:700">📦 Nhận hàng</span>' +
+    '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="co-addr-old"' + (_co.addrOld ? ' checked' : '') + ' onchange="_coAddrToggle(this.checked)"> Dùng địa chỉ cũ (có Quận/Huyện — trước 01/07/2025)</label></div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + (_co.addrOld ? 'Địa chỉ CŨ: Tỉnh/Thành → Quận/Huyện → Phường/Xã (63 tỉnh).' : 'Địa chỉ MỚI (từ 01/07/2025): Tỉnh/Thành → Phường/Xã, không còn Quận/Huyện (34 tỉnh).') + ' Bấm vào ô rồi gõ để tìm.</div>' +
+    '<div style="' + grid + '">' + _coField('Người nhận', 'recvName') + _coField('SĐT nhận', 'recvPhone', { type:'tel' }) + '<div id="co-addr" style="display:contents">' + _coAddrHtml() + '</div>' + _coField('Địa chỉ cụ thể', 'address') + _coField('Ngày giao dự kiến', 'expectedDate', { type:'date' }) + _coField('Đơn vị vận chuyển', 'carrier') + '</div>' +
     sec('🏷 Thông tin đơn') + '<div style="' + grid + '">' + _coField('Nguồn đơn', 'source') + _coField('Sale', 'saleName') + _coField('NV chăm sóc', 'careName') + _coField('Marketer', 'marketer') + _coField('Thẻ (cách nhau dấu phẩy)', 'tags') + '</div>' +
     '<div style="' + grid + ';margin-top:8px">' + _coField('Ghi chú nội bộ', 'note') + _coField('Ghi chú in trên đơn', 'printNote') + '</div>' +
     '</div><div style="flex:1;min-width:260px;position:sticky;top:8px">' +
@@ -550,4 +635,4 @@ document.addEventListener('keydown', function(e){
   if (!p || p.style.display === 'none' || !document.getElementById('co-save')) return;
   e.preventDefault(); _coSave();
 });
-registerExtraTab('taodon', '➕ Tạo đơn', function(){ _coRender(); _coCatLoad(); _coPromoLoad(); });
+registerExtraTab('taodon', '➕ Tạo đơn', function(){ _coRender(); _coCatLoad(); _coPromoLoad(); _coAddrLoad(_coAddrKey()); });

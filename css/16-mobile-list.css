@@ -17,7 +17,6 @@
   #ymf-bar .ymf-label{white-space:nowrap;}
 
   /* 2) "Cột hiển thị" chiếm 4 hàng chỉ vì nhãn xuống dòng; ít khi dùng → ẩn cùng khối "Tổng quan & tác vụ" (bấm thanh đó để mở, như 6 ô thống kê và thanh tác vụ) */
-  body.lov-on-list:not(.lov-open) #tab-list > .col-toggle-bar{display:none !important;}
   .col-toggle-bar{padding:4px 10px;}
   .col-toggle-bar .ymf-label{white-space:nowrap;}
 
@@ -74,3 +73,29 @@
   html body #main-table th.col-lastpos{font-size:10px;}
   html body #main-table th.col-lastpos .th-inner{white-space:normal;flex-wrap:wrap;gap:2px;}
 }
+
+/* ═══ THẺ KHÁCH TRÊN ĐIỆN THOẠI (Duyên 2026-11-28: "danh sách khách dạng thẻ" cho người mới dùng) ═══
+   NGUYÊN NHÂN GỐC: dòng bảng 58px chỉ vừa tên + SĐT, còn CS/tình trạng/nút gọi nằm ngoài màn hình (phải vuốt ngang), người mới không biết có.
+   CÁCH SỬA (chỉ ≤640px): giữ NGUYÊN bảng cuộn ảo + mọi cột (vuốt ngang vẫn thấy hết), nhưng dòng thành "thẻ" cao 88px: cột tên rộng ~2/3 màn hình, thêm dòng thứ 3
+   "CS + 📞 Gọi + 💬 Zalo" (js/02 _cardLineHtml_). Chiều cao 88px PHẢI khớp JS: js/06 _vtRowH_() dùng cùng @media (max-width:640px). Máy tính: .cm-line ẩn, bảng không đổi. */
+.cm-line{display:none;}
+@media (max-width:640px){
+  html body #main-table tbody tr:not(.vspacer){height:88px;}
+  html body #main-table th.col-name,html body #main-table td.col-name{width:262px;min-width:262px;max-width:262px;}
+  html body #main-table td.col-name .cm-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
+  html body #main-table td.col-name .cm-cs{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);}
+  html body #main-table td.col-name .cm-btn{flex:0 0 auto;padding:3px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;}
+  html body #main-table td.col-name .cm-btn:active{background:var(--border);}
+}
+
+/* ═══ DANH SÁCH KH GỌN HƠN TRÊN MÁY TÍNH (Duyên 2026-11-28: "đơn giản chuyên nghiệp dễ sử dụng", bước 1) ═══
+   NGUYÊN NHÂN GỐC: trước bảng khách có ~340px đầu trang: thanh Tổng quan · 6 ô thống kê (mở sẵn trên màn rộng) · thanh công cụ · 2 hàng lọc ngày/giờ · hàng 15+ ô "Cột hiển thị"
+   → chỉ thấy ~7 dòng khách, người mới không biết bắt đầu từ đâu. CÁCH SỬA (chỉ đổi MẶC ĐỊNH, không xoá tính năng, ai đã chọn mở thì giữ):
+   - 6 ô thống kê: thu gọn mặc định (js/05 _lovIsOpen_), bấm thanh "Tổng quan" để mở như cũ.
+   - Thanh công cụ (sắp xếp, chiến dịch, Thêm KH/đơn, Xuất CSV): máy tính (>900px) LUÔN hiện kể cả khi thanh Tổng quan thu gọn (điện thoại giữ như cũ: nằm sau thanh Tổng quan).
+   - "📋 Cột hiển thị": ẩn mặc định ở mọi cỡ màn hình, mở bằng nút cạnh "Lọc nâng cao" (js/05 toggleColBar, body.cols-open). */
+@media (min-width:901px){
+  body.lov-on-list:not(.lov-open) #tab-list > .toolbar{display:flex !important;}
+}
+#tab-list > .col-toggle-bar{display:none;}
+body.cols-open #tab-list > .col-toggle-bar{display:flex;}

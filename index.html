@@ -584,6 +584,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
          <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
            ⚙ Lọc nâng cao
          </button>
+  <button class="btn sm" id="col-toggle-btn" onclick="toggleColBar()" title="Chọn cột hiển thị trong bảng khách">📋 Cột hiển thị ▾</button>
         <span style="font-size:10px;color:var(--hint);margin-left:4px" id="ymf-count-label"></span>
       </div>
 
@@ -979,10 +980,10 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <script src="js/96-ui-dialogs.js?v=20261127a"></script><!-- hop thoai thong nhat: ghi de window.alert (khong chan, xep hang, Esc/Enter dong); lui ve cu: localStorage ome_native_alert=1 -->
 <script src="js/97-write-guard.js?v=20261126a"></script>
 <script src="js/01-fn-splitmulti.js?v=20261126b"></script>
-<script src="js/02-fn-showrowerrorbanner.js?v=20261126b"></script>
+<script src="js/02-fn-showrowerrorbanner.js?v=20261128a"></script>
 <script src="js/03-fn-refreshopendptab.js?v=20261126b"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js?v=20261117a"></script>
-<script src="js/05-fn-saveeditphone.js?v=20261128f"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261128b"></script>
 <script src="js/06-main-renew-sources.js?v=20261128c"></script>
 
 <!-- ASSIGN DATA MODAL -->
@@ -1010,7 +1011,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <div id="reminder-panel" class="reminder-panel" style="display:none"></div>
 <button id="reminder-bell" class="reminder-bell" type="button" style="display:none" onclick="toggleReminderPanel()" title="Xem nhắc hẹn">🔔<span class="rb-count">0</span></button>
 
-<script src="js/07-openassignmodal.js?v=20261128f"></script>
+<script src="js/07-openassignmodal.js?v=20261128g"></script>
 
 
 <!-- ════════════ V9: ROLE MODAL ════════════ -->
@@ -1283,7 +1284,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
 <link rel="stylesheet" href="css/14-qrpills.css?v=20261126a">
 <link rel="stylesheet" href="css/15-mobile.css?v=20261126a">
-<link rel="stylesheet" href="css/16-mobile-list.css?v=20261128a">
+<link rel="stylesheet" href="css/16-mobile-list.css?v=20261128b">
 <link rel="stylesheet" href="css/17-reports-pro.css?v=20261128a">
 <link rel="stylesheet" href="css/18-list-pro.css?v=20261103a">
 <link rel="stylesheet" href="css/19-theme-sunset.css?v=20261105b"><!-- bảng màu hồng hoàng hôn (chỉ chế độ sáng); gỡ = xoá dòng này -->
@@ -1832,7 +1833,7 @@ function openBcLogModal(phone){
 <script src="js/59-fn-mobilefit.js?v=20261115g"></script>
 <script src="js/57-viettat.js?v=20261116a"></script>
 <script src="js/58-auto-cust-link.js?v=20261126a"></script>
-<script src="js/59-conn-diag.js?v=20261115g"></script>
+<script src="js/59-conn-diag.js?v=20261128a"></script>
 <script src="js/59-report-drill.js?v=20261115g"></script>
 <script src="js/60-team-bonus.js?v=20261127b"></script>
 <script src="js/61-recon-export.js?v=20261105b"></script>
@@ -1878,8 +1879,9 @@ function openBcLogModal(phone){
 <script src="js/99-acct-pk-normalize.js?v=20261127a"></script><!-- XUAT DOANH THU B cả team/từng sale, hàm dựng file; gỡ = xoá dòng này + js/99 + 1 dòng menu trong js/13 -->
 <script src="js/99-b-export-sale-ui.js?v=20261126a"></script><!-- XUAT DOANH THU B: hộp thoại chọn team/sale (admin + trưởng nhóm) -->
 <script src="js/99-c-loyalty-card.js?v=20261127b"></script><!-- Diem tich luy muc 9 buoc 2c: khoi Hang & diem trong ho so khach (tai luoi, goi GAS loyaltyGet/loyaltyRedeem); go = xoa dong nay + file js -->
-<script src="js/99-d-crm-order.js?v=20261128f"></script><!-- Len don tren CRM buoc 2/4: tab "Tao don" (GAS crmOrderSave, sheet rieng "Don CRM"); nap SAU js/40 (registerExtraTab); go = xoa dong nay + id taodon trong js/29 -->
+<script src="js/99-d-crm-order.js?v=20261128h"></script><!-- Len don tren CRM buoc 2/4: tab "Tao don" (GAS crmOrderSave, sheet rieng "Don CRM"); nap SAU js/40 (registerExtraTab); go = xoa dong nay + id taodon trong js/29 -->
 <script src="js/99-d-crm-orders.js?v=20261127d"></script><!-- DON CRM buoc 3/4: tab "Don CRM" liet ke + xem chi tiet (GAS crmOrders); nap SAU js/40 (registerExtraTab); go = xoa dong nay + file js + id crmorders trong js/29 -->
+<script src="js/100-a-kenh-board.js?v=20261128a"></script><!-- DON CAC KENH B2/8: tab "Don cac kenh" = bang don theo giai doan kieu Base (GAS kenhBoard/kenhMove); chua ham dung chung _kn* cho B3-B6; nap SAU js/40 (registerExtraTab); go = xoa dong nay + file js + id kenhboard trong js/29 -->
 <script src="js/99-e-crm-card-benefit.js?v=20261128a"></script><!-- Muc 9 buoc 9c-2: quyen loi the (VIP 5% / Super VIP 10% / mien ship) tu dien o man Tao don, goi GAS loyaltyBenefitQuote; nap SAU js/99-d-crm-order; go = xoa dong nay + file js -->
 <script src="js/100-assign-customers.js?v=20261126a"></script><!-- SDT duoc chia luon co trong Danh sach KH; nap SAU js/07 va js/89; go = xoa dong nay -->
 <script src="js/99-e-select-search.js?v=20261127a"></script><!-- o chon (dropdown) co o go tim nhanh cho MOI <select>; go = xoa dong nay + file js; tat khan cap: localStorage ome_native_select=1 -->

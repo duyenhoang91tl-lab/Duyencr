@@ -16,7 +16,10 @@ ok(/throw new Error\('GAS_NO_COMBO'\)/.test(src) && /GAS_NO_FLAT\|GAS_NO_CTKM\|G
 ok(/<div id="zaib-combo"><\/div>\s*<div id="zaib-dyn">/.test(src), 'HTML: #zaib-combo nam ngoai #zaib-dyn (renderBuilderDynZai_ khong xoa)');
 ok(/if \(_zaiComboRows === null && !_zaiComboLoading\) loadCombosZai_\(\);/.test(src), 'initBuilderZai_ tai combo 1 lan');
 ok(/filter\(\(r\) => r && r\.usable\)/.test(src), 'chi giu combo DANG AP DUNG (usable)');
-ok(/"version": "2026\.11\.18\.1"/.test(fs.readFileSync(__dirname + '/../extension-zalo/manifest.json', 'utf8')), 'manifest da bump version');
+// Y DINH: manifest da duoc bump khi them combo. KHONG ghim cung dung 1 so (truoc day === 2026.11.18.1 nen moi lan bump phien ban Zalo deu lam test do) — chi doi KHONG CU HON moc do.
+const _zv = (/"version":\s*"([\d.]+)"/.exec(fs.readFileSync(__dirname + '/../extension-zalo/manifest.json', 'utf8')) || [, '0'])[1].split('.').map(Number);
+const _zmin = [2026, 11, 18, 1]; let _zcmp = 0; for (let i = 0; i < 4 && !_zcmp; i++) _zcmp = Math.sign((_zv[i] || 0) - _zmin[i]);
+ok(_zcmp >= 0, 'manifest da bump version (>= 2026.11.18.1, hien ' + _zv.join('.') + ')');
 
 // ---- trich ma that ----
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('no ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } }

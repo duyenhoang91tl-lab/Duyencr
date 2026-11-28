@@ -164,7 +164,7 @@ async function _cbSave(){
 }
 async function _cbDelete(i){
   var c = _cbVisible()[i]; if (!c || _cb.saving) return;
-  if (!confirm('Xóa hẳn combo "' + c.name + '" (' + c.code + ') khỏi sheet COMBO? Không hoàn tác được.')) return;
+  if (!(await uiConfirm('Xóa hẳn combo "' + c.name + '" (' + c.code + ') khỏi sheet COMBO? Không hoàn tác được.'))) return;
   _cb.saving = true;
   var d = await _cbPost_('comboDelete', { code: c.code });
   _cb.saving = false;
@@ -535,7 +535,7 @@ async function _cbKmSave(){
 }
 async function _cbKmDelete(i){
   var k = _cbKm.rows[i]; if (!k || _cbKm.saving) return;
-  if (!confirm('Xóa hẳn CTKM "' + k.name + '" (' + k.code + ')? Combo đang tích CTKM này sẽ không còn áp dụng nó. Không hoàn tác được.')) return;
+  if (!(await uiConfirm('Xóa hẳn CTKM "' + k.name + '" (' + k.code + ')? Combo đang tích CTKM này sẽ không còn áp dụng nó. Không hoàn tác được.'))) return;
   _cbKm.saving = true; var d = await _cbPost_('ctkmComboDelete', { code: k.code }); _cbKm.saving = false;
   if (d && d.ok){ if (typeof toast === 'function') toast('Đã xóa CTKM ' + k.name); await _cbKmLoad(true); } else _cbKm.err = (d && d.error) || 'Xóa không thành công.';
   _cbRender();

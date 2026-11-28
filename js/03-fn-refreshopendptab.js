@@ -734,7 +734,7 @@ async function _histDeleteOrder(phone, orderIdx) {
     o.product || 'Không có sản phẩm',
     fmtVND(o.revenue)
   ].join(' · ');
-  if (!confirm(`Xác nhận xóa đơn hàng này?\n\n${label}\n\nThao tác này không thể hoàn tác.`)) return;
+  if (!(await uiConfirm(`Xác nhận xóa đơn hàng này?\n\n${label}\n\nThao tác này không thể hoàn tác.`))) return;
 
   const oldYear    = o.year;
   const oldMonth   = o.month;
@@ -964,7 +964,7 @@ function addNoteEntry(phone) {
   if (typeof ntNoteMention === 'function') ntNoteMention(phone, text);   // @tag trong ghi chú -> thông báo (js/39-fn-notify.js)
   if (inp) inp.focus();
 }
-function deleteNoteEntry(ev, btn, raw, idx) {
+async function deleteNoteEntry(ev, btn, raw, idx) {
   ev.stopPropagation();
   const phone = currentPhone;
   if (!phone) return;
@@ -977,7 +977,7 @@ function deleteNoteEntry(ev, btn, raw, idx) {
     toast('Bạn chỉ có thể xoá ghi chú do chính mình tạo. Chỉ Admin mới xoá được ghi chú của người khác.');
     return;
   }
-  if (!confirm('Xóa ghi chú này?')) return;
+  if (!(await uiConfirm('Xóa ghi chú này?'))) return;
   arr.splice(idx, 1);
   const newRaw = _notesToStr(arr);
   if (hiddenEl) hiddenEl.value = newRaw;
@@ -1281,7 +1281,7 @@ async function addNickZaloToList() {
 
 async function deleteNickZaloFromList(idx) {
   var name = _nickZaloList[idx];
-  if (!confirm('Xóa nick "' + name + '" khỏi danh sách?\n(Các khách đã chọn nick này sẽ không bị ảnh hưởng)')) return;
+  if (!(await uiConfirm('Xóa nick "' + name + '" khỏi danh sách?\n(Các khách đã chọn nick này sẽ không bị ảnh hưởng)'))) return;
   // Lấy bản mới nhất từ GAS trước để không vô tình ghi đè nick người khác vừa thêm
   try { var latest = await _syncNickZaloListFromGAS(); if (Array.isArray(latest)) _nickZaloList = latest; } catch(e){}
   var pos = _nickZaloList.indexOf(name);

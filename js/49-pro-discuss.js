@@ -95,7 +95,7 @@ async function khdSend_(key){
   ta.value = ''; S.msgs = khdMergeMsgs_(S.msgs, [r.message]); S.after = S.msgs[S.msgs.length-1].ts; S.err = ''; khdRender_(key, true); ta.focus();
 }
 async function khdDel_(key, id){
-  var S = _khd[key]; if (!S || !id) return; if (typeof confirm==='function' && !confirm('Xoá tin nhắn này?')) return;
+  var S = _khd[key]; if (!S || !id) return; if (typeof confirm==='function' && !(await uiConfirm('Xoá tin nhắn này?'))) return;
   var r = await khdApi_('POST', 'khDiscussDelete', { id:id }); if (_khd[key] !== S) return;
   if (!r.ok){ if (typeof toast==='function') toast('⚠ '+(r.error||'Không xoá được')); return; }
   S.msgs = S.msgs.filter(function(m){ return m.id!==id; }); khdRender_(key, false);

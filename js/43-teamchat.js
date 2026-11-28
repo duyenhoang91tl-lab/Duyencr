@@ -670,7 +670,7 @@
     var ch = w.id, m = (S.msgs[ch] || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!m || m.tmp || !S.me) return;
     if (!(m.u === S.me.username || S.me.role === 'admin')) return;   // server cung kiem lai; day chi la chan som
-    if (!confirm('Xoá tin nhắn này? Mọi người trong kênh sẽ không còn thấy.')) return;
+    if (!(await uiConfirm('Xoá tin nhắn này? Mọi người trong kênh sẽ không còn thấy.'))) return;
     var r = await apiPost('chatDelete', { id: id });
     if (!r.ok) { say(r.error || 'Không xoá được tin nhắn'); return; }
     S.msgs[ch] = (S.msgs[ch] || []).filter(function (x) { return String(x.id) !== String(id); });

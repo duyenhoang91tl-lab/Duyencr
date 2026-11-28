@@ -118,7 +118,7 @@ function editKhLabel(pi, ci, isLeaf) {
   _renderKhParentSel();
 }
 
-function removeKhNode(pi, ci) {
+async function removeKhNode(pi, ci) {
   var node = _khStatusDraft[pi];
   if (ci !== null && ci !== undefined && node.children) {
     if (!confirm('Xóa trạng thái con "' + node.children[ci].label + '"?')) return;
@@ -131,7 +131,7 @@ function removeKhNode(pi, ci) {
     var msg = node.children && node.children.length
       ? 'Xóa nhóm "' + node.label + '" và ' + node.children.length + ' trạng thái con?'
       : 'Xóa "' + node.label + '"?';
-    if (!confirm(msg + '\n\nDữ liệu KH đang có trạng thái này vẫn giữ nguyên.')) return;
+    if (!(await uiConfirm(msg + '\n\nDữ liệu KH đang có trạng thái này vẫn giữ nguyên.'))) return;
     _khStatusDraft.splice(pi, 1);
   }
   _renderKhStatusTree();
@@ -330,9 +330,9 @@ function _cfRenameField(i) {
   f.label = v;
   _renderCfModal();
 }
-function _cfDeleteField(i) {
+async function _cfDeleteField(i) {
   var f = _cfDraft[i]; if (!f) return;
-  if (!confirm('Xoá trường "' + f.label + '"?\n\nLưu ý: giá trị khách hàng đã chọn ở trường này sẽ không còn hiển thị (dữ liệu vẫn nằm trong Sheet, hiện lại nếu bạn tạo lại trường cùng tên ID).')) return;
+  if (!(await uiConfirm('Xoá trường "' + f.label + '"?\n\nLưu ý: giá trị khách hàng đã chọn ở trường này sẽ không còn hiển thị (dữ liệu vẫn nằm trong Sheet, hiện lại nếu bạn tạo lại trường cùng tên ID).'))) return;
   _cfDraft.splice(i, 1);
   if (_cfEditingIdx >= _cfDraft.length) _cfEditingIdx = _cfDraft.length - 1;
   _renderCfModal();
@@ -372,11 +372,11 @@ function _cfRenameNode(pi, ci) {
   if (target.value !== undefined) target.value = v;
   _renderCfModal();
 }
-function _cfDeleteNode(pi, ci) {
+async function _cfDeleteNode(pi, ci) {
   var f = _cfDraft[_cfEditingIdx]; if (!f) return;
   var node = f.tree[pi]; if (!node) return;
   if (ci === null || ci === undefined) {
-    if (node.children && node.children.length && !confirm('Xoá nhóm "' + node.label + '" và toàn bộ ' + node.children.length + ' mục con?')) return;
+    if (node.children && node.children.length && !(await uiConfirm('Xoá nhóm "' + node.label + '" và toàn bộ ' + node.children.length + ' mục con?'))) return;
     f.tree.splice(pi, 1);
   } else {
     (node.children || []).splice(ci, 1);
@@ -417,8 +417,8 @@ async function saveCustomFields() {
   }
 }
 
-function resetKhStatusToDefault() {
-  if (!confirm('Khôi phục trạng thái KH về mặc định? Dữ liệu KH vẫn giữ nguyên.')) return;
+async function resetKhStatusToDefault() {
+  if (!(await uiConfirm('Khôi phục trạng thái KH về mặc định? Dữ liệu KH vẫn giữ nguyên.'))) return;
   _khStatusDraft = JSON.parse(JSON.stringify(CUSTOMER_STATUS_TREE_DEFAULT));
   _renderKhStatusTree();
   _renderKhParentSel();

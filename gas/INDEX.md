@@ -144,14 +144,26 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`, `TB_MSG_SCAN_MAX_ROWS_`, `TOPSP_UNASSIGNED_TEAM_`
 
 ## 34_Loyalty.gs
-- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`, `_loyNorm_`, `_loyRuleList_`, `_loyaltyBenefitCfgNormalize_`, `_loyRuleHit_`, `_loyaltyBenefitLevel_`, `_loyaltyBenefitApply_`, `_loyaltyBenefitCfg_`, `_loyaltyHistoryOf_`, `loyaltyBenefitQuote_`
+- Hàm: `_loyaltyCfgNormalize_`, `_loyaltyEarnPoints_`, `_loyaltyYearOf_`, `_loyaltyBalance_`, `_loyaltyRedeem_`, `_loyaltyTierIndex_`, `_loyaltyTierHistory_`, `_loyaltyCfg_`, `_loyaltyYmdCell_`, `_loyaltyOrdersOfPhone_`, `_loyaltyRead_`, `_loyaltyAppend_`, `loyaltySync_`, `loyaltyState_`, `loyaltyDoGet_`, `loyaltyDoPost_`, `_loyaltyAudit_`, `_loyaltyUndoApply_`, `_loyaltyUndo_`, `_loyaltyCrmEarn_`, `_loyaltyCrmRevoke_`, `_loyNorm_`, `_loyRuleList_`, `_loyaltyBenefitCfgNormalize_`, `_loyRuleHit_`, `_loyaltyBenefitLevel_`, `_loyaltyBenefitApply_`, `_loyaltyBenefitCfg_`, `_loyaltyHistoryOf_`, `loyaltyBenefitQuote_`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`, `LOYALTY_BENEFIT_DEFAULT_`, `LOYALTY_CRM_VALID_STATUS_`, `LOYALTY_LEVEL_LABEL_`
 
 ## 34b_Ticket.gs
 - Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
 - Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
 
+## 34c_CommClose.gs
+- Hàm: `_commPeriodOf_`, `_commNextPeriod_`, `_commPeriodState_`, `_commSettle_`, `_commLedgerRows_`
+- Hằng/biến: `COMMCLOSE_SECTION_`, `COMMCLOSE_DEFAULT_`
+
+## 34d_KpiCommit.gs
+- Hàm: `_kpiCommitCfgNormalize_`, `_kpiFold_`, `_kpiPeriodOf_`, `_kpiCommitKey_`, `_kpiIsApprover_`, `_kpiNewRec_`, `_kpiLog_`, `_kpiCommitSubmit_`, `_kpiCommitDecide_`, `_kpiCommitEffective_`, `_kpiCommitCfg_`, `_kpiMyNames_`, `_kpiCommitRowToRec_`, `_kpiCommitRecToRow_`, `_kpiCommitReadAll_`, `_kpiCommitUpsert_`, `_kpiOverrideOf_`, `kpiCommitDoGet_`, `kpiCommitDoPost_`
+- Hằng/biến: `KPICOMMIT_SECTION_`, `KPICOMMIT_DEFAULT_`, `SH_KPICOMMIT_`, `KPICOMMIT_HEADERS_`, `KPICOMMIT_GET_ACTIONS_`, `KPICOMMIT_POST_ACTIONS_`
+
 ## 35_CrmOrder.gs
-- Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`
-- Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`
+- Hàm: `_crmStatusCheck_`, `_crmNum_`, `_crmStr_`, `_crmDiscount_`, `_crmOrderNormalize_`, `_crmRedeemKey_`, `_crmNextOrderId_`, `_crmOrderRowToObj_`, `_crmReadAll_`, `_crmScopeFor_`, `_crmCanSee_`, `crmOrderDoPost_`, `_crmStockKey_`, `_crmStockPlan_`, `_crmStockLedgerWrite_`, `_crmStockApply_`, `_crmStockReverse_`, `crmOrderStockRetryDoPost_`, `crmOrderStatusDoPost_`, `crmOrderDoGet_`, `_vpTarget_`, `_vpRead_`, `_vpTargetCur_`, `_vpApprovers_`, `_vpIsAdminName_`, `_vpNotifClear_`, `_vpNotifyAdmins_`, `vietTatPropose_`, `_vpOwn_`, `_vpSummaryFor_`, `vietTatProposalsList_`, `vietTatDecide_`, `_vpApply_`
+- Hằng/biến: `CRMORDER_SECTION_`, `SH_CRM_ORDER_`, `CRM_ORDER_HEADERS_`, `CRM_ORDER_GET_ACTIONS_`, `CRM_ORDER_POST_ACTIONS_`, `CRM_ORDER_FLOW_`, `CRM_ORDER_MAX_ITEMS_`, `CRM_STOCK_PREFIX_`, `SH_VT_PROP`, `VT_PROP_HEADERS`, `VT_PROP_MAX_PENDING`
+
+## 36_CrmStage.gs
+- Hàm: `_kenhIsAdmin_`, `_kenhMe_`, `_kenhList_`, `_kenhJsonArr_`, `_kenhRead_`, `_kenhRowOf_`, `_kenhAppend_`, `_kenhWrite_`, `_kenhOrderObj_`, `_kenhNextId_`, `_kenhMaBoDem_`, `_kenhNormalize_`, `_kenhAccess_`, `_kenhSysComment_`, `_kenhWho_`, `_kenhLoadAll_`, `_kenhChannels_`, `kenhDoGet_`, `_kenhTaskObj_`, `_kenhCmtObj_`, `kenhDoPost_`
+- Hằng/biến: `CRMSTAGE_SECTION_`, `SH_KENH_ORDER_`, `KENH_ORDER_HEADERS_`, `KENH_LOG_HEADERS_`, `KENH_TASK_HEADERS_`, `KENH_CMT_HEADERS_`, `KENH_STAGES_`, `KENH_FINAL_`, `KENH_PHAN_LOAI_`, `KENH_GET_ACTIONS_`, `KENH_POST_ACTIONS_`, `KENH_BOARD_LIMIT_`
 
