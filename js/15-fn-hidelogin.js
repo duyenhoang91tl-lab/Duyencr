@@ -409,13 +409,13 @@ function acctAddNames(btn){
   toast('✓ Đã thêm ' + added.join(', ') + ' vào tài khoản ' + acct.username);
 }
 // Cắt bớt 1 sale khỏi phạm vi xem của tài khoản
-function acctRemoveName(u, name){
+async function acctRemoveName(u, name){
   var acct = _findAccount(u); if (!acct) return;
   var cur = _acctNamesOf(acct);
   var next = cur.filter(function(n){ return n !== name; });
   if (next.length === cur.length) return;
   if (!next.length){ toast('Tài khoản ' + _roleLabel(acct.role) + ' phải còn ít nhất 1 sale. Thêm sale khác trước khi cắt người cuối cùng.'); return; }
-  if (!confirm('Cắt sale "' + name + '" khỏi tài khoản "' + acct.username + '"?\n\nTài khoản này sẽ KHÔNG còn nhìn thấy dữ liệu của "' + name + '".')) return;
+  if (!(await uiConfirm('Cắt sale "' + name + '" khỏi tài khoản "' + acct.username + '"?\n\nTài khoản này sẽ KHÔNG còn nhìn thấy dữ liệu của "' + name + '".'))) return;
   _acctApplyNames(acct, next);
   _acctOpen[_acctKey(acct.username)] = true;
   _acctPersist(acct, 'Cắt sale khỏi ' + acct.username + ': ' + name);
@@ -672,11 +672,11 @@ async function addAccount(){
   _renderAuthHeader();
   toast('✓ Đã lưu tài khoản ' + u + pkNote + (autoName ? ' — chưa chọn Sale nên dùng chính “' + u + '” làm tên CS: vào Chia data, chọn CS này để chia khách' : '') + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
 }
-function deleteAccount(u){
+async function deleteAccount(u){
   var acct = _findAccount(u); if (!acct) return;
   var admins = accounts.filter(function(a){ return a.role==='admin'; });
   if (acct.role==='admin' && admins.length<=1){ toast('Không thể xoá admin cuối cùng.'); return; }
-  if (!confirm('Xoá tài khoản "'+u+'"?')) return;
+  if (!(await uiConfirm('Xoá tài khoản "'+u+'"?'))) return;
   accounts = accounts.filter(function(a){ return String(a.username).toLowerCase()!==String(acct.username).toLowerCase(); });
   pushUsers();
   if (typeof logAudit === 'function') logAudit('account','', u, 'Xoá tài khoản');

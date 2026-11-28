@@ -3285,7 +3285,7 @@ function doGetCore_(e) {
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
     // can biet truoc ten cot (tu doc dong tieu de dong 1). ──
-    if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
+    if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : '', null, !!(e && e.parameter && String(e.parameter.combo) === '1')));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
     if (action === 'priceItem') return jsonOut_(priceItem_(e && e.parameter ? e.parameter.name : ''));   // tro ly noi bo: bam 1 goi y -> thong tin + bien the (chat lieu/size) + gia (js/38-pro-dock.js)
     if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'comboList' || action === 'comboSearch') return jsonOut_(comboList_(e && e.parameter ? e.parameter.q : ''));   // combo co san (sheet COMBO)
@@ -3675,8 +3675,11 @@ function doGetCore_(e) {
     // ── VIET TAT (go tat -> chen noi dung; 2026-10-25): danh sach cho CRM (quan ly) va extension Pancake AI (go tat trong o chat). Chi tra muc CHUNG team + muc CUA MINH. ──
     if (action === 'vietTat') {
       var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
-      return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
+      var _vo = { ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' };
+      try { var _vs = _vpSummaryFor_(_vc); _vo.proposals = _vs.own; if (_vs.adminPending !== null) _vo.adminPending = _vs.adminPending; } catch (eVs) {}   // app/extension: trạng thái đề xuất CỦA MÌNH + số đề xuất chờ duyệt (admin)
+      return jsonOut_(_vo);
     }
+    if (action === 'vietTatProposals') return jsonOut_(vietTatProposalsList_(_tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // admin: tất cả (chờ duyệt trước); người khác: đề xuất của mình
     if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
     if (action === 'vietTatAudio') return jsonOut_(vietTatAudio_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));   // app/extension tai byte 1 tep ghi am cua muc Viet tat (base64)
     if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
@@ -8753,6 +8756,8 @@ function doPostCore_(e) {
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
     if (action === 'setTemplateAbbr')       return setTemplateAbbr_(data.id, data.abbr, _tplCaller_(data.token, data.ek, data.by));   // doi RIENG viet tat cua mau tin (tab Viet tat trong CRM)
     if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
+    if (action === 'vietTatPropose')        return vietTatPropose_(data, _tplCaller_(data.token, data.ek, data.by));   // gửi đề xuất sửa/thêm mục chung → báo admin duyệt
+    if (action === 'vietTatDecide')         return vietTatDecide_(data, _tplCaller_(data.token, '', ''));              // CHỈ admin (theo token phiên): approve / reject
     if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
     if (action === 'vietTatUsage')          return jsonOut_(vietTatUsage_(data, _tplCaller_(data.token, data.ek, data.by)));   // dong bo so luot dung Viet tat giua cac may (cong don delta, tra ve tong cua rieng nguoi goi)
     if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
@@ -13107,7 +13112,9 @@ function _priceCatalogRowsCached_() {
   return rows || [];
 }
 // GET action=priceAsk&q=<cau hoi>. Tra { ok, found:true, text, unit } | { ok, found:false, suggestions:[ten san pham gan dung] } | { ok:false, error }.
-function priceAsk_(q, out) {
+function priceAsk_(q, out, comboOnly) {
+  // comboOnly (Duyen 2026-11-18: o tich 'Combo' o Tro ly AI gia): CHI tra combo, khong tra san pham le. Khong co combo khop → combos:[] (giao dien bao 'khong co combo').
+  if (comboOnly) return { ok: true, found: false, text: '', unit: '', suggestions: [], combos: _priceAskCombos_(String(q || '').slice(0, 200), 8), comboOnly: true };
   var r = priceAskBase_(q, out);
   if (r && r.ok) r.combos = _priceAskCombos_(String(q || '').slice(0, 200));   // + combo co san khop (sheet COMBO)
   return r;
@@ -13135,11 +13142,12 @@ function priceAskBase_(q, out) {
   return { ok: true, found: false, suggestions: names };
 }
 // Combo dang ap dung khop cau hoi (toi da 5) — gan vao ket qua priceAsk_ de Tro ly AI "Gia san pham" hien kem. Loi/khong co sheet -> [].
-function _priceAskCombos_(q) {
+function _priceAskCombos_(q, max) {
   try {
     var rows = readComboCatalog_().filter(function (c) { return c.usable; });
     if (!rows.length) return [];
-    return searchCombos_(rows, q, true).slice(0, 5);
+    // text = chu hien thi theo mau moi (gia giam, dong SP co vang/gia, ship, qua) — Tro ly AI / extension dung thang, khong tu ghep lai.
+    return searchCombos_(rows, q, true).slice(0, max || 5).map(function (c) { c.text = _comboFormatText_(c); return c; });
   } catch (e) { return []; }
 }
 // GET action=priceItem&name=<TEN san pham chinh xac (lay tu goi y cua priceAsk)>.
@@ -23316,8 +23324,20 @@ var SH_TEAM_PENALTY_ = 'ThuongPhatDoiSale';
 var TEAM_PENALTY_HEADERS_ = ['id', 'date', 'sale', 'type', 'amount', 'note', 'by', 'at'];
 var TEAMBONUS_GET_ACTIONS_ = { teamBonusReport: 1, teamPenaltySuggest: 1 };
 var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1, teamPenaltyIgnore: 1 };
+// ═══ PHỤ LỤC 02/QC-HTT — CHƯƠNG TRÌNH MINI GAME THÁNG 11/2026 (file Duyên gửi 27/11/2026), mục C + D (thưởng theo DOANH SỐ cá nhân; mục A sản phẩm, B bill = bước sau):
+//  C. Doanh số NGÀY: >=60tr → 50k/ngày, >=100tr → 100k/ngày (KHÔNG cộng dồn, lấy mốc cao nhất đạt trong ngày).
+//  D1. Target DOANH SỐ THÁNG cá nhân: 500tr→500k, 600tr→700k, 800tr→1tr, 1tỷ→1,5tr, 1,2tỷ→2tr, 1,5tỷ→2,5tr, 1,8tỷ→3tr, 2tỷ→3,5tr, 2,5tỷ→4,5tr, 3tỷ+→5tr (mốc cao nhất đạt).
+//  D2. Top 1 doanh thu: 0,1% doanh thu tháng (đã loại đơn thất bại/hoàn/hủy/trùng), điều kiện Sale >= 1 tỷ. ⚠ "tổng doanh thu tháng" mơ hồ → cfg topRevenue.base: 'self' (0,1% doanh thu CỦA Sale đó, mặc định) hoặc 'team' (0,1% tổng doanh thu cả đội) — Duyên chốt lại.
+//  D3. Top 1 tỷ lệ chốt tháng 1.000.000đ (monthlyReward, cơ chế sẵn có: tương tác >= TB team).
+//  D4. Sale ONLINE không lương cứng: doanh số tháng >= 700tr → +1.000.000đ phụ cấp.
+//  Doanh số tính theo NGƯỜI TẠO ĐƠN trên đơn Base (cùng nguồn với thưởng ngày hiện có: _dtOrderRevenue_, đã loại đơn đổi trả/bảo hành/thay dây/trạng thái loại).
 var TEAM_BONUS_DEFAULT_ = {
-  dailyMinOrders: 6, dailyMinRevenue: 50000000, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000,
+  dailyTiers: [ { min: 60000000, reward: 50000 }, { min: 100000000, reward: 100000 } ],
+  monthTiers: [ { min: 500000000, reward: 500000 }, { min: 600000000, reward: 700000 }, { min: 800000000, reward: 1000000 }, { min: 1000000000, reward: 1500000 }, { min: 1200000000, reward: 2000000 },
+                { min: 1500000000, reward: 2500000 }, { min: 1800000000, reward: 3000000 }, { min: 2000000000, reward: 3500000 }, { min: 2500000000, reward: 4500000 }, { min: 3000000000, reward: 5000000 } ],
+  topRevenue: { minRevenue: 1000000000, pct: 0.1, base: 'self' },
+  onlineAllowance: { minRevenue: 700000000, amount: 1000000 },
+  dailyMinOrders: 6, dailyMinRevenue: 50000000, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 1000000,
   excludeRe: 'doi tra|doi hang|bao hanh|thay day',   // so khop KHONG DAU voi Phan loai / Kenh ban / Giai doan cua don Base (don bhZero = BH khong doanh thu luon bi loai)
   penalties: [
     { type: 1, label: 'Tin trôi quá 30 phút không phản hồi (không phải tin nhảy từ Sale khác)', amount: 50000 },
@@ -23337,6 +23357,20 @@ function teamBonusCfg_() {
   if (raw && typeof raw === 'object') {
     ['dailyMinOrders', 'dailyMinRevenue', 'dailyReward', 'weeklyReward', 'monthlyReward'].forEach(function (k) { var n = Number(raw[k]); if (isFinite(n) && n >= 0) cfg[k] = n; });
     if (typeof raw.excludeRe === 'string' && raw.excludeRe.trim()) cfg.excludeRe = raw.excludeRe.trim();
+    ['dailyTiers', 'monthTiers'].forEach(function (k) {   // mốc tiền: mảng {min,reward}, bỏ dòng sai, xếp tăng dần theo min
+      if (!Array.isArray(raw[k])) return;
+      var a = raw[k].map(function (x) { return { min: Number(x && x.min), reward: Number(x && x.reward) }; }).filter(function (x) { return isFinite(x.min) && x.min > 0 && isFinite(x.reward) && x.reward >= 0; }).sort(function (a1, b1) { return a1.min - b1.min; });
+      if (a.length) cfg[k] = a;
+    });
+    if (raw.topRevenue && typeof raw.topRevenue === 'object') {
+      var tr = raw.topRevenue, nm = Number(tr.minRevenue), np = Number(tr.pct);
+      if (isFinite(nm) && nm >= 0) cfg.topRevenue.minRevenue = nm; if (isFinite(np) && np >= 0) cfg.topRevenue.pct = np;
+      if (tr.base === 'self' || tr.base === 'team') cfg.topRevenue.base = tr.base;
+    }
+    if (raw.onlineAllowance && typeof raw.onlineAllowance === 'object') {
+      var oa = raw.onlineAllowance, om = Number(oa.minRevenue), oam = Number(oa.amount);
+      if (isFinite(om) && om >= 0) cfg.onlineAllowance.minRevenue = om; if (isFinite(oam) && oam >= 0) cfg.onlineAllowance.amount = oam;
+    }
     if (Array.isArray(raw.penalties)) raw.penalties.forEach(function (pn) {
       var t = Number(pn && pn.type), n = Number(pn && pn.amount);
       cfg.penalties.forEach(function (d) { if (d.type === t) { if (isFinite(n) && n >= 0) d.amount = n; if (pn.label) d.label = String(pn.label).slice(0, 200); } });
@@ -23421,6 +23455,8 @@ function _tbCloseFor_(dtRows, from, to, memberOf, active) {
     return pick;
   } catch (e) { Logger.log('_tbCloseFor_ ' + from + '..' + to + ': ' + e); return { avgHeld: 0, rows: [], winners: [], noData: true, error: String(e && e.message || e) }; }
 }
+// Mốc cao nhất đạt được (tiers sắp tăng dần theo min); null nếu chưa đạt mốc nào.
+function _tbTierFor_(tiers, v) { var hit = null; (tiers || []).forEach(function (t) { if (v >= t.min) hit = t; }); return hit; }
 // Phan THUONG (cache 10 phut; thang da qua cache lau hon). Nhat ky phat doc truc tiep, khong qua cache.
 function _tbComputeRewards_(month, cfg) {
   var today = _vnYmd_(new Date()), from = month + '-01', mEnd = _tbMonthEnd_(month), to = mEnd < today ? mEnd : today;
@@ -23434,6 +23470,23 @@ function _tbComputeRewards_(month, cfg) {
     var top = arr.length ? arr[0].orders : 0, topE = elig.length ? elig[0].orders : 0, ok = elig.length > 0;
     out.daily.push({ date: d, partial: d === today, top: top, qualified: ok, winners: ok ? elig.filter(function (x) { return x.orders === topE; }) : [], list: arr.slice(0, 8), excluded: day.excluded });
   }
+  // ── Mini game tháng 11 (Phụ lục 02): thưởng theo DOANH SỐ cá nhân (xem TEAM_BONUS_DEFAULT_) ──
+  out.dayTargets = []; var monthRev = {}, totalRev = 0;
+  for (var dd = from; dd <= to; dd = _tbYmdAdd_(dd, 1)) {
+    var dy = dc[dd] || { rev: {} };
+    Object.keys(dy.rev || {}).forEach(function (n) {
+      var rv = dy.rev[n] || 0; monthRev[n] = (monthRev[n] || 0) + rv; totalRev += rv;
+      var tr = _tbTierFor_(cfg.dailyTiers, rv);
+      if (tr) out.dayTargets.push({ date: dd, name: n, revenue: Math.round(rv), min: tr.min, reward: tr.reward, partial: dd === today });
+    });
+  }
+  var mPartial = mEnd > today, grpOf = {}; team.list.forEach(function (m) { grpOf[m.name] = m.group; });
+  out.monthTargets = Object.keys(monthRev).map(function (n) { var t = _tbTierFor_(cfg.monthTiers, monthRev[n]); return { name: n, revenue: Math.round(monthRev[n]), min: t ? t.min : 0, reward: t ? t.reward : 0, partial: mPartial }; })
+    .filter(function (x) { return x.reward > 0; }).sort(function (a, b) { return b.revenue - a.revenue; });
+  var elig2 = Object.keys(monthRev).filter(function (n) { return monthRev[n] >= cfg.topRevenue.minRevenue; }).sort(function (a, b) { return monthRev[b] - monthRev[a]; });
+  out.topRevenue = { partial: mPartial, base: cfg.topRevenue.base, totalRevenue: Math.round(totalRev), winners: [] };
+  if (elig2.length) { var best = Math.round(monthRev[elig2[0]]); elig2.forEach(function (n) { if (Math.round(monthRev[n]) === best) out.topRevenue.winners.push({ name: n, revenue: best, amount: Math.round((cfg.topRevenue.base === 'team' ? totalRev : monthRev[n]) * cfg.topRevenue.pct / 100) }); }); }
+  out.allowances = Object.keys(monthRev).filter(function (n) { return grpOf[n] === 'online' && monthRev[n] >= cfg.onlineAllowance.minRevenue; }).map(function (n) { return { name: n, revenue: Math.round(monthRev[n]), amount: cfg.onlineAllowance.amount, partial: mPartial }; });
   var pm = _tbCloseFor_(dtRows, from, to, team.memberOf), activeNames = pm.rows.map(function (x) { return x.name; });   // sale co tuong tac trong thang = tap tinh TB tuong tac (tuan + thang)
   // Tuan: Thu 2 -> Chu nhat; tinh vao thang chua ngay Chu nhat. Tuan chua ket thuc / chua bat dau xu ly theo "to".
   var mon = from; while (_tbDow_(mon) !== 0) mon = _tbYmdAdd_(mon, -1);
@@ -23469,7 +23522,7 @@ function teamBonusReport_(p, acc) {
   var month = String(p.month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(month)) month = _vnYmd_(new Date()).substring(0, 7);
   var cfg = teamBonusCfg_(), today = _vnYmd_(new Date()), mEnd = _tbMonthEnd_(month);
-  var ck = 'tb_rw_v1_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe]), rw = null;
+  var ck = 'tb_rw_v2_' + month + '_' + JSON.stringify([cfg.dailyMinOrders, cfg.dailyMinRevenue, cfg.excludeRe, cfg.dailyTiers, cfg.monthTiers, cfg.topRevenue, cfg.onlineAllowance]), rw = null;
   try { var raw = _cacheGetBig_(ck); if (raw) rw = JSON.parse(raw); } catch (e0) {}
   if (!rw || p.nocache === '1') {
     rw = _tbComputeRewards_(month, cfg);
@@ -23483,6 +23536,11 @@ function teamBonusReport_(p, acc) {
   rw.daily.forEach(function (d) { if (d.partial) return; d.winners.forEach(function (w) { rewards.push({ kind: 'day', period: d.date, name: w.name, amount: cfg.dailyReward, detail: w.orders + ' đơn' }); var t = tot(w.name); t.reward += cfg.dailyReward; t.dayWins++; }); });
   rw.weekly.forEach(function (w) { if (w.partial) return; w.winners.forEach(function (x) { rewards.push({ kind: 'week', period: w.label, name: x.name, amount: cfg.weeklyReward, detail: x.closeRate + '% (' + x.closed + '/' + x.held + ')' }); var t = tot(x.name); t.reward += cfg.weeklyReward; t.weekWins++; }); });
   if (rw.monthly && !rw.monthly.partial) rw.monthly.winners.forEach(function (x) { rewards.push({ kind: 'month', period: month, name: x.name, amount: cfg.monthlyReward, detail: x.closeRate + '% (' + x.closed + '/' + x.held + ')' }); var t = tot(x.name); t.reward += cfg.monthlyReward; t.monthWins++; });
+  // Mini game tháng 11: thưởng ngày theo mốc doanh số (ngày đã qua), mốc doanh số tháng / Top 1 doanh thu / phụ cấp Online (chỉ khi THÁNG đã kết thúc, giống thưởng tháng hiện có)
+  (rw.dayTargets || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'dayTarget', period: x.date, name: x.name, amount: x.reward, detail: 'DS ' + Math.round(x.revenue / 1e6) + 'tr ≥ mốc ' + Math.round(x.min / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.reward; });
+  (rw.monthTargets || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'monthTarget', period: month, name: x.name, amount: x.reward, detail: 'DS tháng ' + Math.round(x.revenue / 1e6) + 'tr ≥ mốc ' + Math.round(x.min / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.reward; });
+  if (rw.topRevenue && !rw.topRevenue.partial) rw.topRevenue.winners.forEach(function (x) { rewards.push({ kind: 'topRevenue', period: month, name: x.name, amount: x.amount, detail: 'Top 1 DS ' + Math.round(x.revenue / 1e6) + 'tr × ' + cfg.topRevenue.pct + '%' + (cfg.topRevenue.base === 'team' ? ' tổng đội' : '') }); var t = tot(x.name); t.reward += x.amount; });
+  (rw.allowances || []).forEach(function (x) { if (x.partial) return; rewards.push({ kind: 'allowance', period: month, name: x.name, amount: x.amount, detail: 'Online DS ' + Math.round(x.revenue / 1e6) + 'tr ≥ ' + Math.round(cfg.onlineAllowance.minRevenue / 1e6) + 'tr' }); var t = tot(x.name); t.reward += x.amount; });
   pen.forEach(function (e) { var t = tot(e.sale); t.penalty += e.amount; t.penaltyCount++; });
   // Nguoi khong phai admin/quan ly/truong team chi thay phat + tong cua chinh minh (thuong ngay/tuan/thang la bang xep hang chung).
   var mine = {}; _profNames_(acc.u).forEach(function (n) { mine[_normTxt_(n)] = 1; });
@@ -23491,7 +23549,7 @@ function teamBonusReport_(p, acc) {
     Object.keys(totals).forEach(function (k) { if (!mine[_normTxt_(k)]) delete totals[k]; });
   }
   var totalList = Object.keys(totals).map(function (k) { var t = totals[k]; t.net = t.reward - t.penalty; return t; }).sort(function (a, b) { return b.net - a.net || (a.name < b.name ? -1 : 1); });
-  return { ok: true, month: month, today: today, cfg: cfg, canEdit: acc.admin, seeAll: acc.seeAll, team: rw.team, daily: rw.daily, weekly: rw.weekly, monthly: rw.monthly,
+  return { ok: true, month: month, today: today, cfg: cfg, canEdit: acc.admin, seeAll: acc.seeAll, team: rw.team, daily: rw.daily, weekly: rw.weekly, monthly: rw.monthly, dayTargets: rw.dayTargets || [], monthTargets: rw.monthTargets || [], topRevenue: rw.topRevenue || null, allowances: rw.allowances || [],
     rewards: rewards, penalties: pen, totals: totalList, note: 'Thuong tinh tren don goc Base (ngay tao), khong tinh theo Pos. Tuan tinh vao thang chua Chu nhat; ngay/tuan/thang chua ket thuc chi hien tam tinh, chua cong vao tien thuong.' };
 }
 function teamBonusDoGet_(action, p) {
@@ -23859,7 +23917,7 @@ var LOYALTY_HEADERS_ = ['key', 'phone', 'type', 'orderId', 'date', 'points', 'am
 var SH_LOYALTY_TIER_ = 'LoyaltyTier';
 var LOYALTY_TIER_HEADERS_ = ['key', 'phone', 'date', 'orderId', 'from', 'to', 'cumulative', 'at'];
 var LOYALTY_GET_ACTIONS_ = { loyaltyGet: 1 };
-var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1 };
+var LOYALTY_POST_ACTIONS_ = { loyaltyRedeem: 1, loyaltyUndo: 1, loyaltyBenefitQuote: 1 };
 function _loyaltyCfg_() { var c = null; try { c = getSetting_('loyaltyConfig'); } catch (e) {} return _loyaltyCfgNormalize_(c); }
 function _loyaltyYmdCell_(v) { if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : _vnYmd_(v); return String(v || '').slice(0, 10); }
 function _loyaltyOrdersOfPhone_(phone, rows) {
@@ -23935,6 +23993,7 @@ function loyaltyDoGet_(action, p) {
 function loyaltyDoPost_(action, d) {
   try {
     var a = _khoAuth_(d); if (a.err) return a.err;
+    if (action === 'loyaltyBenefitQuote') return loyaltyBenefitQuote_(d);
     if (action === 'loyaltyUndo') return _khoWithLock_(function () { return _loyaltyUndo_(d, a); });
     return _khoWithLock_(function () {
       var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
@@ -24038,6 +24097,31 @@ function _loyaltyBenefitApply_(items, level, cfg) {
   });
   return { level: level, lines: lines, subtotal: subtotal, discount: discount, afterDiscount: subtotal - discount,
            freeShip: level !== 'none' && subtotal >= cfg.freeShipMin && subtotal > 0 };
+}
+
+// ── Bước 9c-1: BÁO GIÁ QUYỀN LỢI THẺ cho màn Tạo đơn (POST loyaltyBenefitQuote) — CHỈ ĐỌC, không ghi gì ──
+// Màn Tạo đơn gọi action này theo SĐT + danh sách sản phẩm, rồi TỰ ĐIỀN giảm % từng dòng + ô Miễn ship. crmOrderSave KHÔNG đổi (vẫn tin số sale nhập như trước).
+// Lịch sử xét thẻ = đơn POS hợp lệ (không Hủy/Hoàn) + đơn CRM đã xác nhận / đang giao / đã giao của chính SĐT đó (đơn CRM 'Mới' chưa tính vì có thể bị hủy).
+var LOYALTY_CRM_VALID_STATUS_ = ['Đã xác nhận', 'Đang giao', 'Đã giao'];
+function _loyaltyBenefitCfg_() { var c = null; try { c = getSetting_('loyaltyBenefits'); } catch (e) {} return _loyaltyBenefitCfgNormalize_(c); }
+function _loyaltyHistoryOf_(phone, posRows, crmRows) {
+  var ph = normPhone_(String(phone || '')), cnt = 0, cum = 0;
+  _loyaltyOrdersOfPhone_(ph, posRows).forEach(function (o) { if (!o.refunded) { cnt++; cum += o.value; } });
+  (crmRows || []).forEach(function (o) {
+    if (normPhone_(String(o.phone || '')) !== ph || LOYALTY_CRM_VALID_STATUS_.indexOf(String(o.status)) < 0) return;
+    var t = Number(o.total) || 0; if (t > 0) { cnt++; cum += t; }
+  });
+  return { orders: cnt, cumulative: cum };
+}
+var LOYALTY_LEVEL_LABEL_ = { none: 'Chưa có thẻ', vip: 'Thẻ VIP (mua lại)', super: 'Thẻ Super VIP' };
+function loyaltyBenefitQuote_(d) {
+  try {
+    var ph = normPhone_(String(d && d.phone || '')); if (!ph) return jsonOut_({ ok: false, error: 'Thieu so dien thoai.' });
+    var items = (d && d.items) || []; if (!items.length || items.length > 200) return jsonOut_({ ok: false, error: 'Danh sach san pham khong hop le.' });
+    var cfg = _loyaltyBenefitCfg_(), h = _loyaltyHistoryOf_(ph, readDonChiTiet_(), _crmReadAll_()), level = _loyaltyBenefitLevel_(h.orders, h.cumulative, cfg);
+    var r = _loyaltyBenefitApply_(items, level, cfg);
+    return jsonOut_({ ok: true, level: level, label: LOYALTY_LEVEL_LABEL_[level], history: h, lines: r.lines, subtotal: r.subtotal, discount: r.discount, afterDiscount: r.afterDiscount, freeShip: r.freeShip, freeShipMin: cfg.freeShipMin });
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi bao gia quyen loi the: ' + (err && err.message || err) }); }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════
@@ -24419,4 +24503,210 @@ function crmOrderDoGet_(action, p) {
     rows.sort(function (x, y) { return (Number(y.createdAt) || 0) - (Number(x.createdAt) || 0); });
     return jsonOut_({ ok: true, scope: sc.level, total: rows.length, orders: rows.slice(0, limit) });
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi doc don CRM: ' + (err && err.message || err) }); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ĐỀ XUẤT SỬA MỤC VIẾT TẮT / MẪU TIN → ADMIN DUYỆT CHO CẢ TEAM (Duyên yêu cầu 2026-11-17)
+//  Bản sửa NỘI BỘ (cá nhân hoá) vẫn ở riêng từng máy (app Android). Muốn cả team dùng: bấm "Gửi đề xuất" → ghi 1 dòng vào sheet VietTatDeXuat
+//  + THÔNG BÁO cho MỌI admin đang hoạt động (cùng cách mẫu tin chờ duyệt: kind 'vtpropose' trong chuông CRM; extension Pancake AI / app đọc `vietTatProposals`).
+//  Admin duyệt → áp vào đích: mục 'tpl_<id>' (CRM · Mẫu tin) = cập nhật nội dung + viết tắt của MẪU TIN; mục VietTat chung = cập nhật abbr/keyword/options;
+//  không có đích = TẠO MỤC CHUNG MỚI. Từ chối kèm lý do; người đề xuất xem trạng thái qua `vietTatProposals` (app hiện "Đề xuất của tôi").
+//  Chỉ gửi được CHỮ (hình/ghi âm của mục chung giữ nguyên). Người gửi chưa đăng nhập (app) xác định bằng TÊN (by=) — vô hại vì phải qua admin duyệt; tối đa 20 đề xuất chờ/người.
+// ═══════════════════════════════════════════════════════════════
+var SH_VT_PROP = 'VietTatDeXuat';
+var VT_PROP_HEADERS = ['id', 'targetId', 'kind', 'nhom', 'abbr', 'keyword', 'options', 'proposer', 'via', 'baseUpdatedAt', 'createdAt', 'status', 'decidedBy', 'decidedAt', 'note'];
+var VT_PROP_MAX_PENDING = 20, VT_PROP_STATUS_ = { pending: 1, approved: 1, rejected: 1 };
+function _vpTarget_(raw) {   // 'crm_tpl_12' / 'tpl_12' -> {kind:'tpl', id:'12'}; 'crm_vt_ab' / 'vt_ab' -> {kind:'vt', id:'vt_ab'}; '' -> {kind:'new'}
+  var s = String(raw == null ? '' : raw).trim().replace(/^crm_/, '');
+  if (!s) return { kind: 'new', id: '' };
+  if (/^tpl_/.test(s)) return { kind: 'tpl', id: s.slice(4) };
+  return { kind: 'vt', id: s };
+}
+function _vpRead_() {
+  var sh = getCrmSS_().getSheetByName(SH_VT_PROP), out = [];
+  if (!sh || sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, VT_PROP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var r = v[i]; if (!r[0]) continue;
+    var opts = []; try { opts = JSON.parse(String(r[6] || '[]')) || []; } catch (e) { opts = []; }
+    var st = String(r[11] || 'pending').toLowerCase(); if (!VT_PROP_STATUS_[st]) st = 'pending';
+    out.push({ row: i + 2, id: String(r[0]), targetId: String(r[1] || ''), kind: String(r[2] || 'new'), nhom: String(r[3] || ''), abbr: String(r[4] || ''), keyword: String(r[5] || ''), options: opts,
+               proposer: String(r[7] || ''), via: String(r[8] || ''), baseUpdatedAt: String(r[9] || ''), createdAt: r[10] instanceof Date ? r[10].toISOString() : String(r[10] || ''), status: st,
+               decidedBy: String(r[12] || ''), decidedAt: r[13] instanceof Date ? r[13].toISOString() : String(r[13] || ''), note: String(r[14] || '') });
+  }
+  return out;
+}
+// Nội dung HIỆN TẠI của đích (để admin so sánh + phát hiện mục chung đã đổi sau khi đề xuất). null = không còn / không hợp lệ.
+function _vpTargetCur_(kind, id) {
+  try {
+    if (kind === 'tpl') {
+      var v = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS).getDataRange().getValues();
+      for (var i = 1; i < v.length; i++) if (String(v[i][0]) === String(id)) {
+        var o = _tplRowToObj_(v[i]);
+        return { row: i + 1, status: o.status, abbr: String(v[i][15] || ''), keyword: '', options: [o.content], updatedAt: String(o.updatedAt || '') };
+      }
+    } else if (kind === 'vt') {
+      var w = getSheet_(SH_VIETTAT, VIETTAT_HEADERS).getDataRange().getValues();
+      for (var j = 1; j < w.length; j++) if (String(w[j][0]) === String(id)) {
+        var op = []; try { op = JSON.parse(String(w[j][4] || '[]')) || []; } catch (e) { op = []; }
+        return { row: j + 1, owner: String(w[j][5] || ''), abbr: String(w[j][2] || ''), keyword: String(w[j][3] || ''), options: op, updatedAt: String(w[j][7] instanceof Date ? w[j][7].toISOString() : (w[j][7] || '')) };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+function _vpApprovers_(excludeName) {   // username của mọi admin đang hoạt động (trừ người đề xuất) — cùng quy tắc _tplNotifyPending_
+  var users = []; try { users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || []; } catch (e) {}
+  var me = String(excludeName || '').trim().toLowerCase(), to = [];
+  users.forEach(function (u) {
+    if (!u || u.active === false || MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) < 0) return;
+    if (me && [u.name, u.username].some(function (x) { return String(x || '').trim().toLowerCase() === me; })) return;
+    to.push(String(u.username));
+  });
+  return to;
+}
+function _vpIsAdminName_(name) {
+  var n = String(name || '').trim(); if (!n) return false;
+  try {
+    return (readUsers_(getCrmSS_().getSheetByName(SH_USER)) || []).some(function (u) {
+      return u && u.active !== false && MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) >= 0 && (_vtSame_(u.name, n) || _vtSame_(u.username, n));
+    });
+  } catch (e) { return false; }
+}
+function _vpNotifClear_(id) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_NOTIF); if (!sh || sh.getLastRow() < 2) return 0;
+    var v = sh.getDataRange().getValues(), now = new Date().toISOString(), n = 0;
+    for (var i = 1; i < v.length; i++) if (String(v[i][3]) === 'vtpropose' && String(v[i][5]) === String(id) && !v[i][9]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    return n;
+  } catch (e) { return 0; }
+}
+function _vpNotifyAdmins_(p) {
+  try {
+    var to = _vpApprovers_(p.proposer); if (!to.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString(), rows = [];
+    var what = p.kind === 'new' ? 'đề xuất mục viết tắt MỚI' : 'đề xuất sửa mục viết tắt';
+    var txt = ('📝 ' + (p.proposer || 'Nhân viên') + ' ' + what + ' "' + p.abbr + '" — chờ bạn duyệt cho cả team').slice(0, 160);
+    to.forEach(function (u, k) { rows.push(['nt_' + Date.now() + '_vp' + k + '_' + Math.floor(Math.random() * 1000), u, p.proposer || 'Nhân viên', 'vtpropose', 'vtpropose', p.id, '', txt, now, '']); });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }   // thông báo hỏng không được làm hỏng việc gửi đề xuất
+}
+function vietTatPropose_(d, caller) {
+  d = d || {}; caller = caller || { name: '' };
+  var who = String(caller.name || '').trim().slice(0, 60);
+  if (!who) return jsonOut_({ error: 'Thiếu tên người đề xuất (đăng nhập CRM hoặc nhập Tên CS trong app).', code: 'AUTH' });
+  var abbr = String(d.abbr || '').trim();
+  if (!abbr || /\s/.test(abbr) || abbr.length > 30) return jsonOut_({ error: 'Viết tắt phải là 1 từ (không có khoảng trắng, tối đa 30 ký tự).' });
+  var stripped = 0;
+  var options = (Array.isArray(d.options) ? d.options : []).map(function (x) { return String(x == null ? '' : x).trim(); })
+    .filter(function (x) { if (/^\[\[(img|aud):/i.test(x)) { stripped++; return false; } return !!x; })   // hình/ghi âm trên máy không gửi được: bỏ, mục chung giữ hình/ghi âm của nó
+    .map(function (x) { return x.slice(0, 4000); }).slice(0, 10);
+  if (!options.length) return jsonOut_({ error: 'Thiếu nội dung chữ để đề xuất.' });
+  var tg = _vpTarget_(d.targetId), cur = null;
+  if (tg.kind !== 'new') {
+    cur = _vpTargetCur_(tg.kind, tg.id);
+    if (!cur) return jsonOut_({ error: 'Không tìm thấy mục chung để sửa (có thể đã bị xoá trên CRM). Hãy bấm ☁ CRM để cập nhật rồi thử lại.' });
+    if (tg.kind === 'vt' && cur.owner) return jsonOut_({ error: 'Chỉ đề xuất được cho mục CHUNG của team (mục riêng của người khác thì không).' });
+    if (tg.kind === 'tpl' && cur.status !== 'approved') return jsonOut_({ error: 'Mẫu tin này chưa được duyệt nên chưa đề xuất sửa được.' });
+    if (tg.kind === 'tpl' && options.length > 1) return jsonOut_({ error: 'Mục "CRM · Mẫu tin" chỉ có 1 nội dung — hãy gộp lại thành 1 đoạn, hoặc lưu thành mục riêng của bạn.' });
+  }
+  var all = _vpRead_(), mineCnt = 0, dup = null;
+  all.forEach(function (p) {
+    if (p.status !== 'pending' || !_vtSame_(p.proposer, who)) return;
+    mineCnt++;
+    if (tg.kind !== 'new' ? (p.targetId === (tg.kind === 'tpl' ? 'tpl_' + tg.id : tg.id)) : (p.kind === 'new' && p.abbr.toLowerCase() === abbr.toLowerCase())) dup = p;
+  });
+  if (!dup && mineCnt >= VT_PROP_MAX_PENDING) return jsonOut_({ error: 'Bạn đang có ' + mineCnt + ' đề xuất chờ duyệt (tối đa ' + VT_PROP_MAX_PENDING + '). Chờ admin duyệt bớt rồi gửi tiếp.' });
+  var nhom = tg.kind === 'new' ? _vtNhom_(d.nhom) : '', keyword = String(d.keyword || '').trim().slice(0, 200), now = new Date().toISOString();
+  var base = String(d.baseUpdatedAt || (cur && cur.updatedAt) || '');
+  var sh = getSheet_(SH_VT_PROP, VT_PROP_HEADERS), id;
+  var targetStored = tg.kind === 'new' ? '' : (tg.kind === 'tpl' ? 'tpl_' + tg.id : tg.id);
+  var rowVals = function (pid) { return [pid, targetStored, tg.kind, nhom, abbr, keyword, JSON.stringify(options), who, String(caller.via || ''), base, now, 'pending', '', '', '']; };
+  if (dup) {   // gửi lại cho cùng mục: cập nhật đề xuất cũ (không nhân đôi), báo lại admin
+    id = dup.id; sh.getRange(dup.row, 1, 1, VT_PROP_HEADERS.length).setValues([rowVals(id)]); _vpNotifClear_(id);
+  } else {
+    id = 'vp_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    sh.getRange(sh.getLastRow() + 1, 1, 1, VT_PROP_HEADERS.length).setValues([rowVals(id)]);
+  }
+  var notified = _vpNotifyAdmins_({ id: id, kind: tg.kind, abbr: abbr, proposer: who });
+  return jsonOut_({ ok: true, id: id, status: 'pending', updatedExisting: !!dup, notified: notified, strippedMedia: stripped });
+}
+function _vpOwn_(who) {
+  return _vpRead_().filter(function (p) { return _vtSame_(p.proposer, who); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+}
+// Tóm tắt cho app/extension: đề xuất CỦA MÌNH (trạng thái) + số đề xuất chờ duyệt nếu người gọi là admin.
+function _vpSummaryFor_(caller) {
+  var who = String((caller && caller.name) || '').trim(), out = { own: [], adminPending: null };
+  if (who) out.own = _vpOwn_(who).slice(0, 30).map(function (p) { return { id: p.id, targetId: p.targetId, abbr: p.abbr, status: p.status, note: p.note, createdAt: p.createdAt, decidedAt: p.decidedAt }; });
+  if ((caller && caller.priv) || _vpIsAdminName_(who)) out.adminPending = _vpRead_().filter(function (p) { return p.status === 'pending'; }).length;
+  return out;
+}
+function vietTatProposalsList_(caller) {
+  caller = caller || { name: '', priv: false };
+  var all = _vpRead_();
+  if (caller.priv) {
+    var pend = all.filter(function (p) { return p.status === 'pending'; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    var done = all.filter(function (p) { return p.status !== 'pending'; }).sort(function (a, b) { return String(b.decidedAt || b.createdAt).localeCompare(String(a.decidedAt || a.createdAt)); }).slice(0, 30);
+    var items = pend.concat(done).map(function (p) {
+      var tg = p.kind === 'new' ? null : _vpTargetCur_(p.kind, p.kind === 'tpl' ? String(p.targetId).replace(/^tpl_/, '') : p.targetId);
+      return { id: p.id, targetId: p.targetId, kind: p.kind, nhom: p.nhom, abbr: p.abbr, keyword: p.keyword, options: p.options, proposer: p.proposer, via: p.via, createdAt: p.createdAt, status: p.status, decidedBy: p.decidedBy, decidedAt: p.decidedAt, note: p.note,
+               target: tg ? { abbr: tg.abbr, keyword: tg.keyword, options: tg.options, updatedAt: tg.updatedAt } : null, targetMissing: p.kind !== 'new' && !tg,
+               conflict: !!(tg && p.baseUpdatedAt && tg.updatedAt && String(tg.updatedAt) > String(p.baseUpdatedAt)) };
+    });
+    return { ok: true, admin: true, pending: pend.length, items: items };
+  }
+  var who = String(caller.name || '').trim();
+  if (!who) return { error: 'Cần đăng nhập CRM hoặc nhập tên CS.', code: 'AUTH' };
+  var own = _vpOwn_(who).slice(0, 50).map(function (p) { return { id: p.id, targetId: p.targetId, kind: p.kind, abbr: p.abbr, keyword: p.keyword, options: p.options, createdAt: p.createdAt, status: p.status, decidedBy: p.decidedBy, decidedAt: p.decidedAt, note: p.note }; });
+  return { ok: true, admin: false, pending: own.filter(function (p) { return p.status === 'pending'; }).length, items: own };
+}
+function vietTatDecide_(d, caller) {
+  if (!caller || !caller.priv) return jsonOut_({ error: 'Chỉ admin mới duyệt được đề xuất viết tắt.', code: 'FORBIDDEN' });
+  d = d || {};
+  var decision = String(d.decision || '').toLowerCase();
+  if (decision !== 'approve' && decision !== 'reject') return jsonOut_({ error: 'decision phải là approve hoặc reject' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return jsonOut_({ error: 'Hệ thống đang bận, thử lại sau vài giây.' });
+  try {
+    var p = _vpRead_().filter(function (x) { return x.id === String(d.id || ''); })[0];
+    if (!p) return jsonOut_({ error: 'Không tìm thấy đề xuất.' });
+    if (p.status !== 'pending') return jsonOut_({ error: 'Đề xuất này đã được xử lý (' + p.status + ').' });
+    var sh = getSheet_(SH_VT_PROP, VT_PROP_HEADERS), now = new Date(), applied = '';
+    if (decision === 'approve') {
+      var r = _vpApply_(p, caller);
+      if (r.error) return jsonOut_({ error: r.error });
+      applied = r.applied;
+    }
+    var st = decision === 'approve' ? 'approved' : 'rejected';
+    sh.getRange(p.row, 12, 1, 4).setValues([[st, caller.name, now.toISOString(), decision === 'reject' ? String(d.note || '').trim().slice(0, 300) : '']]);
+    _vpNotifClear_(p.id);   // đã xử lý (ở CRM hoặc Pancake AI) → thông báo của MỌI admin chuyển "đã đọc"
+    return jsonOut_({ ok: true, id: p.id, status: st, applied: applied });
+  } finally { try { lock.releaseLock(); } catch (e9) {} }
+}
+// Áp đề xuất đã duyệt vào đích. Trả {applied} hoặc {error}.
+function _vpApply_(p, decider) {
+  var now = new Date();
+  if (p.kind === 'tpl') {
+    var tid = String(p.targetId).replace(/^tpl_/, ''), cur = _vpTargetCur_('tpl', tid);
+    if (!cur) return { error: 'Mẫu tin gốc không còn — không thể áp đề xuất.' };
+    var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+    sh.getRange(cur.row, 3).setValue(String(p.options[0] || ''));            // content
+    sh.getRange(cur.row, 7).setValue(now);                                   // updatedAt
+    if (p.abbr) sh.getRange(cur.row, 16).setValue(p.abbr);                   // abbr
+    return { applied: 'tpl' };
+  }
+  if (p.kind === 'vt') {
+    var cv = _vpTargetCur_('vt', p.targetId);
+    if (!cv) return { error: 'Mục chung gốc không còn — không thể áp đề xuất.' };
+    var sv = getSheet_(SH_VIETTAT, VIETTAT_HEADERS);
+    sv.getRange(cv.row, 3, 1, 3).setValues([[p.abbr, p.keyword, JSON.stringify(p.options)]]);   // abbr, keyword, options
+    sv.getRange(cv.row, 8).setValue(now.toISOString());                                          // updatedAt
+    return { applied: 'vt' };
+  }
+  // mục MỚI → tạo mục chung
+  var res = saveVietTat_({ abbr: p.abbr, keyword: p.keyword, options: p.options, nhom: p.nhom, scope: 'team' }, { priv: true, name: decider.name, role: 'admin' });
+  var obj = null; try { obj = JSON.parse(res.getContent()); } catch (e) {}
+  if (!obj || obj.error) return { error: (obj && obj.error) || 'Không tạo được mục chung.' };
+  return { applied: 'new' };
 }

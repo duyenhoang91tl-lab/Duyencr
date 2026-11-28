@@ -244,7 +244,7 @@ async function _srMToggleRatio_(){
   var msg = turnOn
     ? 'BẬT: đơn Pos check ngược về Base. Có Base → chia theo TỶ LỆ Base, tổng luôn = giá Pos (Base lớn hơn/nhỏ hơn Pos đều co/giãn theo tỷ lệ). Không có Base → tính theo Pos.\n\nSau khi bật hãy đối chiếu lại tổng với file kế toán.\n\nBật?'
     : 'TẮT: quay về quy tắc cũ (đơn gốc Base + phần còn lại theo thẻ Pos).\n\nTắt?';
-  if (typeof confirm==='function' && !confirm(msg)) return;
+  if (typeof confirm==='function' && !(await uiConfirm(msg))) return;
   try{
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'POS_GHEP_RATIO', value: turnOn ? '1' : '0' }) });
     var j = await r.json();
@@ -317,7 +317,7 @@ async function splitFixSave_(i){
   var f = _srState.fix, o = f.data.rows[i], t = f.edits[i] !== undefined ? f.edits[i] : splitFixDefaultText_(o), p = splitFixParseLines_(t);
   if (p.errors.length) { toast('❌ ' + p.errors[0]); return; }
   if (!p.rows.length) { toast('❌ Chưa có dòng chia nào'); return; }
-  if (typeof confirm==='function' && !confirm('Lưu chia tay đơn ' + o.code + '?\n\nTổng ' + splitMoney_(p.total) + ' (giá Pos ' + splitMoney_(o.posVal) + ').\nTừ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).')) return;
+  if (typeof confirm==='function' && !(await uiConfirm('Lưu chia tay đơn ' + o.code + '?\n\nTổng ' + splitMoney_(p.total) + ' (giá Pos ' + splitMoney_(o.posVal) + ').\nTừ giờ đơn này tính theo số bạn nhập (ưu tiên hơn ghép Base).'))) return;
   try{
     var cur = await _splitFixGetExtra_();
     await _splitFixPutExtra_(splitFixMergeExtra_(cur, o.code, p.rows));
@@ -341,7 +341,7 @@ async function splitFixSaveCode_(){
   var p = splitFixParseLines_(t);
   if (p.errors.length) { toast('❌ ' + p.errors[0]); return; }
   if (!p.rows.length) { toast('❌ Chưa có dòng chia nào'); return; }
-  if (typeof confirm==='function' && !confirm('Chỉnh đè đơn ' + code + '?\n\nTổng ' + splitMoney_(p.total) + '.\nSố này sẽ ưu tiên hơn cả số trong file kế toán (xoá dòng ở danh sách "đang lưu" để quay về kế toán).')) return;
+  if (typeof confirm==='function' && !(await uiConfirm('Chỉnh đè đơn ' + code + '?\n\nTổng ' + splitMoney_(p.total) + '.\nSố này sẽ ưu tiên hơn cả số trong file kế toán (xoá dòng ở danh sách "đang lưu" để quay về kế toán).'))) return;
   try{
     var cur = await _splitFixGetExtra_();
     await _splitFixPutExtra_(splitFixMergeExtra_(cur, code, p.rows));
@@ -351,7 +351,7 @@ async function splitFixSaveCode_(){
   }catch(e){ toast('❌ Chưa lưu được: ' + (e && e.message || e)); }
 }
 async function splitFixDelete_(code){
-  if (typeof confirm==='function' && !confirm('Xoá chia tay đơn ' + code + ' khỏi bảng CRM? (đơn quay về tự động theo Base; dòng ở tab onl của kế toán không bị xoá)')) return;
+  if (typeof confirm==='function' && !(await uiConfirm('Xoá chia tay đơn ' + code + ' khỏi bảng CRM? (đơn quay về tự động theo Base; dòng ở tab onl của kế toán không bị xoá)'))) return;
   try{
     var cur = await _splitFixGetExtra_();
     await _splitFixPutExtra_(splitFixRemoveCode_(cur, code));
@@ -406,7 +406,7 @@ async function _srMToggleGhep_(){
   var msg = turnOn
     ? 'BẬT: đơn Pos có từ 1 mã bộ đếm trở lên sẽ chia tiền theo sale và giá của đơn gốc Base.\n\nLưu ý: tháng 9 ghép cả đơn 1 mã từng làm tổng lệch 18.986.000đ so với file kế toán. Sau khi bật hãy đối chiếu lại tổng với file kế toán.\n\nBật?'
     : 'TẮT: chỉ đơn Pos có từ 2 mã bộ đếm trở lên mới ghép Base (quy tắc chốt tháng 10), đơn 0–1 mã chia theo thẻ Pos.\n\nTắt?';
-  if (typeof confirm==='function' && !confirm(msg)) return;
+  if (typeof confirm==='function' && !(await uiConfirm(msg))) return;
   try{
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'POS_GHEP_MIN_CODES', value: turnOn ? '1' : '2' }) });
     var j = await r.json();

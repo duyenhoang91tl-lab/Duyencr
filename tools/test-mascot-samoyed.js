@@ -300,7 +300,7 @@ ok(e.els.length === 1, 'nạp lại không nhân đôi canvas');
 
 // 9) Nối đúng vào menu / trang cấu hình / index.html
 const sn = fs.readFileSync(path.join(root, 'js/29-sidenav.js'), 'utf8');
-ok(/'act:sakura','act:mascot','act:garden','act:errlog'/.test(sn), 'menu Settings có act:mascot + act:garden');
+ok(/k:'ui',[^\n]*ids:\[[^\]]*'act:mascot','act:garden'/.test(sn), 'menu nhóm Giao diện & trợ giúp (k ui) có act:mascot + act:garden');
 const gLine = sn.split('\n').find(l => /^\s*garden:\s*\{/.test(l)) || '';
 ok(/f:'toggleGarden'/.test(gLine) && /open:true/.test(gLine) && !/admin:true/.test(gLine), 'ACTS.garden gọi toggleGarden, mọi vai trò');
 const mLine = sn.split('\n').find(l => /^\s*mascot:\s*\{/.test(l)) || '';

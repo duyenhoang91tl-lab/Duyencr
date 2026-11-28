@@ -7,7 +7,7 @@ const info = { ok: true, own: ['Mai'], teams: ['A'], members: ['Lan', 'Minh'], v
   { id: '1', date: '2026-11-20 03:00', csName: 'Mai', label: 'T4', phones: ['0900000001', '0900000002', '0900000003', '0900000004', '0900000005'], donePhones: [] },
   { id: '2', date: '2026-11-21 03:00', csName: 'lan', label: 'x', phones: ['0900000001', '0900000002'], donePhones: ['0900000002'] }] };
 w.esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-w.currentUser = { role: 'leader', name: 'Mai' }; w.gsUrl = 'https://gas.test/exec'; w.assignHistory = []; w.saveLS = () => {}; w.toast = m => toasts.push(m); w.confirm = () => true;
+w.currentUser = { role: 'leader', name: 'Mai' }; w.gsUrl = 'https://gas.test/exec'; w.assignHistory = []; w.saveLS = () => {}; w.toast = m => toasts.push(m); w.confirm = () => true; w.uiConfirm = async () => true;
 w._assignCustMap = () => new Map([['0900000001', { name: 'An', careStatus: 'Đã gọi' }]]);
 let care = null; w._applyCareCSToAssigned = e => { care = e; };
 w.fetch = async (u, o) => { if (o && o.method === 'POST') { const b = JSON.parse(o.body); sent.push(b); return { json: async () => ({ ok: true, total: b.entries.reduce((s, e) => s + e.phones.length, 0), entries: b.entries.map((e, i) => ({ id: 'n' + i, date: '2026-11-26 04:00', csName: e.csName, label: 'Lead', phones: e.phones, donePhones: [] })) }) }; } return { json: async () => JSON.parse(JSON.stringify(info)) }; };

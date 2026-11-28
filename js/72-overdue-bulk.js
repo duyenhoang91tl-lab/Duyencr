@@ -55,12 +55,12 @@ function obDecorate(){
     '<div class="ob-cs"><span class="ob-cs-t">Tồn theo CS:</span>' + cs.map(function(c){ return '<button type="button" class="ob-cs-b" data-ob="cs" data-cs="' + obEsc_(c.name) + '">' + obEsc_(c.name) + ' <b>' + c.ids.length + '</b></button>'; }).join('') + '</div>';
   grid.insertBefore(bar, grid.firstChild);
 }
-function obMoveSelected(newDate){
+async function obMoveSelected(newDate){
   var today = scYmd_(new Date()), items = obItems_();
   var plan = obPlan_(items, _ob.sel, newDate, today);
   if (!plan.movable.length){ scToast_(plan.skippedCount ? 'Không dời được: ' + Object.keys(plan.skipped).join('; ') : 'Chưa chọn lịch nào'); return; }
   var msg = 'Dời ' + plan.movable.length + ' lịch sang ' + newDate + '?' + (plan.skippedCount ? '\n(Bỏ qua ' + plan.skippedCount + ' lịch không dời được: ' + Object.keys(plan.skipped).join('; ') + ')' : '');
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm(msg))) return;
   var phones = {}, cur = schedules;
   plan.movable.forEach(function(id){
     var it = cur.filter(function(x){ return x.id === id; })[0]; if (!it) return;

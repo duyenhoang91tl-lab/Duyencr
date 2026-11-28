@@ -6,7 +6,7 @@ let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); i
 const names = ['splitFixEditSaved_', 'splitEsc_', 'splitMoney_', 'splitKitOn_', 'splitStateChip_', 'splitErrColor_', 'splitToneColor_', 'splitFixCodeNy_', 'splitFixParseLines_', 'splitFixRemoveCode_', 'splitFixMergeExtra_', 'splitFixDefaultText_', 'splitFixSumHtml_', 'splitFixPanelHtml_', 'splitFixEdit_'];
 const asyncNames = ['_splitFixGetExtra_', '_splitFixPutExtra_', 'splitFixSave_', 'splitFixSaveCode_', 'splitFixDelete_'];
 let DOMV = {}, SETTING = '', POSTS = [], TOASTS = [], CONFIRM = true, LOADS = 0;
-const ctx = { _srState: { fixOpen: true, mDateFrom: '2026-10-01', mDateTo: '2026-10-31' }, _srIsAdmin_: () => true, gsUrl: 'http://gs', toast: m => TOASTS.push(m), confirm: () => CONFIRM,
+const ctx = { _srState: { fixOpen: true, mDateFrom: '2026-10-01', mDateTo: '2026-10-31' }, _srIsAdmin_: () => true, gsUrl: 'http://gs', toast: m => TOASTS.push(m), confirm: () => CONFIRM, uiConfirm: async () => CONFIRM,
   _srFetch: async (a) => a === 'getSetting' ? { value: SETTING } : null, _srLoad: () => { LOADS++; }, splitFixLoad_: () => {}, JSON, console, document: { getElementById: (id) => DOMV[id] || null },
   fetch: async (u, o) => { const b = JSON.parse(o.body); POSTS.push(b); if (b.action === 'setSetting') SETTING = b.value; return { json: async () => ({ ok: true }) }; } };
 vm.createContext(ctx);
