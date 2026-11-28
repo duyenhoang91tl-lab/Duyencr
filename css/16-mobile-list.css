@@ -17,7 +17,6 @@
   #ymf-bar .ymf-label{white-space:nowrap;}
 
   /* 2) "Cột hiển thị" chiếm 4 hàng chỉ vì nhãn xuống dòng; ít khi dùng → ẩn cùng khối "Tổng quan & tác vụ" (bấm thanh đó để mở, như 6 ô thống kê và thanh tác vụ) */
-  body.lov-on-list:not(.lov-open) #tab-list > .col-toggle-bar{display:none !important;}
   .col-toggle-bar{padding:4px 10px;}
   .col-toggle-bar .ymf-label{white-space:nowrap;}
 
@@ -88,3 +87,15 @@
   html body #main-table td.col-name .cm-btn{flex:0 0 auto;padding:3px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;}
   html body #main-table td.col-name .cm-btn:active{background:var(--border);}
 }
+
+/* ═══ DANH SÁCH KH GỌN HƠN TRÊN MÁY TÍNH (Duyên 2026-11-28: "đơn giản chuyên nghiệp dễ sử dụng", bước 1) ═══
+   NGUYÊN NHÂN GỐC: trước bảng khách có ~340px đầu trang: thanh Tổng quan · 6 ô thống kê (mở sẵn trên màn rộng) · thanh công cụ · 2 hàng lọc ngày/giờ · hàng 15+ ô "Cột hiển thị"
+   → chỉ thấy ~7 dòng khách, người mới không biết bắt đầu từ đâu. CÁCH SỬA (chỉ đổi MẶC ĐỊNH, không xoá tính năng, ai đã chọn mở thì giữ):
+   - 6 ô thống kê: thu gọn mặc định (js/05 _lovIsOpen_), bấm thanh "Tổng quan" để mở như cũ.
+   - Thanh công cụ (sắp xếp, chiến dịch, Thêm KH/đơn, Xuất CSV): máy tính (>900px) LUÔN hiện kể cả khi thanh Tổng quan thu gọn (điện thoại giữ như cũ: nằm sau thanh Tổng quan).
+   - "📋 Cột hiển thị": ẩn mặc định ở mọi cỡ màn hình, mở bằng nút cạnh "Lọc nâng cao" (js/05 toggleColBar, body.cols-open). */
+@media (min-width:901px){
+  body.lov-on-list:not(.lov-open) #tab-list > .toolbar{display:flex !important;}
+}
+#tab-list > .col-toggle-bar{display:none;}
+body.cols-open #tab-list > .col-toggle-bar{display:flex;}

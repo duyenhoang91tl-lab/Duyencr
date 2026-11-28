@@ -120,18 +120,27 @@ function switchTab(tab, el) {
 }
 
 // ── Thanh "Tổng quan & tác vụ" của tab Danh sách KH (xem css/01-base.css, khối .lov-bar) ──
-// Mở/đóng được nhớ trong localStorage 'ome_list_ov_open' ('1' mở, '0' đóng). Chưa chọn lần nào: màn hình hẹp (<=900px) thu gọn, màn rộng mở sẵn.
+// Mở/đóng được nhớ trong localStorage 'ome_list_ov_open' ('1' mở, '0' đóng). Chưa chọn lần nào: THU GỌN ở mọi màn hình (trước đây màn rộng mở sẵn → ~110px
+// đầu trang bị 6 ô thống kê chiếm, người mới không biết bắt đầu từ đâu; số liệu đó đã có ở trang Tổng quan). Ai đã chọn mở ('1') thì giữ nguyên.
+// Máy tính (>900px): thanh công cụ (sắp xếp, chiến dịch, Thêm KH, Xuất CSV) LUÔN hiện, chỉ 6 ô thống kê được thu gọn (css/16).
 function _lovIsOpen_() {
   var v = null; try { v = localStorage.getItem('ome_list_ov_open'); } catch (e) {}
-  if (v === '1') return true;
-  if (v === '0') return false;
-  return !(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+  return v === '1';
+}
+// Thanh "📋 Cột hiển thị" (15+ ô chọn cột): ẩn mặc định, mở bằng nút cạnh "Lọc nâng cao"; nhớ lựa chọn trong 'ome_list_cols_open' ('1' mở).
+function _colsIsOpen_() { try { return localStorage.getItem('ome_list_cols_open') === '1'; } catch (e) { return false; } }
+function toggleColBar() {
+  try { localStorage.setItem('ome_list_cols_open', _colsIsOpen_() ? '0' : '1'); } catch (e) {}
+  _lovSync_();
 }
 function _lovSync_() {
   var list = document.getElementById('tab-list');
   var onList = !!list && list.style.display !== 'none';
   document.body.classList.toggle('lov-on-list', onList);
   document.body.classList.toggle('lov-open', _lovIsOpen_());
+  var co = _colsIsOpen_();
+  document.body.classList.toggle('cols-open', co);
+  var cb = document.getElementById('col-toggle-btn'); if (cb) cb.textContent = '📋 Cột hiển thị ' + (co ? '▴' : '▾');
   _lovSum_();
 }
 function _lovSum_() {
