@@ -17,6 +17,7 @@ function doGet(e) {
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
   if (LOYALTY_GET_ACTIONS_[action] === 1) return loyaltyDoGet_(action, p);
+  if (TICKET_GET_ACTIONS_[action] === 1) return ticketDoGet_(action, p);   // Ticket (token): danh sach
   if (KPICOMMIT_GET_ACTIONS_[action] === 1) return kpiCommitDoGet_(action, p);   // KPI tu cam ket (token): danh sach theo thang   // diem tich luy + lich su hang khach (token, moi tai khoan dang nhap)
   if (CRM_ORDER_GET_ACTIONS_[action] === 1) return crmOrderDoGet_(action, p);   // danh sach Don CRM (sheet rieng, token): admin xem tat ca, tai khoan khac chi don cua minh
   if (KENH_GET_ACTIONS_[action] === 1) return kenhDoGet_(action, p);   // Don cac kenh theo giai doan kieu Base (sheet rieng 'Don Kenh', token)

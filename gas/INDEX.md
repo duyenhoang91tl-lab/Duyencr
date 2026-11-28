@@ -148,8 +148,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `LOYALTY_SECTION_`, `LOYALTY_DEFAULT_`, `SH_LOYALTY_`, `LOYALTY_HEADERS_`, `SH_LOYALTY_TIER_`, `LOYALTY_TIER_HEADERS_`, `LOYALTY_GET_ACTIONS_`, `LOYALTY_POST_ACTIONS_`, `LOYALTY_BENEFIT_DEFAULT_`, `LOYALTY_CRM_VALID_STATUS_`, `LOYALTY_LEVEL_LABEL_`
 
 ## 34b_Ticket.gs
-- Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`
-- Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`
+- Hàm: `_ticketHm_`, `_ticketMin_`, `_ticketCfgNormalize_`, `_ticketDueMs_`, `_ticketInOfficeHours_`, `_ticketReplyDueMs_`, `_ticketStatus_`, `_ticketOwners_`, `_ticketIsMgr_`, `_ticketRowToObj_`, `_ticketReadAll_`, `_ticketWriteRow_`, `_ticketVisible_`, `ticketDoGet_`, `ticketDoPost_`
+- Hằng/biến: `TICKET_SECTION_`, `TICKET_VN_OFFSET_MS_`, `TICKET_TYPES_`, `TICKET_DEFAULT_`, `SH_TICKET_`, `TICKET_HEADERS_`, `TICKET_GET_ACTIONS_`, `TICKET_POST_ACTIONS_`
 
 ## 34c_CommClose.gs
 - Hàm: `_commPeriodOf_`, `_commNextPeriod_`, `_commPeriodState_`, `_commSettle_`, `_commLedgerRows_`
